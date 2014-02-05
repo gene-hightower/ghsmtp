@@ -1,0 +1,16 @@
+*.o
+*.d
+smtp.cpp
+smtp.hpp
+stack.hh
+dns2
+smtp
+smtpd
+DNSt
+Mailboxt
+Messaget
+Nowt
+Pillt
+Sessiont
+SockBuffert
+Sockt
