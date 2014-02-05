@@ -1,0 +1,471 @@
+/*
+    This file is part of ghsmtp - Gene's simple SMTP server.
+    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef SESSION_DOT_HPP
+#define SESSION_DOT_HPP
+
+#include <iostream>
+#include <random>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include <sys/utsname.h>
+
+#include <boost/algorithm/string/predicate.hpp>
+
+#include "DNS.hpp"
+#include "Mailbox.hpp"
+#include "Message.hpp"
+#include "Sock.hpp"
+
+namespace Config {
+constexpr const char* const bad_recipients[] = { "nobody", "mixmaster" };
+
+constexpr const char* const rbls[] = { "zen.spamhaus.org",
+                                       "b.barracudacentral.org" };
+
+constexpr auto greeting_max_wait_ms = 10000;
+constexpr auto greeting_min_wait_ms = 500;
+}
+
+class Session {
+public:
+  Session(Session const&) = delete;
+  Session& operator=(Session const&) = delete;
+
+  explicit Session(int fd_in = STDIN_FILENO, int fd_out = STDOUT_FILENO,
+                   std::string const& fqdn = "");
+
+  void greeting();
+  void ehlo(std::string const& client_identity);
+  void helo(std::string const& client_identity);
+  void mail_from(Mailbox const& reverse_path,
+                 std::unordered_map<std::string, std::string> parameters);
+  void rcpt_to(Mailbox const& forward_path);
+  void data();
+  void rset();
+  void noop();
+  void vrfy();
+  void help();
+  void quit();
+  void error(std::string const& msg);
+  void time();
+
+  bool timed_out();
+  std::istream& in();
+
+private:
+  std::ostream& out();
+
+  void exit(int status);
+  void reset();
+  bool verify_client(std::string const& client_identity);
+  bool verify_recipient(Mailbox const& recipient);
+  bool verify_sender(Mailbox const& sender);
+
+private:
+  Sock sock_;
+
+  std::string fqdn_;                  // Who we identify as.
+  std::string fcrdns_;                // Who they look-up as.
+  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
+  std::string client_identity_;       // ehlo/helo
+  Mailbox reverse_path_;              // "mail from"
+  std::vector<Mailbox> forward_path_; // for each "rcpt to"
+
+  char const* protocol_;
+
+  std::random_device rd_;
+
+  bool reverse_path_verified_;
+};
+
+inline Session::Session(int fd_in, int fd_out, std::string const& fqdn)
+  : sock_(fd_in, fd_out)
+  , fqdn_(fqdn)
+  , protocol_("")
+  , reverse_path_verified_(false)
+{
+  if (fqdn_.empty()) {
+    utsname un;
+    PCHECK(uname(&un) == 0);
+    fqdn_ = un.nodename;
+
+    if (fqdn_.find('.') == std::string::npos) {
+      if (sock_.us_c_str()[0]) {
+        std::ostringstream ss;
+        ss << "[" << sock_.us_c_str() << "]";
+        fqdn_ = ss.str();
+      }
+    } else {
+      std::transform(fqdn_.begin(), fqdn_.end(), fqdn_.begin(), ::tolower);
+    }
+  }
+}
+
+inline void Session::greeting()
+{
+  if (sock_.has_peername()) {
+
+    using namespace DNS;
+    Resolver res;
+
+    std::string reversed{ reverse_ip4(sock_.them_c_str()) };
+
+    // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
+    std::vector<std::string> ptrs =
+        get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
+
+    for (auto ptr : ptrs) {
+      // chop off the trailing '.'
+      int last = ptr.length() - 1;
+      if ((-1 != last) && ('.' == ptr.at(last))) {
+        ptr.erase(last, 1);
+      }
+      std::vector<std::string> addrs = get_records<RR_type::A>(res, ptr);
+
+      for (const auto addr : addrs) {
+        if (addr == sock_.them_c_str()) {
+          fcrdns_ = ptr;
+          client_ = "(" + fcrdns_ + " [";
+          client_ += sock_.them_c_str();
+          client_ += "])";
+          goto check_holes; // We have found FCRDNS, skip forward.
+        }
+      }
+    }
+
+    // We have _not_ found FCRDNS for this address.
+
+    client_ = "(unknown [";
+    client_ += sock_.them_c_str();
+    client_ += "])";
+
+  check_holes:
+
+    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+    for (const auto rbl : Config::rbls) {
+      if (has_record<RR_type::A>(res, reversed + rbl)) {
+        out() << "554 blocked by " << rbl << std::endl;
+        SYSLOG(ERROR) << sock_.them_c_str() << " blocked by " << rbl;
+        this->exit(2);
+      }
+    }
+
+    // Wait a (random) bit of time for pre-greeting traffic.
+
+    std::uniform_int_distribution<> uni_dist(Config::greeting_min_wait_ms,
+                                             Config::greeting_max_wait_ms);
+
+    std::chrono::milliseconds wait{ uni_dist(rd_) };
+
+    if (sock_.input_pending(wait)) {
+      out() << "554 input before greeting\r\n" << std::flush;
+      SYSLOG(ERROR) << "pregreeting traffic from " << sock_.them_c_str();
+      this->exit(3);
+    }
+  }
+
+  SYSLOG(INFO) << "connect from " << client_;
+
+  out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
+}
+
+inline void Session::ehlo(std::string const& client_identity)
+{
+  if (verify_client(client_identity)) {
+    protocol_ = "ESMTP";
+    reset();
+    client_identity_ = client_identity;
+    out() << "250-" << fqdn_ << "\r\n"
+          << "250-PIPELINING\r\n"
+          << "250 8BITMIME\r\n" << std::flush;
+    if (sock_.has_peername()) {
+      SYSLOG(INFO) << "ehlo from " << client_ << " claiming "
+                   << client_identity;
+    } else {
+      SYSLOG(INFO) << "ehlo claiming " << client_identity;
+    }
+  }
+}
+
+inline void Session::helo(std::string const& client_identity)
+{
+  if (verify_client(client_identity)) {
+    protocol_ = "SMTP";
+    reset();
+    client_identity_ = client_identity;
+    out() << "250 " << fqdn_ << "\r\n" << std::flush;
+    if (sock_.has_peername()) {
+      SYSLOG(INFO) << "helo from " << client_ << " claiming "
+                   << client_identity;
+    } else {
+      SYSLOG(INFO) << "helo claiming " << client_identity;
+    }
+  }
+}
+
+inline void
+Session::mail_from(Mailbox const& reverse_path,
+                   std::unordered_map<std::string, std::string> parameters)
+{
+  if (client_identity_.empty()) {
+    out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
+    SYSLOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
+                    << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  }
+
+  // Take a look at the optional parameters:
+  for (auto& p : parameters) {
+    if (p.first == "BODY") {
+      if (p.second == "8BITMIME") {
+        // everything is cool, this is our default...
+      } else if (p.second == "7BIT") {
+        SYSLOG(WARNING) << "7BIT transport requested";
+      } else {
+        SYSLOG(WARNING) << "unrecognized BODY type \"" << p.second
+                        << "\" requested";
+      }
+    } else {
+      SYSLOG(WARNING) << "unrecognized MAIL parameter " << p.first << "="
+                      << p.second;
+    }
+  }
+
+  if (verify_sender(reverse_path)) {
+    reset();
+    reverse_path_ = reverse_path;
+    out() << "250 mail ok\r\n" << std::flush;
+  }
+}
+
+inline void Session::rcpt_to(Mailbox const& forward_path)
+{
+  if (!reverse_path_verified_) {
+    out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
+    SYSLOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
+                    << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  }
+
+  if (verify_recipient(forward_path)) {
+    forward_path_.push_back(forward_path);
+    out() << "250 rcpt ok\r\n" << std::flush;
+  }
+}
+
+inline void Session::data()
+{
+  if (!reverse_path_verified_) {
+    out() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
+    LOG(WARNING) << "data with empty reverse path";
+    return;
+  }
+
+  if (forward_path_.empty()) {
+    out() << "554 no valid recipients\r\n" << std::flush;
+    LOG(WARNING) << "data with no forward paths";
+    return;
+  }
+
+  Message msg(fqdn_, rd_);
+
+  // The headers Return-Path, X-Original-To and Received are added to
+  // the top of the message.
+
+  std::ostringstream headers;
+  headers << "Return-Path: " << reverse_path_ << std::endl;
+
+  headers << "X-Original-To: " << forward_path_[0] << std::endl;
+  for (size_t i = 1; i < forward_path_.size(); ++i) {
+    headers << '\t' << forward_path_[i] << std::endl;
+  }
+
+  headers << "Received: from " << client_identity_;
+  if (sock_.has_peername()) {
+    headers << " " << client_;
+  }
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
+          << "\n\tfor " << forward_path_[0] << "; " << msg.when() << "\n";
+
+  msg.out() << headers.str();
+
+  out() << "354 go\r\n" << std::flush;
+
+  std::string line;
+
+  while (std::getline(sock_.in(), line)) {
+
+    int last = line.length() - 1;
+    if ((-1 == last) || ('\r' != line.at(last))) {
+      out() << "451 bare linefeed in message data\r\n" << std::flush;
+      SYSLOG(ERROR) << "bare linefeed in message with id " << msg.id();
+      this->exit(4);
+    }
+
+    line.erase(last, 1); // so eat that cr
+
+    if ("." == line) { // just a dot is <cr><lf>.<cr><lf>
+      msg.save();
+      SYSLOG(INFO) << "message delivered with id " << msg.id();
+      out() << "250 data ok\r\n" << std::flush;
+      return;
+    }
+
+    line += '\n'; // add system standard newline
+    if ('.' == line.at(0))
+      line.erase(0, 1); // eat leading dot
+
+    msg.out() << line;
+  }
+
+  if (sock_.timed_out())
+    time();
+
+  out() << "554 data NOT ok\r\n" << std::flush;
+}
+
+inline void Session::rset()
+{
+  reset();
+  out() << "250 ok\r\n" << std::flush;
+}
+
+inline void Session::noop()
+{
+  out() << "250 nook\r\n" << std::flush;
+}
+
+inline void Session::vrfy()
+{
+  out() << "252 try it\r\n" << std::flush;
+}
+
+inline void Session::help()
+{
+  out() << "214-see https://digilicious.com/smtp.html\r\n"
+        << "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n" << std::flush;
+}
+
+inline void Session::quit()
+{
+  out() << "221 bye\r\n" << std::flush;
+  this->exit(0);
+}
+
+inline void Session::error(std::string const& msg)
+{
+  out() << "500 command unrecognized\r\n" << std::flush;
+  SYSLOG(WARNING) << msg;
+}
+
+inline void Session::time()
+{
+  out() << "554 timeout\r\n" << std::flush;
+  SYSLOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "")
+                << client_;
+  this->exit(1);
+}
+
+inline bool Session::timed_out()
+{
+  return sock_.timed_out();
+}
+
+inline std::istream& Session::in()
+{
+  return sock_.in();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+inline std::ostream& Session::out()
+{
+  return sock_.out();
+}
+
+inline void Session::exit(int status)
+{
+  SYSLOG(INFO) << "exit status " << status;
+  ::exit(status);
+}
+
+inline void Session::reset()
+{
+  reverse_path_.clear();
+  forward_path_.clear();
+}
+
+//...........................................................................
+
+// All of the verify_* functions send their own error messages back to
+// the client.
+
+inline bool Session::verify_client(std::string const& client_identity)
+{
+  if ((!fcrdns_.empty()) && (!boost::iequals(fcrdns_, client_identity))) {
+    SYSLOG(WARNING) << "this client has fcrdns (" << fcrdns_ << ") yet claims "
+                    << client_identity;
+  }
+  if (DNS::is_dotted_quad(client_identity.c_str()) &&
+      (client_identity != sock_.them_c_str())) {
+    SYSLOG(WARNING) << "client claiming false IP address";
+  }
+  // Bogus clients claim to be us or some local host.
+  if (boost::iequals(client_identity, fqdn_) ||
+      boost::iequals(client_identity, "localhost") ||
+      boost::iequals(client_identity, "localhost.localdomain")) {
+    out() << "554 liar\r\n" << std::flush;
+    SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
+                    << client_ << " claiming " << client_identity;
+    return false;
+  }
+  return true;
+}
+
+inline bool Session::verify_recipient(Mailbox const& recipient)
+{
+  // Make sure the domain matches.
+  if (!recipient.domain_is(fqdn_)) {
+    out() << "554 relay access denied\r\n" << std::flush;
+    LOG(WARNING) << "relay access denied for " << recipient;
+    return false;
+  }
+
+  // Check for local addresses we reject.
+  for (const auto bad_recipient : Config::bad_recipients) {
+    if (recipient.local_part_is(bad_recipient)) {
+      out() << "" << std::flush;
+      LOG(WARNING) << "bad recipient " << recipient;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+inline bool Session::verify_sender(Mailbox const& sender)
+{
+  // look up SPF & DMARC records...
+  reverse_path_verified_ = true;
+  return true;
+}
+
+#endif // SESSION_DOT_HPP
