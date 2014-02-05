@@ -1,7 +1,7 @@
 Gene's simple SMTP server.  A (hopefully) simple program to receive
 Internet (RFC 5321) mail.
 
-Free software — AGPLv3
+Free software — AGPLv3+
 
 Written using Standard C++ — plus boost, ldns, gflags and glog.
 Compiles with GCC 4.8.2 and clang 3.4.  Needs Bison >3.0.
