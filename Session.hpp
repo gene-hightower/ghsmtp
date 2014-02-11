@@ -173,7 +173,7 @@ inline void Session::greeting()
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     for (const auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
-        out() << "554 blocked by " << rbl << std::endl;
+        out() << "421 blocked by " << rbl << std::endl;
         SYSLOG(ERROR) << sock_.them_c_str() << " blocked by " << rbl;
         this->exit(Config::exit_black_hole);
       }
@@ -187,7 +187,7 @@ inline void Session::greeting()
     std::chrono::milliseconds wait{ uni_dist(rd_) };
 
     if (sock_.input_pending(wait)) {
-      out() << "554 input before greeting\r\n" << std::flush;
+      out() << "421 input before greeting\r\n" << std::flush;
       SYSLOG(ERROR) << "pregreeting traffic from " << sock_.them_c_str();
       this->exit(Config::exit_pregreeting_traffic);
     }
@@ -332,7 +332,7 @@ inline void Session::data()
 
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
-      out() << "451 bare linefeed in message data\r\n" << std::flush;
+      out() << "421 bare linefeed in message data\r\n" << std::flush;
       SYSLOG(ERROR) << "bare linefeed in message with id " << msg.id();
       this->exit(Config::exit_bare_linefeed);
     }
@@ -469,7 +469,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (recipient.local_part_is(bad_recipient)) {
-      out() << "550 no such mailbox" << std::flush;
+      out() << "550 no such mailbox " << recipient << std::flush;
       LOG(WARNING) << "no such mailbox " << recipient;
       return false;
     }
