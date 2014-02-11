@@ -65,7 +65,8 @@ public:
   void helo(std::string const& client_identity);
   void mail_from(Mailbox const& reverse_path,
                  std::unordered_map<std::string, std::string> parameters);
-  void rcpt_to(Mailbox const& forward_path);
+  void rcpt_to(Mailbox const& forward_path,
+               std::unordered_map<std::string, std::string> parameters);
   void data();
   void rset();
   void noop();
@@ -264,7 +265,8 @@ Session::mail_from(Mailbox const& reverse_path,
   }
 }
 
-inline void Session::rcpt_to(Mailbox const& forward_path)
+inline void Session::rcpt_to(Mailbox const& forward_path,
+                             std::unordered_map<std::string, std::string> parameters)
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
@@ -273,6 +275,11 @@ inline void Session::rcpt_to(Mailbox const& forward_path)
     return;
   }
 
+  // Take a look at the optional parameters, we don't accept any:
+  for (auto& p : parameters) {
+    SYSLOG(WARNING) << "unrecognized RCPT TO parameter " << p.first << "="
+                    << p.second;
+  }
   if (verify_recipient(forward_path)) {
     forward_path_.push_back(forward_path);
     out() << "250 rcpt ok\r\n" << std::flush;
@@ -386,7 +393,7 @@ inline void Session::error(std::string const& msg)
 
 inline void Session::time()
 {
-  out() << "554 timeout\r\n" << std::flush;
+  out() << "421 timeout\r\n" << std::flush;
   SYSLOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "")
                 << client_;
   this->exit(Config::exit_timeout);

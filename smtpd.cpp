@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
         std::string dom(matches[2].first, matches[2].second);
 
         Mailbox rto(local, dom);
-        session.rcpt_to(rto);
+        session.rcpt_to(rto, std::unordered_map<std::string, std::string>());
       }
       continue;
     }

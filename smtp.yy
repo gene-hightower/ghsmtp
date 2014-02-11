@@ -176,7 +176,9 @@ command:
 | mail rev_path ' ' mail_parameters CRLF
                         { session.mail_from($2, $4); }
 
-| rcpt fwd_path CRLF    { session.rcpt_to($2); }
+| rcpt fwd_path CRLF    { session.rcpt_to($2, std::unordered_map<std::string, std::string>()); }
+| rcpt fwd_path ' ' mail_parameters CRLF
+                        { session.rcpt_to($2, $4); }
 
 | data CRLF             { session.data(); }
 | rset CRLF             { session.rset(); }
