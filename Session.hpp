@@ -42,6 +42,14 @@ constexpr const char* const rbls[] = { "zen.spamhaus.org",
 
 constexpr auto greeting_max_wait_ms = 10000;
 constexpr auto greeting_min_wait_ms = 500;
+
+enum exit_codes {
+  exit_success = 0,
+  exit_pregreeting_traffic = 1,
+  exit_black_hole = 2,
+  exit_bare_linefeed = 3,
+  exit_timeout = 4,
+};
 }
 
 class Session {
@@ -164,7 +172,7 @@ inline void Session::greeting()
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         out() << "554 blocked by " << rbl << std::endl;
         SYSLOG(ERROR) << sock_.them_c_str() << " blocked by " << rbl;
-        this->exit(2);
+        this->exit(Config::exit_black_hole);
       }
     }
 
@@ -178,7 +186,7 @@ inline void Session::greeting()
     if (sock_.input_pending(wait)) {
       out() << "554 input before greeting\r\n" << std::flush;
       SYSLOG(ERROR) << "pregreeting traffic from " << sock_.them_c_str();
-      this->exit(3);
+      this->exit(Config::exit_pregreeting_traffic);
     }
   }
 
@@ -317,7 +325,7 @@ inline void Session::data()
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "451 bare linefeed in message data\r\n" << std::flush;
       SYSLOG(ERROR) << "bare linefeed in message with id " << msg.id();
-      this->exit(4);
+      this->exit(Config::exit_bare_linefeed);
     }
 
     line.erase(last, 1); // so eat that cr
@@ -367,7 +375,7 @@ inline void Session::help()
 inline void Session::quit()
 {
   out() << "221 bye\r\n" << std::flush;
-  this->exit(0);
+  this->exit(Config::exit_success);
 }
 
 inline void Session::error(std::string const& msg)
@@ -381,7 +389,7 @@ inline void Session::time()
   out() << "554 timeout\r\n" << std::flush;
   SYSLOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "")
                 << client_;
-  this->exit(1);
+  this->exit(Config::exit_timeout);
 }
 
 inline bool Session::timed_out()
