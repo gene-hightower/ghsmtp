@@ -467,8 +467,8 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (recipient.local_part_is(bad_recipient)) {
-      out() << "" << std::flush;
-      LOG(WARNING) << "bad recipient " << recipient;
+      out() << "550 no such mailbox" << std::flush;
+      LOG(WARNING) << "no such mailbox " << recipient;
       return false;
     }
   }
