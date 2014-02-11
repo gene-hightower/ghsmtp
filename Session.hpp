@@ -255,7 +255,7 @@ Session::mail_from(Mailbox const& reverse_path,
                         << "\" requested";
       }
     } else {
-      SYSLOG(WARNING) << "unrecognized MAIL parameter " << p.first << "="
+      SYSLOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "="
                       << p.second;
     }
   }
