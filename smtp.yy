@@ -148,7 +148,7 @@
 
 %type <Mailbox> fwd_path mailbox path rev_path
 
-%type <std::string> address_literal atom domain dot_str dotnum
+%type <std::string> atom domain dot_str dotnum
 %type <std::string> esmtp_keyword esmtp_value label ld_str ldh_str
 %type <std::string> let_dig_or_dash_str local_part qtext quoted_str
 %type <std::string> snum string
@@ -170,7 +170,11 @@ commands:
 command:
   error
 | ehlo ' ' domain CRLF  { session.ehlo($3); }
+| ehlo ' ' '[' dotnum ']' CRLF
+                        { session.ehlo($4); }
 | helo ' ' domain CRLF  { session.helo($3); }
+| helo ' ' '[' dotnum ']' CRLF
+                        { session.helo($4); }
 
 | mail rev_path CRLF    { session.mail_from($2, std::unordered_map<std::string, std::string>()); }
 | mail rev_path ' ' mail_parameters CRLF
@@ -303,12 +307,8 @@ a_d_l:
 
 mailbox:
   local_part '@' domain { $$ = Mailbox($1, $3); }
-| local_part '@' address_literal
-                        { $$ = Mailbox($1, $3); }
-;
-
-address_literal:
-  '[' dotnum ']'        { swap($$, $2); }
+| local_part '@' '[' dotnum ']'
+                        { $$ = Mailbox($1, $4); }
 ;
 
 local_part:
