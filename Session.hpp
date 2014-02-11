@@ -267,8 +267,9 @@ Session::mail_from(Mailbox const& reverse_path,
   }
 }
 
-inline void Session::rcpt_to(Mailbox const& forward_path,
-                             std::unordered_map<std::string, std::string> parameters)
+inline void
+Session::rcpt_to(Mailbox const& forward_path,
+                 std::unordered_map<std::string, std::string> parameters)
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
