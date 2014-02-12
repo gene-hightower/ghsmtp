@@ -56,7 +56,8 @@ private:
   }
 };
 
-class SockBuffer : public boost::iostreams::device<boost::iostreams::bidirectional> {
+class SockBuffer
+    : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
   explicit SockBuffer(int fd_in, int fd_out)
     : fd_in_(fd_in)
@@ -113,7 +114,8 @@ public:
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
-    return ::write(fd_out_, static_cast<const void*>(s), static_cast<size_t>(n));
+    return ::write(fd_out_, static_cast<const void*>(s),
+                   static_cast<size_t>(n));
   }
 
 private:
