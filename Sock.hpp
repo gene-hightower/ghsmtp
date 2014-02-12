@@ -35,10 +35,8 @@ public:
   Sock& operator=(const Sock&) = delete;
 
   Sock(int fd_in, int fd_out)
-    : buf_source_(fd_in)
-    , buf_sink_(fd_out)
-    , istream_(buf_source_)
-    , ostream_(buf_sink_)
+    : buf_(fd_in, fd_out)
+    , iostream_(buf_)
     , us_addr_len_(sizeof us_addr_)
     , them_addr_len_(sizeof them_addr_)
     , us_addr_str_{ '\0' }
@@ -107,27 +105,24 @@ public:
   }
   bool input_pending(std::chrono::milliseconds wait)
   {
-    return istream_->input_pending(wait);
+    return iostream_->input_pending(wait);
   }
   bool timed_out()
   {
-    return istream_->timed_out();
+    return iostream_->timed_out();
   }
   std::istream& in()
   {
-    return istream_;
+    return iostream_;
   }
   std::ostream& out()
   {
-    return ostream_;
+    return iostream_;
   }
 
 private:
-  SockBufferSource buf_source_;
-  SockBufferSink buf_sink_;
-
-  boost::iostreams::stream<SockBufferSource> istream_;
-  boost::iostreams::stream<SockBufferSink> ostream_;
+  SockBuffer buf_;
+  boost::iostreams::stream<SockBuffer> iostream_;
 
   socklen_t us_addr_len_;
   socklen_t them_addr_len_;
