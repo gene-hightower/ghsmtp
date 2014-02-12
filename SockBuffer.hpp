@@ -89,14 +89,24 @@ public:
   }
   std::streamsize read(char* s, std::streamsize n)
   {
-    ssize_t n_read;
+    std::chrono::time_point<std::chrono::system_clock> start =
+        std::chrono::system_clock::now();
 
+    ssize_t n_read;
     while ((n_read = ::read(fd_in_, static_cast<void*>(s),
                             static_cast<size_t>(n))) < 0) {
 
       if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-        if (input_pending(Config::read_timeout))
-          continue;
+
+        std::chrono::time_point<std::chrono::system_clock> now =
+            std::chrono::system_clock::now();
+
+        if (now < (start + Config::read_timeout))
+          if (input_pending(
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      (start + Config::read_timeout) - now)))
+            continue;
+
         timed_out_ = true;
         return static_cast<std::streamsize>(-1);
       }
