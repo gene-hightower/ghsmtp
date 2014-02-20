@@ -195,7 +195,7 @@ inline void Session::greeting()
 
   SYSLOG(INFO) << "connect from " << client_;
 
-  out() << "220 go\r\n" << std::flush;
+  out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
 }
 
 inline void Session::ehlo(std::string const& client_identity)
