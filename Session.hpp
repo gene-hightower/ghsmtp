@@ -173,7 +173,7 @@ inline void Session::greeting()
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     for (const auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
-        out() << "421 blocked by " << rbl << std::endl;
+        out() << "421 blocked by " << rbl << "\r\n" << std::flush;
         SYSLOG(ERROR) << sock_.them_c_str() << " blocked by " << rbl;
         this->exit(Config::exit_black_hole);
       }
@@ -470,7 +470,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (recipient.local_part_is(bad_recipient)) {
-      out() << "550 no such mailbox " << recipient << std::flush;
+      out() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "no such mailbox " << recipient;
       return false;
     }
