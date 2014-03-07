@@ -19,6 +19,7 @@
 #ifndef SESSION_DOT_HPP
 #define SESSION_DOT_HPP
 
+#include <algorithm>
 #include <iostream>
 #include <random>
 #include <string>
@@ -143,40 +144,35 @@ inline void Session::greeting()
     std::vector<std::string> ptrs =
         get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
-    for (auto ptr : ptrs) {
-      // chop off the trailing '.'
-      int last = ptr.length() - 1;
-      if ((-1 != last) && ('.' == ptr.at(last))) {
-        ptr.erase(last, 1);
-      }
-      std::vector<std::string> addrs = get_records<RR_type::A>(res, ptr);
+    char const* them = sock_.them_c_str();
 
-      for (const auto addr : addrs) {
-        if (addr == sock_.them_c_str()) {
-          fcrdns_ = ptr;
-          client_ = "(" + fcrdns_ + " [";
-          client_ += sock_.them_c_str();
-          client_ += "])";
-          goto check_holes; // We have found FCRDNS, skip forward.
-        }
-      }
+    auto ptr = std::find_if(ptrs.begin(), ptrs.end(),
+                            [&res, them](std::string const& s) {
+      std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
+      return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
+    });
+
+    if (ptr != ptrs.end()) {
+      fcrdns_ = *ptr;
+      client_ = "(" + fcrdns_ + " [";
+      client_ += sock_.them_c_str();
+      client_ += "])";
+    } else {
+      client_ = "(unknown [";
+      client_ += sock_.them_c_str();
+      client_ += "])";
     }
 
-    // We have _not_ found FCRDNS for this address.
-
-    client_ = "(unknown [";
-    client_ += sock_.them_c_str();
-    client_ += "])";
-
-  check_holes:
-
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-    for (const auto rbl : Config::rbls) {
-      if (has_record<RR_type::A>(res, reversed + rbl)) {
-        out() << "421 blocked by " << rbl << "\r\n" << std::flush;
-        SYSLOG(ERROR) << sock_.them_c_str() << " blocked by " << rbl;
-        this->exit(Config::exit_black_hole);
-      }
+    auto rbl = std::find_if(std::begin(Config::rbls), std::end(Config::rbls),
+                            [&res, &reversed](std::string const& s) {
+      return has_record<RR_type::A>(res, reversed + s);
+    });
+
+    if (rbl != std::end(Config::rbls)) {
+      out() << "421 blocked by " << *rbl << "\r\n" << std::flush;
+      SYSLOG(ERROR) << "421 blocked by " << *rbl;
+      this->exit(Config::exit_black_hole);
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
