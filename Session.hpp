@@ -184,47 +184,33 @@ inline void Session::greeting()
 
     if (sock_.input_pending(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
-      SYSLOG(ERROR) << "pregreeting traffic from " << sock_.them_c_str();
+      SYSLOG(ERROR) << "421 input before greeting from " << sock_.them_c_str();
       this->exit(Config::exit_pregreeting_traffic);
     }
   }
 
-  SYSLOG(INFO) << "connect from " << client_;
-
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
+  SYSLOG(INFO) << "connect from " << client_;
 }
 
 inline void Session::ehlo(std::string const& client_identity)
 {
+  protocol_ = "ESMTP";
   if (verify_client(client_identity)) {
-    protocol_ = "ESMTP";
     reset();
-    client_identity_ = client_identity;
     out() << "250-" << fqdn_ << "\r\n"
           << "250-PIPELINING\r\n"
+        //<< "250-STARTTLS\r\n"
           << "250 8BITMIME\r\n" << std::flush;
-    if (sock_.has_peername()) {
-      SYSLOG(INFO) << "ehlo from " << client_ << " claiming "
-                   << client_identity;
-    } else {
-      SYSLOG(INFO) << "ehlo claiming " << client_identity;
-    }
   }
 }
 
 inline void Session::helo(std::string const& client_identity)
 {
+  protocol_ = "SMTP";
   if (verify_client(client_identity)) {
-    protocol_ = "SMTP";
     reset();
-    client_identity_ = client_identity;
     out() << "250 " << fqdn_ << "\r\n" << std::flush;
-    if (sock_.has_peername()) {
-      SYSLOG(INFO) << "helo from " << client_ << " claiming "
-                   << client_identity;
-    } else {
-      SYSLOG(INFO) << "helo claiming " << client_identity;
-    }
   }
 }
 
@@ -234,13 +220,13 @@ Session::mail_from(Mailbox const& reverse_path,
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
-    SYSLOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
+    SYSLOG(WARNING) << "503 'MAIL FROM' before 'HELO' or 'EHLO'"
                     << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters:
-  for (auto& p : parameters) {
+  for (auto const& p : parameters) {
     if (p.first == "BODY") {
       if (p.second == "8BITMIME") {
         // everything is cool, this is our default...
@@ -269,7 +255,7 @@ Session::rcpt_to(Mailbox const& forward_path,
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
-    SYSLOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
+    SYSLOG(WARNING) << "503 'RCPT TO' before 'MAIL FROM'"
                     << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
@@ -289,13 +275,13 @@ inline void Session::data()
 {
   if (!reverse_path_verified_) {
     out() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
-    LOG(WARNING) << "data with empty reverse path";
+    LOG(WARNING) << "503 need 'MAIL FROM' before 'DATA'";
     return;
   }
 
   if (forward_path_.empty()) {
     out() << "554 no valid recipients\r\n" << std::flush;
-    LOG(WARNING) << "data with no forward paths";
+    LOG(WARNING) << "554 no valid recipients";
     return;
   }
 
@@ -317,7 +303,7 @@ inline void Session::data()
     headers << " " << client_;
   }
   headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
-          << "\n\tfor " << forward_path_[0] << "; " << msg.when() << "\n";
+          << "\n\tfor " << forward_path_[0] << ";\n\t" << msg.when() << "\n";
 
   msg.out() << headers.str();
 
@@ -330,7 +316,7 @@ inline void Session::data()
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
-      SYSLOG(ERROR) << "bare linefeed in message with id " << msg.id();
+      SYSLOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
       this->exit(Config::exit_bare_linefeed);
     }
 
@@ -429,28 +415,60 @@ inline void Session::reset()
 
 //...........................................................................
 
+inline bool domains_match(std::string const& a, std::string const& b)
+{
+  int a_last = a.length() - 1;
+  if ((-1 != a_last) && ('.' == a.at(a_last))) {
+    --a_last;
+  }
+
+  int b_last = b.length() - 1;
+  if ((-1 != b_last) && ('.' == b.at(b_last))) {
+    --b_last;
+  }
+
+  return boost::iequals(
+      boost::make_iterator_range(a.c_str(), a.c_str() + a_last),
+      boost::make_iterator_range(b.c_str(), b.c_str() + b_last));
+}
+
 // All of the verify_* functions send their own error messages back to
 // the client.
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if ((!fcrdns_.empty()) && (!boost::iequals(fcrdns_, client_identity))) {
+  if ((!fcrdns_.empty()) && (!domains_match(client_identity, fcrdns_))) {
     SYSLOG(WARNING) << "this client has fcrdns (" << fcrdns_ << ") yet claims "
                     << client_identity;
   }
   if (DNS::is_dotted_quad(client_identity.c_str()) &&
       (client_identity != sock_.them_c_str())) {
-    SYSLOG(WARNING) << "client claiming false IP address";
+    SYSLOG(WARNING) << "client claiming questionable IP address";
   }
+
   // Bogus clients claim to be us or some local host.
-  if (boost::iequals(client_identity, fqdn_) ||
-      boost::iequals(client_identity, "localhost") ||
-      boost::iequals(client_identity, "localhost.localdomain")) {
+  if (domains_match(client_identity, fqdn_) ||
+      domains_match(client_identity, "localhost") ||
+      domains_match(client_identity, "localhost.localdomain")) {
     out() << "554 liar\r\n" << std::flush;
     SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
                     << client_ << " claiming " << client_identity;
     return false;
   }
+
+  // Log this client
+  if (sock_.has_peername()) {
+    if (domains_match(fcrdns_, client_identity)) {
+      SYSLOG(INFO) << protocol_ << " connection from " << client_;
+    } else {
+      SYSLOG(INFO) << protocol_ << " connection from " << client_
+                   << " claiming " << client_identity;
+    }
+  } else {
+    SYSLOG(INFO) << protocol_ << " connection claiming " << client_identity;
+  }
+
+  client_identity_ = client_identity;
   return true;
 }
 
@@ -459,7 +477,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   // Make sure the domain matches.
   if (!recipient.domain_is(fqdn_)) {
     out() << "554 relay access denied\r\n" << std::flush;
-    LOG(WARNING) << "relay access denied for " << recipient;
+    LOG(WARNING) << "554 relay access denied for " << recipient;
     return false;
   }
 
