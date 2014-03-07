@@ -27,7 +27,13 @@ inline void init(char const* program_name)
 {
   google::InitGoogleLogging(program_name);
   google::InstallFailureSignalHandler();
-  fLI::FLAGS_stderrthreshold = 4; // No stderr for log messages.
+  fLI::FLAGS_stderrthreshold =
+      google::NUM_SEVERITIES; // No stderr for log messages.
+
+  // Turn off separate log file for everything above INFO.
+  for (int i = google::GLOG_INFO + 1; i < google::NUM_SEVERITIES; ++i) {
+    google::SetLogDestination(i, ""); // Turn off logging to a logfile.
+  }
 }
 }
 
