@@ -36,9 +36,9 @@
 #include "Sock.hpp"
 
 namespace Config {
-constexpr const char* const bad_recipients[] = { "nobody", "mixmaster" };
+constexpr char const* const bad_recipients[] = { "nobody", "mixmaster" };
 
-constexpr const char* const rbls[] = { "zen.spamhaus.org",
+constexpr char const* const rbls[] = { "zen.spamhaus.org",
                                        "b.barracudacentral.org" };
 
 constexpr auto greeting_max_wait_ms = 10000;
