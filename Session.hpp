@@ -437,7 +437,7 @@ inline bool domains_match(std::string const& a, std::string const& b)
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if ((!fcrdns_.empty()) && (!domains_match(client_identity, fcrdns_))) {
+  if ((!fcrdns_.empty()) && (!domains_match(fcrdns_, client_identity))) {
     SYSLOG(WARNING) << "this client has fcrdns (" << fcrdns_ << ") yet claims "
                     << client_identity;
   }
