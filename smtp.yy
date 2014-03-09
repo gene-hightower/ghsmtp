@@ -27,6 +27,7 @@
 %define parser_class_name {Psr}
 
 %code requires {
+  #include <cctype>
   #include "Session.hpp"
   using std::swap;
 }
@@ -571,7 +572,7 @@ YY_DECL
     LOG(WARNING) << "line too long";
   }
 
-  if (!isprint(c)) {
+  if (!std::isprint(c)) {
     LOG(WARNING) << "unprintable character 0x"
                  << std::hex << std::setfill('0') << std::setw(2)
                  << static_cast<unsigned>(c);
