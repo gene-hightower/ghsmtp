@@ -417,19 +417,19 @@ inline void Session::reset()
 
 inline bool domains_match(std::string const& a, std::string const& b)
 {
-  int a_last = a.length() - 1;
-  if ((-1 != a_last) && ('.' == a.at(a_last))) {
-    --a_last;
+  int a_len = a.length();
+  if ((0 != a_len) && ('.' == a.at(a_len - 1))) {
+    --a_len;
   }
 
-  int b_last = b.length() - 1;
-  if ((-1 != b_last) && ('.' == b.at(b_last))) {
-    --b_last;
+  int b_len = b.length();
+  if ((0 != b_len) && ('.' == b.at(b_len - 1))) {
+    --b_len;
   }
 
   return boost::iequals(
-      boost::make_iterator_range(a.c_str(), a.c_str() + a_last + 1),
-      boost::make_iterator_range(b.c_str(), b.c_str() + b_last + 1));
+      boost::make_iterator_range(a.c_str(), a.c_str() + a_len),
+      boost::make_iterator_range(b.c_str(), b.c_str() + b_len));
 }
 
 // All of the verify_* functions send their own error messages back to
