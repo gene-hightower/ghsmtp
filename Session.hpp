@@ -428,8 +428,8 @@ inline bool domains_match(std::string const& a, std::string const& b)
   }
 
   return boost::iequals(
-      boost::make_iterator_range(a.c_str(), a.c_str() + a_last),
-      boost::make_iterator_range(b.c_str(), b.c_str() + b_last));
+      boost::make_iterator_range(a.c_str(), a.c_str() + a_last + 1),
+      boost::make_iterator_range(b.c_str(), b.c_str() + b_last + 1));
 }
 
 // All of the verify_* functions send their own error messages back to
