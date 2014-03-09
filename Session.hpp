@@ -36,6 +36,10 @@
 #include "Sock.hpp"
 
 namespace Config {
+constexpr char const* const bad_identities[] = { "localhost",
+                                                 "localhost.localdomain",
+                                                 "illinnalum.info" };
+
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster" };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
@@ -443,7 +447,8 @@ inline bool Session::verify_client(std::string const& client_identity)
   }
   if (DNS::is_dotted_quad(client_identity.c_str()) &&
       (client_identity != sock_.them_c_str())) {
-    SYSLOG(WARNING) << "client claiming questionable IP address";
+    SYSLOG(WARNING) << "client claiming questionable IP address "
+                    << client_identity;
   }
 
   // Bogus clients claim to be us or some local host.
@@ -452,6 +457,19 @@ inline bool Session::verify_client(std::string const& client_identity)
       domains_match(client_identity, "localhost.localdomain")) {
     out() << "554 liar\r\n" << std::flush;
     SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
+                    << client_ << " claiming " << client_identity;
+    return false;
+  }
+
+  auto bi = std::find_if(std::begin(Config::bad_identities),
+                         std::end(Config::bad_identities),
+                         [&client_identity](char const* identify) {
+    return domains_match(client_identity, identify);
+  });
+
+  if (bi != std::end(Config::bad_identities)) {
+    out() << "554 bad sender\r\n" << std::flush;
+    SYSLOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
                     << client_ << " claiming " << client_identity;
     return false;
   }
