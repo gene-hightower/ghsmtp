@@ -306,8 +306,9 @@ inline void Session::data()
   if (sock_.has_peername()) {
     headers << " " << client_;
   }
-  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
-          << "\n\tfor " << forward_path_[0] << ";\n\t" << msg.when() << "\n";
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << "\n\tid "
+          << msg.id() << "\n\tfor " << forward_path_[0] << ";\n\t" << msg.when()
+          << "\n";
 
   msg.out() << headers.str();
 
