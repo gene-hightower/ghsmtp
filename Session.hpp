@@ -20,6 +20,7 @@
 #define SESSION_DOT_HPP
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 #include <random>
 #include <string>
@@ -47,14 +48,6 @@ constexpr char const* const rbls[] = { "zen.spamhaus.org",
 
 constexpr auto greeting_max_wait_ms = 10000;
 constexpr auto greeting_min_wait_ms = 500;
-
-enum exit_codes {
-  exit_success = 0,
-  exit_pregreeting_traffic = 1,
-  exit_black_hole = 2,
-  exit_bare_linefeed = 3,
-  exit_timeout = 4,
-};
 }
 
 class Session {
@@ -176,7 +169,7 @@ inline void Session::greeting()
     if (rbl != std::end(Config::rbls)) {
       out() << "421 blocked by " << *rbl << "\r\n" << std::flush;
       SYSLOG(ERROR) << client_ << " blocked by " << *rbl;
-      this->exit(Config::exit_black_hole);
+      std::exit(EXIT_SUCCESS);
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
@@ -189,7 +182,7 @@ inline void Session::greeting()
     if (sock_.input_pending(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
       SYSLOG(ERROR) << client_ << " input before greeting";
-      this->exit(Config::exit_pregreeting_traffic);
+      std::exit(EXIT_SUCCESS);
     }
   }
 
@@ -322,7 +315,7 @@ inline void Session::data()
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
       SYSLOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
-      this->exit(Config::exit_bare_linefeed);
+      std::exit(EXIT_SUCCESS);
     }
 
     line.erase(last, 1); // so eat that cr
@@ -372,7 +365,7 @@ inline void Session::help()
 inline void Session::quit()
 {
   out() << "221 bye\r\n" << std::flush;
-  this->exit(Config::exit_success);
+  std::exit(EXIT_SUCCESS);
 }
 
 inline void Session::error(std::string const& msg)
@@ -386,7 +379,7 @@ inline void Session::time()
   out() << "421 timeout\r\n" << std::flush;
   SYSLOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "")
                 << client_;
-  this->exit(Config::exit_timeout);
+  std::exit(EXIT_SUCCESS);
 }
 
 inline bool Session::timed_out()
