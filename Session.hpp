@@ -127,6 +127,7 @@ inline Session::Session(int fd_in, int fd_out, std::string const& fqdn)
 
 inline void Session::greeting()
 {
+  // This is just a teaser, the first line of a multi-line response.
   out() << "220-" << fqdn_ << " ESMTP\r\n" << std::flush;
 
   if (sock_.has_peername()) {
