@@ -19,13 +19,8 @@
 #ifndef DOMAIN_DOT_HPP
 #define DOMAIN_DOT_HPP
 
-#include <cstdlib>
-#include <string>
-
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/utility/string_ref.hpp>
-
-#include <glog/logging.h>
 
 namespace Domain {
 

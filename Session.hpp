@@ -29,10 +29,8 @@
 
 #include <sys/utsname.h>
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/utility/string_ref.hpp>
-
 #include "DNS.hpp"
+#include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Sock.hpp"
@@ -408,25 +406,12 @@ inline void Session::reset()
 
 //...........................................................................
 
-inline bool domains_match(boost::string_ref a, boost::string_ref b)
-{
-  if ((0 != a.length()) && ('.' == a.back())) {
-    a.remove_suffix(1);
-  }
-
-  if ((0 != b.length()) && ('.' == b.back())) {
-    b.remove_suffix(1);
-  }
-
-  return boost::iequals(a, b);
-}
-
 // All of the verify_* functions send their own error messages back to
 // the client.
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if (!domains_match(fcrdns_, client_identity)) {
+  if (!Domain::match(fcrdns_, client_identity)) {
     SYSLOG(WARNING) << "this client has fcrdns " << fcrdns_ << " yet claims "
                     << client_identity;
   }
@@ -437,9 +422,9 @@ inline bool Session::verify_client(std::string const& client_identity)
   }
 
   // Bogus clients claim to be us or some local host.
-  if (domains_match(client_identity, fqdn_) ||
-      domains_match(client_identity, "localhost") ||
-      domains_match(client_identity, "localhost.localdomain")) {
+  if (Domain::match(client_identity, fqdn_) ||
+      Domain::match(client_identity, "localhost") ||
+      Domain::match(client_identity, "localhost.localdomain")) {
     out() << "554 liar\r\n" << std::flush;
     SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
                     << client_ << " claiming " << client_identity;
@@ -449,7 +434,7 @@ inline bool Session::verify_client(std::string const& client_identity)
   auto bi = std::find_if(std::begin(Config::bad_identities),
                          std::end(Config::bad_identities),
                          [&client_identity](char const* identity) {
-    return domains_match(client_identity, identity);
+    return Domain::match(client_identity, identity);
   });
 
   if (bi != std::end(Config::bad_identities)) {
@@ -461,7 +446,7 @@ inline bool Session::verify_client(std::string const& client_identity)
 
   // Log this client
   if (sock_.has_peername()) {
-    if (domains_match(fcrdns_, client_identity)) {
+    if (Domain::match(fcrdns_, client_identity)) {
       SYSLOG(INFO) << protocol_ << " connection from " << client_;
     } else {
       SYSLOG(INFO) << protocol_ << " connection from " << client_
@@ -478,7 +463,7 @@ inline bool Session::verify_client(std::string const& client_identity)
 inline bool Session::verify_recipient(Mailbox const& recipient)
 {
   // Make sure the domain matches.
-  if (!domains_match(recipient.domain(), fqdn_)) {
+  if (!Domain::match(recipient.domain(), fqdn_)) {
     out() << "554 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "554 relay access denied for " << recipient;
     return false;
