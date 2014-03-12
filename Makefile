@@ -25,7 +25,7 @@ LDLIBS += -lglog -lgflags -lboost_regex -lboost_system -lpthread -lldns -lstdc++
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
 
-tests = DNSt Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt
+tests = DNSt Domaint Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt
 
 all: $(programs)
 
