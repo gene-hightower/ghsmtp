@@ -80,7 +80,6 @@ public:
 private:
   std::ostream& out();
 
-  void exit(int status);
   void reset();
   bool verify_client(std::string const& client_identity);
   bool verify_recipient(Mailbox const& recipient);
@@ -397,12 +396,6 @@ inline std::istream& Session::in()
 inline std::ostream& Session::out()
 {
   return sock_.out();
-}
-
-inline void Session::exit(int status)
-{
-  SYSLOG(INFO) << "exit status " << status;
-  ::exit(status);
 }
 
 inline void Session::reset()
