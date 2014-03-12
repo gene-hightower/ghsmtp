@@ -1,6 +1,6 @@
 /*
     This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
