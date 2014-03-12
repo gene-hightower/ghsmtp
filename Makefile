@@ -20,7 +20,11 @@ CXXFLAGS += \
 	-g -O2 \
 	-Wall -Wold-style-cast -Woverloaded-virtual -Wsign-promo
 
-LDLIBS += -lglog -lgflags -lboost_regex -lboost_system -lpthread -lldns -lstdc++
+LDLIBS += \
+	-lglog -lgflags \
+	-lboost_regex -lboost_system -lpthread \
+	-lldns \
+	-lstdc++
 
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
