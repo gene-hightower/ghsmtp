@@ -175,7 +175,7 @@ inline void Session::greeting()
 
     if (rbl != std::end(Config::rbls)) {
       out() << "421 blocked by " << *rbl << "\r\n" << std::flush;
-      SYSLOG(ERROR) << "421 blocked by " << *rbl;
+      SYSLOG(ERROR) << client_ << " blocked by " << *rbl;
       this->exit(Config::exit_black_hole);
     }
 
@@ -188,7 +188,7 @@ inline void Session::greeting()
 
     if (sock_.input_pending(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
-      SYSLOG(ERROR) << "421 input before greeting from " << sock_.them_c_str();
+      SYSLOG(ERROR) << client_ << " input before greeting";
       this->exit(Config::exit_pregreeting_traffic);
     }
   }
