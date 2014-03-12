@@ -30,6 +30,7 @@
 #include <sys/utsname.h>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/utility/string_ref.hpp>
 
 #include "DNS.hpp"
 #include "Mailbox.hpp"
@@ -407,21 +408,17 @@ inline void Session::reset()
 
 //...........................................................................
 
-inline bool domains_match(std::string const& a, std::string const& b)
+inline bool domains_match(boost::string_ref a, boost::string_ref b)
 {
-  int a_len = a.length();
-  if ((0 != a_len) && ('.' == a.at(a_len - 1))) {
-    --a_len;
+  if ((0 != a.length()) && ('.' == a.back())) {
+    a.remove_suffix(1);
   }
 
-  int b_len = b.length();
-  if ((0 != b_len) && ('.' == b.at(b_len - 1))) {
-    --b_len;
+  if ((0 != b.length()) && ('.' == b.back())) {
+    b.remove_suffix(1);
   }
 
-  return boost::iequals(
-      boost::make_iterator_range(a.c_str(), a.c_str() + a_len),
-      boost::make_iterator_range(b.c_str(), b.c_str() + b_len));
+  return boost::iequals(a, b);
 }
 
 // All of the verify_* functions send their own error messages back to
@@ -429,7 +426,7 @@ inline bool domains_match(std::string const& a, std::string const& b)
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if ((!fcrdns_.empty()) && (!domains_match(fcrdns_, client_identity))) {
+  if (!domains_match(fcrdns_, client_identity)) {
     SYSLOG(WARNING) << "this client has fcrdns " << fcrdns_ << " yet claims "
                     << client_identity;
   }
@@ -451,8 +448,8 @@ inline bool Session::verify_client(std::string const& client_identity)
 
   auto bi = std::find_if(std::begin(Config::bad_identities),
                          std::end(Config::bad_identities),
-                         [&client_identity](char const* identify) {
-    return domains_match(client_identity, identify);
+                         [&client_identity](char const* identity) {
+    return domains_match(client_identity, identity);
   });
 
   if (bi != std::end(Config::bad_identities)) {
@@ -481,7 +478,7 @@ inline bool Session::verify_client(std::string const& client_identity)
 inline bool Session::verify_recipient(Mailbox const& recipient)
 {
   // Make sure the domain matches.
-  if (!recipient.domain_is(fqdn_)) {
+  if (!domains_match(recipient.domain(), fqdn_)) {
     out() << "554 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "554 relay access denied for " << recipient;
     return false;
@@ -491,7 +488,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   auto br = std::find_if(std::begin(Config::bad_recipients),
                          std::end(Config::bad_recipients),
                          [&recipient](char const* bad_recipient) {
-    return recipient.local_part_is(bad_recipient);
+    return recipient.local_part() == bad_recipient; // strcmp?
   });
 
   if (br != std::end(Config::bad_recipients)) {

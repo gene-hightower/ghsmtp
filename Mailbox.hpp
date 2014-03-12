@@ -31,22 +31,19 @@ public:
     , domain_(domain)
   {
   }
-  Mailbox()
-  {
-  }
+  Mailbox() = default;
   void clear()
   {
     local_part_.clear();
     domain_.clear();
   }
-  bool domain_is(std::string const& domain) const
+  std::string const& domain() const
   {
-    // Should I remove trailing '.' if any of the domains has one?
-    return boost::iequals(domain_, domain);
+    return domain_;
   }
-  bool local_part_is(std::string const& local_part) const
+  std::string const& local_part() const
   {
-    return local_part_ == local_part;
+    return local_part_;
   }
   bool empty() const
   {
@@ -56,12 +53,11 @@ public:
 private:
   std::string local_part_;
   std::string domain_;
-
-  friend std::ostream& operator<<(std::ostream& stream, Mailbox const& mb)
-  {
-    return stream << '<' << mb.local_part_ << '@' << mb.domain_ << '>';
-  }
-
 };
+
+inline std::ostream& operator<<(std::ostream& stream, Mailbox const& mb)
+{
+  return stream << '<' << mb.local_part() << '@' << mb.domain() << '>';
+}
 
 #endif // MAILBOX_DOT_HPP

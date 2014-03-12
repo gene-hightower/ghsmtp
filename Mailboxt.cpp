@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
 
   Mailbox dg{ "gene", "digilicious.com" };
 
-  CHECK(dg.domain_is("Digilicious.COM"));
+  CHECK_EQ(std::string("digilicious.com"), dg.domain());
 
   std::ostringstream dgs;
   dgs << dg;
