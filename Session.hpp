@@ -488,7 +488,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   auto br = std::find_if(std::begin(Config::bad_recipients),
                          std::end(Config::bad_recipients),
                          [&recipient](char const* bad_recipient) {
-    return recipient.local_part() == bad_recipient; // strcmp?
+    return 0 == strcmp(recipient.local_part().c_str(), bad_recipient);
   });
 
   if (br != std::end(Config::bad_recipients)) {
