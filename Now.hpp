@@ -32,8 +32,9 @@ public:
     PCHECK(gettimeofday(&tv_, 0) == 0);
     tm my_tm;
     CHECK_NOTNULL(localtime_r(&tv_.tv_sec, &my_tm));
-    CHECK_EQ(strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", &my_tm),
-             sizeof(c_str_) - 1);
+    CHECK_EQ(
+        strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", &my_tm),
+        sizeof(c_str_) - 1);
   }
   time_t sec() const
   {
