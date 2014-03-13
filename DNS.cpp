@@ -33,5 +33,4 @@ std::unordered_map<DNS::Pkt_rcode, char const*> Pkt_rcode_to_string{
   { DNS::Pkt_rcode::NOTAUTH, "NOTAUTH" },
   { DNS::Pkt_rcode::NOTZONE, "NOTZONE" },
 };
-
 }

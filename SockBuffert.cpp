@@ -34,13 +34,13 @@ int main(int argc, char* argv[])
   int fd;
   PCHECK((fd = open("input.txt", O_RDONLY)) != -1);
 
-  boost::iostreams::stream<SockBuffer> iostream{ SockBuffer(fd, STDOUT_FILENO) };
+  boost::iostreams::stream<SockBuffer> iostream{ SockBuffer(fd,
+                                                            STDOUT_FILENO) };
 
   std::string line;
   while (std::getline(iostream, line)) {
     std::cout << line << std::endl;
   }
 
-  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer)
-            << std::endl;
+  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << std::endl;
 }

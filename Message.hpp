@@ -53,7 +53,8 @@ public:
 
     // Unique name, see: <http://cr.yp.to/proto/maildir.html>
     std::ostringstream uniq;
-    uniq << then_.sec() << "." << "R" << s_ << "." << fqdn;
+    uniq << then_.sec() << "."
+         << "R" << s_ << "." << fqdn;
 
     tmpfn_ = maildir + "/tmp/" + uniq.str();
     newfn_ = maildir + "/new/" + uniq.str();
