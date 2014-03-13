@@ -22,15 +22,8 @@ int main(int argc, char const* argv[])
 {
   Logging::init(argv[0]);
 
-  std::cout << "sizeof(DNS::Resolver)                == "
-            << sizeof(DNS::Resolver) << std::endl;
-
-  std::cout << "sizeof(DNS::Domain)                  == " << sizeof(DNS::Domain)
-            << std::endl;
-
-  std::cout << "sizeof(DNS::Query<DNS::RR_type::A>)  == "
-            << sizeof(DNS::Query<DNS::RR_type::A>) << std::endl;
-
-  std::cout << "sizeof(DNS::Rrlist<DNS::RR_type::A>) == "
-            << sizeof(DNS::Rrlist<DNS::RR_type::A>) << std::endl;
+  CHECK_EQ(sizeof(DNS::Resolver), sizeof(void*));
+  CHECK_EQ(sizeof(DNS::Domain), sizeof(void*));
+  CHECK_EQ(sizeof(DNS::Query<DNS::RR_type::A>), sizeof(void*));
+  CHECK_EQ(sizeof(DNS::Rrlist<DNS::RR_type::A>), sizeof(void*));
 }
