@@ -19,6 +19,7 @@
 #ifndef MESSAGE_DOT_HPP
 #define MESSAGE_DOT_HPP
 
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <random>
@@ -43,11 +44,29 @@ public:
     if (ev) {
       maildir = ev;
     } else {
-      errno = 0; // See GETPWNAM(3)
-      passwd* pw;
-      PCHECK(pw = getpwuid(getuid()));
+      ev = getenv("HOME");
+      if (ev) {
+        maildir = ev;
+      } else {
+        long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+        if (bufsize == -1)    // Value was indeterminate.
+          bufsize = 4 * 1024; // Generous size.
 
-      maildir = pw->pw_dir;
+        passwd pwd;
+        passwd* pw;
+
+      fresh_vector:
+        std::vector<char> buf(bufsize);
+
+        int e = getpwuid_r(getuid(), &pwd, &buf[0], bufsize, &pw);
+        if (nullptr == pw) {
+          CHECK_EQ(ERANGE, e) << "getpwuid_r() error errno==" << e << ": "
+                              << std::strerror(e);
+          bufsize *= 2;
+          goto fresh_vector;
+        }
+        maildir = pw->pw_dir;
+      }
       maildir += "/Maildir";
     }
 
