@@ -24,12 +24,14 @@ int main(int argc, char const* argv[])
 {
   Logging::init(argv[0]);
 
-  std::string d{ "digilicious.com." };
+  std::string d{ "example.com." };
 
-  CHECK(Domain::match(d, "DIGILICIOUS.COM"));
-  CHECK(Domain::match(d, "digilicious.com"));
-  CHECK(Domain::match(d, "digilicious.com."));
+  CHECK(Domain::match(d, "EXAMPLE.COM"));
+  CHECK(Domain::match(d, "example.com"));
+  CHECK(Domain::match(d, "example.com."));
 
-  CHECK(!Domain::match(d, "digilicious.co"));
-  CHECK(!Domain::match(d, "digilicious.com.."));
+  CHECK(!Domain::match(d, "example.co"));
+  CHECK(!Domain::match(d, "example.com.."));
+  CHECK(!Domain::match(d, ""));
+  CHECK(!Domain::match(d, "."));
 }
