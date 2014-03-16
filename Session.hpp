@@ -434,17 +434,13 @@ inline bool Session::verify_client(std::string const& client_identity)
     return false;
   }
 
-  auto bi = std::find_if(std::begin(Config::bad_identities),
-                         std::end(Config::bad_identities),
-                         [&client_identity](char const* identity) {
-    return Domain::match(client_identity, identity);
-  });
-
-  if (bi != std::end(Config::bad_identities)) {
-    out() << "554 bad sender\r\n" << std::flush;
-    SYSLOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
-                    << client_ << " claiming " << client_identity;
-    return false;
+  for (const auto bad_identity : Config::bad_identities) {
+    if (Domain::match(client_identity, bad_identity)) {
+        out() << "554 bad sender\r\n" << std::flush;
+        SYSLOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
+                        << client_ << " claiming " << client_identity;
+        return false;
+    }
   }
 
   // Log this client
