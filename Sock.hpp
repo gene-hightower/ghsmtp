@@ -119,6 +119,10 @@ public:
   {
     return iostream_;
   }
+  void starttls()
+  {
+    buf_.starttls();
+  }
 
 private:
   SockBuffer buf_;

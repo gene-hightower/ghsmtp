@@ -127,6 +127,9 @@ public:
     return ::write(fd_out_, static_cast<const void*>(s),
                    static_cast<size_t>(n));
   }
+  void starttls()
+  {
+  }
 
 private:
   int fd_in_;

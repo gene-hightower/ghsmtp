@@ -197,6 +197,8 @@ command:
 | help CRLF             { session.help(); }
 | help ' ' string CRLF  { session.help(); }
 
+| starttls              { session.starttls(); }
+
 | quit CRLF             { session.quit(); }
 ;
 
@@ -518,6 +520,8 @@ quit: q u i t;
 rcpt: r c p t ' ' t o ':';
 rset: r s e t;
 vrfy: v r f y;
+
+starttls: s t a r t t l s;
 
 /* case insensitive alphabet, used for above commands */
 

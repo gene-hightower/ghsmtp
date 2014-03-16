@@ -72,6 +72,7 @@ public:
   void quit();
   void error(std::string const& msg);
   void time();
+  void starttls();
 
   bool timed_out();
   std::istream& in();
@@ -381,6 +382,11 @@ inline void Session::time()
   std::exit(EXIT_SUCCESS);
 }
 
+inline void Session::starttls()
+{
+  sock_.starttls();
+}
+
 inline bool Session::timed_out()
 {
   return sock_.timed_out();
@@ -465,7 +471,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   // Make sure the domain matches.
   if (!Domain::match(recipient.domain(), fqdn_)) {
     out() << "554 relay access denied\r\n" << std::flush;
-    LOG(WARNING) << "554 relay access denied for " << recipient;
+    LOG(WARNING) << "relay access denied for " << recipient;
     return false;
   }
 
@@ -478,7 +484,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
   if (br != std::end(Config::bad_recipients)) {
     out() << "550 no such mailbox\r\n" << std::flush;
-    LOG(WARNING) << "550 no such mailbox " << recipient;
+    LOG(WARNING) << "no such mailbox " << recipient;
     return false;
   }
 
