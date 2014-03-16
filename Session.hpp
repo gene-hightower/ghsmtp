@@ -196,9 +196,9 @@ inline void Session::ehlo(std::string const& client_identity)
   if (verify_client(client_identity)) {
     reset();
     out() << "250-" << fqdn_ << "\r\n"
-          << "250-PIPELINING\r\n"
-        //<< "250-STARTTLS\r\n"
-          << "250 8BITMIME\r\n" << std::flush;
+                                "250-PIPELINING\r\n"
+        //                      "250-STARTTLS\r\n"
+                                "250 8BITMIME\r\n" << std::flush;
   }
 }
 
@@ -476,16 +476,12 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  auto br = std::find_if(std::begin(Config::bad_recipients),
-                         std::end(Config::bad_recipients),
-                         [&recipient](char const* bad_recipient) {
-    return 0 == strcmp(recipient.local_part().c_str(), bad_recipient);
-  });
-
-  if (br != std::end(Config::bad_recipients)) {
-    out() << "550 no such mailbox\r\n" << std::flush;
-    LOG(WARNING) << "no such mailbox " << recipient;
-    return false;
+  for (const auto bad_recipient : Config::bad_recipients) {
+    if (0 == strcmp(recipient.local_part().c_str(), bad_recipient)) {
+      out() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
+      LOG(WARNING) << "no such mailbox " << recipient;
+      return false;
+    }
   }
 
   return true;
