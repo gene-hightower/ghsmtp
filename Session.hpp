@@ -161,15 +161,12 @@ inline void Session::greeting()
     }
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-    auto rbl = std::find_if(std::begin(Config::rbls), std::end(Config::rbls),
-                            [&res, &reversed](std::string const& s) {
-      return has_record<RR_type::A>(res, reversed + s);
-    });
-
-    if (rbl != std::end(Config::rbls)) {
-      out() << "421 blocked by " << *rbl << "\r\n" << std::flush;
-      SYSLOG(ERROR) << client_ << " blocked by " << *rbl;
-      std::exit(EXIT_SUCCESS);
+    for (const auto& rbl : Config::rbls) {
+      if (has_record<RR_type::A>(res, reversed + rbl)) {
+        out() << "421 blocked by " << rbl << "\r\n" << std::flush;
+        SYSLOG(ERROR) << client_ << " blocked by " << rbl;
+        std::exit(EXIT_SUCCESS);
+      }
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
