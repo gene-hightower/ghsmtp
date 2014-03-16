@@ -393,7 +393,9 @@ let_dig:
 | digit {$$=$1;}
 ;
 
-dotnum: snum '.' snum '.' snum '.' snum;
+dotnum: snum '.' snum '.' snum '.' snum
+                        { $$=$1; $$+='.'; $$+=$3; $$+='.'; $$+=$5; $$+='.'; $$+=$7; }
+;
 
 snum:
   digit                 { $$=$1; }
