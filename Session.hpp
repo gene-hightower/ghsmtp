@@ -425,9 +425,7 @@ inline bool Session::verify_client(std::string const& client_identity)
   }
 
   // Bogus clients claim to be us or some local host.
-  if (Domain::match(client_identity, fqdn_) ||
-      Domain::match(client_identity, "localhost") ||
-      Domain::match(client_identity, "localhost.localdomain")) {
+  if (Domain::match(client_identity, fqdn_)) {
     out() << "554 liar\r\n" << std::flush;
     SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
                     << client_ << " claiming " << client_identity;
