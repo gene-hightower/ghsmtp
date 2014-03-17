@@ -183,8 +183,8 @@ inline std::vector<std::string> Rrlist<RR_type::TXT>::get() const
             break;
 
           default:
-            SYSLOG(WARNING) << "expecting TXT got:"
-                            << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting TXT got:"
+                         << static_cast<unsigned>(rdf->_type);
             break;
           }
         }
@@ -210,8 +210,8 @@ inline std::vector<std::string> Rrlist<RR_type::PTR>::get() const
             break;
 
           default:
-            SYSLOG(WARNING) << "expecting PTR got:"
-                            << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting PTR got:"
+                         << static_cast<unsigned>(rdf->_type);
             break;
           }
         }
@@ -240,8 +240,8 @@ inline std::vector<std::string> Rrlist<RR_type::A>::get() const
             break;
 
           default:
-            SYSLOG(WARNING) << "expecting A got:"
-                            << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting A got:"
+                         << static_cast<unsigned>(rdf->_type);
             break;
           }
         }

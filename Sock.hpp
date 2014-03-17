@@ -58,8 +58,8 @@ public:
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
       default:
-        SYSLOG(ERROR) << "bogus address length (" << us_addr_len_
-                      << ") returned from getsockname";
+        LOG(ERROR) << "bogus address length (" << us_addr_len_
+                   << ") returned from getsockname";
       }
     } else {
       CHECK_EQ(ENOTSOCK, errno); // only acceptable error from getsockname
@@ -82,8 +82,8 @@ public:
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
       default:
-        SYSLOG(ERROR) << "bogus address length (" << them_addr_len_
-                      << ") returned from getpeername";
+        LOG(ERROR) << "bogus address length (" << them_addr_len_
+                   << ") returned from getpeername";
       }
     } else {
       // Ignore ENOTSOCK errors from getpeername, useful for testing.

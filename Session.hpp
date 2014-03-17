@@ -164,7 +164,7 @@ inline void Session::greeting()
     for (const auto& rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         out() << "421 blocked by " << rbl << "\r\n" << std::flush;
-        SYSLOG(ERROR) << client_ << " blocked by " << rbl;
+        LOG(ERROR) << client_ << " blocked by " << rbl;
         std::exit(EXIT_SUCCESS);
       }
     }
@@ -178,13 +178,13 @@ inline void Session::greeting()
 
     if (sock_.input_pending(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
-      SYSLOG(ERROR) << client_ << " input before greeting";
+      LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
     }
   }
 
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
-  SYSLOG(INFO) << "connect from " << client_;
+  LOG(INFO) << "connect from " << client_;
 }
 
 inline void Session::ehlo(std::string const& client_identity)
@@ -214,8 +214,8 @@ Session::mail_from(Mailbox const& reverse_path,
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
-    SYSLOG(WARNING) << "503 'MAIL FROM' before 'HELO' or 'EHLO'"
-                    << (sock_.has_peername() ? " from " : "") << client_;
+    LOG(WARNING) << "503 'MAIL FROM' before 'HELO' or 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
@@ -225,14 +225,14 @@ Session::mail_from(Mailbox const& reverse_path,
       if (p.second == "8BITMIME") {
         // everything is cool, this is our default...
       } else if (p.second == "7BIT") {
-        SYSLOG(WARNING) << "7BIT transport requested";
+        LOG(WARNING) << "7BIT transport requested";
       } else {
-        SYSLOG(WARNING) << "unrecognized BODY type \"" << p.second
-                        << "\" requested";
+        LOG(WARNING) << "unrecognized BODY type \"" << p.second
+                     << "\" requested";
       }
     } else {
-      SYSLOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "="
-                      << p.second;
+      LOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "="
+                   << p.second;
     }
   }
 
@@ -249,15 +249,15 @@ Session::rcpt_to(Mailbox const& forward_path,
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
-    SYSLOG(WARNING) << "503 'RCPT TO' before 'MAIL FROM'"
-                    << (sock_.has_peername() ? " from " : "") << client_;
+    LOG(WARNING) << "503 'RCPT TO' before 'MAIL FROM'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters, we don't accept any:
   for (auto& p : parameters) {
-    SYSLOG(WARNING) << "unrecognized RCPT TO parameter " << p.first << "="
-                    << p.second;
+    LOG(WARNING) << "unrecognized RCPT TO parameter " << p.first << "="
+                 << p.second;
   }
   if (verify_recipient(forward_path)) {
     forward_path_.push_back(forward_path);
@@ -311,7 +311,7 @@ inline void Session::data()
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
-      SYSLOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
+      LOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
       std::exit(EXIT_SUCCESS);
     }
 
@@ -319,7 +319,7 @@ inline void Session::data()
 
     if ("." == line) { // just a dot is <cr><lf>.<cr><lf>
       msg.save();
-      SYSLOG(INFO) << "message delivered with id " << msg.id();
+      LOG(INFO) << "message delivered with id " << msg.id();
       out() << "250 data ok\r\n" << std::flush;
       return;
     }
@@ -368,14 +368,13 @@ inline void Session::quit()
 inline void Session::error(std::string const& msg)
 {
   out() << "500 command unrecognized\r\n" << std::flush;
-  SYSLOG(WARNING) << msg;
+  LOG(WARNING) << msg;
 }
 
 inline void Session::time()
 {
   out() << "421 timeout\r\n" << std::flush;
-  SYSLOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "")
-                << client_;
+  LOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
 }
 
@@ -415,42 +414,42 @@ inline void Session::reset()
 inline bool Session::verify_client(std::string const& client_identity)
 {
   if (!fcrdns_.empty() && !Domain::match(fcrdns_, client_identity)) {
-    SYSLOG(WARNING) << "this client has fcrdns " << fcrdns_ << " yet claims "
-                    << client_identity;
+    LOG(WARNING) << "this client has fcrdns " << fcrdns_ << " yet claims "
+                 << client_identity;
   }
   if (DNS::is_dotted_quad(client_identity.c_str()) &&
       (client_identity != sock_.them_c_str())) {
-    SYSLOG(WARNING) << "client claiming questionable IP address "
-                    << client_identity;
+    LOG(WARNING) << "client claiming questionable IP address "
+                 << client_identity;
   }
 
   // Bogus clients claim to be us or some local host.
   if (Domain::match(client_identity, fqdn_)) {
     out() << "554 liar\r\n" << std::flush;
-    SYSLOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
-                    << client_ << " claiming " << client_identity;
+    LOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
     return false;
   }
 
   for (const auto bad_identity : Config::bad_identities) {
     if (Domain::match(client_identity, bad_identity)) {
-        out() << "554 bad sender\r\n" << std::flush;
-        SYSLOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
-                        << client_ << " claiming " << client_identity;
-        return false;
+      out() << "554 bad sender\r\n" << std::flush;
+      LOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
+                   << client_ << " claiming " << client_identity;
+      return false;
     }
   }
 
   // Log this client
   if (sock_.has_peername()) {
     if (Domain::match(fcrdns_, client_identity)) {
-      SYSLOG(INFO) << protocol_ << " connection from " << client_;
+      LOG(INFO) << protocol_ << " connection from " << client_;
     } else {
-      SYSLOG(INFO) << protocol_ << " connection from " << client_
-                   << " claiming " << client_identity;
+      LOG(INFO) << protocol_ << " connection from " << client_ << " claiming "
+                << client_identity;
     }
   } else {
-    SYSLOG(INFO) << protocol_ << " connection claiming " << client_identity;
+    LOG(INFO) << protocol_ << " connection claiming " << client_identity;
   }
 
   client_identity_ = client_identity;
