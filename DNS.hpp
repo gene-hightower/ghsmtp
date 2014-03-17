@@ -72,7 +72,7 @@ public:
 
   Resolver()
   {
-    CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, NULL));
+    CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, nullptr));
   }
   ~Resolver()
   {

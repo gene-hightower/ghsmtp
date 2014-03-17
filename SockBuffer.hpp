@@ -79,7 +79,7 @@ public:
     tv.tv_usec = (wait.count() % 1000) * 1000;
 
     int inputs;
-    PCHECK((inputs = select(fd_in_ + 1, &rfds, NULL, NULL, &tv)) != -1);
+    PCHECK((inputs = select(fd_in_ + 1, &rfds, nullptr, nullptr, &tv)) != -1);
 
     return 0 != inputs;
   }
