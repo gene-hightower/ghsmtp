@@ -135,9 +135,12 @@ inline void Session::greeting()
     using namespace DNS;
     Resolver res;
 
+    // "0.1.2.3" => "3.2.1.0."
     std::string reversed{ reverse_ip4(sock_.them_c_str()) };
 
     // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
+
+    // The reverse part, check PTR records.
     std::vector<std::string> ptrs =
         get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
@@ -145,6 +148,7 @@ inline void Session::greeting()
 
     auto ptr = std::find_if(ptrs.begin(), ptrs.end(),
                             [&res, them](std::string const& s) {
+      // The forward part, check each PTR for matching A record.
       std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
       return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
     });
