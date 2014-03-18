@@ -29,9 +29,6 @@
 
 #include <arpa/inet.h>
 
-#include <boost/regex.hpp>
-#include <boost/utility/string_ref.hpp>
-
 #include "Logging.hpp"
 
 namespace DNS {
