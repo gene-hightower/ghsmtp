@@ -318,39 +318,6 @@ inline std::vector<std::string> get_records(Resolver const& res,
   return rrlst.get();
 }
 
-inline bool is_dotted_quad(char const* addr)
-{
-  constexpr char const* dotted_quad_rgx = "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}";
-
-  boost::regex dotted_quad_rx(dotted_quad_rgx);
-  boost::cmatch matches;
-  return boost::regex_match(addr, matches, dotted_quad_rx);
-}
-
-inline std::string reverse_ip4(char const* addr)
-{
-  constexpr char const* dotted_quad_cap_rgx = "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})";
-
-  boost::regex dotted_quad_rx(dotted_quad_cap_rgx);
-  boost::cmatch matches;
-  CHECK(boost::regex_match(addr, matches, dotted_quad_rx))
-      << "reverse_ip4 called with bad dotted quad: " << addr;
-
-  std::ostringstream reverse;
-  for (int n = 4; n > 0; --n) {
-    boost::string_ref octet(matches[n].first,
-                            matches[n].second - matches[n].first);
-    reverse << octet << '.'; // and leave a trailing '.'
-  }
-  return reverse.str();
-}
-
 } // namespace DNS
 
 namespace std {

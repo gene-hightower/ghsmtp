@@ -38,7 +38,7 @@ LDLIBS += \
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
 
-tests = DNSt Domaint Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt
+tests = DNSt Domaint IP4t Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt
 
 all: $(programs)
 

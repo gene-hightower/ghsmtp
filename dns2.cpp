@@ -19,12 +19,13 @@
 // brain dead command line tool to query DNS
 
 #include "DNS.hpp"
+#include "IP4.hpp"
 
 void do_dotted_quad(char const* addr)
 {
   DNS::Resolver res;
 
-  std::string reversed{ DNS::reverse_ip4(addr) };
+  std::string reversed{ IP4::reverse(addr) };
 
   constexpr const char* const rbls[] = { "zen.spamhaus.org",
                                          "b.barracudacentral.org" };
@@ -111,7 +112,7 @@ int main(int argc, char const* argv[])
   Logging::init(argv[0]);
 
   for (int i = 1; i < argc; ++i) {
-    if (DNS::is_dotted_quad(argv[i])) {
+    if (IP4::is_address(argv[i])) {
       do_dotted_quad(argv[i]);
     } else {
       do_domain(argv[i]);

@@ -1,6 +1,6 @@
 /*
     This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -16,32 +16,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "Pill.hpp"
+#include "IP4.hpp"
 
-#include <string.h>
-#include <iostream>
+#include "Logging.hpp"
 
-int main(int arcv, char* argv[])
+int main(int argc, char const* argv[])
 {
   Logging::init(argv[0]);
 
-  std::random_device rd;
+  CHECK(IP4::is_address("127.0.0.1"));
+  CHECK(!IP4::is_address("127.0.0.1."));
+  CHECK(!IP4::is_address("foo.bar"));
 
-  Pill red(rd), blue(rd);
-  CHECK(red != blue);
+  // Limitation of my regex
+  //CHECK(!IP4::is_address("300.300.300.300"));
 
-  std::stringstream red_str, blue_str;
-
-  red_str << red;
-  blue_str << blue;
-
-  CHECK_NE(red_str.str(), blue_str.str());
-
-  CHECK_EQ(13, red_str.str().length());
-  CHECK_EQ(13, blue_str.str().length());
-
-  Pill red2(red);
-  CHECK_EQ(red, red2);
-
-  std::cout << "sizeof(Pill) == " << sizeof(Pill) << std::endl;
+  std::string reverse { IP4::reverse("127.0.0.1") };
+  CHECK_EQ(0, reverse.compare("1.0.0.127."));
 }

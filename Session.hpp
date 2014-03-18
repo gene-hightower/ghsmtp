@@ -30,6 +30,7 @@
 
 #include "DNS.hpp"
 #include "Domain.hpp"
+#include "IP4.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Sock.hpp"
@@ -133,7 +134,7 @@ inline void Session::greeting()
     Resolver res;
 
     // "0.1.2.3" => "3.2.1.0."
-    std::string reversed{ reverse_ip4(sock_.them_c_str()) };
+    std::string reversed{ IP4::reverse(sock_.them_c_str()) };
 
     // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
@@ -414,7 +415,7 @@ inline void Session::reset()
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if (DNS::is_dotted_quad(client_identity.c_str()) &&
+  if (IP4::is_address(client_identity.c_str()) &&
       (client_identity != sock_.them_c_str())) {
     LOG(WARNING) << "client claiming questionable IP address "
                  << client_identity;
