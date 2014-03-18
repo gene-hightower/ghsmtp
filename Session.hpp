@@ -414,10 +414,6 @@ inline void Session::reset()
 
 inline bool Session::verify_client(std::string const& client_identity)
 {
-  if (!fcrdns_.empty() && !Domain::match(fcrdns_, client_identity)) {
-    LOG(WARNING) << "this client has fcrdns " << fcrdns_ << " yet claims "
-                 << client_identity;
-  }
   if (DNS::is_dotted_quad(client_identity.c_str()) &&
       (client_identity != sock_.them_c_str())) {
     LOG(WARNING) << "client claiming questionable IP address "
