@@ -20,7 +20,6 @@
 #define SESSION_DOT_HPP
 
 #include <algorithm>
-#include <cstdlib>
 #include <iostream>
 #include <random>
 #include <string>
@@ -36,9 +35,7 @@
 #include "Sock.hpp"
 
 namespace Config {
-constexpr char const* const bad_identities[] = { "localhost",
-                                                 "localhost.localdomain",
-                                                 "illinnalum.info" };
+constexpr char const* const bad_identities[] = { "illinnalum.info" };
 
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster" };
 
@@ -428,11 +425,15 @@ inline bool Session::verify_client(std::string const& client_identity)
   }
 
   // Bogus clients claim to be us or some local host.
-  if (Domain::match(client_identity, fqdn_)) {
-    out() << "554 liar\r\n" << std::flush;
-    LOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
-    return false;
+  if (Domain::match(client_identity, fqdn_) ||
+      Domain::match(client_identity, "localhost") ||
+      Domain::match(client_identity, "localhost.localdomain")) {
+    if (strcmp(sock_.them_c_str(), "127.0.0.1")) {
+      out() << "554 liar\r\n" << std::flush;
+      LOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
+                   << client_ << " claiming " << client_identity;
+      return false;
+    }
   }
 
   for (const auto bad_identity : Config::bad_identities) {
@@ -471,7 +472,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
-    if (0 == strcmp(recipient.local_part().c_str(), bad_recipient)) {
+    if (0 == recipient.local_part().compare(bad_recipient)) {
       out() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "no such mailbox " << recipient;
       return false;

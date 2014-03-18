@@ -62,11 +62,8 @@ clean::
 
 regression: $(programs) $(TEST_MAILDIR)
 	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
-	@echo
-	cat notes.txt
-	@echo
-	ls -l smtp smtpd
-	size smtp smtpd
+	ls -l smtp
+	size smtp
 
 smtp.hpp stack.hh: smtp.cpp
 	@true
