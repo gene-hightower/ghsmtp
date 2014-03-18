@@ -27,6 +27,7 @@ int main(int argc, char const* argv[])
   CHECK(IP4::is_address("127.0.0.1"));
   CHECK(!IP4::is_address("127.0.0.1."));
   CHECK(!IP4::is_address("foo.bar"));
+  CHECK(!IP4::is_address(""));
 
   // Limitation of my regex
   //CHECK(!IP4::is_address("300.300.300.300"));
