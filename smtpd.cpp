@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
   sact.sa_flags = 0;
   sact.sa_handler = timeout;
-  PCHECK(sigaction(SIGALRM, &sact, NULL) == 0);
+  PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
 
   boost::regex adrx("\\s*<(.+)@(.+)>");
 
