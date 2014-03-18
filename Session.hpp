@@ -20,7 +20,6 @@
 #define SESSION_DOT_HPP
 
 #include <algorithm>
-#include <cstdlib>
 #include <iostream>
 #include <random>
 #include <string>
@@ -471,7 +470,7 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
-    if (0 == strcmp(recipient.local_part().c_str(), bad_recipient)) {
+    if (0 == recipient.local_part().compare(bad_recipient)) {
       out() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "no such mailbox " << recipient;
       return false;
