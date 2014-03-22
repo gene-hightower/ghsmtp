@@ -257,6 +257,7 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
   unsigned char len = data[src_pos];
 
   if (rdf->_size > LDNS_MAX_DOMAINLEN) {
+    LOG(WARNING) << "rdf size too large";
     return "<too long>";
   }
 
