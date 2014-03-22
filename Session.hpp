@@ -172,10 +172,8 @@ inline void Session::greeting()
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
-
     std::uniform_int_distribution<> uni_dist(Config::greeting_min_wait_ms,
                                              Config::greeting_max_wait_ms);
-
     std::chrono::milliseconds wait{ uni_dist(rd_) };
 
     if (sock_.input_pending(wait)) {
@@ -183,7 +181,7 @@ inline void Session::greeting()
       LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
     }
-  }
+  } // if (sock_.has_peername())
 
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
   LOG(INFO) << "connect from " << client_;
