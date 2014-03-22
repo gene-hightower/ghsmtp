@@ -16,7 +16,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Experimental version with no bison -- don't run this version!
+// Experimental untested version -- don't run this version!
 
 #include <fstream>
 #include <iomanip>
