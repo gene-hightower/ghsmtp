@@ -78,7 +78,7 @@ public:
     SSL_library_init();
     OpenSSL_add_all_algorithms();
 
-    const SSL_METHOD* method = CHECK_NOTNULL(SSLv2_server_method());
+    const SSL_METHOD* method = CHECK_NOTNULL(TLSv1_2_server_method());
     ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
     if (SSL_CTX_use_certificate_file(ctx_, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
