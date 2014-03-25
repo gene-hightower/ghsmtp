@@ -226,15 +226,17 @@ public:
 
     X509* cert = SSL_get_peer_certificate(ssl_);
     if (cert) {
-      // OpenSSL functions should never throw...
-      std::unique_ptr<char> subject(
-          X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0));
-      std::unique_ptr<char> issuer(
-          X509_NAME_oneline(X509_get_issuer_name(cert), nullptr, 0));
-      X509_free(cert);
+      // OpenSSL functions should never throw (I hope)
 
-      LOG(INFO) << "Subject: " << subject.get();
-      LOG(INFO) << "Issuer: " << issuer.get();
+      char* subject = X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
+      LOG(INFO) << "Subject: " << subject;
+      free(subject);
+
+      char* issuer = X509_NAME_oneline(X509_get_issuer_name(cert), nullptr, 0);
+      LOG(INFO) << "Issuer: " << issuer;
+      free(issuer);
+
+      X509_free(cert);
     }
 
     tls_ = true;
