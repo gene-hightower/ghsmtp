@@ -130,21 +130,23 @@ public:
   }
   std::streamsize read(char* s, std::streamsize n)
   {
-    std::chrono::time_point<std::chrono::system_clock> start =
-        std::chrono::system_clock::now();
+    using namespace std::chrono;
+
+    time_point<system_clock> start =
+        system_clock::now();
 
     if (tls_) {
       int ssl_n_read;
       while ((ssl_n_read = SSL_read(ssl_, static_cast<void*>(s),
                                     static_cast<int>(n))) < 0) {
-        std::chrono::time_point<std::chrono::system_clock> now =
-            std::chrono::system_clock::now();
+        time_point<system_clock> now =
+            system_clock::now();
 
         switch (SSL_get_error(ssl_, ssl_n_read)) {
         case SSL_ERROR_WANT_READ:
           if (now < (start + Config::read_timeout))
             if (input_ready(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                    duration_cast<milliseconds>(
                         (start + Config::read_timeout) - now)))
               continue;
 
@@ -154,7 +156,7 @@ public:
         case SSL_ERROR_WANT_WRITE:
           if (now < (start + Config::read_timeout))
             if (output_ready(
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                    duration_cast<milliseconds>(
                         (start + Config::read_timeout) - now)))
               continue;
           timed_out_ = true;
@@ -181,11 +183,11 @@ public:
 
       if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
 
-        std::chrono::time_point<std::chrono::system_clock> now =
-            std::chrono::system_clock::now();
+        time_point<system_clock> now =
+            system_clock::now();
 
         if (now < (start + Config::read_timeout))
-          if (input_ready(std::chrono::duration_cast<std::chrono::milliseconds>(
+          if (input_ready(duration_cast<milliseconds>(
                   (start + Config::read_timeout) - now)))
             continue;
 
