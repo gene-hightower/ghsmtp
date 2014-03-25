@@ -176,7 +176,7 @@ inline void Session::greeting()
                                              Config::greeting_max_wait_ms);
     std::chrono::milliseconds wait{ uni_dist(rd_) };
 
-    if (sock_.input_pending(wait)) {
+    if (sock_.input_ready(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
       LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
@@ -194,7 +194,7 @@ inline void Session::ehlo(std::string const& client_identity)
     reset();
     out() << "250-" << fqdn_ << "\r\n"
                                 "250-PIPELINING\r\n"
-        //                      "250-STARTTLS\r\n"
+                                "250-STARTTLS\r\n"
                                 "250 8BITMIME\r\n" << std::flush;
   }
 }

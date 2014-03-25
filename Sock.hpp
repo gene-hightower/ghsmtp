@@ -103,9 +103,9 @@ public:
   {
     return them_addr_str_[0] != '\0';
   }
-  bool input_pending(std::chrono::milliseconds wait)
+  bool input_ready(std::chrono::milliseconds wait)
   {
-    return iostream_->input_pending(wait);
+    return iostream_->input_ready(wait);
   }
   bool timed_out()
   {
