@@ -150,7 +150,6 @@ public:
 
           timed_out_ = true;
           return static_cast<std::streamsize>(-1);
-          continue;
 
         case SSL_ERROR_WANT_WRITE:
           if (now < (start + Config::read_timeout))
@@ -160,7 +159,6 @@ public:
               continue;
           timed_out_ = true;
           return static_cast<std::streamsize>(-1);
-          continue;
 
         case SSL_ERROR_SYSCALL:
         case SSL_ERROR_SSL:
