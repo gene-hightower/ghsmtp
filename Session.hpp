@@ -380,6 +380,7 @@ inline void Session::time()
 
 inline void Session::starttls()
 {
+  out() << "220 go ahead\r\n" << std::flush;
   sock_.starttls();
 }
 

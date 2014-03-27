@@ -35,8 +35,9 @@
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
 
 namespace Config {
 // Timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
@@ -46,7 +47,8 @@ constexpr auto read_timeout = std::chrono::minutes(5);
 
 class read_error : public std::runtime_error {
 public:
-  explicit read_error(int e) : std::runtime_error(errno_to_str(e))
+  explicit read_error(int e)
+    : std::runtime_error(errno_to_str(e))
   {
   }
 
@@ -78,13 +80,17 @@ public:
     SSL_library_init();
     OpenSSL_add_all_algorithms();
 
-    const SSL_METHOD* method = CHECK_NOTNULL(TLSv1_2_server_method());
+    const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
     ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-    if (SSL_CTX_use_certificate_file(ctx_, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+    CHECK(RAND_status());
+
+    if (SSL_CTX_use_certificate_file(ctx_, "/home/gene/src/smtpd/cert.pem",
+                                     SSL_FILETYPE_PEM) <= 0) {
       ssl_error();
     }
-    if (SSL_CTX_use_PrivateKey_file(ctx_, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(ctx_, "/home/gene/src/smtpd/cert.pem",
+                                    SSL_FILETYPE_PEM) <= 0) {
       ssl_error();
     }
     CHECK(SSL_CTX_check_private_key(ctx_))
@@ -92,7 +98,7 @@ public:
   }
   ~SockBuffer()
   {
-    SSL_CTX_free(ctx_);
+    // SSL_CTX_free(ctx_);
   }
   bool input_ready(std::chrono::milliseconds wait) const
   {
@@ -124,10 +130,7 @@ public:
 
     return 0 != inputs;
   }
-  bool timed_out() const
-  {
-    return timed_out_;
-  }
+  bool timed_out() const { return timed_out_; }
   std::streamsize read(char* s, std::streamsize n)
   {
     using namespace std::chrono;
@@ -217,18 +220,41 @@ public:
     if (!ssl_) {
       ssl_error();
     }
-    if (!SSL_set_fd(ssl_, fd_in_)) {
+    if (!SSL_set_rfd(ssl_, fd_in_)) {
       ssl_error();
     }
-    if (-1 == SSL_accept(ssl_)) { // Negotiate the TLS connection.
+    if (!SSL_set_wfd(ssl_, fd_out_)) {
       ssl_error();
+    }
+
+    int rc;
+    while ((rc = SSL_accept(ssl_)) < 0) {
+      switch (SSL_get_error(ssl_, rc)) {
+      case SSL_ERROR_WANT_READ:
+        if (input_ready(std::chrono::milliseconds(500)))
+          continue;
+
+        LOG(ERROR) << "input_ready timed out";
+        continue;
+
+      case SSL_ERROR_WANT_WRITE:
+        if (output_ready(std::chrono::milliseconds(500)))
+          continue;
+
+        LOG(ERROR) << "output_ready timed out";
+        continue;
+
+      default:
+        ssl_error();
+      }
     }
 
     X509* cert = SSL_get_peer_certificate(ssl_);
     if (cert) {
       // OpenSSL functions should never throw (I hope)
 
-      char* subject = X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
+      char* subject =
+          X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
       LOG(INFO) << "Subject: " << subject;
       free(subject);
 
@@ -237,6 +263,8 @@ public:
       free(issuer);
 
       X509_free(cert);
+    } else {
+      LOG(INFO) << "no peer certificate";
     }
 
     tls_ = true;
@@ -246,6 +274,7 @@ private:
   void ssl_error()
   {
     unsigned long er;
+    LOG(ERROR) << "SSL error";
     while (0 != (er = ERR_get_error()))
       LOG(ERROR) << ERR_error_string(er, nullptr);
     abort();

@@ -35,8 +35,7 @@ public:
   Sock& operator=(const Sock&) = delete;
 
   Sock(int fd_in, int fd_out)
-    : buf_(fd_in, fd_out)
-    , iostream_(buf_)
+    : iostream_(fd_in, fd_out)
     , us_addr_len_(sizeof us_addr_)
     , them_addr_len_(sizeof them_addr_)
     , us_addr_str_{ '\0' }
@@ -121,11 +120,10 @@ public:
   }
   void starttls()
   {
-    buf_.starttls();
+    iostream_->starttls();
   }
 
 private:
-  SockBuffer buf_;
   boost::iostreams::stream<SockBuffer> iostream_;
 
   socklen_t us_addr_len_;
