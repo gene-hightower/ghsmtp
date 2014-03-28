@@ -43,11 +43,13 @@ namespace Config {
 // Timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
 constexpr auto read_timeout = std::chrono::minutes(5);
+constexpr auto write_timeout = std::chrono::seconds(5);
+constexpr auto starttls_timeout = std::chrono::seconds(5);
 }
 
-class read_error : public std::runtime_error {
+class io_error : public std::runtime_error {
 public:
-  explicit read_error(int e) : std::runtime_error(errno_to_str(e))
+  explicit io_error(int e) : std::runtime_error(errno_to_str(e))
   {
   }
 
@@ -82,7 +84,7 @@ public:
     const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
     ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-    CHECK(RAND_status());
+    CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
     if (SSL_CTX_use_certificate_file(ctx_, "/home/gene/src/smtpd/cert.pem",
                                      SSL_FILETYPE_PEM) <= 0) {
@@ -97,6 +99,7 @@ public:
   }
   ~SockBuffer()
   {
+    // ??
     // SSL_CTX_free(ctx_);
   }
   bool input_ready(std::chrono::milliseconds wait) const
@@ -136,7 +139,6 @@ public:
   std::streamsize read(char* s, std::streamsize n)
   {
     using namespace std::chrono;
-
     time_point<system_clock> start = system_clock::now();
 
     if (tls_) {
@@ -144,22 +146,25 @@ public:
       while ((ssl_n_read = SSL_read(ssl_, static_cast<void*>(s),
                                     static_cast<int>(n))) < 0) {
         time_point<system_clock> now = system_clock::now();
+        if (now > (start + Config::read_timeout)) {
+          LOG(ERROR) << "SSL_read timed out";
+          timed_out_ = true;
+          return static_cast<std::streamsize>(-1);
+        }
+
+        milliseconds t_o =
+            duration_cast<milliseconds>((start + Config::read_timeout) - now);
 
         switch (SSL_get_error(ssl_, ssl_n_read)) {
         case SSL_ERROR_WANT_READ:
-          if (now < (start + Config::read_timeout))
-            if (input_ready(duration_cast<milliseconds>(
-                    (start + Config::read_timeout) - now)))
-              continue;
-
+          if (input_ready(t_o))
+            continue;
           timed_out_ = true;
           return static_cast<std::streamsize>(-1);
 
         case SSL_ERROR_WANT_WRITE:
-          if (now < (start + Config::read_timeout))
-            if (output_ready(duration_cast<milliseconds>(
-                    (start + Config::read_timeout) - now)))
-              continue;
+          if (output_ready(t_o))
+            continue;
           timed_out_ = true;
           return static_cast<std::streamsize>(-1);
 
@@ -171,8 +176,8 @@ public:
       }
 
       if (ssl_n_read == 0) {
-        // XXX
         // This is a close
+        tls_ = false;
       }
 
       return static_cast<std::streamsize>(ssl_n_read);
@@ -185,7 +190,6 @@ public:
       if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
 
         time_point<system_clock> now = system_clock::now();
-
         if (now < (start + Config::read_timeout))
           if (input_ready(duration_cast<milliseconds>(
                   (start + Config::read_timeout) - now)))
@@ -198,7 +202,7 @@ public:
       if (errno == EINTR)
         continue;
 
-      throw read_error(errno);
+      throw io_error(errno);
     }
 
     if (0 == n_read)
@@ -208,13 +212,69 @@ public:
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
+    using namespace std::chrono;
+    time_point<system_clock> start = system_clock::now();
+
     if (tls_) {
-      return SSL_write(ssl_, static_cast<const void*>(s),
-                       static_cast<size_t>(n));
+      int ssl_n_write;
+      while ((ssl_n_write = SSL_write(ssl_, static_cast<const void*>(s),
+                                      static_cast<size_t>(n))) < 0) {
+        time_point<system_clock> now = system_clock::now();
+        if (now > (start + Config::write_timeout)) {
+          LOG(ERROR) << "SSL_write timed out";
+          timed_out_ = true;
+          return static_cast<std::streamsize>(-1);
+        }
+
+        milliseconds t_o =
+            duration_cast<milliseconds>((start + Config::write_timeout) - now);
+
+        switch (SSL_get_error(ssl_, ssl_n_write)) {
+        case SSL_ERROR_WANT_READ:
+          if (input_ready(t_o))
+            continue;
+          timed_out_ = true;
+          return static_cast<std::streamsize>(-1);
+
+        case SSL_ERROR_WANT_WRITE:
+          if (output_ready(t_o))
+            continue;
+          timed_out_ = true;
+          return static_cast<std::streamsize>(-1);
+
+        case SSL_ERROR_SYSCALL:
+        case SSL_ERROR_SSL:
+        default:
+          ssl_error();
+        }
+      }
     }
 
-    return ::write(fd_out_, static_cast<const void*>(s),
-                   static_cast<size_t>(n));
+    ssize_t n_write;
+    while ((n_write = ::write(fd_out_, static_cast<const void*>(s),
+                              static_cast<size_t>(n))) < 0) {
+      if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
+
+        time_point<system_clock> now = system_clock::now();
+        if (now < (start + Config::write_timeout))
+          if (output_ready(duration_cast<milliseconds>(
+                  (start + Config::write_timeout) - now)))
+            continue;
+
+        timed_out_ = true;
+        return static_cast<std::streamsize>(-1);
+      }
+
+      if (errno == EINTR)
+        continue;
+
+      throw io_error(errno);
+    }
+
+    if (0 == n_write)
+      return static_cast<std::streamsize>(-1);
+
+    return static_cast<std::streamsize>(n_write);
   }
   void starttls()
   {
@@ -229,44 +289,37 @@ public:
       ssl_error();
     }
 
+    using namespace std::chrono;
+    time_point<system_clock> start = system_clock::now();
+
     int rc;
     while ((rc = SSL_accept(ssl_)) < 0) {
+
+      time_point<system_clock> now = system_clock::now();
+      if (now > (start + Config::starttls_timeout)) {
+        LOG(ERROR) << "starttls timed out";
+        return;
+      }
+
+      milliseconds t_o =
+          duration_cast<milliseconds>((start + Config::starttls_timeout) - now);
+
       switch (SSL_get_error(ssl_, rc)) {
       case SSL_ERROR_WANT_READ:
-        if (input_ready(std::chrono::milliseconds(500)))
+        if (input_ready(t_o))
           continue;
-
-        LOG(ERROR) << "input_ready timed out";
-        continue;
+        LOG(ERROR) << "starttls timed out on input_ready";
+        return;
 
       case SSL_ERROR_WANT_WRITE:
-        if (output_ready(std::chrono::milliseconds(500)))
+        if (output_ready(t_o))
           continue;
-
-        LOG(ERROR) << "output_ready timed out";
+        LOG(ERROR) << "starttls timed out on output_ready";
         continue;
 
       default:
         ssl_error();
       }
-    }
-
-    X509* cert = SSL_get_peer_certificate(ssl_);
-    if (cert) {
-      // OpenSSL functions should never throw (I hope)
-
-      char* subject =
-          X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
-      LOG(INFO) << "Subject: " << subject;
-      free(subject);
-
-      char* issuer = X509_NAME_oneline(X509_get_issuer_name(cert), nullptr, 0);
-      LOG(INFO) << "Issuer: " << issuer;
-      free(issuer);
-
-      X509_free(cert);
-    } else {
-      LOG(INFO) << "no peer certificate";
     }
 
     tls_ = true;
