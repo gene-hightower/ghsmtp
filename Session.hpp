@@ -214,7 +214,7 @@ Session::mail_from(Mailbox const& reverse_path,
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
-    LOG(WARNING) << "503 'MAIL FROM' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
@@ -249,14 +249,14 @@ Session::rcpt_to(Mailbox const& forward_path,
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
-    LOG(WARNING) << "503 'RCPT TO' before 'MAIL FROM'"
+    LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters, we don't accept any:
   for (auto& p : parameters) {
-    LOG(WARNING) << "unrecognized RCPT TO parameter " << p.first << "="
+    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << p.first << "="
                  << p.second;
   }
   if (verify_recipient(forward_path)) {
@@ -269,13 +269,13 @@ inline void Session::data()
 {
   if (!reverse_path_verified_) {
     out() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
-    LOG(WARNING) << "503 need 'MAIL FROM' before 'DATA'";
+    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return;
   }
 
   if (forward_path_.empty()) {
     out() << "554 no valid recipients\r\n" << std::flush;
-    LOG(WARNING) << "554 no valid recipients";
+    LOG(WARNING) << "no valid recipients";
     return;
   }
 
@@ -297,8 +297,9 @@ inline void Session::data()
     headers << " " << client_;
   }
   headers << "\n\tby " << fqdn_ << " with " << protocol_ << "\n\tid "
-          << msg.id() << "\n\tfor " << forward_path_[0] << ";\n\t" << msg.when()
-          << "\n";
+          << msg.id() << "\n\tfor " << forward_path_[0];
+
+  headers << ";\n\t" << msg.when() << "\n";
 
   msg.out() << headers.str();
 
@@ -311,7 +312,7 @@ inline void Session::data()
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
-      LOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
+      LOG(ERROR) << "bare linefeed in message with id " << msg.id();
       std::exit(EXIT_SUCCESS);
     }
 
@@ -334,6 +335,7 @@ inline void Session::data()
   if (sock_.timed_out())
     time();
 
+  LOG(ERROR) << "unexpected end of data in message with id " << msg.id();
   out() << "554 data NOT ok\r\n" << std::flush;
 }
 
