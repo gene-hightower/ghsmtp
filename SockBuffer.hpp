@@ -64,7 +64,7 @@ private:
 class SockBuffer
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
-  explicit SockBuffer(int fd_in, int fd_out)
+  SockBuffer(int fd_in, int fd_out)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
     , timed_out_(false)
