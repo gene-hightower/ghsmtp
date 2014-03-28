@@ -47,8 +47,7 @@ constexpr auto read_timeout = std::chrono::minutes(5);
 
 class read_error : public std::runtime_error {
 public:
-  explicit read_error(int e)
-    : std::runtime_error(errno_to_str(e))
+  explicit read_error(int e) : std::runtime_error(errno_to_str(e))
   {
   }
 
@@ -130,7 +129,10 @@ public:
 
     return 0 != inputs;
   }
-  bool timed_out() const { return timed_out_; }
+  bool timed_out() const
+  {
+    return timed_out_;
+  }
   std::streamsize read(char* s, std::streamsize n)
   {
     using namespace std::chrono;
