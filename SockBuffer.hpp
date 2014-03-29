@@ -248,6 +248,10 @@ public:
           ssl_error();
         }
       }
+      if (0 == ssl_n_write) {
+        // This is a close
+        tls_ = false;
+      }
     }
 
     ssize_t n_write;
@@ -323,6 +327,21 @@ public:
     }
 
     tls_ = true;
+  }
+  std::string tls_info()
+  {
+    std::ostringstream info;
+    if (tls_) {
+      SSL_CIPHER const* const c = SSL_get_current_cipher(ssl_);
+      if (c) {
+        info << "version=" << SSL_CIPHER_get_version(c);
+        info << " cipher=" << SSL_CIPHER_get_name(c);
+        int alg_bits;
+        int bits = SSL_CIPHER_get_bits(c, &alg_bits);
+        info << " bits=" << bits << "/" << alg_bits;
+      }
+    }
+    return info.str();
   }
 
 private:

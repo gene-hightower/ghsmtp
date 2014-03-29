@@ -20,6 +20,7 @@
 #define SOCK_DOT_HPP
 
 #include <iostream>
+#include <string>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -121,6 +122,10 @@ public:
   void starttls()
   {
     iostream_->starttls();
+  }
+  std::string tls_info()
+  {
+    return iostream_->tls_info();
   }
 
 private:

@@ -299,6 +299,11 @@ inline void Session::data()
   headers << "\n\tby " << fqdn_ << " with " << protocol_ << "\n\tid "
           << msg.id() << "\n\tfor " << forward_path_[0];
 
+  std::string tls_info{ sock_.tls_info() };
+  if (tls_info.length()) {
+    headers << "\n\t(" << tls_info << ")";
+  }
+
   headers << ";\n\t" << msg.when() << "\n";
 
   msg.out() << headers.str();
