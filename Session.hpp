@@ -289,18 +289,18 @@ inline void Session::data()
   // the top of the message.
 
   std::ostringstream headers;
-  headers << "Return-Path: " << reverse_path_ << std::endl;
+  headers << "Return-Path: " << reverse_path_ << "\n";
 
-  headers << "X-Original-To: " << forward_path_[0] << std::endl;
+  headers << "X-Original-To: " << forward_path_[0] << "\n";
   for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << '\t' << forward_path_[i] << std::endl;
+    headers << '\t' << forward_path_[i] << "\n";
   }
 
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " " << client_;
   }
-  headers << "\n\tby " << fqdn_ << " with " << protocol_ << "\n\tid "
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id "
           << msg.id() << "\n\tfor " << forward_path_[0];
 
   std::string tls_info{ sock_.tls_info() };
