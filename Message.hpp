@@ -43,11 +43,15 @@ public:
     if (ev) {
       maildir = ev;
     } else {
-      errno = 0; // See GETPWNAM(3)
-      passwd* pw;
-      PCHECK(pw = getpwuid(getuid()));
-
-      maildir = pw->pw_dir;
+      ev = getenv("HOME");
+      if (ev) {
+        maildir = ev;
+      } else {
+        errno = 0; // See GETPWNAM(3)
+        passwd* pw;
+        PCHECK(pw = getpwuid(getuid()));
+        maildir = pw->pw_dir;
+      }
       maildir += "/Maildir";
     }
 
