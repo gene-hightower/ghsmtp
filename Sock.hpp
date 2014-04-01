@@ -123,6 +123,10 @@ public:
   {
     iostream_->starttls();
   }
+  bool tls()
+  {
+    return iostream_->tls();
+  }
   std::string tls_info()
   {
     return iostream_->tls_info();

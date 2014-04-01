@@ -36,12 +36,13 @@
 #include "Sock.hpp"
 
 namespace Config {
-constexpr char const* const bad_identities[] = { "illinnalum.info" };
+constexpr char const* const bad_identities[] = { "illinnalum.info",
+                                                 "playsportz.com", };
 
-constexpr char const* const bad_recipients[] = { "nobody", "mixmaster" };
+constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
-                                       "b.barracudacentral.org" };
+                                       "b.barracudacentral.org", };
 
 constexpr auto greeting_max_wait_ms = 10000;
 constexpr auto greeting_min_wait_ms = 500;
@@ -86,8 +87,8 @@ private:
 private:
   Sock sock_;
 
-  std::string fqdn_;                  // Who we identify as.
-  std::string fcrdns_;                // Who they look-up as.
+  std::string fqdn_;                  // who we identify as
+  std::string fcrdns_;                // who they look-up as
   std::string client_;                // (fcrdns_ [sock_.them_c_str()])
   std::string client_identity_;       // ehlo/helo
   Mailbox reverse_path_;              // "mail from"
@@ -162,6 +163,8 @@ inline void Session::greeting()
       client_ += "])";
     }
 
+    // If we have fcrdns, check a white list before looking in DNSBLs
+
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     for (const auto& rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
@@ -189,13 +192,14 @@ inline void Session::greeting()
 
 inline void Session::ehlo(std::string const& client_identity)
 {
-  protocol_ = "ESMTP";
+  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   if (verify_client(client_identity)) {
     reset();
-    out() << "250-" << fqdn_ << "\r\n"
-                                "250-PIPELINING\r\n"
-                                "250-STARTTLS\r\n"
-                                "250 8BITMIME\r\n" << std::flush;
+    out() << "250-" << fqdn_ << "\r\n250-PIPELINING\r\n";
+    if (!sock_.tls()) {
+      out() << "250-STARTTLS\r\n";
+    }
+    out() << "250 8BITMIME\r\n" << std::flush;
   }
 }
 
@@ -340,7 +344,7 @@ inline void Session::data()
   if (sock_.timed_out())
     time();
 
-  LOG(ERROR) << "unexpected end of data in message with id " << msg.id();
+  LOG(WARNING) << "unexpected end of data in message with id " << msg.id();
   out() << "554 data NOT ok\r\n" << std::flush;
 }
 
@@ -387,8 +391,13 @@ inline void Session::time()
 
 inline void Session::starttls()
 {
-  out() << "220 go ahead\r\n" << std::flush;
-  sock_.starttls();
+  if (sock_.tls()) {
+    out() << "554 TLS already active\r\n" << std::flush;
+    LOG(WARNING) << "STARTTLS issued with TLS already active";
+  } else {
+    out() << "220 go ahead\r\n" << std::flush;
+    sock_.starttls();
+  }
 }
 
 inline bool Session::timed_out()
@@ -487,7 +496,12 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
 inline bool Session::verify_sender(Mailbox const& sender)
 {
-  // look up SPF & DMARC records...
+  // If the reverse path domain matches the Forward-confirmed reverse
+  // DNS of the sending IP address, we're golden.
+  if (!Domain::match(sender.domain(), fcrdns_)) {
+    // look up SPF & DMARC records...
+    // check black.uribl.com
+  }
   reverse_path_verified_ = true;
   return true;
 }

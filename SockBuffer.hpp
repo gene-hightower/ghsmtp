@@ -36,6 +36,7 @@
 #include <boost/iostreams/stream.hpp>
 
 #include <openssl/err.h>
+#include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
 
@@ -73,32 +74,74 @@ public:
   {
     int flags;
     PCHECK((flags = fcntl(fd_in_, F_GETFL, 0)) != -1);
-    PCHECK(fcntl(fd_in_, F_SETFL, flags | O_NONBLOCK) != -1);
+    if (0 == (flags&O_NONBLOCK)) {
+      PCHECK(fcntl(fd_in_, F_SETFL, flags | O_NONBLOCK) != -1);
+    }
+    PCHECK((flags = fcntl(fd_out_, F_GETFL, 0)) != -1);
+    if (0 == (flags&O_NONBLOCK)) {
+      PCHECK(fcntl(fd_out_, F_SETFL, flags | O_NONBLOCK) != -1);
+    }
 
     // TLS
 
     SSL_load_error_strings();
     SSL_library_init();
+    CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
     OpenSSL_add_all_algorithms();
 
     const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
     ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-    CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
-
-    if (SSL_CTX_use_certificate_file(ctx_, "/home/gene/src/smtpd/cert.pem",
+    if (SSL_CTX_use_certificate_file(ctx_, "/z/home/gene/src/smtpd/cert.pem",
                                      SSL_FILETYPE_PEM) <= 0) {
       ssl_error();
     }
-    if (SSL_CTX_use_PrivateKey_file(ctx_, "/home/gene/src/smtpd/cert.pem",
+    if (SSL_CTX_use_PrivateKey_file(ctx_, "/z/home/gene/src/smtpd/cert.pem",
                                     SSL_FILETYPE_PEM) <= 0) {
       ssl_error();
     }
     CHECK(SSL_CTX_check_private_key(ctx_))
         << "Private key does not match the public certificate";
+
+    constexpr char dh_ike_23_pem[] =
+        "-----BEGIN DH PARAMETERS-----\n"
+        "MIICCgKCAQEArRB+HpEjqdDWYPqnlVnFH6INZOVoO5/RtUsVl7YdCnXm+hQd+VpW\n"
+        "26+aPEB7od8V6z1oijCcGA4d5rhaEnSgpm0/gVKtasISkDfJ7e/aTfjZHo/vVbc5\n"
+        "S3rVt9C2wSIHyfmNEe002/bGugssi7wnvmoA4KC5xJcIs7+KMXCRiDaBKGEwvImF\n"
+        "2xYC5xRBXZMwJ4Jzx94x79xzEPcSH9WgdBWYfZrcCkhtzfk6zEQyg4cxXXXhmMZB\n"
+        "pIDNhqG55YfovmDmnMkosrnFIXLkEwQumyPxCw4W55djybU9z0uoCinj+3PBa451\n"
+        "uX7zY+L/ox9xz53lOE5xuBwKxN/+DBDmTwKCAQEArEAy708tmuOd8wtcj/2sUGze\n"
+        "vnuJmYyvdIZqCM/k/+OmgkpOELmm8N2SHwGnDEr6q3OddwDCn1LFfbF8YgqGUr5e\n"
+        "kAGo1mrXwXZpEBmZAkr00CcnWsE0i7inYtBSG8mK4kcVBCLqHtQJk51U2nRgzbX2\n"
+        "xrJQcXy+8YDrNBGOmNEZUppF1vg0Vm4wJeMWozDvu3eobwwasVsFGuPUKMj4rLcK\n"
+        "gTcVC47rEOGD7dGZY93Z4mPkdwWJ72qiHn9fL/OBtTnM40CdE81Wavu0jWwBkYHh\n"
+        "vP6UswJp7f5y/ptqpL17Wg8ccc//TBnEGOH27AF5gbwIfypwZbOEuJDTGR8r+g==\n"
+        "-----END DH PARAMETERS-----\n";
+
+    BIO* bio =
+        CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(dh_ike_23_pem), -1));
+    DH* dh =
+        CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
+    SSL_CTX_set_tmp_dh(ctx_, dh);
+
+#pragma GCC diagnostic pop
+
+    DH_free(dh);
+    BIO_free(bio);
+
+    SSL_CTX_set_tmp_rsa_callback(ctx_, rsa_callback);
+
+    SSL_CTX_set_mode(ctx_, SSL_MODE_AUTO_RETRY);
+
+    CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
   }
   ~SockBuffer()
   {
+    EVP_cleanup();
     // ??
     // SSL_CTX_free(ctx_);
   }
@@ -176,8 +219,27 @@ public:
       }
 
       if (ssl_n_read == 0) {
-        // This is a close
-        tls_ = false;
+        switch (SSL_get_error(ssl_, ssl_n_read)) {
+        case SSL_ERROR_NONE:
+          LOG(INFO) << "SSL_read returned SSL_ERROR_NONE";
+          break;
+
+        case SSL_ERROR_ZERO_RETURN:
+          // This is a close
+          LOG(INFO) << "SSL_read returned SSL_ERROR_SSL";
+          tls_ = false;
+          break;
+
+        case SSL_ERROR_SSL:
+          LOG(INFO) << "SSL_read returned SSL_ERROR_SSL";
+          ssl_error();
+          break;
+
+        default:
+          LOG(INFO) << "SSL_read other error";
+          ssl_error();
+          break;
+        }
       }
 
       return static_cast<std::streamsize>(ssl_n_read);
@@ -248,10 +310,31 @@ public:
           ssl_error();
         }
       }
+
       if (0 == ssl_n_write) {
-        // This is a close
-        tls_ = false;
+        switch (SSL_get_error(ssl_, ssl_n_write)) {
+        case SSL_ERROR_NONE:
+          LOG(INFO) << "SSL_write returned SSL_ERROR_NONE";
+          break;
+
+        case SSL_ERROR_ZERO_RETURN:
+          // This is a close
+          tls_ = false;
+          break;
+
+        case SSL_ERROR_SSL:
+          LOG(INFO) << "SSL_write returned SSL_ERROR_SSL";
+          ssl_error();
+          break;
+
+        default:
+          LOG(INFO) << "SSL_write other error";
+          ssl_error();
+          break;
+        }
       }
+
+      return static_cast<std::streamsize>(ssl_n_write);
     }
 
     ssize_t n_write;
@@ -343,15 +426,32 @@ public:
     }
     return info.str();
   }
+  bool tls()
+  {
+    return tls_;
+  }
 
 private:
-  void ssl_error()
+  static void ssl_error()
   {
     unsigned long er;
     LOG(ERROR) << "SSL error";
     while (0 != (er = ERR_get_error()))
       LOG(ERROR) << ERR_error_string(er, nullptr);
     abort();
+  }
+  static RSA* rsa_callback(SSL* s, int ex, int keylength)
+  {
+    LOG(INFO) << "generating " << keylength << " bit RSA key";
+
+    RSA* rsa_key = RSA_generate_key(keylength, RSA_F4, nullptr, nullptr);
+    if (rsa_key == NULL) {
+      static char ssl_errstring[256];
+      ERR_error_string(ERR_get_error(), ssl_errstring);
+      LOG(ERROR) << "TLS error (RSA_generate_key): " << ssl_errstring;
+      return NULL;
+    }
+    return rsa_key;
   }
 
 private:
