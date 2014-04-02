@@ -265,7 +265,8 @@ public:
   }
 
 private:
-  std::streamsize io_fd(std::function<ssize_t(int, void*, size_t)> fnc,
+  std::streamsize io_fd(char const* fnm,
+                        std::function<ssize_t(int, void*, size_t)> fnc,
                         std::chrono::milliseconds timeout, char* s,
                         std::streamsize n)
   {
@@ -285,6 +286,7 @@ private:
             continue; // try fnc again
         }
         timed_out_ = true;
+        LOG(WARNING) << fnm << " timed out";
         return static_cast<std::streamsize>(-1);
       }
 
@@ -294,18 +296,21 @@ private:
       throw runtime_error_from_errno(errno);
     }
 
-    if (0 == n_ret)
+    if (0 == n_ret) {
+      LOG(WARNING) << fnm << " returned zero, interpreting as EOF";
       return static_cast<std::streamsize>(-1);
+    }
 
     return static_cast<std::streamsize>(n_ret);
   }
   std::streamsize read_fd(char* s, std::streamsize n)
   {
-    return io_fd(::read, Config::read_timeout, s, n);
+    return io_fd("read", ::read, Config::read_timeout, s, n);
   }
   std::streamsize write_fd(const char* s, std::streamsize n)
   {
-    return io_fd(::write, Config::write_timeout, const_cast<char*>(s), n);
+    return io_fd("write", ::write, Config::write_timeout, const_cast<char*>(s),
+                 n);
   }
 
   std::streamsize io_tls(char const* fnm,
@@ -321,7 +326,7 @@ private:
            0) {
       time_point<system_clock> now = system_clock::now();
       if (now > (start + timeout)) {
-        LOG(ERROR) << fnm << " timed out";
+        LOG(WARNING) << fnm << " timed out";
         timed_out_ = true;
         return static_cast<std::streamsize>(-1);
       }
@@ -333,12 +338,14 @@ private:
       case SSL_ERROR_WANT_READ:
         if (input_ready(time_left))
           continue; // try fnc again
+        LOG(WARNING) << fnm << " timed out";
         timed_out_ = true;
         return static_cast<std::streamsize>(-1);
 
       case SSL_ERROR_WANT_WRITE:
         if (output_ready(time_left))
           continue; // try fnc again
+        LOG(WARNING) << fnm << " timed out";
         timed_out_ = true;
         return static_cast<std::streamsize>(-1);
 
