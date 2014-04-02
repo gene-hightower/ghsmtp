@@ -22,6 +22,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring> // std::strerror
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <streambuf>
@@ -48,14 +49,15 @@ constexpr auto write_timeout = std::chrono::seconds(10);
 constexpr auto starttls_timeout = std::chrono::seconds(10);
 }
 
-class io_error : public std::runtime_error {
+class runtime_error_from_errno : public std::runtime_error {
 public:
-  explicit io_error(int e) : std::runtime_error(errno_to_str(e))
+  explicit runtime_error_from_errno(int e)
+    : std::runtime_error(errno_to_string(e))
   {
   }
 
 private:
-  static std::string errno_to_str(int e)
+  static std::string errno_to_string(int e)
   {
     std::stringstream ss;
     ss << "read() error errno==" << e << ": " << std::strerror(e);
@@ -151,7 +153,7 @@ public:
     SSL_CTX_set_tmp_rsa_callback(ctx_, rsa_callback);
 #endif
 
-    //SSL_CTX_set_mode(ctx_, SSL_MODE_AUTO_RETRY);
+    // SSL_CTX_set_mode(ctx_, SSL_MODE_AUTO_RETRY);
 
     // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
   }
@@ -167,33 +169,33 @@ public:
   }
   bool input_ready(std::chrono::milliseconds wait) const
   {
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(fd_in_, &rfds);
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd_in_, &fds);
 
     struct timeval tv;
     tv.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(wait).count();
     tv.tv_usec = (wait.count() % 1000) * 1000;
 
-    int inputs;
-    PCHECK((inputs = select(fd_in_ + 1, &rfds, nullptr, nullptr, &tv)) != -1);
+    int puts;
+    PCHECK((puts = select(fd_in_ + 1, &fds, nullptr, nullptr, &tv)) != -1);
 
-    return 0 != inputs;
+    return 0 != puts;
   }
   bool output_ready(std::chrono::milliseconds wait) const
   {
-    fd_set wfds;
-    FD_ZERO(&wfds);
-    FD_SET(fd_out_, &wfds);
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd_out_, &fds);
 
     struct timeval tv;
     tv.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(wait).count();
     tv.tv_usec = (wait.count() % 1000) * 1000;
 
-    int inputs;
-    PCHECK((inputs = select(fd_out_ + 1, nullptr, &wfds, nullptr, &tv)) != -1);
+    int puts;
+    PCHECK((puts = select(fd_out_ + 1, nullptr, &fds, nullptr, &tv)) != -1);
 
-    return 0 != inputs;
+    return 0 != puts;
   }
   bool timed_out() const
   {
@@ -203,186 +205,9 @@ public:
   {
     return tls_ ? read_tls(s, n) : read_fd(s, n);
   }
-  std::streamsize read_tls(char* s, std::streamsize n)
-  {
-    using namespace std::chrono;
-    time_point<system_clock> start = system_clock::now();
-
-    int ssl_n_read;
-    while ((ssl_n_read = SSL_read(ssl_, static_cast<void*>(s),
-                                  static_cast<int>(n))) < 0) {
-      time_point<system_clock> now = system_clock::now();
-      if (now > (start + Config::read_timeout)) {
-        LOG(ERROR) << "SSL_read timed out";
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-      }
-
-      milliseconds t_o =
-          duration_cast<milliseconds>((start + Config::read_timeout) - now);
-
-      switch (SSL_get_error(ssl_, ssl_n_read)) {
-      case SSL_ERROR_WANT_READ:
-        if (input_ready(t_o))
-          continue;
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-
-      case SSL_ERROR_WANT_WRITE:
-        if (output_ready(t_o))
-          continue;
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-
-      default:
-        ssl_error();
-      }
-    }
-
-    // The strange case of 0 return.
-    if (0 == ssl_n_read) {
-      switch (SSL_get_error(ssl_, ssl_n_read)) {
-      case SSL_ERROR_NONE:
-        LOG(INFO) << "SSL_read returned SSL_ERROR_NONE";
-        break;
-
-      case SSL_ERROR_ZERO_RETURN:
-        // This is a close, not at all sure this is the right thing to do.
-        LOG(INFO) << "SSL_read returned SSL_ERROR_ZERO_RETURN";
-        tls_ = false;
-        break;
-
-      default:
-        LOG(INFO) << "SSL_read returned zero";
-        ssl_error();
-      }
-    }
-
-    return static_cast<std::streamsize>(ssl_n_read);
-  }
-  std::streamsize read_fd(char* s, std::streamsize n)
-  {
-    using namespace std::chrono;
-    time_point<system_clock> start = system_clock::now();
-
-    ssize_t n_read;
-    while ((n_read = ::read(fd_in_, static_cast<void*>(s),
-                            static_cast<size_t>(n))) < 0) {
-
-      if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-
-        time_point<system_clock> now = system_clock::now();
-        if (now < (start + Config::read_timeout))
-          if (input_ready(duration_cast<milliseconds>(
-                  (start + Config::read_timeout) - now)))
-            continue;
-
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-      }
-
-      if (errno == EINTR)
-        continue;
-
-      throw io_error(errno);
-    }
-
-    if (0 == n_read)
-      return static_cast<std::streamsize>(-1);
-
-    return static_cast<std::streamsize>(n_read);
-  }
   std::streamsize write(const char* s, std::streamsize n)
   {
     return tls_ ? write_tls(s, n) : write_fd(s, n);
-  }
-  std::streamsize write_tls(const char* s, std::streamsize n)
-  {
-    using namespace std::chrono;
-    time_point<system_clock> start = system_clock::now();
-
-    int ssl_n_write;
-    while ((ssl_n_write = SSL_write(ssl_, static_cast<const void*>(s),
-                                    static_cast<size_t>(n))) < 0) {
-      time_point<system_clock> now = system_clock::now();
-      if (now > (start + Config::write_timeout)) {
-        LOG(ERROR) << "SSL_write timed out";
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-      }
-
-      milliseconds t_o =
-          duration_cast<milliseconds>((start + Config::write_timeout) - now);
-
-      switch (SSL_get_error(ssl_, ssl_n_write)) {
-      case SSL_ERROR_WANT_READ:
-        if (input_ready(t_o))
-          continue;
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-
-      case SSL_ERROR_WANT_WRITE:
-        if (output_ready(t_o))
-          continue;
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-
-      default:
-        ssl_error();
-      }
-    }
-
-    // The strange case of 0 return.
-    if (0 == ssl_n_write) {
-      switch (SSL_get_error(ssl_, ssl_n_write)) {
-      case SSL_ERROR_NONE:
-        LOG(INFO) << "SSL_write returned SSL_ERROR_NONE";
-        break;
-
-      case SSL_ERROR_ZERO_RETURN:
-        // This is a close, not at all sure this is the right thing to do.
-        LOG(INFO) << "SSL_write returned SSL_ERROR_ZERO_RETURN";
-        tls_ = false;
-        break;
-
-      default:
-        LOG(INFO) << "SSL_write returned zero";
-        ssl_error();
-      }
-    }
-
-    return static_cast<std::streamsize>(ssl_n_write);
-  }
-  std::streamsize write_fd(const char* s, std::streamsize n)
-  {
-    using namespace std::chrono;
-    time_point<system_clock> start = system_clock::now();
-
-    ssize_t n_write;
-    while ((n_write = ::write(fd_out_, static_cast<const void*>(s),
-                              static_cast<size_t>(n))) < 0) {
-      if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-
-        time_point<system_clock> now = system_clock::now();
-        if (now < (start + Config::write_timeout))
-          if (output_ready(duration_cast<milliseconds>(
-                  (start + Config::write_timeout) - now)))
-            continue;
-
-        timed_out_ = true;
-        return static_cast<std::streamsize>(-1);
-      }
-
-      if (errno == EINTR)
-        continue;
-
-      throw io_error(errno);
-    }
-
-    if (0 == n_write)
-      return static_cast<std::streamsize>(-1);
-
-    return static_cast<std::streamsize>(n_write);
   }
   void starttls()
   {
@@ -400,17 +225,17 @@ public:
 
       CHECK(now < (start + Config::starttls_timeout)) << "starttls timed out";
 
-      milliseconds t_o =
+      milliseconds time_left =
           duration_cast<milliseconds>((start + Config::starttls_timeout) - now);
 
       switch (SSL_get_error(ssl_, rc)) {
       case SSL_ERROR_WANT_READ:
-        CHECK(input_ready(t_o)) << "starttls timed out on input_ready";
-        continue;
+        CHECK(input_ready(time_left)) << "starttls timed out on input_ready";
+        continue; // try SSL_accept again
 
       case SSL_ERROR_WANT_WRITE:
-        CHECK(output_ready(t_o)) << "starttls timed out on output_ready";
-        continue;
+        CHECK(output_ready(time_left)) << "starttls timed out on output_ready";
+        continue; // try SSL_accept again
 
       default:
         ssl_error();
@@ -440,6 +265,119 @@ public:
   }
 
 private:
+  std::streamsize io_fd(std::function<ssize_t(int, void*, size_t)> fnc,
+                        std::chrono::milliseconds timeout, char* s,
+                        std::streamsize n)
+  {
+    using namespace std::chrono;
+    time_point<system_clock> start = system_clock::now();
+
+    ssize_t n_ret;
+    while ((n_ret = fnc(fd_in_, static_cast<void*>(s),
+                        static_cast<size_t>(n))) < 0) {
+
+      if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
+        time_point<system_clock> now = system_clock::now();
+        if (now < (start + timeout)) {
+          milliseconds time_left =
+              duration_cast<milliseconds>((start + timeout) - now);
+          if (input_ready(time_left))
+            continue; // try fnc again
+        }
+        timed_out_ = true;
+        return static_cast<std::streamsize>(-1);
+      }
+
+      if (errno == EINTR)
+        continue; // try fnc again
+
+      throw runtime_error_from_errno(errno);
+    }
+
+    if (0 == n_ret)
+      return static_cast<std::streamsize>(-1);
+
+    return static_cast<std::streamsize>(n_ret);
+  }
+  std::streamsize read_fd(char* s, std::streamsize n)
+  {
+    return io_fd(::read, Config::read_timeout, s, n);
+  }
+  std::streamsize write_fd(const char* s, std::streamsize n)
+  {
+    return io_fd(::write, Config::write_timeout, const_cast<char*>(s), n);
+  }
+
+  std::streamsize io_tls(char const* fnm,
+                         std::function<int(SSL*, void*, int)> fnc,
+                         std::chrono::milliseconds timeout, char* s,
+                         std::streamsize n)
+  {
+    using namespace std::chrono;
+    time_point<system_clock> start = system_clock::now();
+
+    int n_ret;
+    while ((n_ret = fnc(ssl_, static_cast<void*>(s), static_cast<int>(n))) <
+           0) {
+      time_point<system_clock> now = system_clock::now();
+      if (now > (start + timeout)) {
+        LOG(ERROR) << fnm << " timed out";
+        timed_out_ = true;
+        return static_cast<std::streamsize>(-1);
+      }
+
+      milliseconds time_left =
+          duration_cast<milliseconds>((start + timeout) - now);
+
+      switch (SSL_get_error(ssl_, n_ret)) {
+      case SSL_ERROR_WANT_READ:
+        if (input_ready(time_left))
+          continue; // try fnc again
+        timed_out_ = true;
+        return static_cast<std::streamsize>(-1);
+
+      case SSL_ERROR_WANT_WRITE:
+        if (output_ready(time_left))
+          continue; // try fnc again
+        timed_out_ = true;
+        return static_cast<std::streamsize>(-1);
+
+      default:
+        ssl_error();
+      }
+    }
+
+    // The strange case of 0 return.
+    if (0 == n_ret) {
+      switch (SSL_get_error(ssl_, n_ret)) {
+      case SSL_ERROR_NONE:
+        LOG(INFO) << fnm << " returned SSL_ERROR_NONE";
+        break;
+
+      case SSL_ERROR_ZERO_RETURN:
+        // This is a close, not at all sure this is the right thing to do.
+        LOG(INFO) << fnm << " returned SSL_ERROR_ZERO_RETURN";
+        tls_ = false;
+        break;
+
+      default:
+        LOG(INFO) << fnm << " returned zero";
+        ssl_error();
+      }
+    }
+
+    return static_cast<std::streamsize>(n_ret);
+  }
+  std::streamsize read_tls(char* s, std::streamsize n)
+  {
+    return io_tls("SSL_read", SSL_read, Config::read_timeout, s, n);
+  }
+  std::streamsize write_tls(const char* s, std::streamsize n)
+  {
+    return io_tls("SSL_write", SSL_write, Config::write_timeout,
+                  const_cast<char*>(s), n);
+  }
+
   static void ssl_error()
   {
     unsigned long er;
