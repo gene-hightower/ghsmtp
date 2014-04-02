@@ -154,13 +154,9 @@ inline void Session::greeting()
 
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
-      client_ = "(" + fcrdns_ + " [";
-      client_ += sock_.them_c_str();
-      client_ += "])";
+      client_ = "(" + fcrdns_ + " [" + sock_.them_c_str() + "])";
     } else {
-      client_ = "(unknown [";
-      client_ += sock_.them_c_str();
-      client_ += "])";
+      client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
     }
 
     // If we have fcrdns, check a white list before looking in DNSBLs
@@ -300,8 +296,8 @@ inline void Session::data()
   if (sock_.has_peername()) {
     headers << " " << client_;
   }
-  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id "
-          << msg.id() << "\n\tfor " << forward_path_[0];
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
+          << "\n\tfor " << forward_path_[0];
 
   std::string tls_info{ sock_.tls_info() };
   if (tls_info.length()) {
