@@ -169,6 +169,11 @@ int main(int argc, char* argv[])
       continue;
     }
 
+    if ("STARTTLS" == cmd) {
+      session.starttls();
+      continue;
+    }
+
     session.error("unrecognized command");
   }
 }

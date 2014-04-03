@@ -20,6 +20,7 @@
 #define SOCK_DOT_HPP
 
 #include <iostream>
+#include <string>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -35,8 +36,7 @@ public:
   Sock& operator=(const Sock&) = delete;
 
   Sock(int fd_in, int fd_out)
-    : buf_(fd_in, fd_out)
-    , iostream_(buf_)
+    : iostream_(fd_in, fd_out)
     , us_addr_len_(sizeof us_addr_)
     , them_addr_len_(sizeof them_addr_)
     , us_addr_str_{ '\0' }
@@ -103,9 +103,9 @@ public:
   {
     return them_addr_str_[0] != '\0';
   }
-  bool input_pending(std::chrono::milliseconds wait)
+  bool input_ready(std::chrono::milliseconds wait)
   {
-    return iostream_->input_pending(wait);
+    return iostream_->input_ready(wait);
   }
   bool timed_out()
   {
@@ -121,11 +121,18 @@ public:
   }
   void starttls()
   {
-    buf_.starttls();
+    iostream_->starttls();
+  }
+  bool tls()
+  {
+    return iostream_->tls();
+  }
+  std::string tls_info()
+  {
+    return iostream_->tls_info();
   }
 
 private:
-  SockBuffer buf_;
   boost::iostreams::stream<SockBuffer> iostream_;
 
   socklen_t us_addr_len_;

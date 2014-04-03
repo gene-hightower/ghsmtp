@@ -197,7 +197,7 @@ command:
 | help CRLF             { session.help(); }
 | help ' ' string CRLF  { session.help(); }
 
-| starttls              { session.starttls(); }
+| starttls CRLF         { session.starttls(); }
 
 | quit CRLF             { session.quit(); }
 ;

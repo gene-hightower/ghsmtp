@@ -18,10 +18,6 @@
 
 #include "Sock.hpp"
 
-#include <iostream>
-
-#include "Logging.hpp"
-
 int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);

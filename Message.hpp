@@ -45,6 +45,7 @@ public:
     } else {
       ev = getenv("HOME");
       if (ev) {
+        CHECK(strcmp(ev, "/root")) << "should not run as root";
         maildir = ev;
       } else {
         errno = 0; // See GETPWNAM(3)

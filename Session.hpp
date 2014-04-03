@@ -36,12 +36,13 @@
 #include "Sock.hpp"
 
 namespace Config {
-constexpr char const* const bad_identities[] = { "illinnalum.info" };
+constexpr char const* const bad_identities[] = { "illinnalum.info",
+                                                 "playsportz.com", };
 
-constexpr char const* const bad_recipients[] = { "nobody", "mixmaster" };
+constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
-                                       "b.barracudacentral.org" };
+                                       "b.barracudacentral.org", };
 
 constexpr auto greeting_max_wait_ms = 10000;
 constexpr auto greeting_min_wait_ms = 500;
@@ -86,8 +87,8 @@ private:
 private:
   Sock sock_;
 
-  std::string fqdn_;                  // Who we identify as.
-  std::string fcrdns_;                // Who they look-up as.
+  std::string fqdn_;                  // who we identify as
+  std::string fcrdns_;                // who they look-up as
   std::string client_;                // (fcrdns_ [sock_.them_c_str()])
   std::string client_identity_;       // ehlo/helo
   Mailbox reverse_path_;              // "mail from"
@@ -153,14 +154,12 @@ inline void Session::greeting()
 
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
-      client_ = "(" + fcrdns_ + " [";
-      client_ += sock_.them_c_str();
-      client_ += "])";
+      client_ = "(" + fcrdns_ + " [" + sock_.them_c_str() + "])";
     } else {
-      client_ = "(unknown [";
-      client_ += sock_.them_c_str();
-      client_ += "])";
+      client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
     }
+
+    // If we have fcrdns, check a white list before looking in DNSBLs
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     for (const auto& rbl : Config::rbls) {
@@ -176,7 +175,7 @@ inline void Session::greeting()
                                              Config::greeting_max_wait_ms);
     std::chrono::milliseconds wait{ uni_dist(rd_) };
 
-    if (sock_.input_pending(wait)) {
+    if (sock_.input_ready(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
       LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
@@ -189,13 +188,14 @@ inline void Session::greeting()
 
 inline void Session::ehlo(std::string const& client_identity)
 {
-  protocol_ = "ESMTP";
+  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   if (verify_client(client_identity)) {
     reset();
-    out() << "250-" << fqdn_ << "\r\n"
-                                "250-PIPELINING\r\n"
-        //                      "250-STARTTLS\r\n"
-                                "250 8BITMIME\r\n" << std::flush;
+    out() << "250-" << fqdn_ << "\r\n250-PIPELINING\r\n";
+    if (!sock_.tls()) {
+      out() << "250-STARTTLS\r\n";
+    }
+    out() << "250 8BITMIME\r\n" << std::flush;
   }
 }
 
@@ -214,7 +214,7 @@ Session::mail_from(Mailbox const& reverse_path,
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
-    LOG(WARNING) << "503 'MAIL FROM' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
@@ -249,14 +249,14 @@ Session::rcpt_to(Mailbox const& forward_path,
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
-    LOG(WARNING) << "503 'RCPT TO' before 'MAIL FROM'"
+    LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters, we don't accept any:
   for (auto& p : parameters) {
-    LOG(WARNING) << "unrecognized RCPT TO parameter " << p.first << "="
+    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << p.first << "="
                  << p.second;
   }
   if (verify_recipient(forward_path)) {
@@ -269,13 +269,13 @@ inline void Session::data()
 {
   if (!reverse_path_verified_) {
     out() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
-    LOG(WARNING) << "503 need 'MAIL FROM' before 'DATA'";
+    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return;
   }
 
   if (forward_path_.empty()) {
     out() << "554 no valid recipients\r\n" << std::flush;
-    LOG(WARNING) << "554 no valid recipients";
+    LOG(WARNING) << "no valid recipients";
     return;
   }
 
@@ -285,20 +285,26 @@ inline void Session::data()
   // the top of the message.
 
   std::ostringstream headers;
-  headers << "Return-Path: " << reverse_path_ << std::endl;
+  headers << "Return-Path: " << reverse_path_ << "\n";
 
-  headers << "X-Original-To: " << forward_path_[0] << std::endl;
+  headers << "X-Original-To: " << forward_path_[0] << "\n";
   for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << '\t' << forward_path_[i] << std::endl;
+    headers << '\t' << forward_path_[i] << "\n";
   }
 
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " " << client_;
   }
-  headers << "\n\tby " << fqdn_ << " with " << protocol_ << "\n\tid "
-          << msg.id() << "\n\tfor " << forward_path_[0] << ";\n\t" << msg.when()
-          << "\n";
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
+          << "\n\tfor " << forward_path_[0];
+
+  std::string tls_info{ sock_.tls_info() };
+  if (tls_info.length()) {
+    headers << "\n\t(" << tls_info << ")";
+  }
+
+  headers << ";\n\t" << msg.when() << "\n";
 
   msg.out() << headers.str();
 
@@ -311,7 +317,7 @@ inline void Session::data()
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
-      LOG(ERROR) << "421 bare linefeed in message with id " << msg.id();
+      LOG(ERROR) << "bare linefeed in message with id " << msg.id();
       std::exit(EXIT_SUCCESS);
     }
 
@@ -334,6 +340,7 @@ inline void Session::data()
   if (sock_.timed_out())
     time();
 
+  LOG(WARNING) << "unexpected end of data in message with id " << msg.id();
   out() << "554 data NOT ok\r\n" << std::flush;
 }
 
@@ -356,7 +363,7 @@ inline void Session::vrfy()
 inline void Session::help()
 {
   out() << "214-see https://digilicious.com/smtp.html\r\n"
-        << "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n" << std::flush;
+           "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n" << std::flush;
 }
 
 inline void Session::quit()
@@ -380,7 +387,13 @@ inline void Session::time()
 
 inline void Session::starttls()
 {
-  sock_.starttls();
+  if (sock_.tls()) {
+    out() << "554 TLS already active\r\n" << std::flush;
+    LOG(WARNING) << "STARTTLS issued with TLS already active";
+  } else {
+    out() << "220 go ahead\r\n" << std::flush;
+    sock_.starttls();
+  }
 }
 
 inline bool Session::timed_out()
@@ -479,7 +492,12 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
 inline bool Session::verify_sender(Mailbox const& sender)
 {
-  // look up SPF & DMARC records...
+  // If the reverse path domain matches the Forward-confirmed reverse
+  // DNS of the sending IP address, we're golden.
+  if (!Domain::match(sender.domain(), fcrdns_)) {
+    // look up SPF & DMARC records...
+    // check black.uribl.com
+  }
   reverse_path_verified_ = true;
   return true;
 }
