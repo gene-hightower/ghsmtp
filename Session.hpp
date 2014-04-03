@@ -436,7 +436,8 @@ inline bool Session::verify_client(std::string const& client_identity)
   if (Domain::match(client_identity, fqdn_) ||
       Domain::match(client_identity, "localhost") ||
       Domain::match(client_identity, "localhost.localdomain")) {
-    if (strcmp(sock_.them_c_str(), "127.0.0.1")) {
+    if (!Domain::match(fqdn_, fcrdns_) &&
+        strcmp(sock_.them_c_str(), "127.0.0.1")) {
       out() << "554 liar\r\n" << std::flush;
       LOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
                    << client_ << " claiming " << client_identity;
