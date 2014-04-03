@@ -266,8 +266,7 @@ public:
 
 private:
   std::streamsize io_fd(char const* fnm,
-                        std::function<ssize_t(int, void*, size_t)> fnc,
-                        int fd,
+                        std::function<ssize_t(int, void*, size_t)> fnc, int fd,
                         std::chrono::milliseconds timeout, char* s,
                         std::streamsize n)
   {
@@ -275,8 +274,8 @@ private:
     time_point<system_clock> start = system_clock::now();
 
     ssize_t n_ret;
-    while ((n_ret = fnc(fd, static_cast<void*>(s),
-                        static_cast<size_t>(n))) < 0) {
+    while ((n_ret = fnc(fd, static_cast<void*>(s), static_cast<size_t>(n))) <
+           0) {
 
       if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
         time_point<system_clock> now = system_clock::now();
@@ -310,8 +309,8 @@ private:
   }
   std::streamsize write_fd(const char* s, std::streamsize n)
   {
-    return io_fd("write", ::write, fd_out_, Config::write_timeout, const_cast<char*>(s),
-                 n);
+    return io_fd("write", ::write, fd_out_, Config::write_timeout,
+                 const_cast<char*>(s), n);
   }
 
   std::streamsize io_tls(char const* fnm,
