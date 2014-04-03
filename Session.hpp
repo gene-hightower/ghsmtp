@@ -363,7 +363,7 @@ inline void Session::vrfy()
 inline void Session::help()
 {
   out() << "214-see https://digilicious.com/smtp.html\r\n"
-        << "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n" << std::flush;
+           "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n" << std::flush;
 }
 
 inline void Session::quit()
