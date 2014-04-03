@@ -133,8 +133,6 @@ public:
     DH_free(dh);
     BIO_free(bio);
 
-    // SSL_CTX_set_mode(ctx_, SSL_MODE_AUTO_RETRY);
-
     // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
   }
   ~SockBuffer()
