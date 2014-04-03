@@ -133,10 +133,6 @@ public:
     DH_free(dh);
     BIO_free(bio);
 
-#ifdef NEED_RSA_CALLBACK
-    SSL_CTX_set_tmp_rsa_callback(ctx_, rsa_callback);
-#endif
-
     // SSL_CTX_set_mode(ctx_, SSL_MODE_AUTO_RETRY);
 
     // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
@@ -375,22 +371,6 @@ private:
       LOG(ERROR) << ERR_error_string(er, nullptr);
     abort();
   }
-
-#ifdef NEED_RSA_CALLBACK
-  static RSA* rsa_callback(SSL* s, int ex, int keylength)
-  {
-    LOG(INFO) << "generating " << keylength << " bit RSA key";
-
-    RSA* rsa_key = RSA_generate_key(keylength, RSA_F4, nullptr, nullptr);
-    if (rsa_key == NULL) {
-      static char ssl_errstring[256];
-      ERR_error_string(ERR_get_error(), ssl_errstring);
-      LOG(ERROR) << "TLS error (RSA_generate_key): " << ssl_errstring;
-      return NULL;
-    }
-    return rsa_key;
-  }
-#endif
 
 private:
   int fd_in_;
