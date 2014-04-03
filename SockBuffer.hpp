@@ -49,22 +49,6 @@ constexpr auto write_timeout = std::chrono::seconds(10);
 constexpr auto starttls_timeout = std::chrono::seconds(10);
 }
 
-class runtime_error_from_errno : public std::runtime_error {
-public:
-  explicit runtime_error_from_errno(int e)
-    : std::runtime_error(errno_to_string(e))
-  {
-  }
-
-private:
-  static std::string errno_to_string(int e)
-  {
-    std::stringstream ss;
-    ss << "read() error errno==" << e << ": " << std::strerror(e);
-    return ss.str();
-  }
-};
-
 class SockBuffer
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
@@ -277,23 +261,21 @@ private:
     while ((n_ret = fnc(fd, static_cast<void*>(s), static_cast<size_t>(n))) <
            0) {
 
-      if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-        time_point<system_clock> now = system_clock::now();
-        if (now < (start + timeout)) {
-          milliseconds time_left =
-              duration_cast<milliseconds>((start + timeout) - now);
-          if (input_ready(time_left))
-            continue; // try fnc again
-        }
-        timed_out_ = true;
-        LOG(WARNING) << fnm << " timed out";
-        return static_cast<std::streamsize>(-1);
-      }
-
       if (errno == EINTR)
         continue; // try fnc again
 
-      throw runtime_error_from_errno(errno);
+      PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN));
+
+      time_point<system_clock> now = system_clock::now();
+      if (now < (start + timeout)) {
+        milliseconds time_left =
+          duration_cast<milliseconds>((start + timeout) - now);
+        if (input_ready(time_left))
+          continue; // try fnc again
+      }
+      timed_out_ = true;
+      LOG(WARNING) << fnm << " timed out";
+      return static_cast<std::streamsize>(-1);
     }
 
     if (0 == n_ret) {
