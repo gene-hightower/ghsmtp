@@ -100,8 +100,10 @@ public:
     if (!key)
       key = cert;
 
-    CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0);
-    CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key, SSL_FILETYPE_PEM) > 0);
+    CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0)
+      << "Can't load certificate file \"" << cert << "\"";
+    CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key, SSL_FILETYPE_PEM) > 0)
+      << "Can't load private key file \"" << key << "\"";
 
     CHECK(SSL_CTX_check_private_key(ctx_))
         << "Private key does not match the public certificate";
