@@ -330,7 +330,7 @@ private:
       }
     }
 
-    // The strange case of 0 return.
+    // The strange (and never before seen) case of 0 return.
     if (0 == n_ret) {
       switch (SSL_get_error(ssl_, n_ret)) {
       case SSL_ERROR_NONE:
