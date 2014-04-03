@@ -263,7 +263,7 @@ private:
       time_point<system_clock> now = system_clock::now();
       if (now < (start + timeout)) {
         milliseconds time_left =
-          duration_cast<milliseconds>((start + timeout) - now);
+            duration_cast<milliseconds>((start + timeout) - now);
         if (input_ready(time_left))
           continue; // try fnc again
       }
