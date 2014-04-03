@@ -21,6 +21,7 @@
 
 #include <cerrno>
 #include <chrono>
+#include <cstdlib>
 #include <cstring> // std::strerror
 #include <functional>
 #include <sstream>
@@ -92,14 +93,16 @@ public:
     const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
     ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-    if (SSL_CTX_use_certificate_file(ctx_, "/z/home/gene/src/smtpd/cert.pem",
-                                     SSL_FILETYPE_PEM) <= 0) {
-      ssl_error();
-    }
-    if (SSL_CTX_use_PrivateKey_file(ctx_, "/z/home/gene/src/smtpd/cert.pem",
-                                    SSL_FILETYPE_PEM) <= 0) {
-      ssl_error();
-    }
+    char const* cert = std::getenv("CERT");
+    if (!cert)
+      cert = "cert.pem";
+    char const* key = std::getenv("KEY");
+    if (!key)
+      key = cert;
+
+    CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0);
+    CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key, SSL_FILETYPE_PEM) > 0);
+
     CHECK(SSL_CTX_check_private_key(ctx_))
         << "Private key does not match the public certificate";
 
