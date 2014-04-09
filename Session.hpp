@@ -496,8 +496,12 @@ inline bool Session::verify_sender(Mailbox const& sender)
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we're golden.
   if (!Domain::match(sender.domain(), fcrdns_)) {
-    // look up SPF & DMARC records...
-    // check black.uribl.com
+    DNS::Resolver res;
+    if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() + ".black.uribl.com")) {
+      out() << "421 blocked by black.uribl.com\r\n" << std::flush;
+      LOG(ERROR) << sender << " blocked by black.uribl.com";
+      std::exit(EXIT_SUCCESS);
+    }
   }
   reverse_path_verified_ = true;
   return true;
