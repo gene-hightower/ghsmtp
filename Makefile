@@ -17,11 +17,18 @@
 CPPFLAGS += \
 	-I/usr/local/include
 
+warnings = \
+	-Wall \
+	-Wformat=2 \
+	-Wold-style-cast \
+	-Woverloaded-virtual \
+	-Wsign-promo
+
 CXXFLAGS += \
 	-std=c++11 \
 	-MMD \
 	-g -O2 \
-	-Wall -Wold-style-cast -Woverloaded-virtual -Wsign-promo
+	$(warnings)
 
 LDLIBS += \
 	-L/usr/local/lib \
