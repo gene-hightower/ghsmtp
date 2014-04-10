@@ -36,12 +36,14 @@ LDLIBS += \
 	-lglog -lgflags \
 	-lboost_regex -lboost_system -lpthread \
 	-lldns \
+	-lspf2 \
 	-lstdc++
 
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
+SPFt_EXTRA = SPF
 
-tests = DNSt Domaint IP4t Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt
+tests = DNSt Domaint IP4t Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt SPFt
 
 all: $(programs)
 
