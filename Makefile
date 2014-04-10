@@ -14,11 +14,8 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-openssl_dir = /usr/local/ssl
-
 CPPFLAGS += \
-	-I/usr/local/include \
-	-I$(openssl_dir)/include
+	-I/usr/local/include
 
 CXXFLAGS += \
 	-std=c++11 \
@@ -28,7 +25,6 @@ CXXFLAGS += \
 
 LDLIBS += \
 	-L/usr/local/lib \
-	-L$(openssl_dir)/lib \
 	-lcrypto -lssl \
 	-lglog -lgflags \
 	-lboost_regex -lboost_system -lpthread \
