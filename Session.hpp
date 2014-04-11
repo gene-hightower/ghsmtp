@@ -499,7 +499,7 @@ inline bool Session::verify_sender(Mailbox const& sender)
     DNS::Resolver res;
     if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() + ".black.uribl.com")) {
       out() << "421 blocked by black.uribl.com\r\n" << std::flush;
-      LOG(ERROR) << sender << " blocked by black.uribl.com";
+      LOG(ERROR) << sender.domain() << " blocked by black.uribl.com";
       std::exit(EXIT_SUCCESS);
     }
   }
