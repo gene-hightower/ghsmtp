@@ -28,11 +28,17 @@ int main(int argc, char const* argv[])
   CHECK_EQ(sizeof(SPF::Request), sizeof(void*));
 
   SPF::Server srv("EXAMPLE.COM");
+
   SPF::Request req(srv);
   req.set_ipv4_str("108.83.36.113");
   req.set_helo_dom("digilicious.com");
   req.set_env_from("postmaster@digilicious.com");
+  CHECK_EQ(req.check(), SPF::Result::PASS);
 
-  SPF::Result res = req.check();
-  std::cout << "result == " << SPF::result_to_string[res] << std::endl;
+  SPF::Request req2(srv);
+  req2.set_ipv4_str("10.1.1.1");
+  req2.set_helo_dom("digilicious.com");
+  req2.set_env_from("postmaster@digilicious.com");
+  CHECK_EQ(req2.check(), SPF::Result::FAIL);
+
 }

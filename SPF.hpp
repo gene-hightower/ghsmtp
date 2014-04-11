@@ -19,6 +19,7 @@
 #ifndef SPF_DOT_HPP
 #define SPF_DOT_HPP
 
+#include <ostream>
 #include <unordered_map>
 
 #include <arpa/inet.h> // in_addr
@@ -102,7 +103,7 @@ public:
 private:
   SPF_request_t* req_;
 };
-}
+} // namespace SPF
 
 namespace std {
 template <>
@@ -112,6 +113,13 @@ struct hash<SPF::Result> {
     return static_cast<size_t>(x);
   }
 };
+}
+
+namespace SPF {
+inline std::ostream& operator<<(std::ostream& s, Result result)
+{
+  return s << result_to_string[result];
+}
 }
 
 #endif // SPF_DOT_HPP

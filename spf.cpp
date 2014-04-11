@@ -14,19 +14,34 @@ extern "C" {
 
 #include "Logging.hpp"
 
-int main(int argc, char* argv[])
-{
-#if 0
-  extern void (*SPF_error_handler)( const char *, int, const char * ) __attribute__ ((noreturn));
-  extern void (*SPF_warning_handler)( const char *, int, const char * );
-  extern void (*SPF_info_handler)( const char *, int, const char * );
-  extern void (*SPF_debug_handler)( const char *, int, const char * );
-#endif
+// We map libspf2's levels of error, warning, info and debug to
+// Google's fatal, error, warning and info.
 
-  SPF_error_handler = nullptr;
-  SPF_warning_handler = nullptr;
-  SPF_info_handler = nullptr;
-  SPF_debug_handler = nullptr;
+void glog_error(const char* file, int line, char const* errmsg)
+{
+  google::LogMessageFatal(file, line).stream() << errmsg;
+}
+void glog_warning(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line, google::GLOG_ERROR).stream() << errmsg;
+}
+void glog_info(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line, google::GLOG_WARNING).stream() << errmsg;
+}
+void glog_debug(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line).stream() << errmsg;
+}
+
+int main(int argc, char const* argv[])
+{
+  Logging::init(argv[0]);
+
+  SPF_error_handler = glog_error;
+  SPF_warning_handler = glog_warning;
+  SPF_info_handler = glog_info;
+  SPF_debug_handler = glog_debug;
 
   SPF_server_t* spf_server = CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1));
   SPF_request_t* spf_request = CHECK_NOTNULL(SPF_request_new(spf_server));

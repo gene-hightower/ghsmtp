@@ -55,7 +55,7 @@ enum class Pkt_rcode {
   NOTZONE = LDNS_RCODE_NOTZONE,
 };
 
-extern std::unordered_map<Pkt_rcode, char const*> Pkt_rcode_to_string;
+extern std::unordered_map<Pkt_rcode, char const*> pkt_rcode_to_string;
 
 template <RR_type T>
 class Query;
@@ -326,6 +326,13 @@ struct hash<DNS::Pkt_rcode> {
     return static_cast<size_t>(x);
   }
 };
+}
+
+namespace DNS {
+inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode)
+{
+  return s << pkt_rcode_to_string[pkt_rcode];
+}
 }
 
 #endif // DNS_DOT_HPP

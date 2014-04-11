@@ -30,4 +30,36 @@ std::unordered_map<Result, char const*> result_to_string{
   { SPF::Result::TEMPERROR, "TEMPERROR" },
   { SPF::Result::PERMERROR, "PERMERROR" },
 };
+
+// We map libspf2's levels of error, warning, info and debug to
+// Google's fatal, error, warning and info.
+
+static void glog_error(const char* file, int line, char const* errmsg)
+{
+  google::LogMessageFatal(file, line).stream() << errmsg;
+}
+static void glog_warning(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line, google::GLOG_ERROR).stream() << errmsg;
+}
+static void glog_info(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line, google::GLOG_WARNING).stream() << errmsg;
+}
+static void glog_debug(const char* file, int line, char const* errmsg)
+{
+  google::LogMessage(file, line).stream() << errmsg;
+}
+
+struct Init {
+  Init()
+  {
+    SPF_error_handler = glog_error;
+    SPF_warning_handler = glog_warning;
+    SPF_info_handler = glog_info;
+    SPF_debug_handler = glog_debug;
+  }
+};
+
+static class Init init;
 }
