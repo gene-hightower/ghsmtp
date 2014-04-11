@@ -277,7 +277,7 @@ private:
       return static_cast<std::streamsize>(-1);
     }
 
-    if (0 == n_ret) {
+    if (0 == n_ret) {           // This happens for "normal" files.
       LOG(WARNING) << fnm << " returned zero, interpreting as EOF";
       return static_cast<std::streamsize>(-1);
     }

@@ -29,18 +29,32 @@ int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  // std::filebuf buf; buf.open("/dev/stdin", std::ios::in);
+  constexpr char infile[]{ "input.txt" };
 
-  int fd;
-  PCHECK((fd = open("input.txt", O_RDONLY)) != -1);
+  int fd_in;
+  PCHECK((fd_in = open(infile, O_RDONLY)) != -1);
 
-  boost::iostreams::stream<SockBuffer> iostream{ SockBuffer(fd,
-                                                            STDOUT_FILENO) };
+  constexpr char tmplt[]{ "/tmp/SockBuffert-XXXXXX" };
+  char outfile[sizeof(tmplt)];
+  strcpy(outfile, tmplt);
+
+  int fd_out;
+  PCHECK((fd_out = mkstemp(outfile)) != -1);
+
+  boost::iostreams::stream<SockBuffer> iostream{ SockBuffer(fd_in, fd_out) };
 
   std::string line;
   while (std::getline(iostream, line)) {
-    std::cout << line << std::endl;
+    iostream << line << std::endl;
   }
+
+  std::string diff_cmd = "diff ";
+  diff_cmd += infile;
+  diff_cmd += " ";
+  diff_cmd += outfile;
+  CHECK_EQ(system(diff_cmd.c_str()), 0);
+
+  PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;
 
   std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << std::endl;
 }
