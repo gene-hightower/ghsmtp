@@ -93,16 +93,47 @@ public:
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_env_from(req_, frm));
   }
-  Result check()
-  {
-    SPF_response_t* response = NULL;
-    SPF_request_query_mailfrom(req_, &response);
-    return static_cast<Result>(SPF_response_result(response));
-  }
 
 private:
   SPF_request_t* req_;
+
+  friend class Response;
 };
+
+class Response {
+public:
+  Response(Response const&) = delete;
+  Response& operator=(Response const&) = delete;
+
+  explicit Response(Request const& req)
+  {
+    SPF_request_query_mailfrom(req.req_, &res_);
+  }
+  ~Response()
+  {
+    SPF_response_free(res_);
+  }
+  Result result() const
+  {
+    return static_cast<Result>(SPF_response_result(res_));
+  }
+  char const* smtp_comment() const
+  {
+    return SPF_response_get_smtp_comment(res_);
+  }
+  char const* header_comment() const
+  {
+    return SPF_response_get_header_comment(res_);
+  }
+  char const* received_spf() const
+  {
+    return SPF_response_get_received_spf(res_);
+  }
+
+private:
+  SPF_response_t* res_;
+};
+
 } // namespace SPF
 
 namespace std {

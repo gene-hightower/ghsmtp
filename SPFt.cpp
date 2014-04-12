@@ -33,12 +33,13 @@ int main(int argc, char const* argv[])
   req.set_ipv4_str("108.83.36.113");
   req.set_helo_dom("digilicious.com");
   req.set_env_from("postmaster@digilicious.com");
-  CHECK_EQ(req.check(), SPF::Result::PASS);
+  SPF::Response res(req);
+  CHECK_EQ(res.result(), SPF::Result::PASS);
 
   SPF::Request req2(srv);
   req2.set_ipv4_str("10.1.1.1");
   req2.set_helo_dom("digilicious.com");
   req2.set_env_from("postmaster@digilicious.com");
-  CHECK_EQ(req2.check(), SPF::Result::FAIL);
-
+  SPF::Response res2(req2);
+  CHECK_EQ(res2.result(), SPF::Result::FAIL);
 }
