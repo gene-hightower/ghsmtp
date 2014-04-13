@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
   std::ostringstream dgs;
   dgs << dg;
 
-  CHECK_EQ(dgs.str(), "<gene@digilicious.com>");
+  CHECK_EQ(dgs.str(), "gene@digilicious.com");
 
   dg.clear();
   CHECK(dg.empty());
