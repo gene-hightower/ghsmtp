@@ -239,40 +239,40 @@ inline std::vector<std::string> Rrlist<RR_type::A>::get() const
 template <RR_type T>
 inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 {
+  if (rdf->_size > LDNS_MAX_DOMAINLEN) {
+    LOG(WARNING) << "rdf size too large";
+    return "<too long>";
+  }
+  if (rdf->_size == 1) {
+    return "."; // root label
+  }
+
   unsigned char* data = static_cast<unsigned char*>(rdf->_data);
 
   unsigned char src_pos = 0;
   unsigned char len = data[src_pos];
 
-  if (rdf->_size > LDNS_MAX_DOMAINLEN) {
-    LOG(WARNING) << "rdf size too large";
-    return "<too long>";
+  std::ostringstream str;
+  while ((len > 0) && (src_pos < rdf->_size)) {
+    src_pos++;
+    for (unsigned char i = 0; i < len; ++i) {
+      unsigned char c = data[src_pos];
+      if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
+        str << '\\' << c;
+      } else if (!(isascii(c) && isgraph(c))) {
+        str << "0x" << std::hex << std::setfill('0') << std::setw(2)
+            << static_cast<unsigned>(c);
+      } else {
+        str << c;
+      }
+      src_pos++;
+    }
+    if (src_pos < rdf->_size) {
+      str << '.';
+    }
+    len = data[src_pos];
   }
 
-  std::ostringstream str;
-  if (1 == rdf->_size) {
-    str << '.'; // root label
-  } else {
-    while ((len > 0) && (src_pos < rdf->_size)) {
-      src_pos++;
-      for (unsigned char i = 0; i < len; ++i) {
-        unsigned char c = data[src_pos];
-        if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
-          str << '\\' << c;
-        } else if (!(isascii(c) && isgraph(c))) {
-          str << "0x" << std::hex << std::setfill('0') << std::setw(2)
-              << static_cast<unsigned>(c);
-        } else {
-          str << c;
-        }
-        src_pos++;
-      }
-      if (src_pos < rdf->_size) {
-        str << '.';
-      }
-      len = data[src_pos];
-    }
-  }
   return str.str();
 }
 
