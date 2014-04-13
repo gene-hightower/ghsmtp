@@ -35,6 +35,11 @@ std::unordered_map<Result, char const*> result_to_string{
 // Google's fatal, error, warning and info.
 
 static void glog_error(const char* file, int line, char const* errmsg)
+    __attribute__((noreturn)); // This just is for GCC 4.8.2 which
+                               // can't take the attribute on the
+                               // function definition.
+
+static void glog_error(const char* file, int line, char const* errmsg)
 {
   google::LogMessageFatal(file, line).stream() << errmsg;
 }
@@ -61,5 +66,5 @@ struct Init {
   }
 };
 
-static class Init init;
+static Init init;
 }

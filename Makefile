@@ -14,9 +14,6 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-CPPFLAGS += \
-	-I/usr/local/include
-
 warnings = \
 	-Wall \
 	-Wformat=2 \
@@ -31,12 +28,12 @@ CXXFLAGS += \
 	$(warnings)
 
 LDLIBS += \
-	-L/usr/local/lib \
 	-lcrypto -lssl \
 	-lglog -lgflags \
 	-lboost_regex -lboost_system -lpthread \
 	-lldns \
 	-lspf2 \
+	-lm \
 	-lstdc++
 
 programs = dns2 smtp smtpd
