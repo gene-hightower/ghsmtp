@@ -38,10 +38,30 @@ LDLIBS += \
 
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
-smtp_EXTRA = SPF
+smtp_EXTRA = SPF POSIX
+smtpd_EXTRA = POSIX
 
-tests = DNSt Domaint IP4t Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt SPFt
+tests = \
+	DNSt \
+	Domaint \
+	IP4t \
+	Mailboxt \
+	Messaget \
+	Nowt \
+	POSIXt \
+	Pillt \
+	SPFt \
+	Sessiont \
+	SockBuffert \
+	Sockt \
+	TLS-OpenSSLt
+
 SPFt_EXTRA = SPF
+POSIXt_EXTRA = POSIX
+Sessiont_EXTRA = POSIX
+SockBuffert_EXTRA = POSIX
+Sockt_EXTRA = POSIX
+TLS-OpenSSLt_EXTRA = POSIX
 
 all: $(programs)
 
