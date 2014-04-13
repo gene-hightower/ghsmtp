@@ -20,7 +20,7 @@
 
 namespace DNS {
 
-std::unordered_map<DNS::Pkt_rcode, char const*> Pkt_rcode_to_string{
+std::unordered_map<DNS::Pkt_rcode, char const*> pkt_rcode_to_string{
   { DNS::Pkt_rcode::NOERROR, "NOERROR" },
   { DNS::Pkt_rcode::FORMERR, "FORMERR" },
   { DNS::Pkt_rcode::SERVFAIL, "SERVFAIL" },

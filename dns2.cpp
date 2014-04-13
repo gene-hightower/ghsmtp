@@ -51,7 +51,7 @@ void do_dotted_quad(char const* addr)
         std::cout << "not found in " << rbl << std::endl;
       } else {
         std::cout << "Error from lookup at " << rbl << " "
-                  << DNS::Pkt_rcode_to_string[q.get_rcode()] << std::endl;
+                  << q.get_rcode() << std::endl;
       }
     }
   }

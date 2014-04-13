@@ -33,6 +33,7 @@
 #include "IP4.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
+#include "SPF.hpp"
 #include "Sock.hpp"
 
 namespace Config {
@@ -279,17 +280,33 @@ inline void Session::data()
     return;
   }
 
+  SPF::Server spf_srv(fqdn_.c_str());
+  SPF::Request spf_req(spf_srv);
+  spf_req.set_ipv4_str(sock_.them_c_str());
+  spf_req.set_helo_dom(client_identity_.c_str());
+  std::ostringstream from;
+  from << reverse_path_;
+  spf_req.set_env_from(from.str().c_str());
+  SPF::Response spf_res(spf_req);
+
+  if (spf_res.result() == SPF::Result::FAIL) {
+    out() << "421 " << spf_res.smtp_comment() << std::flush;
+    LOG(ERROR) << spf_res.header_comment();
+    std::exit(EXIT_SUCCESS);
+  }
+  LOG(INFO) << spf_res.header_comment();
+
   Message msg(fqdn_, rd_);
 
   // The headers Return-Path, X-Original-To and Received are added to
   // the top of the message.
 
   std::ostringstream headers;
-  headers << "Return-Path: " << reverse_path_ << "\n";
+  headers << "Return-Path: <" << reverse_path_ << ">\n";
 
-  headers << "X-Original-To: " << forward_path_[0] << "\n";
+  headers << "X-Original-To: <" << forward_path_[0] << ">\n";
   for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << '\t' << forward_path_[i] << "\n";
+    headers << "\t<" << forward_path_[i] << ">\n";
   }
 
   headers << "Received: from " << client_identity_;
@@ -297,7 +314,7 @@ inline void Session::data()
     headers << " " << client_;
   }
   headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
-          << "\n\tfor " << forward_path_[0];
+          << "\n\tfor <" << forward_path_[0] << '>';
 
   std::string tls_info{ sock_.tls_info() };
   if (tls_info.length()) {
@@ -305,6 +322,8 @@ inline void Session::data()
   }
 
   headers << ";\n\t" << msg.when() << "\n";
+
+  headers << spf_res.received_spf() << "\n";
 
   msg.out() << headers.str();
 
@@ -494,17 +513,18 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 inline bool Session::verify_sender(Mailbox const& sender)
 {
   // If the reverse path domain matches the Forward-confirmed reverse
-  // DNS of the sending IP address, we're golden.
+  // DNS of the sending IP address, we skip the uribl check.
   if (!Domain::match(sender.domain(), fcrdns_)) {
     DNS::Resolver res;
-    if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() + ".black.uribl.com")) {
+    if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() +
+                                                  ".black.uribl.com")) {
       out() << "421 blocked by black.uribl.com\r\n" << std::flush;
       LOG(ERROR) << sender.domain() << " blocked by black.uribl.com";
       std::exit(EXIT_SUCCESS);
     }
   }
-  reverse_path_verified_ = true;
-  return true;
+
+  return reverse_path_verified_ = true;
 }
 
 #endif // SESSION_DOT_HPP
