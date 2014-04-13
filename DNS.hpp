@@ -174,15 +174,11 @@ inline std::vector<std::string> Rrlist<RR_type::TXT>::get() const
       if (rr) {
         for (unsigned j = 0; j < rr->_rd_count; ++j) {
           ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_STR:
+          if (rdf->_type == LDNS_RDF_TYPE_STR) {
             ret.push_back(rr_str(rdf));
-            break;
-
-          default:
+          } else {
             LOG(WARNING) << "expecting TXT got:"
                          << static_cast<unsigned>(rdf->_type);
-            break;
           }
         }
       }
@@ -201,12 +197,9 @@ inline std::vector<std::string> Rrlist<RR_type::PTR>::get() const
       if (rr) {
         for (unsigned j = 0; j < rr->_rd_count; ++j) {
           ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_DNAME:
+          if (rdf->_type == LDNS_RDF_TYPE_DNAME) {
             ret.push_back(rr_name_str(rdf));
-            break;
-
-          default:
+          } else {
             LOG(WARNING) << "expecting PTR got:"
                          << static_cast<unsigned>(rdf->_type);
             break;
@@ -228,18 +221,13 @@ inline std::vector<std::string> Rrlist<RR_type::A>::get() const
       if (rr) {
         for (unsigned j = 0; j < rr->_rd_count; ++j) {
           ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_A:
+          if (rdf->_type == LDNS_RDF_TYPE_A) {
             char str[INET_ADDRSTRLEN];
-            if (inet_ntop(AF_INET, rdf->_data, str, sizeof str)) {
-              ret.push_back(str);
-            }
-            break;
-
-          default:
+            PCHECK(inet_ntop(AF_INET, rdf->_data, str, sizeof str));
+            ret.push_back(str);
+          } else {
             LOG(WARNING) << "expecting A got:"
                          << static_cast<unsigned>(rdf->_type);
-            break;
           }
         }
       }
