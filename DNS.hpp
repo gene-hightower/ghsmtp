@@ -20,8 +20,9 @@
 #define DNS_DOT_HPP
 
 #include <cstdlib>
-#include <iostream>
+#include <functional>
 #include <iomanip>
+#include <iostream>
 #include <unordered_map>
 
 #include <ldns/ldns.h>
@@ -54,8 +55,41 @@ enum class Pkt_rcode {
   NOTAUTH = LDNS_RCODE_NOTAUTH,
   NOTZONE = LDNS_RCODE_NOTZONE,
 };
+}
 
+namespace std {
+
+template <>
+struct hash<DNS::RR_type> {
+  size_t operator()(DNS::RR_type const& x) const
+  {
+    return static_cast<size_t>(x);
+  }
+};
+
+template <>
+struct hash<DNS::Pkt_rcode> {
+  size_t operator()(DNS::Pkt_rcode const& x) const
+  {
+    return static_cast<size_t>(x);
+  }
+};
+}
+
+namespace DNS {
+
+extern std::unordered_map<RR_type, char const*> rr_type_to_string;
 extern std::unordered_map<Pkt_rcode, char const*> pkt_rcode_to_string;
+
+inline std::ostream& operator<<(std::ostream& s, RR_type rr_type)
+{
+  return s << rr_type_to_string[rr_type];
+}
+
+inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode)
+{
+  return s << pkt_rcode_to_string[pkt_rcode];
+}
 
 template <RR_type T>
 class Query;
@@ -159,142 +193,73 @@ public:
 
 private:
   ldns_rr_list* rrlst_;
-
-  std::string rr_name_str(ldns_rdf const* rdf) const;
-  std::string rr_str(ldns_rdf const* rdf) const;
 };
+
+extern std::vector<std::string>
+get_loop(enum ldns_enum_rdf_type t, ldns_rr_list* rrlst,
+         std::function<std::string(ldns_rdf const* rdf)> f);
 
 template <>
 inline std::vector<std::string> Rrlist<RR_type::TXT>::get() const
 {
-  std::vector<std::string> ret;
-  if (rrlst_) {
-    for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
-      ldns_rr const* rr = rrlst_->_rrs[i];
-      if (rr) {
-        for (unsigned j = 0; j < rr->_rd_count; ++j) {
-          ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_STR:
-            ret.push_back(rr_str(rdf));
-            break;
+  return get_loop(LDNS_RDF_TYPE_STR, rrlst_, [](ldns_rdf const* rdf) {
+    char const* data = static_cast<char const*>(rdf->_data);
+    unsigned char const* udata = static_cast<unsigned char const*>(rdf->_data);
 
-          default:
-            LOG(WARNING) << "expecting TXT got:"
-                         << static_cast<unsigned>(rdf->_type);
-            break;
-          }
-        }
-      }
-    }
-  }
-  return ret;
+    return std::string(data + 1, static_cast<size_t>(*udata));
+  });
 }
 
 template <>
 inline std::vector<std::string> Rrlist<RR_type::PTR>::get() const
 {
-  std::vector<std::string> ret;
-  if (rrlst_) {
-    for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
-      ldns_rr const* rr = rrlst_->_rrs[i];
-      if (rr) {
-        for (unsigned j = 0; j < rr->_rd_count; ++j) {
-          ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_DNAME:
-            ret.push_back(rr_name_str(rdf));
-            break;
+  return get_loop(LDNS_RDF_TYPE_DNAME, rrlst_, [](ldns_rdf const* rdf) {
+    unsigned char* data = static_cast<unsigned char*>(rdf->_data);
 
-          default:
-            LOG(WARNING) << "expecting PTR got:"
-                         << static_cast<unsigned>(rdf->_type);
-            break;
+    unsigned char src_pos = 0;
+    unsigned char len = data[src_pos];
+
+    if (rdf->_size > LDNS_MAX_DOMAINLEN) {
+      LOG(WARNING) << "rdf size too large";
+      return std::string{ "<too long>" };
+    }
+
+    std::ostringstream str;
+    if (1 == rdf->_size) {
+      str << '.'; // root label
+    } else {
+      while ((len > 0) && (src_pos < rdf->_size)) {
+        src_pos++;
+        for (unsigned char i = 0; i < len; ++i) {
+          unsigned char c = data[src_pos];
+          if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
+            str << '\\' << c;
+          } else if (!(isascii(c) && isgraph(c))) {
+            str << "0x" << std::hex << std::setfill('0') << std::setw(2)
+                << static_cast<unsigned>(c);
+          } else {
+            str << c;
           }
+          src_pos++;
         }
+        if (src_pos < rdf->_size) {
+          str << '.';
+        }
+        len = data[src_pos];
       }
     }
-  }
-  return ret;
+    return str.str();
+  });
 }
 
 template <>
 inline std::vector<std::string> Rrlist<RR_type::A>::get() const
 {
-  std::vector<std::string> ret;
-  if (rrlst_) {
-    for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
-      ldns_rr const* rr = rrlst_->_rrs[i];
-      if (rr) {
-        for (unsigned j = 0; j < rr->_rd_count; ++j) {
-          ldns_rdf const* rdf = rr->_rdata_fields[j];
-          switch (rdf->_type) {
-          case LDNS_RDF_TYPE_A:
-            char str[INET_ADDRSTRLEN];
-            if (inet_ntop(AF_INET, rdf->_data, str, sizeof str)) {
-              ret.push_back(str);
-            }
-            break;
-
-          default:
-            LOG(WARNING) << "expecting A got:"
-                         << static_cast<unsigned>(rdf->_type);
-            break;
-          }
-        }
-      }
-    }
-  }
-  return ret;
-}
-
-template <RR_type T>
-inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
-{
-  unsigned char* data = static_cast<unsigned char*>(rdf->_data);
-
-  unsigned char src_pos = 0;
-  unsigned char len = data[src_pos];
-
-  if (rdf->_size > LDNS_MAX_DOMAINLEN) {
-    LOG(WARNING) << "rdf size too large";
-    return "<too long>";
-  }
-
-  std::ostringstream str;
-  if (1 == rdf->_size) {
-    str << '.'; // root label
-  } else {
-    while ((len > 0) && (src_pos < rdf->_size)) {
-      src_pos++;
-      for (unsigned char i = 0; i < len; ++i) {
-        unsigned char c = data[src_pos];
-        if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
-          str << '\\' << c;
-        } else if (!(isascii(c) && isgraph(c))) {
-          str << "0x" << std::hex << std::setfill('0') << std::setw(2)
-              << static_cast<unsigned>(c);
-        } else {
-          str << c;
-        }
-        src_pos++;
-      }
-      if (src_pos < rdf->_size) {
-        str << '.';
-      }
-      len = data[src_pos];
-    }
-  }
-  return str.str();
-}
-
-template <RR_type T>
-inline std::string Rrlist<T>::rr_str(ldns_rdf const* rdf) const
-{
-  char const* data = static_cast<char const*>(rdf->_data);
-  unsigned char const* udata = static_cast<unsigned char const*>(rdf->_data);
-
-  return std::string(data + 1, static_cast<size_t>(*udata));
+  return get_loop(LDNS_RDF_TYPE_A, rrlst_, [](ldns_rdf const* rdf) {
+    char str[INET_ADDRSTRLEN];
+    PCHECK(inet_ntop(AF_INET, rdf->_data, str, sizeof str));
+    return std::string(str);
+  });
 }
 
 template <RR_type T>
@@ -317,22 +282,5 @@ inline std::vector<std::string> get_records(Resolver const& res,
 }
 
 } // namespace DNS
-
-namespace std {
-template <>
-struct hash<DNS::Pkt_rcode> {
-  size_t operator()(DNS::Pkt_rcode const& x) const
-  {
-    return static_cast<size_t>(x);
-  }
-};
-}
-
-namespace DNS {
-inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode)
-{
-  return s << pkt_rcode_to_string[pkt_rcode];
-}
-}
 
 #endif // DNS_DOT_HPP

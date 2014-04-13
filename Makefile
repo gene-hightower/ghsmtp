@@ -41,9 +41,11 @@ LDLIBS += \
 
 programs = dns2 smtp smtpd
 dns2_EXTRA = DNS
-smtp_EXTRA = SPF
+smtp_EXTRA = DNS SPF
+smtpd_EXTRA = DNS
 
 tests = DNSt Domaint IP4t Mailboxt Messaget Nowt Pillt Sessiont SockBuffert Sockt SPFt
+DNSt_EXTRA = DNS
 SPFt_EXTRA = SPF
 
 all: $(programs)

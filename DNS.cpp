@@ -21,16 +21,48 @@
 namespace DNS {
 
 std::unordered_map<DNS::Pkt_rcode, char const*> pkt_rcode_to_string{
-  { DNS::Pkt_rcode::NOERROR, "NOERROR" },
-  { DNS::Pkt_rcode::FORMERR, "FORMERR" },
-  { DNS::Pkt_rcode::SERVFAIL, "SERVFAIL" },
-  { DNS::Pkt_rcode::NXDOMAIN, "NXDOMAIN" },
-  { DNS::Pkt_rcode::NOTIMPL, "NOTIMPL" },
-  { DNS::Pkt_rcode::REFUSED, "REFUSED" },
-  { DNS::Pkt_rcode::YXDOMAIN, "YXDOMAIN" },
-  { DNS::Pkt_rcode::YXRRSET, "YXRRSET" },
-  { DNS::Pkt_rcode::NXRRSET, "NXRRSET" },
-  { DNS::Pkt_rcode::NOTAUTH, "NOTAUTH" },
-  { DNS::Pkt_rcode::NOTZONE, "NOTZONE" },
+  { Pkt_rcode::NOERROR, "NOERROR" },
+  { Pkt_rcode::FORMERR, "FORMERR" },
+  { Pkt_rcode::SERVFAIL, "SERVFAIL" },
+  { Pkt_rcode::NXDOMAIN, "NXDOMAIN" },
+  { Pkt_rcode::NOTIMPL, "NOTIMPL" },
+  { Pkt_rcode::REFUSED, "REFUSED" },
+  { Pkt_rcode::YXDOMAIN, "YXDOMAIN" },
+  { Pkt_rcode::YXRRSET, "YXRRSET" },
+  { Pkt_rcode::NXRRSET, "NXRRSET" },
+  { Pkt_rcode::NOTAUTH, "NOTAUTH" },
+  { Pkt_rcode::NOTZONE, "NOTZONE" },
 };
+
+std::unordered_map<DNS::RR_type, char const*> rr_type_to_string{
+  { RR_type::A, "A" },
+  { RR_type::CNAME, "CNAME" },
+  { RR_type::PTR, "PTR" },
+  { RR_type::MX, "MX" },
+  { RR_type::TXT, "TXT" },
+};
+
+std::vector<std::string>
+get_loop(enum ldns_enum_rdf_type t, ldns_rr_list* rrlst,
+         std::function<std::string(ldns_rdf const* rdf)> f)
+{
+  std::vector<std::string> ret;
+  if (rrlst) {
+    for (unsigned i = 0; i < rrlst->_rr_count; ++i) {
+      ldns_rr const* rr = rrlst->_rrs[i];
+      if (rr) {
+        for (unsigned j = 0; j < rr->_rd_count; ++j) {
+          ldns_rdf const* rdf = rr->_rdata_fields[j];
+          if (t == rdf->_type) {
+            ret.push_back(f(rdf));
+          } else {
+            LOG(WARNING) << "expecting " << static_cast<unsigned>(t)
+                         << " got:" << static_cast<unsigned>(rdf->_type);
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
 }

@@ -43,8 +43,6 @@ enum class Result {
   PERMERROR = SPF_RESULT_PERMERROR,
 };
 
-extern std::unordered_map<Result, char const*> result_to_string;
-
 class Server {
 public:
   Server(Server const&) = delete;
@@ -147,6 +145,8 @@ struct hash<SPF::Result> {
 }
 
 namespace SPF {
+extern std::unordered_map<Result, char const*> result_to_string;
+
 inline std::ostream& operator<<(std::ostream& s, Result result)
 {
   return s << result_to_string[result];
