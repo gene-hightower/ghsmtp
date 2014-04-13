@@ -25,7 +25,6 @@ int main(int argc, char* argv[])
   Logging::init(argv[0]);
 
   Now then;
-  std::cout << then << std::endl;
 
   std::cout << "sizeof(Now) == " << sizeof(Now) << std::endl;
 
