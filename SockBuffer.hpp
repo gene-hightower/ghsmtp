@@ -369,10 +369,9 @@ private:
   static void ssl_error()
   {
     unsigned long er;
-    LOG(ERROR) << "SSL error";
     while (0 != (er = ERR_get_error()))
       LOG(ERROR) << ERR_error_string(er, nullptr);
-    abort();
+    LOG(FATAL) << "fatal OpenSSL error";
   }
 
 private:
