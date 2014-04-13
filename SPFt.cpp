@@ -27,7 +27,7 @@ int main(int argc, char const* argv[])
   CHECK_EQ(sizeof(SPF::Server), sizeof(void*));
   CHECK_EQ(sizeof(SPF::Request), sizeof(void*));
 
-  SPF::Server srv("EXAMPLE.COM");
+  SPF::Server srv("Example.com");
 
   SPF::Request req(srv);
   req.set_ipv4_str("108.83.36.113");
@@ -35,6 +35,10 @@ int main(int argc, char const* argv[])
   req.set_env_from("postmaster@digilicious.com");
   SPF::Response res(req);
   CHECK_EQ(res.result(), SPF::Result::PASS);
+  std::cout << (res.header_comment() ? res.header_comment() : "") << std::endl;
+  std::cout << (res.received_spf() ? res.received_spf() : "") << std::endl;
+
+  std::cout << std::endl;
 
   SPF::Request req2(srv);
   req2.set_ipv4_str("10.1.1.1");
@@ -42,4 +46,7 @@ int main(int argc, char const* argv[])
   req2.set_env_from("postmaster@digilicious.com");
   SPF::Response res2(req2);
   CHECK_EQ(res2.result(), SPF::Result::FAIL);
+  std::cout << (res2.header_comment() ? res2.header_comment() : "") << std::endl;
+  std::cout << (res2.received_spf() ? res2.received_spf() : "") << std::endl;
+  std::cout << (res2.smtp_comment() ? res2.smtp_comment() : "") << std::endl;
 }

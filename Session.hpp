@@ -33,6 +33,7 @@
 #include "IP4.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
+#include "SPF.hpp"
 #include "Sock.hpp"
 
 namespace Config {
@@ -279,6 +280,22 @@ inline void Session::data()
     return;
   }
 
+  SPF::Server spf_srv(fqdn_.c_str());
+  SPF::Request spf_req(spf_srv);
+  spf_req.set_ipv4_str(sock_.them_c_str());
+  spf_req.set_helo_dom(client_identity_.c_str());
+  std::ostringstream from;
+  from << reverse_path_;
+  spf_req.set_env_from(from.str().c_str());
+  SPF::Response spf_res(spf_req);
+
+  if (spf_res.result() == SPF::Result::FAIL) {
+    out() << "421 " << spf_res.smtp_comment() << std::flush;
+    LOG(ERROR) << spf_res.header_comment();
+    std::exit(EXIT_SUCCESS);
+  }
+  LOG(INFO) << spf_res.header_comment();
+
   Message msg(fqdn_, rd_);
 
   // The headers Return-Path, X-Original-To and Received are added to
@@ -305,6 +322,8 @@ inline void Session::data()
   }
 
   headers << ";\n\t" << msg.when() << "\n";
+
+  headers << spf_res.header_comment() << "\n";
 
   msg.out() << headers.str();
 
@@ -493,18 +512,14 @@ inline bool Session::verify_recipient(Mailbox const& recipient)
 
 inline bool Session::verify_sender(Mailbox const& sender)
 {
-  // If the reverse path domain matches the Forward-confirmed reverse
-  // DNS of the sending IP address, we're golden.
-  if (!Domain::match(sender.domain(), fcrdns_)) {
-    DNS::Resolver res;
-    if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() + ".black.uribl.com")) {
-      out() << "421 blocked by black.uribl.com\r\n" << std::flush;
-      LOG(ERROR) << sender << " blocked by black.uribl.com";
-      std::exit(EXIT_SUCCESS);
-    }
+  DNS::Resolver res;
+  if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() + ".black.uribl.com")) {
+    out() << "421 blocked by black.uribl.com\r\n" << std::flush;
+    LOG(ERROR) << sender << " blocked by black.uribl.com";
+    std::exit(EXIT_SUCCESS);
   }
-  reverse_path_verified_ = true;
-  return true;
+
+  return reverse_path_verified_ = true;
 }
 
 #endif // SESSION_DOT_HPP
