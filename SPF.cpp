@@ -21,14 +21,14 @@
 namespace SPF {
 
 std::unordered_map<Result, char const*> result_to_string{
-  { SPF::Result::INVALID, "INVALID" },
-  { SPF::Result::NEUTRAL, "NEUTRAL" },
-  { SPF::Result::PASS, "PASS" },
-  { SPF::Result::FAIL, "FAIL" },
-  { SPF::Result::SOFTFAIL, "SOFTFAIL" },
-  { SPF::Result::NONE, "NONE" },
-  { SPF::Result::TEMPERROR, "TEMPERROR" },
-  { SPF::Result::PERMERROR, "PERMERROR" },
+  { Result::INVALID, "INVALID" },
+  { Result::NEUTRAL, "NEUTRAL" },
+  { Result::PASS, "PASS" },
+  { Result::FAIL, "FAIL" },
+  { Result::SOFTFAIL, "SOFTFAIL" },
+  { Result::NONE, "NONE" },
+  { Result::TEMPERROR, "TEMPERROR" },
+  { Result::PERMERROR, "PERMERROR" },
 };
 
 // We map libspf2's levels of error, warning, info and debug to
