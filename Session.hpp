@@ -323,7 +323,7 @@ inline void Session::data()
 
   headers << ";\n\t" << msg.when() << "\n";
 
-  headers << spf_res.header_comment() << "\n";
+  headers << spf_res.received_spf() << "\n";
 
   msg.out() << headers.str();
 
