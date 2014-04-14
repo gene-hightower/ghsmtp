@@ -52,7 +52,7 @@ public:
 
   explicit Server(char const* fqdn)
   {
-    srv_ = CHECK_NOTNULL(SPF_server_new(SPF_DNS_CACHE, 1));
+    srv_ = CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1));
     if (fqdn) {
       CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, fqdn));
     }
