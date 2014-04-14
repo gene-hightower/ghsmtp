@@ -110,12 +110,11 @@ public:
     // We ignore the return code from this call, as everything we need
     // to know is in the SPF_response_t struct.
     SPF_request_query_mailfrom(req.req_, &res_);
+    CHECK_NOTNULL(res_);
   }
   ~Response()
   {
-    if (res_) {
-      SPF_response_free(res_);
-    }
+    SPF_response_free(res_);
   }
   Result result() const
   {
