@@ -107,6 +107,8 @@ public:
 
   explicit Response(Request const& req)
   {
+    // We ignore the return code from this call, as everything we need
+    // to know is in the SPF_response_t struct.
     SPF_request_query_mailfrom(req.req_, &res_);
   }
   ~Response()
