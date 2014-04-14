@@ -6,6 +6,7 @@ smtp.hpp
 stack.hh
 dns2
 smtp
+smtp.pem
 smtpd
 DNSt
 Domaint

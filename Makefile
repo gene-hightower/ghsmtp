@@ -22,6 +22,7 @@ warnings = \
 	-Wsign-promo
 
 CXXFLAGS += \
+	-DSMTP_HOME=$(shell pwd) \
 	-std=c++11 \
 	-MMD \
 	-g -O2 \
