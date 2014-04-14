@@ -107,7 +107,7 @@ public:
 
   explicit Response(Request const& req)
   {
-    SPF_request_query_mailfrom(req.req_, &res_);
+    CHECK_EQ(SPF_request_query_mailfrom(req.req_, &res_), SPF_E_SUCCESS);
   }
   ~Response()
   {

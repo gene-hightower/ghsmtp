@@ -95,6 +95,8 @@ private:
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 
+  std::string received_spf_;          // from libspf2
+
   char const* protocol_;
 
   std::random_device rd_;
@@ -529,6 +531,25 @@ inline bool Session::verify_sender(Mailbox const& sender)
       LOG(ERROR) << sender.domain() << " blocked by black.uribl.com";
       std::exit(EXIT_SUCCESS);
     }
+  }
+
+  if (sock_.has_peername()) {
+    SPF::Server spf_srv(fqdn_.c_str());
+    SPF::Request spf_req(spf_srv);
+    spf_req.set_ipv4_str(sock_.them_c_str());
+    spf_req.set_helo_dom(client_identity_.c_str());
+    std::ostringstream from;
+    from << sender;
+    spf_req.set_env_from(from.str().c_str());
+    SPF::Response spf_res(spf_req);
+
+    if (spf_res.result() == SPF::Result::FAIL) {
+      out() << "421 " << spf_res.smtp_comment() << std::flush;
+      LOG(ERROR) << spf_res.header_comment();
+      std::exit(EXIT_SUCCESS);
+    }
+    LOG(INFO) << spf_res.header_comment();
+    received_spf_ = spf_res.received_spf();
   }
 
   return reverse_path_verified_ = true;
