@@ -22,7 +22,7 @@
 #include <ostream>
 #include <unordered_map>
 
-#include <arpa/inet.h> // in_addr
+#include <arpa/inet.h> // in_addr required by spf2/spf.h
 
 extern "C" {
 #include <spf2/spf.h>
@@ -51,8 +51,8 @@ public:
   Server& operator=(Server const&) = delete;
 
   explicit Server(char const* fqdn)
+    : srv_(CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1)))
   {
-    srv_ = CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1));
     if (fqdn) {
       CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, fqdn));
     }
@@ -74,8 +74,8 @@ public:
   Request& operator=(Request const&) = delete;
 
   explicit Request(Server const& srv)
+    : req_(CHECK_NOTNULL(SPF_request_new(srv.srv_)))
   {
-    req_ = CHECK_NOTNULL(SPF_request_new(srv.srv_));
   }
   ~Request()
   {
@@ -105,7 +105,7 @@ public:
   Response(Response const&) = delete;
   Response& operator=(Response const&) = delete;
 
-  explicit Response(Request const& req)
+  explicit Response(Request const& req) : res_(nullptr)
   {
     // We ignore the return code from this call, as everything we need
     // to know is in the SPF_response_t struct.
@@ -113,7 +113,9 @@ public:
   }
   ~Response()
   {
-    SPF_response_free(res_);
+    if (res_) {
+      SPF_response_free(res_);
+    }
   }
   Result result() const
   {
