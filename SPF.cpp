@@ -51,10 +51,10 @@ static void glog_info(const char* file, int line, char const* errmsg)
 {
   google::LogMessage(file, line, google::GLOG_WARNING).stream() << errmsg;
 }
-static void glog_debug(const char* file, int line, char const* errmsg)
-{
-  google::LogMessage(file, line).stream() << errmsg;
-}
+// static void glog_debug(const char* file, int line, char const* errmsg)
+// {
+//   google::LogMessage(file, line).stream() << errmsg;
+// }
 
 struct Init {
   Init()
@@ -62,7 +62,8 @@ struct Init {
     SPF_error_handler = glog_error;
     SPF_warning_handler = glog_warning;
     SPF_info_handler = glog_info;
-    SPF_debug_handler = glog_debug;
+    // SPF_debug_handler = glog_debug;
+    SPF_debug_handler = nullptr;
   }
 };
 
