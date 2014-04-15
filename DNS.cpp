@@ -145,6 +145,4 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 
   return str.str();
 }
-
-
 }
