@@ -28,6 +28,7 @@
 
 #include <sys/utsname.h>
 
+#include "CDB.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
 #include "IP4.hpp"
@@ -36,14 +37,26 @@
 #include "SPF.hpp"
 #include "Sock.hpp"
 
+#include "stringify.h"
+
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 namespace Config {
 constexpr char const* const bad_identities[] = { "illinnalum.info",
                                                  "playsportz.com", };
+
+constexpr char const* const good_identities[] = { "yahoo.com",  "w3.org",
+                                                  "google.com", "gmail.com", };
 
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
                                        "b.barracudacentral.org", };
+
+constexpr char const* const uribls[] = { "black.uribl.com",
+                                         "multi.surbl.org", };
 
 constexpr auto greeting_max_wait_ms = 10000;
 constexpr auto greeting_min_wait_ms = 500;
@@ -77,13 +90,16 @@ public:
   bool timed_out();
   std::istream& in();
 
-private:
+  // private:
   std::ostream& out();
 
   void reset();
   bool verify_client(std::string const& client_identity);
   bool verify_recipient(Mailbox const& recipient);
   bool verify_sender(Mailbox const& sender);
+  bool verify_sender_domain(std::string const& sender);
+  bool verify_sender_domain_uribl(std::string const& sender);
+  bool verify_sender_spf(Mailbox const& sender);
 
 private:
   Sock sock_;
@@ -95,7 +111,7 @@ private:
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 
-  std::string received_spf_;          // from libspf2
+  std::string received_spf_; // from libspf2
 
   char const* protocol_;
 
@@ -524,35 +540,101 @@ inline bool Session::verify_sender(Mailbox const& sender)
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
   if (!Domain::match(sender.domain(), fcrdns_)) {
-    DNS::Resolver res;
-    if (DNS::has_record<DNS::RR_type::A>(res, sender.domain() +
-                                                  ".black.uribl.com")) {
-      out() << "421 blocked by black.uribl.com\r\n" << std::flush;
-      LOG(ERROR) << sender.domain() << " blocked by black.uribl.com";
-      std::exit(EXIT_SUCCESS);
-    }
+    if (!verify_sender_domain(sender.domain()))
+      return false;
   }
 
   if (sock_.has_peername()) {
-    SPF::Server spf_srv(fqdn_.c_str());
-    SPF::Request spf_req(spf_srv);
-    spf_req.set_ipv4_str(sock_.them_c_str());
-    spf_req.set_helo_dom(client_identity_.c_str());
-    std::ostringstream from;
-    from << sender;
-    spf_req.set_env_from(from.str().c_str());
-    SPF::Response spf_res(spf_req);
-
-    if (spf_res.result() == SPF::Result::FAIL) {
-      out() << "421 " << spf_res.smtp_comment() << std::flush;
-      LOG(ERROR) << spf_res.header_comment();
-      std::exit(EXIT_SUCCESS);
-    }
-    LOG(INFO) << spf_res.header_comment();
-    received_spf_ = spf_res.received_spf();
+    if (!verify_sender_spf(sender))
+      return false;
   }
 
   return reverse_path_verified_ = true;
+}
+
+inline bool Session::verify_sender_domain(std::string const& sender)
+{
+  std::string domain = sender;
+  boost::algorithm::to_lower(domain);
+
+  // break sender domain into labels:
+
+  std::vector<std::string> labels;
+  boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
+
+  if (labels.size() < 2) {
+    // This is not a valid domain
+    out() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
+    LOG(ERROR) << "invalid sender domain " << domain;
+    return false;
+  }
+
+  // Based on <www.surbl.org/guidelines>
+
+  std::string two_level =
+      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+
+  if (labels.size() > 2) {
+    std::string three_level = labels[labels.size() - 3] + "." + two_level;
+
+    if (CDB::lookup("three-level-tlds", three_level)) {
+      if (labels.size() > 3) {
+        return verify_sender_domain_uribl(labels[labels.size() - 4] + "." + three_level);
+      } else {
+        out() << "421 bad sender domain\r\n" << std::flush;
+        LOG(ERROR) << sender << " blocked by exact match on three-level-tlds list";
+        return false;
+      }
+    }
+  }
+
+  if (CDB::lookup("two-level-tlds", two_level)) {
+    if (labels.size() > 2) {
+      return verify_sender_domain_uribl(labels[labels.size() - 3] + "." + two_level);
+    } else {
+      out() << "421 bad sender domain\r\n" << std::flush;
+      LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
+      return false;
+    }
+  }
+
+  return verify_sender_domain_uribl(two_level);
+}
+
+inline bool Session::verify_sender_domain_uribl(std::string const& sender)
+{
+   DNS::Resolver res;
+   for (const auto& uribl : Config::uribls) {
+     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+       out() << "421 blocked by " << uribl << "\r\n" << std::flush;
+       LOG(ERROR) << sender << " blocked by " << uribl;
+       return false;
+     }
+   }
+
+  return true;
+}
+
+inline bool Session::verify_sender_spf(Mailbox const& sender)
+{
+  SPF::Server spf_srv(fqdn_.c_str());
+  SPF::Request spf_req(spf_srv);
+  spf_req.set_ipv4_str(sock_.them_c_str());
+  spf_req.set_helo_dom(client_identity_.c_str());
+  std::ostringstream from;
+  from << sender;
+  spf_req.set_env_from(from.str().c_str());
+  SPF::Response spf_res(spf_req);
+
+  if (spf_res.result() == SPF::Result::FAIL) {
+    out() << "421 " << spf_res.smtp_comment() << std::flush;
+    LOG(ERROR) << spf_res.header_comment();
+    std::exit(EXIT_SUCCESS);
+  }
+  LOG(INFO) << spf_res.header_comment();
+  received_spf_ = spf_res.received_spf();
+
+  return true;
 }
 
 #endif // SESSION_DOT_HPP

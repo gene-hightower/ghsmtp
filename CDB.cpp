@@ -1,6 +1,6 @@
 /*
     This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -16,19 +16,35 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "Session.hpp"
+#include "CDB.hpp"
 
-#include <iostream>
+#include "Logging.hpp"
 
-int main(int argc, char* argv[])
+#include "stringify.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+extern "C" {
+#include <cdb.h>
+}
+
+namespace CDB {
+
+bool lookup(std::string const& db, std::string const& key)
 {
-  Logging::init(argv[0]);
+  std::string dbpath = STRINGIFY(SMTP_HOME) "/" + db + ".cdb";
 
-  Session sess(STDIN_FILENO, STDOUT_FILENO, "example.com");
-
-  CHECK(!sess.verify_sender_domain("com"));
-  CHECK(!sess.verify_sender_domain("zzux.com"));
-  CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
-
-  std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+  struct cdb cdb;
+  int fd = open(dbpath.c_str(), O_RDONLY);
+  PCHECK(fd>=0) << " can't open " << dbpath;
+  cdb_init(&cdb, fd);
+  if (cdb_find(&cdb, key.c_str(), key.length()) > 0) {
+    close(fd);
+    return true;    
+  }
+  close(fd);
+  return false;
+}
 }

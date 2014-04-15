@@ -1,5 +1,5 @@
 #   This file is part of ghsmtp - Gene's simple SMTP server.
-#   Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+#   Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
 #   This program is free software: you can redistribute it and/or modify
 #   it under the terms of the GNU Affero General Public License as
@@ -34,15 +34,17 @@ LDLIBS += \
 	-lboost_regex -lboost_system -lpthread \
 	-lldns \
 	-lspf2 \
+	-lcdb \
 	-lm \
 	-lstdc++
 
-programs = dns2 smtp smtpd
+programs = smtp smtpd dns2
 dns2_EXTRA = DNS
-smtp_EXTRA = SPF POSIX
-smtpd_EXTRA = POSIX
+smtp_EXTRA = CDB POSIX SPF
+smtpd_EXTRA = CDB POSIX SPF
 
 tests = \
+	CDBt \
 	DNSt \
 	Domaint \
 	IP4t \
@@ -57,14 +59,17 @@ tests = \
 	Sockt \
 	TLS-OpenSSLt
 
-SPFt_EXTRA = SPF
+CDBt_EXTRA = CDB
 POSIXt_EXTRA = POSIX
-Sessiont_EXTRA = POSIX
+SPFt_EXTRA = SPF
+Sessiont_EXTRA = CDB POSIX SPF
 SockBuffert_EXTRA = POSIX
 Sockt_EXTRA = POSIX
 TLS-OpenSSLt_EXTRA = POSIX
 
-all: $(programs)
+databases = two-level-tlds.cdb three-level-tlds.cdb
+
+all: $(programs) $(databases)
 
 all_programs = $(programs) $(tests)
 
@@ -104,6 +109,16 @@ TAGS:
 clean::
 	rm -f TAGS
 
+%.cdb : %
+	$(MAKE) cdb-gen
+	./cdb-gen < $^ | cdb -c $@
+
+two-level-tlds.cdb: two-level-tlds
+three-level-tlds.cdb: three-level-tlds
+
+two-level-tlds three-level-tlds:
+	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
+
 define link_cmd
 $(1)_STEMS = $(1) $$($(1)_EXTRA)
 $(1)_OBJS = $$(patsubst %,%.o,$$($(1)_STEMS))
@@ -120,4 +135,6 @@ endef
 
 $(foreach prog,$(all_programs),$(eval $(call link_cmd,$(prog))))
 
-.PHONY: all check coverage regression clean
+.PHONY: all check coverage regression clean freshen
+
+.PRECIOUS: %.pem

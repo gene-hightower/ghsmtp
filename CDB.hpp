@@ -1,6 +1,6 @@
 /*
     This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -16,19 +16,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "Session.hpp"
+#ifndef CDB_DOT_H
+#define CDB_DOT_H
 
-#include <iostream>
+#include <string>
 
-int main(int argc, char* argv[])
-{
-  Logging::init(argv[0]);
-
-  Session sess(STDIN_FILENO, STDOUT_FILENO, "example.com");
-
-  CHECK(!sess.verify_sender_domain("com"));
-  CHECK(!sess.verify_sender_domain("zzux.com"));
-  CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
-
-  std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+namespace CDB {
+bool lookup(std::string const& db, std::string const& key);
 }
+
+#endif // CDB_DOT_H

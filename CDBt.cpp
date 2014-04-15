@@ -1,6 +1,6 @@
 /*
     This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2013  Gene Hightower <gene@digilicious.com>
+    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -16,7 +16,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "Session.hpp"
+#include "CDB.hpp"
+
+#include "Logging.hpp"
 
 #include <iostream>
 
@@ -24,11 +26,15 @@ int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  Session sess(STDIN_FILENO, STDOUT_FILENO, "example.com");
+  std::string db_2 { "two-level-tlds" };
 
-  CHECK(!sess.verify_sender_domain("com"));
-  CHECK(!sess.verify_sender_domain("zzux.com"));
-  CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
+  CHECK(CDB::lookup(db_2, "0.bg"));
+  CHECK(CDB::lookup(db_2, "zzux.com"));
+  CHECK(!CDB::lookup(db_2, "This should not be found."));
 
-  std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+  std::string db_3 { "three-level-tlds" };
+
+  CHECK(CDB::lookup(db_3, "act.edu.au"));
+  CHECK(CDB::lookup(db_3, "zen.co.uk"));
+  CHECK(!CDB::lookup(db_3, "This should not be found."));
 }
