@@ -119,7 +119,7 @@ clean::
 	./cdb-gen < $^ | cdb -c $@
 
 clean::
-	rm two-level-*.cdb three-level-*.cdb
+	rm -f two-level-*.cdb three-level-*.cdb
 
 two-level-tlds.cdb: two-level-tlds
 two-level-black.cdb: two-level-black
