@@ -38,11 +38,11 @@ bool lookup(std::string const& db, std::string const& key)
 
   struct cdb cdb;
   int fd = open(dbpath.c_str(), O_RDONLY);
-  PCHECK(fd>=0) << " can't open " << dbpath;
+  PCHECK(fd >= 0) << " can't open " << dbpath;
   cdb_init(&cdb, fd);
   if (cdb_find(&cdb, key.c_str(), key.length()) > 0) {
     close(fd);
-    return true;    
+    return true;
   }
   close(fd);
   return false;

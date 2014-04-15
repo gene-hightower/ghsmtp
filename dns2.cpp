@@ -50,8 +50,8 @@ void do_dotted_quad(char const* addr)
       if (q.get_rcode() == DNS::Pkt_rcode::NXDOMAIN) {
         std::cout << "not found in " << rbl << std::endl;
       } else {
-        std::cout << "Error from lookup at " << rbl << " "
-                  << q.get_rcode() << std::endl;
+        std::cout << "Error from lookup at " << rbl << " " << q.get_rcode()
+                  << std::endl;
       }
     }
   }

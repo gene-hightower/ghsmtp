@@ -30,8 +30,8 @@ int main(int argc, char const* argv[])
   CHECK(!IP4::is_address(""));
 
   // Limitation of my regex
-  //CHECK(!IP4::is_address("300.300.300.300"));
+  // CHECK(!IP4::is_address("300.300.300.300"));
 
-  std::string reverse { IP4::reverse("127.0.0.1") };
+  std::string reverse{ IP4::reverse("127.0.0.1") };
   CHECK_EQ(0, reverse.compare("1.0.0.127."));
 }

@@ -26,13 +26,13 @@ int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  std::string db_2 { "two-level-tlds" };
+  std::string db_2{ "two-level-tlds" };
 
   CHECK(CDB::lookup(db_2, "0.bg"));
   CHECK(CDB::lookup(db_2, "zzux.com"));
   CHECK(!CDB::lookup(db_2, "This should not be found."));
 
-  std::string db_3 { "three-level-tlds" };
+  std::string db_3{ "three-level-tlds" };
 
   CHECK(CDB::lookup(db_3, "act.edu.au"));
   CHECK(CDB::lookup(db_3, "zen.co.uk"));
