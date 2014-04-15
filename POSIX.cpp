@@ -18,16 +18,12 @@
 
 #include "POSIX.hpp"
 
-#include <functional>
+#include "Logging.hpp"
 
 #include <fcntl.h>
 #include <sys/select.h>
 
-#include "Logging.hpp"
-
-namespace POSIX {
-
-void set_nonblocking(int fd)
+void POSIX::set_nonblocking(int fd)
 {
   int flags;
   PCHECK((flags = fcntl(fd, F_GETFL, 0)) != -1);
@@ -36,7 +32,7 @@ void set_nonblocking(int fd)
   }
 }
 
-bool input_ready(int fd_in, std::chrono::milliseconds wait)
+bool POSIX::input_ready(int fd_in, std::chrono::milliseconds wait)
 {
   fd_set fds;
   FD_ZERO(&fds);
@@ -52,7 +48,7 @@ bool input_ready(int fd_in, std::chrono::milliseconds wait)
   return 0 != puts;
 }
 
-bool output_ready(int fd_out, std::chrono::milliseconds wait)
+bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
 {
   fd_set fds;
   FD_ZERO(&fds);
@@ -68,7 +64,7 @@ bool output_ready(int fd_out, std::chrono::milliseconds wait)
   return 0 != puts;
 }
 
-static std::streamsize io_fd(char const* fnm,
+std::streamsize POSIX::io_fd(char const* fnm,
                              std::function<ssize_t(int, void*, size_t)> fnc,
                              int fd, char* s, std::streamsize n,
                              std::chrono::milliseconds timeout, bool& t_o)
@@ -102,15 +98,4 @@ static std::streamsize io_fd(char const* fnm,
   }
 
   return static_cast<std::streamsize>(n_ret);
-}
-std::streamsize read(int fd_in, char* s, std::streamsize n,
-                     std::chrono::milliseconds timeout, bool& t_o)
-{
-  return io_fd("read", ::read, fd_in, s, n, timeout, t_o);
-}
-std::streamsize write(int fd_out, const char* s, std::streamsize n,
-                      std::chrono::milliseconds timeout, bool& t_o)
-{
-  return io_fd("write", ::write, fd_out, const_cast<char*>(s), n, timeout, t_o);
-}
 }
