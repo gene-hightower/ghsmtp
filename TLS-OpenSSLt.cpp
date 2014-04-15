@@ -18,6 +18,8 @@
 
 #include "TLS-OpenSSL.hpp"
 
+#include "Logging.hpp"
+
 #include <iostream>
 
 int main(int argc, char* argv[])
