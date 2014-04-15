@@ -292,27 +292,6 @@ inline void Session::data()
     return;
   }
 
-  std::string received_spf;
-
-  if (sock_.has_peername()) {
-    SPF::Server spf_srv(fqdn_.c_str());
-    SPF::Request spf_req(spf_srv);
-    spf_req.set_ipv4_str(sock_.them_c_str());
-    spf_req.set_helo_dom(client_identity_.c_str());
-    std::ostringstream from;
-    from << reverse_path_;
-    spf_req.set_env_from(from.str().c_str());
-    SPF::Response spf_res(spf_req);
-
-    if (spf_res.result() == SPF::Result::FAIL) {
-      out() << "421 " << spf_res.smtp_comment() << std::flush;
-      LOG(ERROR) << spf_res.header_comment();
-      std::exit(EXIT_SUCCESS);
-    }
-    LOG(INFO) << spf_res.header_comment();
-    received_spf = spf_res.received_spf();
-  }
-
   Message msg(fqdn_, rd_);
 
   // The headers Return-Path, X-Original-To and Received are added to
@@ -340,8 +319,8 @@ inline void Session::data()
 
   headers << ";\n\t" << msg.when() << "\n";
 
-  if (!received_spf.empty()) {
-    headers << received_spf << "\n";
+  if (!received_spf_.empty()) {
+    headers << received_spf_ << "\n";
   }
 
   msg.out() << headers.str();
