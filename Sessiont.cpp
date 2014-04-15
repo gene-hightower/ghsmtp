@@ -20,11 +20,18 @@
 
 #include <iostream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  Session sess(STDIN_FILENO, STDOUT_FILENO, "example.com");
+  int fd_null = open("/dev/null", O_WRONLY);
+  PCHECK(fd_null>=0) << " can't open /dev/null";
+
+  Session sess(STDIN_FILENO, fd_null, "example.com");
 
   CHECK(!sess.verify_sender_domain("com"));
   CHECK(!sess.verify_sender_domain("zzux.com"));

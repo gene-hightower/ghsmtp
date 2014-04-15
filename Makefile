@@ -67,7 +67,12 @@ SockBuffert_EXTRA = POSIX
 Sockt_EXTRA = POSIX
 TLS-OpenSSLt_EXTRA = POSIX
 
-databases = two-level-tlds.cdb three-level-tlds.cdb
+databases = \
+	three-level-tlds.cdb \
+	three-level-black.cdb \
+	two-level-tlds.cdb \
+	two-level-black.cdb \
+	two-level-white.cdb
 
 all: $(programs) $(databases)
 
@@ -113,8 +118,15 @@ clean::
 	$(MAKE) cdb-gen
 	./cdb-gen < $^ | cdb -c $@
 
+clean::
+	rm two-level-*.cdb three-level-*.cdb
+
 two-level-tlds.cdb: two-level-tlds
+two-level-black.cdb: two-level-black
+two-level-white.cdb: two-level-white
+
 three-level-tlds.cdb: three-level-tlds
+three-level-black.cdb: three-level-black
 
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)

@@ -44,12 +44,6 @@
 #include <boost/algorithm/string/split.hpp>
 
 namespace Config {
-constexpr char const* const bad_identities[] = { "illinnalum.info",
-                                                 "playsportz.com", };
-
-constexpr char const* const good_identities[] = { "yahoo.com",  "w3.org",
-                                                  "google.com", "gmail.com", };
-
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
@@ -489,11 +483,32 @@ inline bool Session::verify_client(std::string const& client_identity)
     }
   }
 
-  for (const auto bad_identity : Config::bad_identities) {
-    if (Domain::match(client_identity, bad_identity)) {
-      out() << "554 bad sender\r\n" << std::flush;
-      LOG(WARNING) << "bad sender" << (sock_.has_peername() ? " " : "")
-                   << client_ << " claiming " << client_identity;
+  std::vector<std::string> labels;
+  boost::algorithm::split(labels, client_identity,
+                          boost::algorithm::is_any_of("."));
+
+  if (labels.size() < 2) {
+    out() << "554 invalid sender\r\n" << std::flush;
+    LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
+    return false;
+  }
+
+  std::string two_level =
+      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+
+  if (CDB::lookup("two-level-black", two_level)) {
+    out() << "554 known bad sender\r\n" << std::flush;
+    LOG(INFO) << "sender " << client_identity << " blacklisted";
+    return false;
+  }
+
+  if (labels.size() > 2) {
+    std::string three_level = labels[labels.size() - 3] + "." + two_level;
+
+    if (CDB::lookup("three-level-black", three_level)) {
+      out() << "554 known bad sender\r\n" << std::flush;
+      LOG(INFO) << "sender " << client_identity << " blacklisted";
       return false;
     }
   }
@@ -557,7 +572,7 @@ inline bool Session::verify_sender_domain(std::string const& sender)
   std::string domain = sender;
   boost::algorithm::to_lower(domain);
 
-  // break sender domain into labels:
+  // Break sender domain into labels:
 
   std::vector<std::string> labels;
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
@@ -569,20 +584,27 @@ inline bool Session::verify_sender_domain(std::string const& sender)
     return false;
   }
 
-  // Based on <www.surbl.org/guidelines>
-
   std::string two_level =
       labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+
+  if (CDB::lookup("two-level-white", two_level)) {
+    LOG(INFO) << "sender " << sender << " whitelisted";
+    return true;
+  }
+
+  // Based on <www.surbl.org/guidelines>
 
   if (labels.size() > 2) {
     std::string three_level = labels[labels.size() - 3] + "." + two_level;
 
     if (CDB::lookup("three-level-tlds", three_level)) {
       if (labels.size() > 3) {
-        return verify_sender_domain_uribl(labels[labels.size() - 4] + "." + three_level);
+        return verify_sender_domain_uribl(labels[labels.size() - 4] + "." +
+                                          three_level);
       } else {
         out() << "421 bad sender domain\r\n" << std::flush;
-        LOG(ERROR) << sender << " blocked by exact match on three-level-tlds list";
+        LOG(ERROR) << sender
+                   << " blocked by exact match on three-level-tlds list";
         return false;
       }
     }
@@ -590,7 +612,8 @@ inline bool Session::verify_sender_domain(std::string const& sender)
 
   if (CDB::lookup("two-level-tlds", two_level)) {
     if (labels.size() > 2) {
-      return verify_sender_domain_uribl(labels[labels.size() - 3] + "." + two_level);
+      return verify_sender_domain_uribl(labels[labels.size() - 3] + "." +
+                                        two_level);
     } else {
       out() << "421 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
@@ -603,14 +626,14 @@ inline bool Session::verify_sender_domain(std::string const& sender)
 
 inline bool Session::verify_sender_domain_uribl(std::string const& sender)
 {
-   DNS::Resolver res;
-   for (const auto& uribl : Config::uribls) {
-     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-       out() << "421 blocked by " << uribl << "\r\n" << std::flush;
-       LOG(ERROR) << sender << " blocked by " << uribl;
-       return false;
-     }
-   }
+  DNS::Resolver res;
+  for (const auto& uribl : Config::uribls) {
+    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+      out() << "421 blocked by " << uribl << "\r\n" << std::flush;
+      LOG(ERROR) << sender << " blocked by " << uribl;
+      return false;
+    }
+  }
 
   return true;
 }
