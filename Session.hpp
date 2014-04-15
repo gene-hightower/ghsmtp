@@ -478,7 +478,7 @@ inline bool Session::verify_client(std::string const& client_identity)
 
   if (CDB::lookup("two-level-black", two_level)) {
     out() << "554 known bad sender\r\n" << std::flush;
-    LOG(INFO) << "sender " << client_identity << " blacklisted";
+    LOG(WARNING) << "sender " << client_identity << " blacklisted";
     return false;
   }
 
@@ -487,7 +487,7 @@ inline bool Session::verify_client(std::string const& client_identity)
 
     if (CDB::lookup("three-level-black", three_level)) {
       out() << "554 known bad sender\r\n" << std::flush;
-      LOG(INFO) << "sender " << client_identity << " blacklisted";
+      LOG(WARNING) << "sender " << client_identity << " blacklisted";
       return false;
     }
   }
@@ -614,6 +614,7 @@ inline bool Session::verify_sender_domain_uribl(std::string const& sender)
     }
   }
 
+  LOG(INFO) << sender << " cleared by URIBLs";
   return true;
 }
 
