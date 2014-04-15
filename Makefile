@@ -40,8 +40,8 @@ LDLIBS += \
 
 programs = smtp smtpd dns2
 dns2_EXTRA = DNS
-smtp_EXTRA = CDB POSIX SPF
-smtpd_EXTRA = CDB POSIX SPF
+smtp_EXTRA = CDB POSIX SPF Session
+smtpd_EXTRA = CDB POSIX SPF Session
 
 tests = \
 	CDBt \
@@ -62,7 +62,7 @@ tests = \
 CDBt_EXTRA = CDB
 POSIXt_EXTRA = POSIX
 SPFt_EXTRA = SPF
-Sessiont_EXTRA = CDB POSIX SPF
+Sessiont_EXTRA = CDB POSIX SPF Session
 SockBuffert_EXTRA = POSIX
 Sockt_EXTRA = POSIX
 TLS-OpenSSLt_EXTRA = POSIX

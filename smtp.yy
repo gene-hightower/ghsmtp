@@ -28,7 +28,10 @@
 
 %code requires {
   #include <cctype>
+  #include <iomanip>
+
   #include "Session.hpp"
+
   using std::swap;
 }
 

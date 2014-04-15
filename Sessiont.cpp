@@ -24,18 +24,26 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+struct Session_test {
+  void test()
+  {
+    int fd_null = open("/dev/null", O_WRONLY);
+    PCHECK(fd_null >= 0) << " can't open /dev/null";
+
+    Session sess(STDIN_FILENO, fd_null, "example.com");
+
+    CHECK(!sess.verify_sender_domain("com"));
+    CHECK(!sess.verify_sender_domain("zzux.com"));
+    CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
+
+    std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+  }
+};
+
 int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  int fd_null = open("/dev/null", O_WRONLY);
-  PCHECK(fd_null>=0) << " can't open /dev/null";
-
-  Session sess(STDIN_FILENO, fd_null, "example.com");
-
-  CHECK(!sess.verify_sender_domain("com"));
-  CHECK(!sess.verify_sender_domain("zzux.com"));
-  CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
-
-  std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+  Session_test t;
+  t.test();
 }
