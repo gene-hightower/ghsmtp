@@ -82,7 +82,7 @@ void Session::greeting()
 
   if (sock_.has_peername()) {
 
-    LOG(INFO) << "connect from: " << sock_.them_c_str();
+    LOG(INFO) << "connect from " << sock_.them_c_str();
 
     using namespace DNS;
     Resolver res;
@@ -136,7 +136,9 @@ void Session::greeting()
   } // if (sock_.has_peername())
 
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
-  LOG(INFO) << "connect from " << client_;
+  if (!fcrdns_.empty() ) {
+    LOG(INFO) << "connect from " << fcrdns_;
+  }
 }
 
 void Session::ehlo(std::string const& client_identity)
