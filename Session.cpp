@@ -82,6 +82,8 @@ void Session::greeting()
 
   if (sock_.has_peername()) {
 
+    LOG(INFO) << "connect from: " << sock_.them_c_str();
+
     using namespace DNS;
     Resolver res;
 
