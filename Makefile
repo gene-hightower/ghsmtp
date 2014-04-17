@@ -34,6 +34,7 @@ LDLIBS += \
 	-lboost_regex -lboost_system -lpthread \
 	-lldns \
 	-lspf2 \
+	-lregdom \
 	-lcdb \
 	-lm \
 	-lstdc++
