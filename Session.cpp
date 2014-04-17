@@ -115,11 +115,10 @@ void Session::greeting()
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
       client_ = "(" + fcrdns_ + " [" + sock_.them_c_str() + "])";
+      LOG(INFO) << "connect from " << fcrdns_;
     } else {
       client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
     }
-
-    // If we have fcrdns, check a white list before looking in DNSBLs
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     for (const auto& rbl : Config::rbls) {
@@ -143,9 +142,6 @@ void Session::greeting()
   } // if (sock_.has_peername())
 
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
-  if (!fcrdns_.empty()) {
-    LOG(INFO) << "connect from " << fcrdns_;
-  }
 }
 
 void Session::ehlo(std::string const& client_identity)
