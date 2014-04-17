@@ -39,6 +39,10 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+extern "C" {
+#include <regdom.h>
+}
+
 namespace Config {
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
@@ -139,7 +143,7 @@ void Session::greeting()
   } // if (sock_.has_peername())
 
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
-  if (!fcrdns_.empty() ) {
+  if (!fcrdns_.empty()) {
     LOG(INFO) << "connect from " << fcrdns_;
   }
 }
@@ -522,7 +526,24 @@ bool Session::verify_sender_domain(std::string const& sender)
     }
   }
 
-  return verify_sender_domain_uribl(two_level);
+  // According to the surbl.org guidelines we should use two_level for
+  // this lookup, but instead lets use <www.dkim-reputation.org>
+  // algorithm:
+
+  void* tree = loadTldTree();
+  char* result = getRegisteredDomain(domain.c_str(), tree);
+
+  if (!result) {
+    LOG(WARNING) << "top level domain [" << domain
+                 << "] undetected by surbl.org rigmarole";
+    return false;
+  }
+
+  if (strcmp(result, two_level.c_str())) {
+    LOG(WARNING) << "TLD " << result << " != " << two_level;
+  }
+
+  return verify_sender_domain_uribl(result);
 }
 
 bool Session::verify_sender_domain_uribl(std::string const& sender)
