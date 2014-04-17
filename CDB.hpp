@@ -19,10 +19,8 @@
 #ifndef CDB_DOT_H
 #define CDB_DOT_H
 
-#include <string>
-
 namespace CDB {
-bool lookup(std::string const& db, std::string const& key);
+bool lookup(char const* db, char const* key);
 }
 
 #endif // CDB_DOT_H

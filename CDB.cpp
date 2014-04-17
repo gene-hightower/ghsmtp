@@ -32,15 +32,17 @@ extern "C" {
 
 namespace CDB {
 
-bool lookup(std::string const& db, std::string const& key)
+bool lookup(char const* db, char const* key)
 {
-  std::string dbpath = STRINGIFY(SMTP_HOME) "/" + db + ".cdb";
+  std::string dbpath = STRINGIFY(SMTP_HOME) "/";
+  dbpath += db;
+  dbpath += ".cdb";
 
   struct cdb cdb;
   int fd = open(dbpath.c_str(), O_RDONLY);
   PCHECK(fd >= 0) << " can't open " << dbpath;
   cdb_init(&cdb, fd);
-  if (cdb_find(&cdb, key.c_str(), key.length()) > 0) {
+  if (cdb_find(&cdb, key, strlen(key)) > 0) {
     close(fd);
     return true;
   }
