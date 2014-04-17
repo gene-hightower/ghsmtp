@@ -70,6 +70,7 @@ Sockt_EXTRA = POSIX TLS-OpenSSL
 TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 
 databases = \
+	ip-black.cdb \
 	three-level-tlds.cdb \
 	three-level-black.cdb \
 	two-level-tlds.cdb \
@@ -122,6 +123,8 @@ clean::
 
 clean::
 	rm -f two-level-*.cdb three-level-*.cdb
+
+ip-black.cdb: ip-black
 
 two-level-tlds.cdb: two-level-tlds
 two-level-black.cdb: two-level-black
