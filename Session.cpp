@@ -87,6 +87,8 @@ void Session::greeting()
   if (sock_.has_peername()) {
 
     if (CDB::lookup("ip-black", sock_.them_c_str())) {
+      LOG(ERROR) << sock_.them_c_str() << " blacklisted";
+      exit(0);
     }
 
     LOG(INFO) << "connect from " << sock_.them_c_str();
