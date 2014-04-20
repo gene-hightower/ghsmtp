@@ -32,16 +32,13 @@
 #include "Message.hpp"
 #include "SPF.hpp"
 #include "Session.hpp"
+#include "TLD.hpp"
 
 #include "stringify.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-
-extern "C" {
-#include <regdom.h>
-}
 
 namespace Config {
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
@@ -397,23 +394,16 @@ bool Session::verify_client(std::string const& client_identity)
     return false;
   }
 
-  std::string two_level =
-      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+  TLD tld_db;
+  char const* tld = tld_db.get_registered_domain(client_identity.c_str());
 
-  if (CDB::lookup("two-level-black", two_level.c_str())) {
-    out() << "554 known bad sender\r\n" << std::flush;
-    LOG(WARNING) << "sender " << client_identity << " blacklisted";
-    return false;
+  if (!tld) {
+    tld = client_identity.c_str();
   }
 
-  if (labels.size() > 2) {
-    std::string three_level = labels[labels.size() - 3] + "." + two_level;
-
-    if (CDB::lookup("three-level-black", three_level.c_str())) {
-      out() << "554 known bad sender\r\n" << std::flush;
-      LOG(WARNING) << "sender " << client_identity << " blacklisted";
-      return false;
-    }
+  if (CDB::lookup("tld-black", tld)) {
+    LOG(INFO) << "sender " << client_identity << " blacklisted";
+    return true;
   }
 
   // Log this client
@@ -487,15 +477,22 @@ bool Session::verify_sender_domain(std::string const& sender)
     return false;
   }
 
-  std::string two_level =
-      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+  TLD tld_db;
+  char const* tld = tld_db.get_registered_domain(domain.c_str());
 
-  if (CDB::lookup("two-level-white", two_level.c_str())) {
+  if (!tld) {
+    tld = domain.c_str();       // ingoingDomain is a TLD
+  }
+
+  if (CDB::lookup("tld-white", tld)) {
     LOG(INFO) << "sender " << sender << " whitelisted";
     return true;
   }
 
   // Based on <www.surbl.org/guidelines>
+
+  std::string two_level =
+      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
 
   if (labels.size() > 2) {
     std::string three_level = labels[labels.size() - 3] + "." + two_level;
@@ -528,20 +525,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   // this lookup, but instead lets use <www.dkim-reputation.org>
   // algorithm:
 
-  void* tree = loadTldTree();
-  char* result = getRegisteredDomain(domain.c_str(), tree);
-
-  if (!result) {
-    LOG(WARNING) << "top level domain [" << domain
-                 << "] undetected by surbl.org rigmarole";
-    return false;
-  }
-
-  if (strcmp(result, two_level.c_str())) {
-    LOG(WARNING) << "TLD " << result << " != " << two_level;
-  }
-
-  return verify_sender_domain_uribl(result);
+  return verify_sender_domain_uribl(tld);
 }
 
 bool Session::verify_sender_domain_uribl(std::string const& sender)

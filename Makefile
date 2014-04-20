@@ -58,6 +58,7 @@ tests = \
 	Sessiont \
 	SockBuffert \
 	Sockt \
+	TLDt \
 	TLS-OpenSSLt
 
 CDBt_EXTRA = CDB
@@ -72,10 +73,9 @@ TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 databases = \
 	ip-black.cdb \
 	three-level-tlds.cdb \
-	three-level-black.cdb \
-	two-level-tlds.cdb \
-	two-level-black.cdb \
-	two-level-white.cdb
+	tld-black.cdb \
+	tld-white.cdb \
+	two-level-tlds.cdb
 
 all: $(programs) $(databases)
 
@@ -86,7 +86,7 @@ TEST_MAILDIR=/tmp/Maildir
 $(TEST_MAILDIR):
 	mkdir -p $(TEST_MAILDIR)/tmp $(TEST_MAILDIR)/new
 
-check: $(tests) $(TEST_MAILDIR)
+check: $(tests) $(TEST_MAILDIR) $(databases)
 	$(foreach t,$(tests),./$(t) ;)
 
 coverage:
@@ -122,16 +122,15 @@ clean::
 	./cdb-gen < $^ | cdb -c $@
 
 clean::
-	rm -f two-level-*.cdb three-level-*.cdb
+	rm -f two-level-*.cdb three-level-*.cdb white.cdb
 
 ip-black.cdb: ip-black
 
 two-level-tlds.cdb: two-level-tlds
-two-level-black.cdb: two-level-black
-two-level-white.cdb: two-level-white
-
 three-level-tlds.cdb: three-level-tlds
-three-level-black.cdb: three-level-black
+
+tld-black.cdb: tld-black
+tld-white.cdb: tld-white
 
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
