@@ -53,6 +53,7 @@ enum class Pkt_rcode {
   NXRRSET = LDNS_RCODE_NXRRSET,
   NOTAUTH = LDNS_RCODE_NOTAUTH,
   NOTZONE = LDNS_RCODE_NOTZONE,
+  INTERNAL = 666,
 };
 
 extern std::unordered_map<Pkt_rcode, char const*> pkt_rcode_to_string;
@@ -113,19 +114,29 @@ public:
   Query& operator=(Query const&) = delete;
 
   Query(Resolver const& res, Domain const& dom)
-    : p_(CHECK_NOTNULL(ldns_resolver_query(res.res_, dom.domain_,
-                                           static_cast<ldns_enum_rr_type>(T),
-                                           LDNS_RR_CLASS_IN, LDNS_RD)))
   {
+    ldns_status stat = ldns_resolver_query_status(
+        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(T),
+        LDNS_RR_CLASS_IN, LDNS_RD);
+
+    if (stat != LDNS_STATUS_OK) {
+      LOG(ERROR) << "ldns_resolver_query_status failed: stat=="
+                 << static_cast<unsigned>(stat);
+    }
   }
   ~Query()
   {
-    ldns_pkt_free(p_);
+    if (p_) {
+      ldns_pkt_free(p_);
+    }
   }
 
   Pkt_rcode get_rcode() const
   {
-    return static_cast<Pkt_rcode>(ldns_pkt_get_rcode(p_));
+    if (p_) {
+      return static_cast<Pkt_rcode>(ldns_pkt_get_rcode(p_));
+    }
+    return Pkt_rcode::INTERNAL;
   }
 
 private:
@@ -140,10 +151,12 @@ public:
   Rrlist(Rrlist const&) = delete;
   Rrlist& operator=(Rrlist const&) = delete;
 
-  explicit Rrlist(Query<T> const& q)
-    : rrlst_(ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
-                                      LDNS_SECTION_ANSWER))
+  explicit Rrlist(Query<T> const& q) : rrlst_(nullptr)
   {
+    if (q.p_) {
+      rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
+                                        LDNS_SECTION_ANSWER);
+    }
   }
   ~Rrlist()
   {
