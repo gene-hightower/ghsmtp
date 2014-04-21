@@ -394,6 +394,11 @@ bool Session::verify_client(std::string const& client_identity)
     return false;
   }
 
+  if (CDB::lookup("black", client_identity.c_str())) {
+    LOG(WARNING) << "client_identity " << client_identity << " blacklisted";
+    return false;
+  }
+
   TLD tld_db;
   char const* tld = tld_db.get_registered_domain(client_identity.c_str());
 
@@ -401,8 +406,8 @@ bool Session::verify_client(std::string const& client_identity)
     tld = client_identity.c_str();
   }
 
-  if (CDB::lookup("tld-black", tld)) {
-    LOG(INFO) << "sender " << client_identity << " blacklisted";
+  if (CDB::lookup("black", tld)) {
+    LOG(INFO) << "sender " << tld << " blacklisted";
     return true;
   }
 
@@ -477,6 +482,11 @@ bool Session::verify_sender_domain(std::string const& sender)
     return false;
   }
 
+  if (CDB::lookup("white", domain.c_str())) {
+    LOG(INFO) << "sender " << domain << " whitelisted";
+    return true;
+  }
+
   TLD tld_db;
   char const* tld = tld_db.get_registered_domain(domain.c_str());
 
@@ -484,8 +494,8 @@ bool Session::verify_sender_domain(std::string const& sender)
     tld = domain.c_str();       // ingoingDomain is a TLD
   }
 
-  if (CDB::lookup("tld-white", tld)) {
-    LOG(INFO) << "sender " << sender << " whitelisted";
+  if (CDB::lookup("white", tld)) {
+    LOG(INFO) << "sender tld " << tld << " whitelisted";
     return true;
   }
 

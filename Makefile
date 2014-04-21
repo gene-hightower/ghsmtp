@@ -73,8 +73,8 @@ TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 databases = \
 	ip-black.cdb \
 	three-level-tlds.cdb \
-	tld-black.cdb \
-	tld-white.cdb \
+	black.cdb \
+	white.cdb \
 	two-level-tlds.cdb
 
 all: $(programs) $(databases)
@@ -129,8 +129,8 @@ ip-black.cdb: ip-black
 two-level-tlds.cdb: two-level-tlds
 three-level-tlds.cdb: three-level-tlds
 
-tld-black.cdb: tld-black
-tld-white.cdb: tld-white
+black.cdb: black
+white.cdb: white
 
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)

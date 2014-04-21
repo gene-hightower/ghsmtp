@@ -1,6 +1,7 @@
 *~
 *.o
 *.d
+*.cdb
 smtp.cpp
 smtp.hpp
 stack.hh
@@ -22,6 +23,7 @@ SPFt
 Sessiont
 SockBuffert
 Sockt
+TLDt
 TLS-OpenSSLt
 three-level-tlds
 three-level-tlds.cdb
