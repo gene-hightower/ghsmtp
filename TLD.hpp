@@ -27,8 +27,7 @@ extern "C" {
 
 class TLD {
 public:
-  TLD()
-    : tree_(CHECK_NOTNULL(loadTldTree()))
+  TLD() : tree_(CHECK_NOTNULL(loadTldTree()))
   {
   }
   ~TLD()

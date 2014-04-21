@@ -120,7 +120,6 @@ void Session::greeting()
       client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
     }
 
-
     CDB white("ip-white");
     if (white.lookup(sock_.them_c_str())) {
       LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
@@ -364,8 +363,6 @@ void Session::starttls()
 
 /////////////////////////////////////////////////////////////////////////////
 
-//...........................................................................
-
 // All of the verify_* functions send their own error messages back to
 // the client.
 
@@ -500,7 +497,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   char const* tld = tld_db.get_registered_domain(domain.c_str());
 
   if (!tld) {
-    tld = domain.c_str();       // ingoingDomain is a TLD
+    tld = domain.c_str(); // ingoingDomain is a TLD
   }
 
   if (white.lookup(tld)) {
@@ -545,6 +542,10 @@ bool Session::verify_sender_domain(std::string const& sender)
   // According to the surbl.org guidelines we should use two_level for
   // this lookup, but instead lets use <www.dkim-reputation.org>
   // algorithm:
+
+  if (two_level.compare(tld)) {
+    LOG(WARNING) << "two level " << two_level << " != tld " << tld;
+  }
 
   return verify_sender_domain_uribl(tld);
 }
