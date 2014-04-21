@@ -26,15 +26,15 @@ int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  CDB cdb("two-level-tlds");
+  CDB cdb2("two-level-tlds");
 
-  CHECK(cdb.lookup("0.bg"));
-  CHECK(cdb.lookup("zzux.com"));
-  CHECK(!cdb.lookup("This should not be found."));
-
-  CDB cdb2("three-level-tlds");
-
-  CHECK(cdb2.lookup("act.edu.au"));
-  CHECK(cdb2.lookup("zen.co.uk"));
+  CHECK(cdb2.lookup("0.bg"));
+  CHECK(cdb2.lookup("zzux.com"));
   CHECK(!cdb2.lookup("This should not be found."));
+
+  CDB cdb3("three-level-tlds");
+
+  CHECK(cdb3.lookup("act.edu.au"));
+  CHECK(cdb3.lookup("zen.co.uk"));
+  CHECK(!cdb3.lookup("This should not be found."));
 }
