@@ -23,7 +23,7 @@ warnings = \
 
 CXXFLAGS += \
 	-DSMTP_HOME=$(shell pwd) \
-	-std=c++11 \
+	-std=c++1y \
 	-MMD \
 	-g -O2 \
 	$(warnings)
