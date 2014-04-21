@@ -114,10 +114,10 @@ void Session::greeting()
 
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
-      client_ = "(" + fcrdns_ + " [" + sock_.them_c_str() + "])";
+      client_ = fcrdns_ + " [" + sock_.them_c_str() + "]";
       LOG(INFO) << "connect from " << fcrdns_;
     } else {
-      client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
+      client_ = std::string("unknown [") + sock_.them_c_str() + "]";
     }
 
     CDB white("ip-white");
@@ -255,7 +255,7 @@ void Session::data()
 
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
-    headers << " " << client_;
+    headers << " (" << client_ << ")";
   }
   headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
           << "\n\tfor <" << forward_path_[0] << '>';
@@ -400,20 +400,23 @@ bool Session::verify_client(std::string const& client_identity)
 
   CDB black("black");
   if (black.lookup(client_identity.c_str())) {
-    LOG(WARNING) << "client_identity " << client_identity << " blacklisted";
+    out() << "554 blacklisted identity\r\n" << std::flush;
+    LOG(WARNING) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
     return false;
   }
 
   TLD tld_db;
   char const* tld = tld_db.get_registered_domain(client_identity.c_str());
-
   if (!tld) {
     tld = client_identity.c_str();
-  }
-
-  if (black.lookup(tld)) {
-    LOG(INFO) << "sender " << tld << " blacklisted";
-    return true;
+  } else {
+    if (black.lookup(tld)) {
+      out() << "554 blacklisted identity\r\n" << std::flush;
+      LOG(WARNING) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
+                   << client_ << " claiming " << client_identity;
+      return false;
+    }
   }
 
   // Log this client
@@ -480,8 +483,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   std::vector<std::string> labels;
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
-  if (labels.size() < 2) {
-    // This is not a valid domain
+  if (labels.size() < 2) { // This is not a valid domain.
     out() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
     LOG(ERROR) << "invalid sender domain " << domain;
     return false;
@@ -495,14 +497,13 @@ bool Session::verify_sender_domain(std::string const& sender)
 
   TLD tld_db;
   char const* tld = tld_db.get_registered_domain(domain.c_str());
-
   if (!tld) {
-    tld = domain.c_str(); // ingoingDomain is a TLD
-  }
-
-  if (white.lookup(tld)) {
-    LOG(INFO) << "sender tld " << tld << " whitelisted";
-    return true;
+    tld = domain.c_str(); // If ingoing domain is a TLD.
+  } else {
+    if (white.lookup(tld)) {
+      LOG(INFO) << "sender tld " << tld << " whitelisted";
+      return true;
+    }
   }
 
   // Based on <www.surbl.org/guidelines>
