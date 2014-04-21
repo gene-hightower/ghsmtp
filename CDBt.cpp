@@ -26,15 +26,15 @@ int main(int argc, char* argv[])
 {
   Logging::init(argv[0]);
 
-  char const* db_2{ "two-level-tlds" };
+  CDB cdb("two-level-tlds");
 
-  CHECK(CDB::lookup(db_2, "0.bg"));
-  CHECK(CDB::lookup(db_2, "zzux.com"));
-  CHECK(!CDB::lookup(db_2, "This should not be found."));
+  CHECK(cdb.lookup("0.bg"));
+  CHECK(cdb.lookup("zzux.com"));
+  CHECK(!cdb.lookup("This should not be found."));
 
-  char const* db_3{ "three-level-tlds" };
+  CDB cdb2("three-level-tlds");
 
-  CHECK(CDB::lookup(db_3, "act.edu.au"));
-  CHECK(CDB::lookup(db_3, "zen.co.uk"));
-  CHECK(!CDB::lookup(db_3, "This should not be found."));
+  CHECK(cdb2.lookup("act.edu.au"));
+  CHECK(cdb2.lookup("zen.co.uk"));
+  CHECK(!cdb2.lookup("This should not be found."));
 }

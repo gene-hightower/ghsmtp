@@ -19,8 +19,46 @@
 #ifndef CDB_DOT_H
 #define CDB_DOT_H
 
-namespace CDB {
-bool lookup(char const* db, char const* key);
+extern "C" {
+#include <cdb.h>
 }
+
+#include "Logging.hpp"
+
+#include "stringify.h"
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+class CDB {
+public:
+  CDB(char const* db)
+  {
+    std::string dbpath = STRINGIFY(SMTP_HOME) "/";
+    dbpath += db;
+    dbpath += ".cdb";
+
+    fd_ = open(dbpath.c_str(), O_RDONLY);
+    PCHECK(fd_ >= 0) << " can't open " << dbpath;
+    cdb_init(&cdb_, fd_);
+  }
+  ~CDB()
+  {
+    close(fd_);
+    cdb_free(&cdb_);
+  }
+  bool lookup(char const* key)
+  {
+    if (cdb_find(&cdb_, key, strlen(key)) > 0) {
+      return true;
+    }
+    return false;
+  }
+
+private:
+  int fd_;
+  struct cdb cdb_;
+};
 
 #endif // CDB_DOT_H

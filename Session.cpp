@@ -83,8 +83,9 @@ void Session::greeting()
 
   if (sock_.has_peername()) {
 
-    if (CDB::lookup("ip-black", sock_.them_c_str())) {
-      LOG(ERROR) << sock_.them_c_str() << " blacklisted";
+    CDB cdb("ip-black");
+    if (cdb.lookup(sock_.them_c_str())) {
+      LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
       exit(0);
     }
 
@@ -394,7 +395,8 @@ bool Session::verify_client(std::string const& client_identity)
     return false;
   }
 
-  if (CDB::lookup("black", client_identity.c_str())) {
+  CDB cdb("black");
+  if (cdb.lookup(client_identity.c_str())) {
     LOG(WARNING) << "client_identity " << client_identity << " blacklisted";
     return false;
   }
@@ -406,7 +408,7 @@ bool Session::verify_client(std::string const& client_identity)
     tld = client_identity.c_str();
   }
 
-  if (CDB::lookup("black", tld)) {
+  if (cdb.lookup(tld)) {
     LOG(INFO) << "sender " << tld << " blacklisted";
     return true;
   }
@@ -482,7 +484,8 @@ bool Session::verify_sender_domain(std::string const& sender)
     return false;
   }
 
-  if (CDB::lookup("white", domain.c_str())) {
+  CDB cdb("white");
+  if (cdb.lookup(domain.c_str())) {
     LOG(INFO) << "sender " << domain << " whitelisted";
     return true;
   }
@@ -494,7 +497,7 @@ bool Session::verify_sender_domain(std::string const& sender)
     tld = domain.c_str();       // ingoingDomain is a TLD
   }
 
-  if (CDB::lookup("white", tld)) {
+  if (cdb.lookup(tld)) {
     LOG(INFO) << "sender tld " << tld << " whitelisted";
     return true;
   }
@@ -507,7 +510,8 @@ bool Session::verify_sender_domain(std::string const& sender)
   if (labels.size() > 2) {
     std::string three_level = labels[labels.size() - 3] + "." + two_level;
 
-    if (CDB::lookup("three-level-tlds", three_level.c_str())) {
+    CDB three_tld("three-level-tlds");
+    if (three_tld.lookup(three_level.c_str())) {
       if (labels.size() > 3) {
         return verify_sender_domain_uribl(labels[labels.size() - 4] + "." +
                                           three_level);
@@ -520,7 +524,8 @@ bool Session::verify_sender_domain(std::string const& sender)
     }
   }
 
-  if (CDB::lookup("two-level-tlds", two_level.c_str())) {
+  CDB two_tld("two-level-tlds");
+  if (two_tld.lookup(two_level.c_str())) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl(labels[labels.size() - 3] + "." +
                                         two_level);
