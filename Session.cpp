@@ -83,8 +83,8 @@ void Session::greeting()
 
   if (sock_.has_peername()) {
 
-    CDB cdb("ip-black");
-    if (cdb.lookup(sock_.them_c_str())) {
+    CDB black("ip-black");
+    if (black.lookup(sock_.them_c_str())) {
       LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
       exit(0);
     }
@@ -120,12 +120,18 @@ void Session::greeting()
       client_ = std::string("(unknown [") + sock_.them_c_str() + "])";
     }
 
-    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-    for (const auto& rbl : Config::rbls) {
-      if (has_record<RR_type::A>(res, reversed + rbl)) {
-        out() << "421 blocked by " << rbl << "\r\n" << std::flush;
-        LOG(ERROR) << client_ << " blocked by " << rbl;
-        std::exit(EXIT_SUCCESS);
+
+    CDB white("ip-white");
+    if (white.lookup(sock_.them_c_str())) {
+      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+    } else {
+      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+      for (const auto& rbl : Config::rbls) {
+        if (has_record<RR_type::A>(res, reversed + rbl)) {
+          out() << "421 blocked by " << rbl << "\r\n" << std::flush;
+          LOG(ERROR) << client_ << " blocked by " << rbl;
+          std::exit(EXIT_SUCCESS);
+        }
       }
     }
 
@@ -395,8 +401,8 @@ bool Session::verify_client(std::string const& client_identity)
     return false;
   }
 
-  CDB cdb("black");
-  if (cdb.lookup(client_identity.c_str())) {
+  CDB black("black");
+  if (black.lookup(client_identity.c_str())) {
     LOG(WARNING) << "client_identity " << client_identity << " blacklisted";
     return false;
   }
@@ -408,7 +414,7 @@ bool Session::verify_client(std::string const& client_identity)
     tld = client_identity.c_str();
   }
 
-  if (cdb.lookup(tld)) {
+  if (black.lookup(tld)) {
     LOG(INFO) << "sender " << tld << " blacklisted";
     return true;
   }
@@ -484,8 +490,8 @@ bool Session::verify_sender_domain(std::string const& sender)
     return false;
   }
 
-  CDB cdb("white");
-  if (cdb.lookup(domain.c_str())) {
+  CDB white("white");
+  if (white.lookup(domain.c_str())) {
     LOG(INFO) << "sender " << domain << " whitelisted";
     return true;
   }
@@ -497,7 +503,7 @@ bool Session::verify_sender_domain(std::string const& sender)
     tld = domain.c_str();       // ingoingDomain is a TLD
   }
 
-  if (cdb.lookup(tld)) {
+  if (white.lookup(tld)) {
     LOG(INFO) << "sender tld " << tld << " whitelisted";
     return true;
   }

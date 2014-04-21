@@ -71,6 +71,7 @@ TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 
 databases = \
 	ip-black.cdb \
+	ip-white.cdb \
 	three-level-tlds.cdb \
 	black.cdb \
 	white.cdb \
@@ -124,6 +125,7 @@ clean::
 	rm -f two-level-*.cdb three-level-*.cdb white.cdb
 
 ip-black.cdb: ip-black
+ip-white.cdb: ip-white
 
 two-level-tlds.cdb: two-level-tlds
 three-level-tlds.cdb: three-level-tlds
