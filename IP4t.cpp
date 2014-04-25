@@ -29,6 +29,14 @@ int main(int argc, char const* argv[])
   CHECK(!IP4::is_address("foo.bar"));
   CHECK(!IP4::is_address(""));
 
+  // If this is acceptable,
+  CHECK(IP4::is_address("001.0.0.0"));
+  // why not:
+  CHECK(!IP4::is_address("0001.0.0.0"));
+  // or:
+  CHECK(!IP4::is_address("00001.0.0.0"));
+  // ?
+
   CHECK(!IP4::is_address("300.0.0.0"));
   CHECK(!IP4::is_address("256.0.0.0"));
   CHECK(!IP4::is_address("260.0.0.0"));
