@@ -32,7 +32,7 @@ inline bool is_address(char const* addr)
   "(?:"                                                                        \
   "(?:25[0..5])|"                                                              \
   "(?:2[0..4]\\d)|"                                                            \
-  "(?:1\\d\\d)|"                                                               \
+  "(?:[0..1]\\d\\d)|"                                                               \
   "(?:\\d{1,2})"                                                               \
   ")"
   constexpr char const* dotted_quad_spec =
