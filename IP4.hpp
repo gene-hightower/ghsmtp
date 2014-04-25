@@ -28,24 +28,28 @@ namespace IP4 {
 
 inline bool is_address(char const* addr)
 {
-  constexpr char const* dotted_quad_rgx = "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}";
+#define OCTET                                                                  \
+  "(?:"                                                                        \
+  "(?:25[0..5])|"                                                              \
+  "(?:2[0..4]\\d)|"                                                            \
+  "(?:1\\d\\d)|"                                                               \
+  "(?:\\d{1,2})"                                                               \
+  ")"
+  constexpr char const* dotted_quad_spec =
+      OCTET "\\." OCTET "\\." OCTET "\\." OCTET;
 
-  boost::regex dotted_quad_rx(dotted_quad_rgx);
+  boost::regex dotted_quad_rx(dotted_quad_spec);
   boost::cmatch matches;
   return boost::regex_match(addr, matches, dotted_quad_rx);
 }
 
 inline std::string reverse(char const* addr)
 {
-  constexpr char const* dotted_quad_cap_rgx = "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})";
+#define OCTET_CAP "(" OCTET ")"
+  constexpr char const* dotted_quad_cap_spec =
+      OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP;
 
-  boost::regex dotted_quad_rx(dotted_quad_cap_rgx);
+  boost::regex dotted_quad_rx(dotted_quad_cap_spec);
   boost::cmatch matches;
   CHECK(boost::regex_match(addr, matches, dotted_quad_rx))
       << "reverse_ip4 called with bad dotted quad: " << addr;
