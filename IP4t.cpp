@@ -37,6 +37,9 @@ int main(int argc, char const* argv[])
   CHECK(!IP4::is_address("00001.0.0.0"));
   // ?
 
+  // Many RFCs (see https://tools.ietf.org/html/rfc3795) talk about a
+  // 3DIGIT, but I can't seem to locate a definition for that.
+
   CHECK(!IP4::is_address("300.0.0.0"));
   CHECK(!IP4::is_address("256.0.0.0"));
   CHECK(!IP4::is_address("260.0.0.0"));
