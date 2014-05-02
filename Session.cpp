@@ -486,7 +486,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   if (labels.size() < 2) { // This is not a valid domain.
     out() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
     LOG(ERROR) << "invalid sender domain " << domain;
-    return false;
+    std::exit(EXIT_SUCCESS);
   }
 
   CDB white("white");
