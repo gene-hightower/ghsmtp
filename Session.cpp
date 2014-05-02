@@ -558,7 +558,7 @@ bool Session::verify_sender_domain_uribl(std::string const& sender)
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out() << "421 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
-      return false;
+      std::exit(EXIT_SUCCESS);
     }
   }
 
