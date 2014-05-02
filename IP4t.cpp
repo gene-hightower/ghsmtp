@@ -24,14 +24,30 @@ int main(int argc, char const* argv[])
 {
   Logging::init(argv[0]);
 
+  CHECK(IP4::is_address("9.9.9.9"));
+  CHECK(IP4::is_address("99.99.99.99"));
+  CHECK(IP4::is_address("255.0.0.1"));
   CHECK(IP4::is_address("127.0.0.1"));
   CHECK(!IP4::is_address("127.0.0.1."));
   CHECK(!IP4::is_address("foo.bar"));
   CHECK(!IP4::is_address(""));
 
-  // Limitation of my regex
-  // CHECK(!IP4::is_address("300.300.300.300"));
+  // If this is acceptable,
+  CHECK(IP4::is_address("001.0.0.0"));
+  // why not:
+  CHECK(!IP4::is_address("0001.0.0.0"));
+  // or:
+  CHECK(!IP4::is_address("00001.0.0.0"));
+  // ?
 
-  std::string reverse{ IP4::reverse("127.0.0.1") };
-  CHECK_EQ(0, reverse.compare("1.0.0.127."));
+  // Many RFCs (see https://tools.ietf.org/html/rfc3795) talk about a
+  // 3DIGIT, but I can't seem to locate a definition for that.
+
+  CHECK(!IP4::is_address("256.0.0.0"));
+  CHECK(!IP4::is_address("260.0.0.0"));
+  CHECK(!IP4::is_address("300.0.0.0"));
+  CHECK(!IP4::is_address("1000.0.0.0"));
+
+  std::string reverse{ IP4::reverse("1.2.3.4") };
+  CHECK_EQ(0, reverse.compare("4.3.2.1."));
 }

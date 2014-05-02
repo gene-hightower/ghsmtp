@@ -19,7 +19,8 @@
 #ifndef IP4_DOT_HPP
 #define IP4_DOT_HPP
 
-#include <boost/regex.hpp>
+#include <regex>
+
 #include <boost/utility/string_ref.hpp>
 
 #include "Logging.hpp"
@@ -28,26 +29,30 @@ namespace IP4 {
 
 inline bool is_address(char const* addr)
 {
-  constexpr char const* dotted_quad_rgx = "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}\\."
-                                          "\\d{1,3}";
+#define OCTET                                                                  \
+  "(?:"                                                                        \
+  "(?:25[0..5])|"                                                              \
+  "(?:2[0..4]\\d)|"                                                            \
+  "(?:[0..1]\\d\\d)|"                                                          \
+  "(?:\\d{1,2})"                                                               \
+  ")"
+  constexpr char const* dotted_quad_spec =
+      OCTET "\\." OCTET "\\." OCTET "\\." OCTET;
 
-  boost::regex dotted_quad_rx(dotted_quad_rgx);
-  boost::cmatch matches;
-  return boost::regex_match(addr, matches, dotted_quad_rx);
+  std::regex dotted_quad_rx(dotted_quad_spec);
+  std::cmatch matches;
+  return std::regex_match(addr, matches, dotted_quad_rx);
 }
 
 inline std::string reverse(char const* addr)
 {
-  constexpr char const* dotted_quad_cap_rgx = "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})\\."
-                                              "(\\d{1,3})";
+#define OCTET_CAP "(" OCTET ")"
+  constexpr char const* dotted_quad_cap_spec =
+      OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP;
 
-  boost::regex dotted_quad_rx(dotted_quad_cap_rgx);
-  boost::cmatch matches;
-  CHECK(boost::regex_match(addr, matches, dotted_quad_rx))
+  std::regex dotted_quad_rx(dotted_quad_cap_spec);
+  std::cmatch matches;
+  CHECK(std::regex_match(addr, matches, dotted_quad_rx))
       << "reverse_ip4 called with bad dotted quad: " << addr;
 
   std::ostringstream reverse;
