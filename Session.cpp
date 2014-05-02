@@ -523,7 +523,7 @@ bool Session::verify_sender_domain(std::string const& sender)
         out() << "421 bad sender domain\r\n" << std::flush;
         LOG(ERROR) << sender
                    << " blocked by exact match on three-level-tlds list";
-        return false;
+        std::exit(EXIT_SUCCESS);
       }
     }
   }
@@ -536,7 +536,7 @@ bool Session::verify_sender_domain(std::string const& sender)
     } else {
       out() << "421 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
-      return false;
+      std::exit(EXIT_SUCCESS);
     }
   }
 
