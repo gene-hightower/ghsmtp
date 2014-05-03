@@ -22,7 +22,16 @@
 
 int main(int argc, char const* argv[])
 {
-  Logging::init(argv[0]);
+  //Logging::init(argv[0]);
+
+  CHECK(IP4::is_address("69.0.0.0"));
+  CHECK(IP4::is_address("160.0.0.0"));
+  CHECK(IP4::is_address("250.0.0.0"));
+  CHECK(IP4::is_address("251.0.0.0"));
+  CHECK(IP4::is_address("252.0.0.0"));
+  CHECK(IP4::is_address("253.0.0.0"));
+  CHECK(IP4::is_address("254.0.0.0"));
+  CHECK(IP4::is_address("111.0.0.0"));
 
   CHECK(IP4::is_address("9.9.9.9"));
   CHECK(IP4::is_address("99.99.99.99"));
