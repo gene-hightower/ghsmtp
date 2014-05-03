@@ -20,15 +20,13 @@
 
 #include <fstream>
 #include <iomanip>
-
+#include <regex>
 #include <string>
 #include <vector>
 
 #include <signal.h>
 
 #include "Session.hpp"
-
-#include <boost/regex.hpp>
 
 inline bool eat(std::istream& is, const char* str)
 {
@@ -61,7 +59,7 @@ int main(int argc, char* argv[])
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
 
-  boost::regex adrx("\\s*<(.+)@(.+)>");
+  std::regex adrx("\\s*<(.+)@(.+)>");
 
   alarm(5 * 60); // Initial timeout set for command loop.
 
@@ -101,9 +99,9 @@ int main(int argc, char* argv[])
       eat(session.in(), "\n");
 
       // parse the "from" address
-      boost::cmatch matches;
+      std::cmatch matches;
 
-      if (boost::regex_match(reverse_path.c_str(), matches, adrx)) {
+      if (std::regex_match(reverse_path.c_str(), matches, adrx)) {
         std::string local(matches[1].first, matches[1].second);
         std::string dom(matches[2].first, matches[2].second);
 
@@ -119,9 +117,9 @@ int main(int argc, char* argv[])
       eat(session.in(), "\n");
 
       // parse the "to" address
-      boost::cmatch matches;
+      std::cmatch matches;
 
-      if (boost::regex_match(to.c_str(), matches, adrx)) {
+      if (std::regex_match(to.c_str(), matches, adrx)) {
         std::string local(matches[1].first, matches[1].second);
         std::string dom(matches[2].first, matches[2].second);
 
