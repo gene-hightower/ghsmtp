@@ -33,7 +33,6 @@ LDLIBS += \
 	-L/usr/local/ssl/lib \
 	-lcrypto -lssl \
 	-lglog -lgflags \
-	-lboost_regex -lboost_system -lpthread \
 	-lldns \
 	-lspf2 \
 	-lregdom \
