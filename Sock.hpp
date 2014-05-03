@@ -53,6 +53,8 @@ public:
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
       case sizeof(sockaddr_in6) :
+        LOG(WARNING)
+            << "getsockname returned us_addr_len_ == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
                                         &us_addr_)->sin6_addr),
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
@@ -77,6 +79,8 @@ public:
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
       case sizeof(sockaddr_in6) :
+        LOG(WARNING)
+            << "getpeername returned them_addr_len_ == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
                                         &them_addr_)->sin6_addr),
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
