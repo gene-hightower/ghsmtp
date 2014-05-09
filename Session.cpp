@@ -39,6 +39,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/lexical_cast.hpp>
 
 namespace Config {
 constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
@@ -572,9 +573,8 @@ bool Session::verify_sender_spf(Mailbox const& sender)
   SPF::Request spf_req(spf_srv);
   spf_req.set_ipv4_str(sock_.them_c_str());
   spf_req.set_helo_dom(client_identity_.c_str());
-  std::ostringstream from;
-  from << sender;
-  spf_req.set_env_from(from.str().c_str());
+  std::string from = boost::lexical_cast<std::string>(sender);
+  spf_req.set_env_from(from.c_str());
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {

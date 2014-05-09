@@ -17,10 +17,11 @@
 */
 
 #include "Mailbox.hpp"
+#include "Logging.hpp"
 
 #include <iostream>
 
-#include "Logging.hpp"
+#include <boost/lexical_cast.hpp>
 
 int main(int argc, char* argv[])
 {
@@ -33,10 +34,9 @@ int main(int argc, char* argv[])
 
   CHECK_EQ(std::string("digilicious.com"), dg.domain());
 
-  std::ostringstream dgs;
-  dgs << dg;
+  std::string dgstr = boost::lexical_cast<std::string>(dg);
 
-  CHECK_EQ(dgs.str(), "gene@digilicious.com");
+  CHECK_EQ(dgstr, "gene@digilicious.com");
 
   dg.clear();
   CHECK(dg.empty());
