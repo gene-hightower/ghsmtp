@@ -173,7 +173,7 @@ void Session::helo(std::string const& client_identity)
 }
 
 void Session::mail_from(Mailbox const& reverse_path,
-                        std::unordered_map<std::string, std::string> parameters)
+                        std::unordered_map<std::string, std::string> const& parameters)
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
@@ -207,7 +207,7 @@ void Session::mail_from(Mailbox const& reverse_path,
 }
 
 void Session::rcpt_to(Mailbox const& forward_path,
-                      std::unordered_map<std::string, std::string> parameters)
+                      std::unordered_map<std::string, std::string> const& parameters)
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
