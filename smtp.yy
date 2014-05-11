@@ -554,8 +554,8 @@ y: 'y' | 'Y';
 
 YY_DECL
 {
-  static int line_length;
-  static std::string line;
+  static int line_length;       // † Code sections so marked are for protocol
+  static std::string line;      //   debugging purposes only.
 
   int c = session.in().get();
 
@@ -568,16 +568,18 @@ YY_DECL
   if ('\r' == c) {
     c = session.in().get();
     if ('\n' == c) {
-      line_length = 0;
-      LOG(INFO) << line;
-      line.clear();
+
+      line_length = 0;          // †
+      LOG(INFO) << line;        // †
+      line.clear();             // †
+
       return yy::Psr::make_CRLF();
     }
     session.in().unget();
     c = '\r';
   }
 
-  if (1024 == ++line_length) {
+  if (1024 == ++line_length) {  // †
     LOG(WARNING) << "line too long";
   }
 
@@ -588,7 +590,7 @@ YY_DECL
     return yy::Psr::make_UNPRINTABLE();
   }
 
-  line.push_back(c);
+  line.push_back(c);            // †
   return yy::Psr::symbol_type(static_cast<yy::Psr::token_type>(c), c);
 }
 
