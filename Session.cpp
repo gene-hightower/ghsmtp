@@ -410,13 +410,12 @@ bool Session::verify_client(std::string const& client_identity)
   char const* tld = tld_db.get_registered_domain(client_identity.c_str());
   if (!tld) {
     tld = client_identity.c_str();
-  } else {
-    if (black.lookup(tld)) {
-      out() << "554 blacklisted identity\r\n" << std::flush;
-      LOG(WARNING) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
-                   << client_ << " claiming " << client_identity;
-      return false;
-    }
+  }
+  if (black.lookup(tld)) {
+    out() << "554 blacklisted identity\r\n" << std::flush;
+    LOG(WARNING) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
+    return false;
   }
 
   // Log this client
@@ -499,11 +498,10 @@ bool Session::verify_sender_domain(std::string const& sender)
   char const* tld = tld_db.get_registered_domain(domain.c_str());
   if (!tld) {
     tld = domain.c_str(); // If ingoing domain is a TLD.
-  } else {
-    if (white.lookup(tld)) {
-      LOG(INFO) << "sender tld " << tld << " whitelisted";
-      return true;
-    }
+  }
+  if (white.lookup(tld)) {
+    LOG(INFO) << "sender tld " << tld << " whitelisted";
+    return true;
   }
 
   // Based on <www.surbl.org/guidelines>
