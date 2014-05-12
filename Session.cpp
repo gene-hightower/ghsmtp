@@ -357,6 +357,7 @@ void Session::starttls()
   } else {
     out() << "220 go ahead\r\n" << std::flush;
     sock_.starttls();
+    LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
 }
 
