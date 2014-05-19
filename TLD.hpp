@@ -27,6 +27,9 @@ extern "C" {
 
 class TLD {
 public:
+  TLD(TLD const&) = delete;
+  TLD& operator=(TLD const&) = delete;
+
   TLD() : tree_(CHECK_NOTNULL(loadTldTree()))
   {
   }
