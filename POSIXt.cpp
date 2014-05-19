@@ -25,4 +25,7 @@ int main(int argc, char* argv[])
   Logging::init(argv[0]);
 
   POSIX::set_nonblocking(0);
+
+  CHECK(!POSIX::input_ready(0, std::chrono::milliseconds(1)));
+  CHECK(POSIX::output_ready(1, std::chrono::milliseconds(1)));
 }
