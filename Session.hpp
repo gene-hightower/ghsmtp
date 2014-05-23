@@ -37,8 +37,9 @@ public:
   void greeting();
   void ehlo(std::string const& client_identity);
   void helo(std::string const& client_identity);
-  void mail_from(Mailbox const& reverse_path,
-                 std::unordered_map<std::string, std::string> const& parameters);
+  void
+  mail_from(Mailbox const& reverse_path,
+            std::unordered_map<std::string, std::string> const& parameters);
   void rcpt_to(Mailbox const& forward_path,
                std::unordered_map<std::string, std::string> const& parameters);
   void data();
