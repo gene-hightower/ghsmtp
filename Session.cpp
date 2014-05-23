@@ -559,10 +559,14 @@ bool Session::verify_sender_spf(Mailbox const& sender)
 {
   SPF::Server spf_srv(fqdn_.c_str());
   SPF::Request spf_req(spf_srv);
+
   spf_req.set_ipv4_str(sock_.them_c_str());
   spf_req.set_helo_dom(client_identity_.c_str());
+
   std::string from = boost::lexical_cast<std::string>(sender);
+
   spf_req.set_env_from(from.c_str());
+
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
@@ -570,8 +574,8 @@ bool Session::verify_sender_spf(Mailbox const& sender)
     LOG(ERROR) << spf_res.header_comment();
     std::exit(EXIT_SUCCESS);
   }
+
   LOG(INFO) << spf_res.header_comment();
   received_spf_ = spf_res.received_spf();
-
   return true;
 }
