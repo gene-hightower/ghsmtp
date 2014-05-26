@@ -170,8 +170,9 @@ void Session::helo(std::string const& client_identity)
   }
 }
 
-void Session::mail_from(Mailbox const& reverse_path,
-                        std::unordered_map<std::string, std::string> const& parameters)
+void Session::mail_from(
+    Mailbox const& reverse_path,
+    std::unordered_map<std::string, std::string> const& parameters)
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
@@ -204,8 +205,9 @@ void Session::mail_from(Mailbox const& reverse_path,
   }
 }
 
-void Session::rcpt_to(Mailbox const& forward_path,
-                      std::unordered_map<std::string, std::string> const& parameters)
+void
+Session::rcpt_to(Mailbox const& forward_path,
+                 std::unordered_map<std::string, std::string> const& parameters)
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
@@ -232,7 +234,6 @@ void Session::data()
     LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return;
   }
-
   if (forward_path_.empty()) {
     out() << "554 no valid recipients\r\n" << std::flush;
     LOG(WARNING) << "no valid recipients";
@@ -246,12 +247,10 @@ void Session::data()
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\n";
-
   headers << "X-Original-To: <" << forward_path_[0] << ">\n";
   for (size_t i = 1; i < forward_path_.size(); ++i) {
     headers << "\t<" << forward_path_[i] << ">\n";
   }
-
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " (" << client_ << ")";
@@ -263,13 +262,10 @@ void Session::data()
   if (tls_info.length()) {
     headers << "\n\t(" << tls_info << ")";
   }
-
   headers << ";\n\t" << msg.when() << "\n";
-
   if (!received_spf_.empty()) {
     headers << received_spf_ << "\n";
   }
-
   msg.out() << headers.str();
 
   out() << "354 go\r\n" << std::flush;
@@ -277,27 +273,22 @@ void Session::data()
   std::string line;
 
   while (std::getline(sock_.in(), line)) {
-
     int last = line.length() - 1;
     if ((-1 == last) || ('\r' != line.at(last))) {
       out() << "421 bare linefeed in message data\r\n" << std::flush;
       LOG(ERROR) << "bare linefeed in message with id " << msg.id();
       std::exit(EXIT_SUCCESS);
     }
-
     line.erase(last, 1); // so eat that cr
-
-    if ("." == line) { // just a dot is <cr><lf>.<cr><lf>
+    if ("." == line) {   // just a dot is <cr><lf>.<cr><lf>
       msg.save();
       LOG(INFO) << "message delivered with id " << msg.id();
       out() << "250 data ok\r\n" << std::flush;
       return;
     }
-
-    line += '\n'; // add system standard newline
+    line += '\n'; // add standard newline
     if ('.' == line.at(0))
       line.erase(0, 1); // eat leading dot
-
     msg.out() << line;
   }
 
@@ -568,10 +559,14 @@ bool Session::verify_sender_spf(Mailbox const& sender)
 {
   SPF::Server spf_srv(fqdn_.c_str());
   SPF::Request spf_req(spf_srv);
+
   spf_req.set_ipv4_str(sock_.them_c_str());
   spf_req.set_helo_dom(client_identity_.c_str());
+
   std::string from = boost::lexical_cast<std::string>(sender);
+
   spf_req.set_env_from(from.c_str());
+
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
@@ -579,8 +574,8 @@ bool Session::verify_sender_spf(Mailbox const& sender)
     LOG(ERROR) << spf_res.header_comment();
     std::exit(EXIT_SUCCESS);
   }
+
   LOG(INFO) << spf_res.header_comment();
   received_spf_ = spf_res.received_spf();
-
   return true;
 }
