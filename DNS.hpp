@@ -120,7 +120,8 @@ public:
 
     if (stat != LDNS_STATUS_OK) {
       LOG(ERROR) << "ldns_resolver_query_status failed: stat=="
-                 << static_cast<unsigned>(stat);
+                 << static_cast<unsigned>(stat) << " "
+                 << ldns_get_errorstr_by_id(stat);
     }
   }
   ~Query()
