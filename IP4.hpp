@@ -19,40 +19,34 @@
 #ifndef IP4_DOT_HPP
 #define IP4_DOT_HPP
 
-#include <regex>
-
 #include <boost/utility/string_ref.hpp>
+#include <boost/xpressive/xpressive.hpp>
 
 #include "Logging.hpp"
+
+using namespace boost::xpressive;
 
 namespace IP4 {
 
 inline bool is_address(char const* addr)
 {
-#define OCTET                                                                  \
-  "(?:"                                                                        \
-  "(?:25[0-5])|"                                                               \
-  "(?:2[0-4]\\d)|"                                                             \
-  "(?:[0-1]\\d{1,2})|"                                                         \
-  "(?:\\d{1,2})"                                                               \
-  ")"
-  constexpr char const* dotted_quad_spec =
-      OCTET "\\." OCTET "\\." OCTET "\\." OCTET;
-
-  std::regex dotted_quad_rx(dotted_quad_spec);
-  std::cmatch matches;
-  return std::regex_match(addr, matches, dotted_quad_rx);
+  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) |
+                 ('2' >> range('0', '4') >> _d) |
+                 (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+  cregex re = octet >> '.' >> octet >> '.' >> octet >> '.' >> octet;
+  cmatch matches;
+  return regex_match(addr, matches, re);
 }
 
 inline std::string reverse(char const* addr)
 {
-#define OCTET_CAP "(" OCTET ")"
-  constexpr char const* dotted_quad_cap_spec =
-      OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP "\\." OCTET_CAP;
-
-  std::regex dotted_quad_rx(dotted_quad_cap_spec);
-  std::cmatch matches;
-  CHECK(std::regex_match(addr, matches, dotted_quad_rx))
+  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) |
+                 ('2' >> range('0', '4') >> _d) |
+                 (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+  cregex re = (s1 = octet) >> '.' >> (s2 = octet) >> '.' >> (s3 = octet) >>
+              '.' >> (s4 = octet);
+  cmatch matches;
+  CHECK(regex_match(addr, matches, re))
       << "reverse_ip4 called with bad dotted quad: " << addr;
 
   std::ostringstream reverse;
