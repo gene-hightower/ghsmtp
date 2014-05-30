@@ -45,7 +45,8 @@ constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
                                        "b.barracudacentral.org", };
 
-constexpr char const* const uribls[] = { "black.uribl.com",
+constexpr char const* const uribls[] = { "dbl.spamhaus.org",
+                                         "black.uribl.com",
                                          "multi.surbl.org", };
 
 constexpr auto greeting_max_wait_ms = 10000;
