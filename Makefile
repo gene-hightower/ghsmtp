@@ -118,12 +118,11 @@ TAGS:
 clean::
 	rm -f TAGS
 
-%.cdb : %
-	$(MAKE) cdb-gen
+%.cdb : % cdb-gen
 	./cdb-gen < $^ | cdb -c $@
 
 clean::
-	rm -f two-level-*.cdb three-level-*.cdb white.cdb
+	rm -f two-level-*.cdb three-level-*.cdb white.cdb cdb-gen
 
 ip-black.cdb: ip-black
 ip-white.cdb: ip-white
