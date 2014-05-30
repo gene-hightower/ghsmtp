@@ -71,12 +71,12 @@ Sockt_EXTRA = POSIX TLS-OpenSSL
 TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 
 databases = \
+	black.cdb \
 	ip-black.cdb \
 	ip-white.cdb \
 	three-level-tlds.cdb \
-	black.cdb \
+	two-level-tlds.cdb \
 	white.cdb \
-	two-level-tlds.cdb
 
 all: $(programs) $(databases)
 
@@ -118,20 +118,18 @@ TAGS:
 clean::
 	rm -f TAGS
 
-%.cdb : % cdb-gen
+%.cdb : %
 	./cdb-gen < $^ | cdb -c $@
 
 clean::
 	rm -f two-level-*.cdb three-level-*.cdb white.cdb cdb-gen
 
-ip-black.cdb: ip-black
-ip-white.cdb: ip-white
-
-two-level-tlds.cdb: two-level-tlds
-three-level-tlds.cdb: three-level-tlds
-
-black.cdb: black
-white.cdb: white
+black.cdb: black cdb-gen
+ip-black.cdb: ip-black cdb-gen
+ip-white.cdb: ip-white cdb-gen
+three-level-tlds.cdb: three-level-tlds cdb-gen
+two-level-tlds.cdb: two-level-tlds cdb-gen
+white.cdb: white cdb-gen
 
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
