@@ -22,7 +22,6 @@ warnings = \
 	-Wsign-promo
 
 CXXFLAGS += \
-	-I/usr/local/ssl/include \
 	-DSMTP_HOME=$(shell pwd) \
 	-std=c++1y \
 	-MMD \
@@ -30,7 +29,6 @@ CXXFLAGS += \
 	$(warnings)
 
 LDLIBS += \
-	-L/usr/local/ssl/lib \
 	-lcrypto -lssl \
 	-lglog -lgflags \
 	-lldns \
