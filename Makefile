@@ -117,7 +117,7 @@ clean::
 	rm -f TAGS
 
 %.cdb : %
-	./cdb-gen < $^ | cdb -c $@
+	./cdb-gen < $< | cdb -c $@
 
 clean::
 	rm -f two-level-*.cdb three-level-*.cdb white.cdb cdb-gen
