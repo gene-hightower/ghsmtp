@@ -372,10 +372,10 @@ bool Session::verify_client(std::string const& client_identity)
       Domain::match(client_identity, "localhost.localdomain")) {
     if (!Domain::match(fqdn_, fcrdns_) &&
         strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      out() << "554 liar\r\n" << std::flush;
-      LOG(WARNING) << "liar: client" << (sock_.has_peername() ? " " : "")
-                   << client_ << " claiming " << client_identity;
-      return false;
+      out() << "421 liar\r\n" << std::flush;
+      LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
+      std::exit(EXIT_SUCCESS);
     }
   }
 
@@ -384,18 +384,18 @@ bool Session::verify_client(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    out() << "554 invalid sender\r\n" << std::flush;
-    LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
-    return false;
+    out() << "421 invalid sender\r\n" << std::flush;
+    LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
+               << client_ << " claiming " << client_identity;
+    std::exit(EXIT_SUCCESS);
   }
 
   CDB black("black");
   if (black.lookup(client_identity.c_str())) {
-    out() << "554 blacklisted identity\r\n" << std::flush;
-    LOG(WARNING) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
-    return false;
+    out() << "421 blacklisted identity\r\n" << std::flush;
+    LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
+               << client_ << " claiming " << client_identity;
+    std::exit(EXIT_SUCCESS);
   }
 
   TLD tld_db;
@@ -404,10 +404,10 @@ bool Session::verify_client(std::string const& client_identity)
     tld = client_identity.c_str();
   }
   if (black.lookup(tld)) {
-    out() << "554 blacklisted identity\r\n" << std::flush;
-    LOG(WARNING) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
-    return false;
+    out() << "421 blacklisted identity\r\n" << std::flush;
+    LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
+               << client_ << " claiming " << client_identity;
+    std::exit(EXIT_SUCCESS);
   }
 
   // Log this client
