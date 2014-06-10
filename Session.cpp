@@ -466,6 +466,12 @@ bool Session::verify_sender(Mailbox const& sender)
 
 bool Session::verify_sender_domain(std::string const& sender)
 {
+  if (0 == sender.length()) {
+    // MAIL FROM:<>
+    // is used to send bounce messages.
+    return true;
+  }
+
   std::string domain = sender;
   boost::algorithm::to_lower(domain);
 
