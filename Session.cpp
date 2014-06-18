@@ -40,7 +40,9 @@
 #include <boost/lexical_cast.hpp>
 
 namespace Config {
-constexpr char const* const bad_recipients[] = { "a", "nobody", "mixmaster", };
+constexpr char const* const very_bad_recipients[] = { "a", };
+
+constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
 
 constexpr char const* const rbls[] = { "zen.spamhaus.org",
                                        "b.barracudacentral.org", };
@@ -429,16 +431,25 @@ bool Session::verify_recipient(Mailbox const& recipient)
 {
   // Make sure the domain matches.
   if (!Domain::match(recipient.domain(), fqdn_)) {
-    out() << "421 relay access denied\r\n" << std::flush;
-    LOG(ERROR) << "relay access denied for " << recipient;
-    std::exit(EXIT_SUCCESS);
+    out() << "554 relay access denied\r\n" << std::flush;
+    LOG(WARNING) << "relay access denied for " << recipient;
+    return false;
   }
 
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
-      out() << "421 no such mailbox " << recipient << "\r\n" << std::flush;
-      LOG(ERROR) << "no such mailbox " << recipient;
+      out() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
+      LOG(WARNING) << "no such mailbox " << recipient;
+      return false;
+    }
+  }
+
+  // Check for local addresses we reject with prejudice.
+  for (const auto very_bad_recipient : Config::very_bad_recipients) {
+    if (0 == recipient.local_part().compare(very_bad_recipient)) {
+      out() << "421 very bad recipient " << recipient << "\r\n" << std::flush;
+      LOG(ERROR) << "very bad recipient " << recipient;
       std::exit(EXIT_SUCCESS);
     }
   }
