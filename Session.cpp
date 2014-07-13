@@ -79,18 +79,19 @@ Session::Session(int fd_in, int fd_out, std::string const& fqdn)
 
 void Session::greeting()
 {
-  // This is just a teaser, the first line of a multi-line response.
-  out() << "220-" << fqdn_ << " ESMTP\r\n" << std::flush;
-
   if (sock_.has_peername()) {
 
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
-      LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
+      // Silent exit, no log file written.  Don't spin up any disks.
+      // LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
       exit(0);
     }
 
     LOG(INFO) << "connect from " << sock_.them_c_str();
+
+    // This is just a teaser, the first line of a multi-line response.
+    out() << "220-" << fqdn_ << " ESMTP\r\n" << std::flush;
 
     using namespace DNS;
     Resolver res;
