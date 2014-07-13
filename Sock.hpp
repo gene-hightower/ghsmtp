@@ -37,30 +37,34 @@ public:
 
   Sock(int fd_in, int fd_out)
     : iostream_(fd_in, fd_out)
-    , us_addr_len_(sizeof us_addr_)
-    , them_addr_len_(sizeof them_addr_)
     , us_addr_str_{ '\0' }
     , them_addr_str_{ '\0' }
   {
+    sockaddr_storage us_addr;
+    sockaddr_storage them_addr;
+
+    socklen_t us_addr_len = sizeof us_addr;
+    socklen_t them_addr_len = sizeof them_addr;
+
     // Get our local IP address as "us".
 
-    if (-1 != getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr_),
-                          &us_addr_len_)) {
-      switch (us_addr_len_) {
+    if (-1 != getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr),
+                          &us_addr_len)) {
+      switch (us_addr_len) {
       case sizeof(sockaddr_in) :
         PCHECK(inet_ntop(AF_INET, &(reinterpret_cast<struct sockaddr_in*>(
-                                       &us_addr_)->sin_addr),
+                                       &us_addr)->sin_addr),
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
       case sizeof(sockaddr_in6) :
         LOG(WARNING)
-            << "getsockname returned us_addr_len_ == sizeof(sockaddr_in6)";
+            << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
-                                        &us_addr_)->sin6_addr),
+                                        &us_addr)->sin6_addr),
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
       default:
-        LOG(ERROR) << "bogus address length (" << us_addr_len_
+        LOG(ERROR) << "bogus address length (" << us_addr_len
                    << ") returned from getsockname";
       }
     } else {
@@ -70,23 +74,23 @@ public:
     // Get the remote IP address as "them".
 
     if (-1 != getpeername(fd_out,
-                          reinterpret_cast<struct sockaddr*>(&them_addr_),
-                          &them_addr_len_)) {
-      switch (them_addr_len_) {
+                          reinterpret_cast<struct sockaddr*>(&them_addr),
+                          &them_addr_len)) {
+      switch (them_addr_len) {
       case sizeof(sockaddr_in) :
         PCHECK(inet_ntop(AF_INET, &(reinterpret_cast<struct sockaddr_in*>(
-                                       &them_addr_)->sin_addr),
+                                       &them_addr)->sin_addr),
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
       case sizeof(sockaddr_in6) :
         LOG(WARNING)
-            << "getpeername returned them_addr_len_ == sizeof(sockaddr_in6)";
+            << "getpeername returned them_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
-                                        &them_addr_)->sin6_addr),
+                                        &them_addr)->sin6_addr),
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
       default:
-        LOG(ERROR) << "bogus address length (" << them_addr_len_
+        LOG(ERROR) << "bogus address length (" << them_addr_len
                    << ") returned from getpeername";
       }
     } else {
@@ -138,12 +142,6 @@ public:
 
 private:
   boost::iostreams::stream<SockBuffer> iostream_;
-
-  socklen_t us_addr_len_;
-  socklen_t them_addr_len_;
-
-  sockaddr_storage us_addr_;
-  sockaddr_storage them_addr_;
 
   char us_addr_str_[INET6_ADDRSTRLEN];
   char them_addr_str_[INET6_ADDRSTRLEN];
