@@ -27,16 +27,18 @@
 struct Session_test {
   void test()
   {
+    std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+
     int fd_null = open("/dev/null", O_WRONLY);
     PCHECK(fd_null >= 0) << " can't open /dev/null";
 
     Session sess(STDIN_FILENO, fd_null, "example.com");
 
+    // These now die and never return, so maybe just the first one is
+    // ever called.
     CHECK(!sess.verify_sender_domain("com"));
     CHECK(!sess.verify_sender_domain("zzux.com"));
     CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
-
-    std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
   }
 };
 
