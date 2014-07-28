@@ -30,7 +30,7 @@
 
 class Pill {
 public:
-  Pill(std::random_device& rd)
+  explicit Pill(std::random_device& rd)
   {
     std::uniform_int_distribution<decltype(s_)> uni_dist;
 
