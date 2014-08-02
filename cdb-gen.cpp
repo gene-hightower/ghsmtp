@@ -11,5 +11,5 @@ int main(int argc, char const* argv[])
     */
     std::cout << "+" << line.length() << ",1:" << line << "->1\n";
   }
-  std::cout << std::endl;
+  std::cout << "\n";
 }
