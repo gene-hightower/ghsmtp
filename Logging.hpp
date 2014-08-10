@@ -20,6 +20,7 @@
 #define LOGGING_HPP
 
 #include <cassert>
+#include <cerrno>
 #include <chrono>
 #include <cstdlib>
 #include <cstdint>
@@ -241,7 +242,8 @@ public:
     assert(s == sizeof(tm_str_z) - 1);
 
     msg_ << tm_str << "." << std::setfill('0') << std::setw(6) << us << tm_str_z
-         << file << ":" << static_cast<unsigned>(line) << "] ";
+         << " " << boost::lexical_cast<std::string>(getpid()) << " " << file
+         << ":" << static_cast<unsigned>(line) << "] ";
   }
 
   virtual ~Message()
@@ -275,7 +277,8 @@ public:
 
   ~ErrnoMessage()
   {
-    stream() << ": strerror(errno) [errno]";
+    stream() << ": " << std::strerror(errno) << " ["
+             << static_cast<unsigned>(errno) << "]";
   }
 };
 }
@@ -287,18 +290,20 @@ public:
 #define LOG_FATAL Logging::Message(__FILE__, __LINE__, Logging::Severity::FATAL)
 
 #define PLOG_INFO Logging::ErrnoMessage(__FILE__, __LINE__)
-#define PLOG_WARNING                                                            \
+#define PLOG_WARNING                                                           \
   Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::WARNING)
-#define PLOG_ERROR Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::ERROR)
-#define PLOG_FATAL Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::FATAL)
+#define PLOG_ERROR                                                             \
+  Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::ERROR)
+#define PLOG_FATAL                                                             \
+  Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::FATAL)
 
 #define LOG(severity) LOG_##severity.stream()
 #define PLOG(severity) PLOG_##severity.stream()
 
 #define LOG_IF(severity, condition)                                            \
   !(condition) ? (void)0 : Logging::MessageVoidify() & LOG(severity)
-#define PLOG_IF(severity, condition) \
-  !(condition) ? (void) 0 : Logging::MessageVoidify() & PLOG(severity)
+#define PLOG_IF(severity, condition)                                           \
+  !(condition) ? (void)0 : Logging::MessageVoidify() & PLOG(severity)
 
 #define CHECK(condition)                                                       \
   LOG_IF(FATAL, BRANCH_NOT_TAKEN(!(condition)))                                \
