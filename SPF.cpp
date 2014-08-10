@@ -31,38 +31,28 @@ std::unordered_map<Result, char const*> result_to_string{
   { Result::PERMERROR, "PERMERROR" },
 };
 
-// We map libspf2's levels of error, warning, info and debug to
-// Google's fatal, error, warning and info.
+// We map libspf2's levels of error, warning, info and debug to our
+// own fatal, error, warning and info log levels.
 
-static void glog_error(const char* file, int line, char const* errmsg)
-    __attribute__((noreturn)); // This just is for GCC 4.8.2 which
-                               // can't take the attribute on the
-                               // function definition.
-
-static void glog_error(const char* file, int line, char const* errmsg)
+static void log_error(const char* file, int line, char const* errmsg)
 {
-  google::LogMessageFatal(file, line).stream() << errmsg;
+  Logging::Message(file, line, Logging::Severity::FATAL).stream() << errmsg;
 }
-static void glog_warning(const char* file, int line, char const* errmsg)
+static void log_warning(const char* file, int line, char const* errmsg)
 {
-  google::LogMessage(file, line, google::GLOG_ERROR).stream() << errmsg;
+  Logging::Message(file, line, Logging::Severity::ERROR).stream() << errmsg;
 }
-static void glog_info(const char* file, int line, char const* errmsg)
+static void log_info(const char* file, int line, char const* errmsg)
 {
-  google::LogMessage(file, line, google::GLOG_WARNING).stream() << errmsg;
+  Logging::Message(file, line, Logging::Severity::WARNING).stream() << errmsg;
 }
-// static void glog_debug(const char* file, int line, char const* errmsg)
-// {
-//   google::LogMessage(file, line).stream() << errmsg;
-// }
 
 struct Init {
   Init()
   {
-    SPF_error_handler = glog_error;
-    SPF_warning_handler = glog_warning;
-    SPF_info_handler = glog_info;
-    // SPF_debug_handler = glog_debug;
+    SPF_error_handler = log_error;
+    SPF_warning_handler = log_warning;
+    SPF_info_handler = log_info;
     SPF_debug_handler = nullptr;
   }
 };

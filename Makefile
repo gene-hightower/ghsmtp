@@ -39,9 +39,9 @@ LDLIBS += \
 	-lstdc++
 
 programs = smtp smtpd dns2
-dns2_EXTRA = DNS
-smtp_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
-smtpd_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
+dns2_EXTRA = DNS Logging
+smtp_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
+smtpd_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
 
 tests = \
 	CDBt \
@@ -60,13 +60,13 @@ tests = \
 	TLDt \
 	TLS-OpenSSLt
 
-DNSt_EXTRA = DNS
-POSIXt_EXTRA = POSIX
-SPFt_EXTRA = SPF
-Sessiont_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
-SockBuffert_EXTRA = POSIX TLS-OpenSSL
-Sockt_EXTRA = POSIX TLS-OpenSSL
-TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
+DNSt_EXTRA = DNS Logging
+POSIXt_EXTRA = Logging POSIX
+SPFt_EXTRA = Logging SPF
+Sessiont_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
+SockBuffert_EXTRA = Logging POSIX TLS-OpenSSL
+Sockt_EXTRA = Logging POSIX TLS-OpenSSL
+TLS-OpenSSLt_EXTRA = Logging POSIX TLS-OpenSSL
 
 databases = \
 	black.cdb \
