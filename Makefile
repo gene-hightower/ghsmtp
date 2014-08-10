@@ -30,7 +30,6 @@ CXXFLAGS += \
 
 LDLIBS += \
 	-lcrypto -lssl \
-	-lglog -lgflags \
 	-lldns \
 	-lspf2 \
 	-lregdom \
