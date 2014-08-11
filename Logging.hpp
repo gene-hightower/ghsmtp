@@ -254,8 +254,8 @@ public:
     assert(s == sizeof(tm_str_z) - 1);
 
     msg_ << tm_str << "." << std::setfill('0') << std::setw(6) << us << tm_str_z
-         << " " << boost::lexical_cast<std::string>(getpid()) << " " << file
-         << ":" << static_cast<unsigned>(line) << "] ";
+         << boost::lexical_cast<std::string>(getpid()) << " " << file << ":"
+         << static_cast<unsigned>(line) << "] ";
   }
 
   virtual ~Message()
