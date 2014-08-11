@@ -287,7 +287,7 @@ public:
   {
   }
 
-  ~ErrnoMessage()
+  ~ErrnoMessage() override
   {
     stream() << ": " << std::strerror(errno) << " ["
              << static_cast<unsigned>(errno) << "]";
