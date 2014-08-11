@@ -46,10 +46,7 @@
 #include <io.h>
 
 #define open _open
-#define read _read
 #define write _write
-#define lseek _lseek
-#define close _close
 #endif
 
 #include <boost/lexical_cast.hpp>
