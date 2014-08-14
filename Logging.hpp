@@ -64,12 +64,20 @@
 #include <sstream>
 #include <utility>
 
-#ifdef _POSIX_SOURCE
+#include <sys/types.h>
+
+#ifdef WIN32
+// MinGW 4.8.1 needs off64_t defined before including <fcntl.h> when
+// using -std=c++1y:
+using off64_t = _off64_t;
+#endif
+
 #include <fcntl.h>
+
+#ifdef _POSIX_SOURCE
 #include <unistd.h>
 
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/utsname.h>
 #endif
 
@@ -77,10 +85,11 @@
 #include <windows.h>
 #include <winsock.h> // for GetComputerNameA
 #include <io.h>
+#include <process.h> // for _getpid()
 
-#define open _open
-#define write _write
-#endif
+#undef ERROR
+
+#endif // WIN32
 
 #include <boost/lexical_cast.hpp>
 
@@ -93,6 +102,8 @@ extern int log_fd;
 // localtime().  In the context of logging, this should be just fine
 // if we're always calling localtime with a time_t representing, more
 // or less, "now."
+
+#undef localtime_r // defined by win-builds / gcc 4.8.2
 
 namespace query {
 char localtime_r(...);
@@ -278,10 +289,23 @@ public:
     size_t s = strftime(tm_str, sizeof(tm_str), tm_fmt, tm_ptr);
     assert(s == sizeof(tm_str) - 1);
 
+    // The strftime() call on win-builds calls the MS version that,
+    // for %z will: "Either the time-zone name or time zone
+    // abbreviation, depending on registry settings; no characters if
+    // time zone is unknown"
+
+    char const* tm_str_z = " "; // default
     constexpr char const* tm_fmt_z = " %z ";
-    char tm_str_z[8];
-    s = strftime(tm_str_z, sizeof(tm_str_z), tm_fmt_z, tm_ptr);
-    assert(s == sizeof(tm_str_z) - 1);
+    char tm_str_bfr[8];
+    s = strftime(tm_str_bfr, sizeof(tm_str_bfr), tm_fmt_z, tm_ptr);
+
+    // If we have a version of strftime that gives us the +hhmm or
+    // -hhmm numeric timezone, we use it.  Otherwise we default to a
+    // single space from the initialization above.
+
+    if (s == sizeof(tm_str_bfr) - 1) {
+      tm_str_z = tm_str_bfr;
+    }
 
     msg_ << tm_str << "." << std::setfill('0') << std::setw(6) << us << tm_str_z
          << boost::lexical_cast<std::string>(getpid()) << " " << file << ":"
