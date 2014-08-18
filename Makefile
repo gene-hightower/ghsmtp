@@ -29,6 +29,7 @@ CXXFLAGS += \
 	$(warnings)
 
 LDLIBS += \
+	-L/usr/local/lib \
 	-lcrypto -lssl \
 	-lldns \
 	-lspf2 \
