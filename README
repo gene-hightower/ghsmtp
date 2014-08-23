@@ -3,8 +3,8 @@ Internet (RFC 5321) mail.
 
 Free software — AGPLv3+
 
-Written using Standard C++ — plus boost, ldns, gflags and glog.
-Compiles with GCC 4.9.0 and clang 3.4.  Needs Bison >3.0.
+Written using Standard C++ — plus OpenSSL, boost, ldns, spf2, regdom
+and cdb.  Compiles with GCC 4.9.0 and clang 3.4.  Needs Bison >3.0.
 
 No runtime configuration file — code as configuration.
 
