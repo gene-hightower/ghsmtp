@@ -31,6 +31,6 @@ int main(int argc, char const* argv[])
   std::vector<std::string> addrs =
       DNS::get_records<DNS::RR_type::A>(res, "digilicious.com");
 
-  CHECK_EQ(addrs.size(), 1);
+  CHECK_EQ(addrs.size(), 1U);
   CHECK_EQ(addrs[0], "108.83.36.113");
 }

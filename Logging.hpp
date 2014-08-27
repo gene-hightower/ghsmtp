@@ -1,21 +1,3 @@
-/*
-    This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 // This is original code based on the Google "glog" code.  To the
 // extent that it includes anything that Google holds copyright to:
 //
@@ -52,6 +34,8 @@
 #ifndef LOGGING_HPP
 #define LOGGING_HPP
 
+#include "dll_spec.h"
+
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -64,12 +48,19 @@
 #include <sstream>
 #include <utility>
 
-#ifdef _POSIX_SOURCE
-#include <fcntl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
+#ifdef WIN32
+// MinGW 4.8.1 needs off64_t defined before including <fcntl.h> when
+// using -std=c++1y:
+using off64_t = _off64_t;
+#endif
+
+#include <fcntl.h>
+
+#ifdef _POSIX_SOURCE
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/utsname.h>
 #endif
 
@@ -77,10 +68,9 @@
 #include <windows.h>
 #include <winsock.h> // for GetComputerNameA
 #include <io.h>
-
-#define open _open
-#define write _write
-#endif
+#include <process.h> // for _getpid()
+#undef ERROR
+#endif // WIN32
 
 #include <boost/lexical_cast.hpp>
 
@@ -93,6 +83,8 @@ extern int log_fd;
 // localtime().  In the context of logging, this should be just fine
 // if we're always calling localtime with a time_t representing, more
 // or less, "now."
+
+#undef localtime_r // defined by win-builds / gcc 4.8.2
 
 namespace query {
 char localtime_r(...);
@@ -229,10 +221,11 @@ public:
   }
 };
 
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
-#define BRANCH_NOT_TAKEN(x) (unlikely(x))
+#define PREDICT_BRANCH_NOT_TAKEN(x) (__builtin_expect(x, 0))
+#define PREDICT_TRUE(x) (LIKELY(x))
 
 enum class Severity : uint8_t {
   INFO,
@@ -243,6 +236,11 @@ enum class Severity : uint8_t {
 
 class Message {
 public:
+  Message(char const* file, int line, std::string const& msg)
+    : Message(file, line, Severity::FATAL)
+  {
+    msg_ << msg;
+  }
   Message(char const* file, int line) : Message(file, line, Severity::INFO)
   {
   }
@@ -278,10 +276,23 @@ public:
     size_t s = strftime(tm_str, sizeof(tm_str), tm_fmt, tm_ptr);
     assert(s == sizeof(tm_str) - 1);
 
+    // The strftime() call on win-builds calls the MS version that,
+    // for %z will: "Either the time-zone name or time zone
+    // abbreviation, depending on registry settings; no characters if
+    // time zone is unknown"
+
+    char const* tm_str_z = " "; // default
     constexpr char const* tm_fmt_z = " %z ";
-    char tm_str_z[8];
-    s = strftime(tm_str_z, sizeof(tm_str_z), tm_fmt_z, tm_ptr);
-    assert(s == sizeof(tm_str_z) - 1);
+    char tm_str_bfr[8];
+    s = strftime(tm_str_bfr, sizeof(tm_str_bfr), tm_fmt_z, tm_ptr);
+
+    // If we have a version of strftime that gives us the +hhmm or
+    // -hhmm numeric timezone, we use it.  Otherwise we default to a
+    // single space from the initialization above.
+
+    if (s == sizeof(tm_str_bfr) - 1) {
+      tm_str_z = tm_str_bfr;
+    }
 
     msg_ << tm_str << "." << std::setfill('0') << std::setw(6) << us << tm_str_z
          << boost::lexical_cast<std::string>(getpid()) << " " << file << ":"
@@ -323,6 +334,57 @@ public:
              << static_cast<unsigned>(errno) << "]";
   }
 };
+
+// A helper class for formatting "expr (V1 vs. V2)" in a CHECK_XX
+// statement.  See MakeCheckOpString for sample usage.  Other
+// approaches were considered: use of a template method (e.g.,
+// BuildCheckOpString(exprtext, base::Print<T1>, &v1,
+// Print<T2>, &v2), however this approach has complications
+// related to volatile arguments and function-pointer arguments).
+class DLL_SPEC CheckOpMessageBuilder {
+public:
+  // Inserts "exprtext" and " (" to the stream.
+  explicit CheckOpMessageBuilder(const char* exprtext);
+  // Deletes "stream_".
+  ~CheckOpMessageBuilder();
+  // For inserting the first variable.
+  std::ostream* ForVar1()
+  {
+    return stream_;
+  }
+  // For inserting the second variable (adds an intermediate " vs. ").
+  std::ostream* ForVar2();
+  // Get the result (inserts the closing ")").
+  std::string* NewString();
+
+private:
+  std::ostringstream* stream_;
+};
+
+// This formats a value for a failing CHECK_XX statement.  Ordinarily,
+// it uses the definition for operator<<, with a few special cases below.
+template <typename T>
+inline void MakeCheckOpValueString(std::ostream* os, const T& v)
+{
+  (*os) << v;
+}
+
+// Overrides for char types provide readable values for unprintable
+// characters.
+template <>
+DLL_SPEC void MakeCheckOpValueString(std::ostream* os, const char& v);
+template <>
+DLL_SPEC void MakeCheckOpValueString(std::ostream* os, const signed char& v);
+template <>
+DLL_SPEC void MakeCheckOpValueString(std::ostream* os, const unsigned char& v);
+
+template <typename T1, typename T2>
+std::string* MakeCheckOpString(const T1& v1, const T2& v2, const char* exprtext)
+{
+  CheckOpMessageBuilder comb(exprtext);
+  MakeCheckOpValueString(comb.ForVar1(), v1);
+  MakeCheckOpValueString(comb.ForVar2(), v2);
+  return comb.NewString();
 }
 
 #define LOG_INFO Logging::Message(__FILE__, __LINE__)
@@ -348,25 +410,67 @@ public:
   !(condition) ? (void)0 : Logging::MessageVoidify() & PLOG(severity)
 
 #define CHECK(condition)                                                       \
-  LOG_IF(FATAL, BRANCH_NOT_TAKEN(!(condition)))                                \
+  LOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition)))                        \
       << "Check failed: " #condition " "
 #define PCHECK(condition)                                                      \
-  PLOG_IF(FATAL, BRANCH_NOT_TAKEN(!(condition)))                               \
+  PLOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition)))                       \
       << "Check failed: " #condition " "
 
-#define CHECK_EQ(val1, val2) CHECK((val1) == (val2))
-#define CHECK_NE(val1, val2) CHECK((val1) != (val2))
+#define CHECK_OP(name, op, val1, val2)                                         \
+  while (std::string* _result = Logging::Check##name##Impl(                    \
+             (val1), (val2), #val1 " " #op " " #val2))                         \
+  Logging::Message(__FILE__, __LINE__, *_result).stream()
+
+// Helper functions for CHECK_OP macro.
+// The (int, int) specialization works around the issue that the compiler
+// will not instantiate the template version of the function on values of
+// unnamed enum type - see comment below.
+#define DEFINE_CHECK_OP_IMPL(name, op)                                         \
+  template <typename T1, typename T2>                                          \
+  inline std::string* name##Impl(const T1& v1, const T2& v2,                   \
+                                 const char* exprtext)                         \
+  {                                                                            \
+    if (PREDICT_TRUE(v1 op v2))                                                \
+      return NULL;                                                             \
+    else                                                                       \
+      return Logging::MakeCheckOpString(v1, v2, exprtext);                     \
+  }                                                                            \
+  inline std::string* name##Impl(int v1, int v2, const char* exprtext)         \
+  {                                                                            \
+    return Logging::name##Impl<int, int>(v1, v2, exprtext);                    \
+  }
+
+// We use the full name Check_EQ, Check_NE, etc. in case the file including
+// base/logging.h provides its own #defines for the simpler names EQ, NE, etc.
+// This happens if, for example, those are used as token names in a
+// yacc grammar.
+DEFINE_CHECK_OP_IMPL(Check_EQ, == ) // Compilation error with CHECK_EQ(NULL, x)?
+DEFINE_CHECK_OP_IMPL(Check_NE, != ) // Use CHECK(x == NULL) instead.
+DEFINE_CHECK_OP_IMPL(Check_LE, <= )
+DEFINE_CHECK_OP_IMPL(Check_LT, < )
+DEFINE_CHECK_OP_IMPL(Check_GE, >= )
+DEFINE_CHECK_OP_IMPL(Check_GT, > )
+#undef DEFINE_CHECK_OP_IMPL
+
+#define CHECK_EQ(val1, val2) CHECK_OP(_EQ, ==, val1, val2)
+#define CHECK_NE(val1, val2) CHECK_OP(_NE, !=, val1, val2)
+#define CHECK_LE(val1, val2) CHECK_OP(_LE, <=, val1, val2)
+#define CHECK_LT(val1, val2) CHECK_OP(_LT, <, val1, val2)
+#define CHECK_GE(val1, val2) CHECK_OP(_GE, >=, val1, val2)
+#define CHECK_GT(val1, val2) CHECK_OP(_GT, >, val1, val2)
 
 #define CHECK_NOTNULL(val)                                                     \
-  CheckNotNull(__FILE__, __LINE__, "'" #val "' Must not be nullptr", (val))
+  Logging::CheckNotNull(__FILE__, __LINE__, "'" #val "' Must not be nullptr",  \
+                        (val))
 
 template <typename T>
 T* CheckNotNull(char const* file, int line, char const* names, T* t)
 {
   if (t == nullptr) {
-    Logging::Message(file, line, Logging::Severity::FATAL).stream() << names;
+    Message(file, line, Logging::Severity::FATAL).stream() << names;
   }
   return t;
 }
+} // namespace Logging
 
 #endif

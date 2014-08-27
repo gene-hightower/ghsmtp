@@ -18,8 +18,7 @@ warnings = \
 	-Wall \
 	-Wformat=2 \
 	-Wold-style-cast \
-	-Woverloaded-virtual \
-	-Wsign-promo
+	-Woverloaded-virtual
 
 CXXFLAGS += \
 	-DSMTP_HOME=$(shell pwd) \
@@ -59,12 +58,20 @@ tests = \
 	TLDt \
 	TLS-OpenSSLt
 
+CDBt_EXTRA = Logging
 DNSt_EXTRA = DNS Logging
+Domaint_EXTRA = Logging
+IP4t_EXTRA = Logging
+Mailboxt_EXTRA = Logging
+Messaget_EXTRA = Logging
+Nowt_EXTRA = Logging
 POSIXt_EXTRA = Logging POSIX
+Pillt_EXTRA = Logging
 SPFt_EXTRA = Logging SPF
 Sessiont_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
 SockBuffert_EXTRA = Logging POSIX TLS-OpenSSL
 Sockt_EXTRA = Logging POSIX TLS-OpenSSL
+TLDt_EXTRA = Logging
 TLS-OpenSSLt_EXTRA = Logging POSIX TLS-OpenSSL
 
 databases = \

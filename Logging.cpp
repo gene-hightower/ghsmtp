@@ -1,26 +1,34 @@
-/*
-    This file is part of ghsmtp - Gene's simple SMTP server.
-    Copyright (C) 2014  Gene Hightower <gene@digilicious.com>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as
-    published by the Free Software Foundation, either version 3 of the
-    License, or (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
+#define DLL_IMPLEMENTATION
 #include "Logging.hpp"
+#include "dll_spec.h"
+
+#include <sstream>
 
 namespace Logging {
 
-char const* program_name = nullptr;
-int log_fd = STDERR_FILENO;
+char const* DLL_SPEC program_name = nullptr;
+int DLL_SPEC log_fd = STDERR_FILENO;
 
+CheckOpMessageBuilder::CheckOpMessageBuilder(const char* exprtext)
+  : stream_(new std::ostringstream)
+{
+  *stream_ << exprtext << " (";
+}
+
+CheckOpMessageBuilder::~CheckOpMessageBuilder()
+{
+  delete stream_;
+}
+
+std::ostream* CheckOpMessageBuilder::ForVar2()
+{
+  *stream_ << " vs. ";
+  return stream_;
+}
+
+std::string* CheckOpMessageBuilder::NewString()
+{
+  *stream_ << ")";
+  return new std::string(stream_->str());
+}
 }

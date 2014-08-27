@@ -37,8 +37,8 @@ int main(int arcv, char* argv[])
 
   CHECK_NE(red_str.str(), blue_str.str());
 
-  CHECK_EQ(13, red_str.str().length());
-  CHECK_EQ(13, blue_str.str().length());
+  CHECK_EQ(13U, red_str.str().length());
+  CHECK_EQ(13U, blue_str.str().length());
 
   Pill red2(red);
   CHECK_EQ(red, red2);
