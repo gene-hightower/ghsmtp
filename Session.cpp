@@ -372,6 +372,7 @@ bool Session::verify_client(std::string const& client_identity)
   if (Domain::match(client_identity, fqdn_) ||
       Domain::match(client_identity, "localhost") ||
       Domain::match(client_identity, "localhost.localdomain")) {
+
     if (!Domain::match(fqdn_, fcrdns_) &&
         strcmp(sock_.them_c_str(), "127.0.0.1")) {
       out() << "421 liar\r\n" << std::flush;
@@ -547,10 +548,6 @@ bool Session::verify_sender_domain(std::string const& sender)
     }
   }
 
-  // According to the surbl.org guidelines we should use two_level for
-  // this lookup, but instead lets use <www.dkim-reputation.org>
-  // algorithm:
-
   if (two_level.compare(tld)) {
     LOG(WARNING) << "two level " << two_level << " != tld " << tld;
   }
@@ -581,7 +578,7 @@ bool Session::verify_sender_spf(Mailbox const& sender)
   spf_req.set_ipv4_str(sock_.them_c_str());
   spf_req.set_helo_dom(client_identity_.c_str());
 
-  std::string from = boost::lexical_cast<std::string>(sender);
+  auto from = boost::lexical_cast<std::string>(sender);
 
   spf_req.set_env_from(from.c_str());
 
