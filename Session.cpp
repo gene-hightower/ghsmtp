@@ -50,7 +50,7 @@ constexpr char const* const rbls[] = { "zen.spamhaus.org",
 constexpr char const* const uribls[] = { "dbl.spamhaus.org", "black.uribl.com",
                                          "multi.surbl.org", };
 
-constexpr auto greeting_max_wait_ms = 10000;
+constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
 }
 
