@@ -71,10 +71,7 @@ public:
   {
     CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, nullptr));
   }
-  ~Resolver()
-  {
-    ldns_resolver_deep_free(res_);
-  }
+  ~Resolver() { ldns_resolver_deep_free(res_); }
 
 private:
   ldns_resolver* res_;
@@ -93,10 +90,7 @@ public:
     : domain_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
   {
   }
-  ~Domain()
-  {
-    ldns_rdf_deep_free(domain_);
-  }
+  ~Domain() { ldns_rdf_deep_free(domain_); }
 
 private:
   ldns_rdf* domain_;
@@ -151,7 +145,8 @@ public:
   Rrlist(Rrlist const&) = delete;
   Rrlist& operator=(Rrlist const&) = delete;
 
-  explicit Rrlist(Query<T> const& q) : rrlst_(nullptr)
+  explicit Rrlist(Query<T> const& q)
+    : rrlst_(nullptr)
   {
     if (q.p_) {
       rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
@@ -163,10 +158,7 @@ public:
     if (!empty()) // since we don't assert success in the ctr()
       ldns_rr_list_deep_free(rrlst_);
   }
-  bool empty() const
-  {
-    return nullptr == rrlst_;
-  }
+  bool empty() const { return nullptr == rrlst_; }
 
   std::vector<std::string> get() const;
 

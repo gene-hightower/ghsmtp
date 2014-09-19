@@ -102,13 +102,13 @@ int main(int argc, char* argv[])
     char net_addr[INET6_ADDRSTRLEN];
 
     switch (rp->ai_addrlen) {
-    case sizeof(sockaddr_in) : {
+    case sizeof(sockaddr_in): {
       CHECK(rp->ai_family == AF_INET);
       sockaddr_in* sa = reinterpret_cast<struct sockaddr_in*>(rp->ai_addr);
       inet_ntop(AF_INET, &(sa->sin_addr), net_addr, sizeof net_addr);
       break;
     }
-    case sizeof(sockaddr_in6) : {
+    case sizeof(sockaddr_in6): {
       CHECK(rp->ai_family == AF_INET6);
       sockaddr_in6* sa = reinterpret_cast<struct sockaddr_in6*>(rp->ai_addr);
       inet_ntop(AF_INET6, &(sa->sin6_addr), net_addr, sizeof net_addr);

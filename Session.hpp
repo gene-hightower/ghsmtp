@@ -52,22 +52,13 @@ public:
   void time();
   void starttls();
 
-  bool timed_out()
-  {
-    return sock_.timed_out();
-  }
-  std::istream& in()
-  {
-    return sock_.in();
-  }
+  bool timed_out() { return sock_.timed_out(); }
+  std::istream& in() { return sock_.in(); }
 
 private:
   friend struct Session_test;
 
-  std::ostream& out()
-  {
-    return sock_.out();
-  }
+  std::ostream& out() { return sock_.out(); }
 
   void reset()
   {

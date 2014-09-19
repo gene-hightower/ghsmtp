@@ -211,14 +211,10 @@ inline void init(char const* prgrm_nm)
 
 class MessageVoidify {
 public:
-  MessageVoidify()
-  {
-  }
+  MessageVoidify() {}
   // This has to be an operator with a precedence lower than << but
   // higher than ?:
-  void operator&(std::ostream&)
-  {
-  }
+  void operator&(std::ostream&) {}
 };
 
 #define LIKELY(x) __builtin_expect(!!(x), 1)
@@ -241,10 +237,12 @@ public:
   {
     msg_ << msg;
   }
-  Message(char const* file, int line) : Message(file, line, Severity::INFO)
+  Message(char const* file, int line)
+    : Message(file, line, Severity::INFO)
   {
   }
-  Message(char const* file, int line, Severity severity) : severity_(severity)
+  Message(char const* file, int line, Severity severity)
+    : severity_(severity)
   {
     switch (severity_) {
     case Severity::INFO:
@@ -266,7 +264,7 @@ public:
     auto whole_second = std::chrono::system_clock::from_time_t(t);
 
     auto us = std::chrono::duration_cast<std::chrono::microseconds>(
-        now - whole_second).count();
+                  now - whole_second).count();
 
     std::tm tm_local;
     std::tm* tm_ptr = localtime(&t, &tm_local);
@@ -311,10 +309,7 @@ public:
     }
   }
 
-  std::ostream& stream()
-  {
-    return msg_;
-  }
+  std::ostream& stream() { return msg_; }
 
 private:
   Severity severity_;
@@ -348,10 +343,7 @@ public:
   // Deletes "stream_".
   ~CheckOpMessageBuilder();
   // For inserting the first variable.
-  std::ostream* ForVar1()
-  {
-    return stream_;
-  }
+  std::ostream* ForVar1() { return stream_; }
   // For inserting the second variable (adds an intermediate " vs. ").
   std::ostream* ForVar2();
   // Get the result (inserts the closing ")").

@@ -40,15 +40,21 @@
 #include <boost/lexical_cast.hpp>
 
 namespace Config {
-constexpr char const* const very_bad_recipients[] = { "a", };
+constexpr char const* const very_bad_recipients[] = {
+  "a",
+};
 
-constexpr char const* const bad_recipients[] = { "nobody", "mixmaster", };
+constexpr char const* const bad_recipients[] = {
+  "nobody", "mixmaster",
+};
 
-constexpr char const* const rbls[] = { "zen.spamhaus.org",
-                                       "b.barracudacentral.org", };
+constexpr char const* const rbls[] = {
+  "zen.spamhaus.org", "b.barracudacentral.org",
+};
 
-constexpr char const* const uribls[] = { "dbl.spamhaus.org", "black.uribl.com",
-                                         "multi.surbl.org", };
+constexpr char const* const uribls[] = {
+  "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
+};
 
 constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
@@ -308,15 +314,9 @@ void Session::rset()
   out() << "250 ok\r\n" << std::flush;
 }
 
-void Session::noop()
-{
-  out() << "250 nook\r\n" << std::flush;
-}
+void Session::noop() { out() << "250 nook\r\n" << std::flush; }
 
-void Session::vrfy()
-{
-  out() << "252 try it\r\n" << std::flush;
-}
+void Session::vrfy() { out() << "252 try it\r\n" << std::flush; }
 
 void Session::help()
 {

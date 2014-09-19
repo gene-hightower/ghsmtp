@@ -55,10 +55,7 @@ public:
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, CHECK_NOTNULL(fqdn)));
   }
-  ~Server()
-  {
-    SPF_server_free(srv_);
-  }
+  ~Server() { SPF_server_free(srv_); }
 
 private:
   SPF_server_t* srv_;
@@ -75,10 +72,7 @@ public:
     : req_(CHECK_NOTNULL(SPF_request_new(srv.srv_)))
   {
   }
-  ~Request()
-  {
-    SPF_request_free(req_);
-  }
+  ~Request() { SPF_request_free(req_); }
   void set_ipv4_str(char const* ipv4)
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv4_str(req_, ipv4));
@@ -103,17 +97,15 @@ public:
   Response(Response const&) = delete;
   Response& operator=(Response const&) = delete;
 
-  explicit Response(Request const& req) : res_(nullptr)
+  explicit Response(Request const& req)
+    : res_(nullptr)
   {
     // We ignore the return code from this call, as everything we need
     // to know is in the SPF_response_t struct.
     SPF_request_query_mailfrom(req.req_, &res_);
     CHECK_NOTNULL(res_);
   }
-  ~Response()
-  {
-    SPF_response_free(res_);
-  }
+  ~Response() { SPF_response_free(res_); }
   Result result() const
   {
     return static_cast<Result>(SPF_response_result(res_));

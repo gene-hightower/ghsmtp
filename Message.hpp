@@ -35,7 +35,8 @@ public:
   Message(Message const&) = delete;
   Message& operator=(Message const&) = delete;
 
-  Message(std::string const& fqdn, std::random_device& rd) : s_(rd)
+  Message(std::string const& fqdn, std::random_device& rd)
+    : s_(rd)
   {
     std::string maildir;
 
@@ -68,18 +69,9 @@ public:
     ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     ofs_.open(tmpfn_.c_str());
   }
-  Pill const& id() const
-  {
-    return s_;
-  }
-  Now const& when() const
-  {
-    return then_;
-  }
-  std::ostream& out()
-  {
-    return ofs_;
-  }
+  Pill const& id() const { return s_; }
+  Now const& when() const { return then_; }
+  std::ostream& out() { return ofs_; }
   void save()
   {
     ofs_.close();

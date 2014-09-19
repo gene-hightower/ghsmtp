@@ -68,10 +68,7 @@ public:
   {
     return POSIX::output_ready(fd_out_, wait);
   }
-  bool timed_out() const
-  {
-    return timed_out_;
-  }
+  bool timed_out() const { return timed_out_; }
   std::streamsize read(char* s, std::streamsize n)
   {
     return tls_active_
@@ -96,10 +93,7 @@ public:
     }
     return "";
   }
-  bool tls()
-  {
-    return tls_active_;
-  }
+  bool tls() { return tls_active_; }
 
 private:
   int fd_in_;

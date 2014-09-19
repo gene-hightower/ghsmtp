@@ -3,9 +3,9 @@
 
 #if defined(_WIN32)
 #if defined(DLL_IMPLEMENTATION)
- #define DLL_SPEC __declspec(dllexport)
+#define DLL_SPEC __declspec(dllexport)
 #else
- #define DLL_SPEC __declspec(dllimport)
+#define DLL_SPEC __declspec(dllimport)
 #endif
 #endif
 

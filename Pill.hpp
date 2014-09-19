@@ -79,14 +79,8 @@ public:
       } while (osp > os);
     }
   }
-  bool operator==(Pill const& that) const
-  {
-    return this->s_ == that.s_;
-  }
-  bool operator!=(Pill const& that) const
-  {
-    return !(*this == that);
-  }
+  bool operator==(Pill const& that) const { return this->s_ == that.s_; }
+  bool operator!=(Pill const& that) const { return !(*this == that); }
 
 private:
   unsigned long long s_;

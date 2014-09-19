@@ -36,22 +36,13 @@ public:
         strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", &my_tm),
         sizeof(c_str_) - 1);
   }
-  time_t sec() const
-  {
-    return tv_.tv_sec;
-  }
-  suseconds_t usec() const
-  {
-    return tv_.tv_usec;
-  }
+  time_t sec() const { return tv_.tv_sec; }
+  suseconds_t usec() const { return tv_.tv_usec; }
   bool operator==(Now const& that) const
   {
     return (this->sec() == that.sec()) && (this->usec() == that.usec());
   }
-  bool operator!=(Now const& that) const
-  {
-    return !(*this == that);
-  }
+  bool operator!=(Now const& that) const { return !(*this == that); }
 
 private:
   timeval tv_;

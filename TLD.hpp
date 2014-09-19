@@ -30,13 +30,11 @@ public:
   TLD(TLD const&) = delete;
   TLD& operator=(TLD const&) = delete;
 
-  TLD() : tree_(CHECK_NOTNULL(loadTldTree()))
+  TLD()
+    : tree_(CHECK_NOTNULL(loadTldTree()))
   {
   }
-  ~TLD()
-  {
-    freeTldTree(tree_);
-  }
+  ~TLD() { freeTldTree(tree_); }
 
   char const* get_registered_domain(char const* dom)
   {

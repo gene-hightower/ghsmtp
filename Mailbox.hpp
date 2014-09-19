@@ -37,18 +37,9 @@ public:
     local_part_.clear();
     domain_.clear();
   }
-  std::string const& domain() const
-  {
-    return domain_;
-  }
-  std::string const& local_part() const
-  {
-    return local_part_;
-  }
-  bool empty() const
-  {
-    return local_part_.empty() && domain_.empty();
-  }
+  std::string const& domain() const { return domain_; }
+  std::string const& local_part() const { return local_part_; }
+  bool empty() const { return local_part_.empty() && domain_.empty(); }
 
 private:
   std::string local_part_;

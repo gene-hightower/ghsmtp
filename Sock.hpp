@@ -51,16 +51,16 @@ public:
     if (-1 != getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr),
                           &us_addr_len)) {
       switch (us_addr_len) {
-      case sizeof(sockaddr_in) :
+      case sizeof(sockaddr_in):
         PCHECK(inet_ntop(AF_INET, &(reinterpret_cast<struct sockaddr_in*>(
-                                       &us_addr)->sin_addr),
+                                        &us_addr)->sin_addr),
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
-      case sizeof(sockaddr_in6) :
+      case sizeof(sockaddr_in6):
         LOG(WARNING)
             << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
-                                        &us_addr)->sin6_addr),
+                                         &us_addr)->sin6_addr),
                          us_addr_str_, sizeof us_addr_str_) != nullptr);
         break;
       default:
@@ -77,16 +77,16 @@ public:
                           reinterpret_cast<struct sockaddr*>(&them_addr),
                           &them_addr_len)) {
       switch (them_addr_len) {
-      case sizeof(sockaddr_in) :
+      case sizeof(sockaddr_in):
         PCHECK(inet_ntop(AF_INET, &(reinterpret_cast<struct sockaddr_in*>(
-                                       &them_addr)->sin_addr),
+                                        &them_addr)->sin_addr),
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
-      case sizeof(sockaddr_in6) :
+      case sizeof(sockaddr_in6):
         LOG(WARNING)
             << "getpeername returned them_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6, &(reinterpret_cast<struct sockaddr_in6*>(
-                                        &them_addr)->sin6_addr),
+                                         &them_addr)->sin6_addr),
                          them_addr_str_, sizeof them_addr_str_) != nullptr);
         break;
       default:
@@ -99,46 +99,19 @@ public:
     }
   }
 
-  char const* us_c_str() const
-  {
-    return us_addr_str_;
-  }
-  char const* them_c_str() const
-  {
-    return them_addr_str_;
-  }
-  bool has_peername() const
-  {
-    return them_addr_str_[0] != '\0';
-  }
+  char const* us_c_str() const { return us_addr_str_; }
+  char const* them_c_str() const { return them_addr_str_; }
+  bool has_peername() const { return them_addr_str_[0] != '\0'; }
   bool input_ready(std::chrono::milliseconds wait)
   {
     return iostream_->input_ready(wait);
   }
-  bool timed_out()
-  {
-    return iostream_->timed_out();
-  }
-  std::istream& in()
-  {
-    return iostream_;
-  }
-  std::ostream& out()
-  {
-    return iostream_;
-  }
-  void starttls()
-  {
-    iostream_->starttls();
-  }
-  bool tls()
-  {
-    return iostream_->tls();
-  }
-  std::string tls_info()
-  {
-    return iostream_->tls_info();
-  }
+  bool timed_out() { return iostream_->timed_out(); }
+  std::istream& in() { return iostream_; }
+  std::ostream& out() { return iostream_; }
+  void starttls() { iostream_->starttls(); }
+  bool tls() { return iostream_->tls(); }
+  std::string tls_info() { return iostream_->tls_info(); }
 
 private:
   boost::iostreams::stream<SockBuffer> iostream_;

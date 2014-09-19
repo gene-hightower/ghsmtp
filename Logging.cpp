@@ -15,10 +15,7 @@ CheckOpMessageBuilder::CheckOpMessageBuilder(const char* exprtext)
   *stream_ << exprtext << " (";
 }
 
-CheckOpMessageBuilder::~CheckOpMessageBuilder()
-{
-  delete stream_;
-}
+CheckOpMessageBuilder::~CheckOpMessageBuilder() { delete stream_; }
 
 std::ostream* CheckOpMessageBuilder::ForVar2()
 {
