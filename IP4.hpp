@@ -30,9 +30,8 @@ namespace IP4 {
 
 inline bool is_address(char const* addr)
 {
-  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) |
-                 ('2' >> range('0', '4') >> _d) |
-                 (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) | ('2' >> range('0', '4') >> _d)
+                 | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
   cregex re = octet >> '.' >> octet >> '.' >> octet >> '.' >> octet;
   cmatch matches;
   return regex_match(addr, matches, re);
@@ -40,19 +39,15 @@ inline bool is_address(char const* addr)
 
 inline std::string reverse(char const* addr)
 {
-  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) |
-                 ('2' >> range('0', '4') >> _d) |
-                 (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
-  cregex re = (s1 = octet) >> '.' >> (s2 = octet) >> '.' >> (s3 = octet) >>
-              '.' >> (s4 = octet);
+  cregex octet = (as_xpr('2') >> '5' >> range('0', '5')) | ('2' >> range('0', '4') >> _d)
+                 | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+  cregex re = (s1 = octet) >> '.' >> (s2 = octet) >> '.' >> (s3 = octet) >> '.' >> (s4 = octet);
   cmatch matches;
-  CHECK(regex_match(addr, matches, re))
-      << "reverse_ip4 called with bad dotted quad: " << addr;
+  CHECK(regex_match(addr, matches, re)) << "reverse_ip4 called with bad dotted quad: " << addr;
 
   std::ostringstream reverse;
   for (int n = 4; n > 0; --n) {
-    boost::string_ref octet(matches[n].first,
-                            matches[n].second - matches[n].first);
+    boost::string_ref octet(matches[n].first, matches[n].second - matches[n].first);
     reverse << octet << '.'; // and leave a trailing '.'
   }
   return reverse.str();

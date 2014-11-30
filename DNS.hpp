@@ -67,10 +67,7 @@ public:
   Resolver(Resolver const&) = delete;
   Resolver& operator=(Resolver const&) = delete;
 
-  Resolver()
-  {
-    CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, nullptr));
-  }
+  Resolver() { CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, nullptr)); }
   ~Resolver() { ldns_resolver_deep_free(res_); }
 
 private:
@@ -109,12 +106,10 @@ public:
   Query(Resolver const& res, Domain const& dom)
   {
     ldns_status stat = ldns_resolver_query_status(
-        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(T),
-        LDNS_RR_CLASS_IN, LDNS_RD);
+        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(T), LDNS_RR_CLASS_IN, LDNS_RD);
 
     if (stat != LDNS_STATUS_OK) {
-      LOG(ERROR) << "ldns_resolver_query_status failed: stat=="
-                 << static_cast<unsigned>(stat) << " "
+      LOG(ERROR) << "ldns_resolver_query_status failed: stat==" << static_cast<unsigned>(stat) << " "
                  << ldns_get_errorstr_by_id(stat);
     }
   }
@@ -149,8 +144,7 @@ public:
     : rrlst_(nullptr)
   {
     if (q.p_) {
-      rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
-                                        LDNS_SECTION_ANSWER);
+      rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T), LDNS_SECTION_ANSWER);
     }
   }
   ~Rrlist()
@@ -188,8 +182,7 @@ inline bool has_record(Resolver const& res, std::string const& addr)
 }
 
 template <RR_type T>
-inline std::vector<std::string> get_records(Resolver const& res,
-                                            std::string const& addr)
+inline std::vector<std::string> get_records(Resolver const& res, std::string const& addr)
 {
   Domain dom(addr.c_str());
   Query<T> q(res, dom);
@@ -202,18 +195,12 @@ inline std::vector<std::string> get_records(Resolver const& res,
 namespace std {
 template <>
 struct hash<DNS::Pkt_rcode> {
-  size_t operator()(DNS::Pkt_rcode const& x) const
-  {
-    return static_cast<size_t>(x);
-  }
+  size_t operator()(DNS::Pkt_rcode const& x) const { return static_cast<size_t>(x); }
 };
 }
 
 namespace DNS {
-inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode)
-{
-  return s << pkt_rcode_to_string[pkt_rcode];
-}
+inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode) { return s << pkt_rcode_to_string[pkt_rcode]; }
 }
 
 #endif // DNS_DOT_HPP

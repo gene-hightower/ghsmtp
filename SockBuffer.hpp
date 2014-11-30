@@ -40,8 +40,7 @@ constexpr auto write_timeout = std::chrono::seconds(10);
 constexpr auto starttls_timeout = std::chrono::seconds(10);
 }
 
-class SockBuffer
-    : public boost::iostreams::device<boost::iostreams::bidirectional> {
+class SockBuffer : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(const SockBuffer& that)
@@ -60,26 +59,18 @@ public:
     POSIX::set_nonblocking(fd_in_);
     POSIX::set_nonblocking(fd_out_);
   }
-  bool input_ready(std::chrono::milliseconds wait) const
-  {
-    return POSIX::input_ready(fd_in_, wait);
-  }
-  bool output_ready(std::chrono::milliseconds wait) const
-  {
-    return POSIX::output_ready(fd_out_, wait);
-  }
+  bool input_ready(std::chrono::milliseconds wait) const { return POSIX::input_ready(fd_in_, wait); }
+  bool output_ready(std::chrono::milliseconds wait) const { return POSIX::output_ready(fd_out_, wait); }
   bool timed_out() const { return timed_out_; }
   std::streamsize read(char* s, std::streamsize n)
   {
-    return tls_active_
-               ? tls_.read(s, n, Config::read_timeout, timed_out_)
-               : POSIX::read(fd_in_, s, n, Config::read_timeout, timed_out_);
+    return tls_active_ ? tls_.read(s, n, Config::read_timeout, timed_out_)
+                       : POSIX::read(fd_in_, s, n, Config::read_timeout, timed_out_);
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
-    return tls_active_
-               ? tls_.write(s, n, Config::write_timeout, timed_out_)
-               : POSIX::write(fd_out_, s, n, Config::write_timeout, timed_out_);
+    return tls_active_ ? tls_.write(s, n, Config::write_timeout, timed_out_)
+                       : POSIX::write(fd_out_, s, n, Config::write_timeout, timed_out_);
   }
   void starttls()
   {

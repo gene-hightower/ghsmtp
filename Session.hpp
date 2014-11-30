@@ -31,17 +31,13 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(int fd_in = STDIN_FILENO, int fd_out = STDOUT_FILENO,
-                   std::string const& fqdn = "");
+  explicit Session(int fd_in = STDIN_FILENO, int fd_out = STDOUT_FILENO, std::string const& fqdn = "");
 
   void greeting();
   void ehlo(std::string const& client_identity);
   void helo(std::string const& client_identity);
-  void
-  mail_from(Mailbox const& reverse_path,
-            std::unordered_map<std::string, std::string> const& parameters);
-  void rcpt_to(Mailbox const& forward_path,
-               std::unordered_map<std::string, std::string> const& parameters);
+  void mail_from(Mailbox const& reverse_path, std::unordered_map<std::string, std::string> const& parameters);
+  void rcpt_to(Mailbox const& forward_path, std::unordered_map<std::string, std::string> const& parameters);
   void data();
   void rset();
   void noop();

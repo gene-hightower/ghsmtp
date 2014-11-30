@@ -23,17 +23,17 @@
 namespace DNS {
 
 std::unordered_map<DNS::Pkt_rcode, char const*> pkt_rcode_to_string{
-  { DNS::Pkt_rcode::NOERROR, "NOERROR" },
-  { DNS::Pkt_rcode::FORMERR, "FORMERR" },
-  { DNS::Pkt_rcode::SERVFAIL, "SERVFAIL" },
-  { DNS::Pkt_rcode::NXDOMAIN, "NXDOMAIN" },
-  { DNS::Pkt_rcode::NOTIMPL, "NOTIMPL" },
-  { DNS::Pkt_rcode::REFUSED, "REFUSED" },
-  { DNS::Pkt_rcode::YXDOMAIN, "YXDOMAIN" },
-  { DNS::Pkt_rcode::YXRRSET, "YXRRSET" },
-  { DNS::Pkt_rcode::NXRRSET, "NXRRSET" },
-  { DNS::Pkt_rcode::NOTAUTH, "NOTAUTH" },
-  { DNS::Pkt_rcode::NOTZONE, "NOTZONE" },
+    {DNS::Pkt_rcode::NOERROR, "NOERROR"},
+    {DNS::Pkt_rcode::FORMERR, "FORMERR"},
+    {DNS::Pkt_rcode::SERVFAIL, "SERVFAIL"},
+    {DNS::Pkt_rcode::NXDOMAIN, "NXDOMAIN"},
+    {DNS::Pkt_rcode::NOTIMPL, "NOTIMPL"},
+    {DNS::Pkt_rcode::REFUSED, "REFUSED"},
+    {DNS::Pkt_rcode::YXDOMAIN, "YXDOMAIN"},
+    {DNS::Pkt_rcode::YXRRSET, "YXRRSET"},
+    {DNS::Pkt_rcode::NXRRSET, "NXRRSET"},
+    {DNS::Pkt_rcode::NOTAUTH, "NOTAUTH"},
+    {DNS::Pkt_rcode::NOTZONE, "NOTZONE"},
 };
 
 template <>
@@ -49,8 +49,7 @@ std::vector<std::string> Rrlist<RR_type::TXT>::get() const
           if (rdf->_type == LDNS_RDF_TYPE_STR) {
             ret.push_back(rr_str(rdf));
           } else {
-            LOG(WARNING) << "expecting TXT got:"
-                         << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting TXT got:" << static_cast<unsigned>(rdf->_type);
           }
         }
       }
@@ -72,8 +71,7 @@ std::vector<std::string> Rrlist<RR_type::PTR>::get() const
           if (rdf->_type == LDNS_RDF_TYPE_DNAME) {
             ret.push_back(rr_name_str(rdf));
           } else {
-            LOG(WARNING) << "expecting PTR got:"
-                         << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting PTR got:" << static_cast<unsigned>(rdf->_type);
             break;
           }
         }
@@ -98,8 +96,7 @@ std::vector<std::string> Rrlist<RR_type::A>::get() const
             PCHECK(inet_ntop(AF_INET, rdf->_data, str, sizeof str));
             ret.push_back(str);
           } else {
-            LOG(WARNING) << "expecting A got:"
-                         << static_cast<unsigned>(rdf->_type);
+            LOG(WARNING) << "expecting A got:" << static_cast<unsigned>(rdf->_type);
           }
         }
       }
@@ -132,8 +129,7 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
       if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
         str << '\\' << c;
       } else if (!(isascii(c) && isgraph(c))) {
-        str << "0x" << std::hex << std::setfill('0') << std::setw(2)
-            << static_cast<unsigned>(c);
+        str << "0x" << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(c);
       } else {
         str << c;
       }

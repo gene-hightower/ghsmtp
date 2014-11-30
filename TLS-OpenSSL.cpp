@@ -46,31 +46,28 @@ TLS::TLS()
 
   char const* cert = STRINGIFY(SMTP_HOME) "/smtp.pem";
 
-  CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0)
-      << "Can't load certificate file \"" << cert << "\"";
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert, SSL_FILETYPE_PEM) > 0)
-      << "Can't load private key file \"" << cert << "\"";
+  CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0) << "Can't load certificate file \"" << cert
+                                                                        << "\"";
+  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert, SSL_FILETYPE_PEM) > 0) << "Can't load private key file \"" << cert
+                                                                       << "\"";
 
-  CHECK(SSL_CTX_check_private_key(ctx_))
-      << "Private key does not match the public certificate";
+  CHECK(SSL_CTX_check_private_key(ctx_)) << "Private key does not match the public certificate";
 
-  constexpr char dh_ike_23_pem[] =
-      "-----BEGIN DH PARAMETERS-----\n"
-      "MIICCgKCAQEArRB+HpEjqdDWYPqnlVnFH6INZOVoO5/RtUsVl7YdCnXm+hQd+VpW\n"
-      "26+aPEB7od8V6z1oijCcGA4d5rhaEnSgpm0/gVKtasISkDfJ7e/aTfjZHo/vVbc5\n"
-      "S3rVt9C2wSIHyfmNEe002/bGugssi7wnvmoA4KC5xJcIs7+KMXCRiDaBKGEwvImF\n"
-      "2xYC5xRBXZMwJ4Jzx94x79xzEPcSH9WgdBWYfZrcCkhtzfk6zEQyg4cxXXXhmMZB\n"
-      "pIDNhqG55YfovmDmnMkosrnFIXLkEwQumyPxCw4W55djybU9z0uoCinj+3PBa451\n"
-      "uX7zY+L/ox9xz53lOE5xuBwKxN/+DBDmTwKCAQEArEAy708tmuOd8wtcj/2sUGze\n"
-      "vnuJmYyvdIZqCM/k/+OmgkpOELmm8N2SHwGnDEr6q3OddwDCn1LFfbF8YgqGUr5e\n"
-      "kAGo1mrXwXZpEBmZAkr00CcnWsE0i7inYtBSG8mK4kcVBCLqHtQJk51U2nRgzbX2\n"
-      "xrJQcXy+8YDrNBGOmNEZUppF1vg0Vm4wJeMWozDvu3eobwwasVsFGuPUKMj4rLcK\n"
-      "gTcVC47rEOGD7dGZY93Z4mPkdwWJ72qiHn9fL/OBtTnM40CdE81Wavu0jWwBkYHh\n"
-      "vP6UswJp7f5y/ptqpL17Wg8ccc//TBnEGOH27AF5gbwIfypwZbOEuJDTGR8r+g==\n"
-      "-----END DH PARAMETERS-----\n";
+  constexpr char dh_ike_23_pem[] = "-----BEGIN DH PARAMETERS-----\n"
+                                   "MIICCgKCAQEArRB+HpEjqdDWYPqnlVnFH6INZOVoO5/RtUsVl7YdCnXm+hQd+VpW\n"
+                                   "26+aPEB7od8V6z1oijCcGA4d5rhaEnSgpm0/gVKtasISkDfJ7e/aTfjZHo/vVbc5\n"
+                                   "S3rVt9C2wSIHyfmNEe002/bGugssi7wnvmoA4KC5xJcIs7+KMXCRiDaBKGEwvImF\n"
+                                   "2xYC5xRBXZMwJ4Jzx94x79xzEPcSH9WgdBWYfZrcCkhtzfk6zEQyg4cxXXXhmMZB\n"
+                                   "pIDNhqG55YfovmDmnMkosrnFIXLkEwQumyPxCw4W55djybU9z0uoCinj+3PBa451\n"
+                                   "uX7zY+L/ox9xz53lOE5xuBwKxN/+DBDmTwKCAQEArEAy708tmuOd8wtcj/2sUGze\n"
+                                   "vnuJmYyvdIZqCM/k/+OmgkpOELmm8N2SHwGnDEr6q3OddwDCn1LFfbF8YgqGUr5e\n"
+                                   "kAGo1mrXwXZpEBmZAkr00CcnWsE0i7inYtBSG8mK4kcVBCLqHtQJk51U2nRgzbX2\n"
+                                   "xrJQcXy+8YDrNBGOmNEZUppF1vg0Vm4wJeMWozDvu3eobwwasVsFGuPUKMj4rLcK\n"
+                                   "gTcVC47rEOGD7dGZY93Z4mPkdwWJ72qiHn9fL/OBtTnM40CdE81Wavu0jWwBkYHh\n"
+                                   "vP6UswJp7f5y/ptqpL17Wg8ccc//TBnEGOH27AF5gbwIfypwZbOEuJDTGR8r+g==\n"
+                                   "-----END DH PARAMETERS-----\n";
 
-  BIO* bio =
-      CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(dh_ike_23_pem), -1));
+  BIO* bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(dh_ike_23_pem), -1));
   DH* dh = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
 #pragma GCC diagnostic push
@@ -113,18 +110,15 @@ void TLS::starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout)
 
     CHECK(now < (start + timeout)) << "starttls timed out";
 
-    milliseconds time_left =
-        duration_cast<milliseconds>((start + timeout) - now);
+    milliseconds time_left = duration_cast<milliseconds>((start + timeout) - now);
 
     switch (SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
-      CHECK(POSIX::input_ready(fd_in, time_left))
-          << "starttls timed out on input_ready";
+      CHECK(POSIX::input_ready(fd_in, time_left)) << "starttls timed out on input_ready";
       continue; // try SSL_accept again
 
     case SSL_ERROR_WANT_WRITE:
-      CHECK(POSIX::output_ready(fd_out, time_left))
-          << "starttls timed out on output_ready";
+      CHECK(POSIX::output_ready(fd_out, time_left)) << "starttls timed out on output_ready";
       continue; // try SSL_accept again
 
     default:
@@ -150,8 +144,10 @@ std::string TLS::info()
 }
 
 std::streamsize TLS::io_tls(char const* fnm,
-                            std::function<int(SSL*, void*, int)> fnc, char* s,
-                            std::streamsize n, std::chrono::milliseconds wait,
+                            std::function<int(SSL*, void*, int)> fnc,
+                            char* s,
+                            std::streamsize n,
+                            std::chrono::milliseconds wait,
                             bool& t_o)
 {
   using namespace std::chrono;

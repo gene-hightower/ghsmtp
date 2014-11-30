@@ -57,6 +57,6 @@ int main(int argc, char const* argv[])
   CHECK(!IP4::is_address("300.0.0.0"));
   CHECK(!IP4::is_address("1000.0.0.0"));
 
-  std::string reverse{ IP4::reverse("1.2.3.4") };
+  std::string reverse{IP4::reverse("1.2.3.4")};
   CHECK_EQ(0, reverse.compare("4.3.2.1."));
 }

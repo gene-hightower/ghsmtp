@@ -41,8 +41,7 @@ public:
 
     // http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
 
-    static constexpr const char* const b32_charset =
-        "ybndrfg8ejkmcpqxot1uwisza345h769";
+    static constexpr const char* const b32_charset = "ybndrfg8ejkmcpqxot1uwisza345h769";
 
     const unsigned char* os = reinterpret_cast<const unsigned char*>(&s_);
     const unsigned char* osp = os + sizeof(s_);
@@ -88,10 +87,7 @@ private:
   static constexpr int b32_ndigits_ = ((sizeof(s_) * CHAR_BIT) + 4) / 5;
   char b32_str_[b32_ndigits_ + 1];
 
-  friend std::ostream& operator<<(std::ostream& s, Pill const& p)
-  {
-    return s << p.b32_str_;
-  }
+  friend std::ostream& operator<<(std::ostream& s, Pill const& p) { return s << p.b32_str_; }
 };
 
 #endif // PILL_DOT_HPP

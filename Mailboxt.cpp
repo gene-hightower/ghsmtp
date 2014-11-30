@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
   Mailbox mb;
   CHECK(mb.empty());
 
-  Mailbox dg{ "gene", "digilicious.com" };
+  Mailbox dg{"gene", "digilicious.com"};
 
   CHECK_EQ(std::string("digilicious.com"), dg.domain());
 

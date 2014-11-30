@@ -66,8 +66,11 @@ bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
 
 std::streamsize POSIX::io_fd(char const* fnm,
                              std::function<ssize_t(int, void*, size_t)> fnc,
-                             int fd, char* s, std::streamsize n,
-                             std::chrono::milliseconds timeout, bool& t_o)
+                             int fd,
+                             char* s,
+                             std::streamsize n,
+                             std::chrono::milliseconds timeout,
+                             bool& t_o)
 {
   using namespace std::chrono;
   time_point<system_clock> start = system_clock::now();
@@ -78,13 +81,11 @@ std::streamsize POSIX::io_fd(char const* fnm,
     if (errno == EINTR)
       continue; // try fnc again
 
-    PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
-        << "Error from POSIX " << fnm << " system call";
+    PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN)) << "Error from POSIX " << fnm << " system call";
 
     time_point<system_clock> now = system_clock::now();
     if (now < (start + timeout)) {
-      milliseconds time_left =
-          duration_cast<milliseconds>((start + timeout) - now);
+      milliseconds time_left = duration_cast<milliseconds>((start + timeout) - now);
       if (input_ready(fd, time_left))
         continue; // try fnc again
     }

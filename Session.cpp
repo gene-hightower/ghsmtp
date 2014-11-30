@@ -41,19 +41,19 @@
 
 namespace Config {
 constexpr char const* const very_bad_recipients[] = {
-  "a",
+    "a", "oq6_2nbq",
 };
 
 constexpr char const* const bad_recipients[] = {
-  "nobody", "mixmaster",
+    "gene-next", "mixmaster", "nobody",
 };
 
 constexpr char const* const rbls[] = {
-  "zen.spamhaus.org", "b.barracudacentral.org",
+    "zen.spamhaus.org", "b.barracudacentral.org",
 };
 
 constexpr char const* const uribls[] = {
-  "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
+    "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
 };
 
 constexpr auto greeting_max_wait_ms = 10'000;
@@ -103,18 +103,16 @@ void Session::greeting()
     Resolver res;
 
     // "0.1.2.3" => "3.2.1.0."
-    std::string reversed{ IP4::reverse(sock_.them_c_str()) };
+    std::string reversed{IP4::reverse(sock_.them_c_str())};
 
     // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
     // The reverse part, check PTR records.
-    std::vector<std::string> ptrs =
-        get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
+    std::vector<std::string> ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
     char const* them = sock_.them_c_str();
 
-    auto ptr = std::find_if(ptrs.begin(), ptrs.end(),
-                            [&res, them](std::string const& s) {
+    auto ptr = std::find_if(ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
       // The forward part, check each PTR for matching A record.
       std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
       return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
@@ -143,9 +141,8 @@ void Session::greeting()
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
-    std::uniform_int_distribution<> uni_dist(Config::greeting_min_wait_ms,
-                                             Config::greeting_max_wait_ms);
-    std::chrono::milliseconds wait{ uni_dist(rd_) };
+    std::uniform_int_distribution<> uni_dist(Config::greeting_min_wait_ms, Config::greeting_max_wait_ms);
+    std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
       out() << "421 input before greeting\r\n" << std::flush;
@@ -179,14 +176,11 @@ void Session::helo(std::string const& client_identity)
   }
 }
 
-void Session::mail_from(
-    Mailbox const& reverse_path,
-    std::unordered_map<std::string, std::string> const& parameters)
+void Session::mail_from(Mailbox const& reverse_path, std::unordered_map<std::string, std::string> const& parameters)
 {
   if (client_identity_.empty()) {
     out() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
-    LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
-                 << (sock_.has_peername() ? " from " : "") << client_;
+    LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'" << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
@@ -198,12 +192,10 @@ void Session::mail_from(
       } else if (p.second == "7BIT") {
         LOG(WARNING) << "7BIT transport requested";
       } else {
-        LOG(WARNING) << "unrecognized BODY type \"" << p.second
-                     << "\" requested";
+        LOG(WARNING) << "unrecognized BODY type \"" << p.second << "\" requested";
       }
     } else {
-      LOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "="
-                   << p.second;
+      LOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "=" << p.second;
     }
   }
 
@@ -214,21 +206,17 @@ void Session::mail_from(
   }
 }
 
-void
-Session::rcpt_to(Mailbox const& forward_path,
-                 std::unordered_map<std::string, std::string> const& parameters)
+void Session::rcpt_to(Mailbox const& forward_path, std::unordered_map<std::string, std::string> const& parameters)
 {
   if (!reverse_path_verified_) {
     out() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
-    LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
-                 << (sock_.has_peername() ? " from " : "") << client_;
+    LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'" << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters, we don't accept any:
   for (auto& p : parameters) {
-    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << p.first << "="
-                 << p.second;
+    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << p.first << "=" << p.second;
   }
   if (verify_recipient(forward_path)) {
     forward_path_.push_back(forward_path);
@@ -264,10 +252,10 @@ void Session::data()
   if (sock_.has_peername()) {
     headers << " (" << client_ << ")";
   }
-  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id()
-          << "\n\tfor <" << forward_path_[0] << '>';
+  headers << "\n\tby " << fqdn_ << " with " << protocol_ << " id " << msg.id() << "\n\tfor <" << forward_path_[0]
+          << '>';
 
-  std::string tls_info{ sock_.tls_info() };
+  std::string tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     headers << "\n\t(" << tls_info << ")";
   }
@@ -362,42 +350,35 @@ void Session::starttls()
 
 bool Session::verify_client(std::string const& client_identity)
 {
-  if (IP4::is_address(client_identity.c_str()) &&
-      (client_identity != sock_.them_c_str())) {
-    LOG(WARNING) << "client claiming questionable IP address "
-                 << client_identity;
+  if (IP4::is_address(client_identity.c_str()) && (client_identity != sock_.them_c_str())) {
+    LOG(WARNING) << "client claiming questionable IP address " << client_identity;
   }
 
   // Bogus clients claim to be us or some local host.
-  if (Domain::match(client_identity, fqdn_) ||
-      Domain::match(client_identity, "localhost") ||
-      Domain::match(client_identity, "localhost.localdomain")) {
+  if (Domain::match(client_identity, fqdn_) || Domain::match(client_identity, "localhost")
+      || Domain::match(client_identity, "localhost.localdomain")) {
 
-    if (!Domain::match(fqdn_, fcrdns_) &&
-        strcmp(sock_.them_c_str(), "127.0.0.1")) {
+    if (!Domain::match(fqdn_, fcrdns_) && strcmp(sock_.them_c_str(), "127.0.0.1")) {
       out() << "421 liar\r\n" << std::flush;
-      LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
+      LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "") << client_ << " claiming " << client_identity;
       std::exit(EXIT_SUCCESS);
     }
   }
 
   std::vector<std::string> labels;
-  boost::algorithm::split(labels, client_identity,
-                          boost::algorithm::is_any_of("."));
+  boost::algorithm::split(labels, client_identity, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
     out() << "421 invalid sender\r\n" << std::flush;
-    LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
+    LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "") << client_ << " claiming " << client_identity;
     std::exit(EXIT_SUCCESS);
   }
 
   CDB black("black");
   if (black.lookup(client_identity.c_str())) {
     out() << "421 blacklisted identity\r\n" << std::flush;
-    LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
+    LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "") << client_ << " claiming "
+               << client_identity;
     std::exit(EXIT_SUCCESS);
   }
 
@@ -408,8 +389,7 @@ bool Session::verify_client(std::string const& client_identity)
   }
   if (black.lookup(tld)) {
     out() << "421 blacklisted identity\r\n" << std::flush;
-    LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
+    LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "") << client_ << " claiming " << client_identity;
     std::exit(EXIT_SUCCESS);
   }
 
@@ -418,8 +398,7 @@ bool Session::verify_client(std::string const& client_identity)
     if (Domain::match(fcrdns_, client_identity)) {
       LOG(INFO) << protocol_ << " connection from " << client_;
     } else {
-      LOG(INFO) << protocol_ << " connection from " << client_ << " claiming "
-                << client_identity;
+      LOG(INFO) << protocol_ << " connection from " << client_ << " claiming " << client_identity;
     }
   } else {
     LOG(INFO) << protocol_ << " connection claiming " << client_identity;
@@ -516,8 +495,7 @@ bool Session::verify_sender_domain(std::string const& sender)
 
   // Based on <www.surbl.org/guidelines>
 
-  std::string two_level =
-      labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+  std::string two_level = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
 
   if (labels.size() > 2) {
     std::string three_level = labels[labels.size() - 3] + "." + two_level;
@@ -525,12 +503,10 @@ bool Session::verify_sender_domain(std::string const& sender)
     CDB three_tld("three-level-tlds");
     if (three_tld.lookup(three_level.c_str())) {
       if (labels.size() > 3) {
-        return verify_sender_domain_uribl(labels[labels.size() - 4] + "." +
-                                          three_level);
+        return verify_sender_domain_uribl(labels[labels.size() - 4] + "." + three_level);
       } else {
         out() << "421 bad sender domain\r\n" << std::flush;
-        LOG(ERROR) << sender
-                   << " blocked by exact match on three-level-tlds list";
+        LOG(ERROR) << sender << " blocked by exact match on three-level-tlds list";
         std::exit(EXIT_SUCCESS);
       }
     }
@@ -539,8 +515,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   CDB two_tld("two-level-tlds");
   if (two_tld.lookup(two_level.c_str())) {
     if (labels.size() > 2) {
-      return verify_sender_domain_uribl(labels[labels.size() - 3] + "." +
-                                        two_level);
+      return verify_sender_domain_uribl(labels[labels.size() - 3] + "." + two_level);
     } else {
       out() << "421 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
