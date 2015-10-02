@@ -31,7 +31,7 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(int fd_in = STDIN_FILENO, int fd_out = STDOUT_FILENO, std::string const& fqdn = "");
+  Session(int fd_in = STDIN_FILENO, int fd_out = STDOUT_FILENO, std::string const& fqdn = "");
 
   void greeting();
   void ehlo(std::string const& client_identity);
