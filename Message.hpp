@@ -43,12 +43,14 @@ public:
     char const* ev = getenv("MAILDIR");
     if (ev) {
       maildir = ev;
-    } else {
+    }
+    else {
       ev = getenv("HOME");
       if (ev) {
         CHECK(strcmp(ev, "/root")) << "should not run as root";
         maildir = ev;
-      } else {
+      }
+      else {
         errno = 0; // See GETPWNAM(3)
         passwd* pw;
         PCHECK(pw = getpwuid(getuid()));

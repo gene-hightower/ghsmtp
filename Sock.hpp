@@ -48,49 +48,62 @@ public:
 
     // Get our local IP address as "us".
 
-    if (-1 != getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr), &us_addr_len)) {
+    if (-1 != getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr),
+                          &us_addr_len)) {
       switch (us_addr_len) {
       case sizeof(sockaddr_in):
-        PCHECK(inet_ntop(AF_INET,
-                         &(reinterpret_cast<struct sockaddr_in*>(&us_addr)->sin_addr),
-                         us_addr_str_,
-                         sizeof us_addr_str_) != nullptr);
+        PCHECK(inet_ntop(
+                   AF_INET,
+                   &(reinterpret_cast<struct sockaddr_in*>(&us_addr)->sin_addr),
+                   us_addr_str_, sizeof us_addr_str_)
+               != nullptr);
         break;
       case sizeof(sockaddr_in6):
-        LOG(WARNING) << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
+        LOG(WARNING)
+            << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6,
-                         &(reinterpret_cast<struct sockaddr_in6*>(&us_addr)->sin6_addr),
-                         us_addr_str_,
-                         sizeof us_addr_str_) != nullptr);
+                         &(reinterpret_cast<struct sockaddr_in6*>(&us_addr)
+                               ->sin6_addr),
+                         us_addr_str_, sizeof us_addr_str_)
+               != nullptr);
         break;
       default:
-        LOG(ERROR) << "bogus address length (" << us_addr_len << ") returned from getsockname";
+        LOG(ERROR) << "bogus address length (" << us_addr_len
+                   << ") returned from getsockname";
       }
-    } else {
+    }
+    else {
       CHECK_EQ(ENOTSOCK, errno); // only acceptable error from getsockname
     }
 
     // Get the remote IP address as "them".
 
-    if (-1 != getpeername(fd_out, reinterpret_cast<struct sockaddr*>(&them_addr), &them_addr_len)) {
+    if (-1 != getpeername(fd_out,
+                          reinterpret_cast<struct sockaddr*>(&them_addr),
+                          &them_addr_len)) {
       switch (them_addr_len) {
       case sizeof(sockaddr_in):
         PCHECK(inet_ntop(AF_INET,
-                         &(reinterpret_cast<struct sockaddr_in*>(&them_addr)->sin_addr),
-                         them_addr_str_,
-                         sizeof them_addr_str_) != nullptr);
+                         &(reinterpret_cast<struct sockaddr_in*>(&them_addr)
+                               ->sin_addr),
+                         them_addr_str_, sizeof them_addr_str_)
+               != nullptr);
         break;
       case sizeof(sockaddr_in6):
-        LOG(WARNING) << "getpeername returned them_addr_len == sizeof(sockaddr_in6)";
+        LOG(WARNING)
+            << "getpeername returned them_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6,
-                         &(reinterpret_cast<struct sockaddr_in6*>(&them_addr)->sin6_addr),
-                         them_addr_str_,
-                         sizeof them_addr_str_) != nullptr);
+                         &(reinterpret_cast<struct sockaddr_in6*>(&them_addr)
+                               ->sin6_addr),
+                         them_addr_str_, sizeof them_addr_str_)
+               != nullptr);
         break;
       default:
-        LOG(ERROR) << "bogus address length (" << them_addr_len << ") returned from getpeername";
+        LOG(ERROR) << "bogus address length (" << them_addr_len
+                   << ") returned from getpeername";
       }
-    } else {
+    }
+    else {
       // Ignore ENOTSOCK errors from getpeername, useful for testing.
       PLOG_IF(WARNING, ENOTSOCK != errno) << "getpeername failed";
     }
@@ -99,7 +112,10 @@ public:
   char const* us_c_str() const { return us_addr_str_; }
   char const* them_c_str() const { return them_addr_str_; }
   bool has_peername() const { return them_addr_str_[0] != '\0'; }
-  bool input_ready(std::chrono::milliseconds wait) { return iostream_->input_ready(wait); }
+  bool input_ready(std::chrono::milliseconds wait)
+  {
+    return iostream_->input_ready(wait);
+  }
   bool timed_out() { return iostream_->timed_out(); }
   std::istream& in() { return iostream_; }
   std::ostream& out() { return iostream_; }

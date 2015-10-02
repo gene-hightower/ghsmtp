@@ -27,7 +27,8 @@ void do_dotted_quad(char const* addr)
 
   std::string reversed{IP4::reverse(addr)};
 
-  constexpr const char* const rbls[] = {"zen.spamhaus.org", "b.barracudacentral.org"};
+  constexpr const char* const rbls[]
+      = {"zen.spamhaus.org", "b.barracudacentral.org"};
 
   for (auto rbl : rbls) {
     std::string lookup = reversed + rbl;
@@ -45,18 +46,22 @@ void do_dotted_quad(char const* addr)
           std::cout << code << std::endl;
         }
       }
-    } else {
+    }
+    else {
       if (q.get_rcode() == DNS::Pkt_rcode::NXDOMAIN) {
         std::cout << "not found in " << rbl << std::endl;
-      } else {
-        std::cout << "Error from lookup at " << rbl << " " << q.get_rcode() << std::endl;
+      }
+      else {
+        std::cout << "Error from lookup at " << rbl << " " << q.get_rcode()
+                  << std::endl;
       }
     }
   }
 
   std::string fcrdns;
 
-  std::vector<std::string> ptrs = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
+  std::vector<std::string> ptrs
+      = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
 
   for (auto ptr : ptrs) {
     // chop off the trailing '.'
@@ -64,7 +69,8 @@ void do_dotted_quad(char const* addr)
     if ((-1 != last) && ('.' == ptr.at(last))) {
       ptr.erase(last, 1);
     }
-    std::vector<std::string> addrs = DNS::get_records<DNS::RR_type::A>(res, ptr);
+    std::vector<std::string> addrs
+        = DNS::get_records<DNS::RR_type::A>(res, ptr);
     for (const auto a : addrs) {
       if (a == addr) {
         fcrdns = ptr;
@@ -79,7 +85,8 @@ void do_dotted_quad(char const* addr)
 found:
   std::cout << fcrdns << std::endl;
 
-  std::vector<std::string> txts = DNS::get_records<DNS::RR_type::TXT>(res, fcrdns);
+  std::vector<std::string> txts
+      = DNS::get_records<DNS::RR_type::TXT>(res, fcrdns);
   for (const auto txt : txts) {
     std::cout << "\"" << txt << "\"" << std::endl;
   }
@@ -89,12 +96,14 @@ void do_domain(char const* domain)
 {
   DNS::Resolver res;
 
-  std::vector<std::string> addrs = DNS::get_records<DNS::RR_type::A>(res, domain);
+  std::vector<std::string> addrs
+      = DNS::get_records<DNS::RR_type::A>(res, domain);
   for (const auto a : addrs) {
     std::cout << a << std::endl;
   }
 
-  std::vector<std::string> txts = DNS::get_records<DNS::RR_type::TXT>(res, domain);
+  std::vector<std::string> txts
+      = DNS::get_records<DNS::RR_type::TXT>(res, domain);
   for (const auto txt : txts) {
     std::cout << "\"" << txt << "\"" << std::endl;
   }
@@ -107,7 +116,8 @@ int main(int argc, char const* argv[])
   for (int i = 1; i < argc; ++i) {
     if (IP4::is_address(argv[i])) {
       do_dotted_quad(argv[i]);
-    } else {
+    }
+    else {
       do_domain(argv[i]);
     }
   }

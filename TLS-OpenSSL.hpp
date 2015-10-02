@@ -41,11 +41,15 @@ public:
 
   void starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout);
 
-  std::streamsize read(char* s, std::streamsize n, std::chrono::milliseconds wait, bool& t_o)
+  std::streamsize
+  read(char* s, std::streamsize n, std::chrono::milliseconds wait, bool& t_o)
   {
     return io_tls("SSL_read", SSL_read, s, n, wait, t_o);
   }
-  std::streamsize write(const char* s, std::streamsize n, std::chrono::milliseconds wait, bool& t_o)
+  std::streamsize write(const char* s,
+                        std::streamsize n,
+                        std::chrono::milliseconds wait,
+                        bool& t_o)
   {
     return io_tls("SSL_write", SSL_write, const_cast<char*>(s), n, wait, t_o);
   }

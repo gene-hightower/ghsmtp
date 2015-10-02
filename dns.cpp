@@ -128,7 +128,8 @@ int main(int argc, char* argv[])
       sockaddr_in adr;
       adr.sin_family = AF_INET;
       PCHECK(inet_pton(AF_INET, net_addr, &adr.sin_addr) == 1);
-      err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host, sizeof host, serv, sizeof serv, 0);
+      err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host,
+                        sizeof host, serv, sizeof serv, 0);
       if (err) {
         cerr << "4 getnameinfo failure: " << gai_strerror(err) << endl;
         return 7;
@@ -139,7 +140,8 @@ int main(int argc, char* argv[])
       sockaddr_in6 adr;
       adr.sin6_family = AF_INET6;
       PCHECK(inet_pton(AF_INET6, net_addr, &adr.sin6_addr) == 1);
-      err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host, sizeof host, serv, sizeof serv, 0);
+      err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host,
+                        sizeof host, serv, sizeof serv, 0);
       if (err) {
         cerr << "6 getnameinfo failure: " << gai_strerror(err) << endl;
         return 8;

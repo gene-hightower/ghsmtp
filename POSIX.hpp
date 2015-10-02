@@ -34,15 +34,23 @@ public:
   static bool input_ready(int fd_in, std::chrono::milliseconds wait);
   static bool output_ready(int fd_out, std::chrono::milliseconds wait);
 
-  static std::streamsize read(int fd_in, char* s, std::streamsize n, std::chrono::milliseconds timeout, bool& t_o)
+  static std::streamsize read(int fd_in,
+                              char* s,
+                              std::streamsize n,
+                              std::chrono::milliseconds timeout,
+                              bool& t_o)
   {
     return io_fd("read", ::read, fd_in, s, n, timeout, t_o);
   }
 
-  static std::streamsize
-  write(int fd_out, const char* s, std::streamsize n, std::chrono::milliseconds timeout, bool& t_o)
+  static std::streamsize write(int fd_out,
+                               const char* s,
+                               std::streamsize n,
+                               std::chrono::milliseconds timeout,
+                               bool& t_o)
   {
-    return io_fd("write", ::write, fd_out, const_cast<char*>(s), n, timeout, t_o);
+    return io_fd("write", ::write, fd_out, const_cast<char*>(s), n, timeout,
+                 t_o);
   }
 
 private:

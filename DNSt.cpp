@@ -28,7 +28,8 @@ int main(int argc, char const* argv[])
   CHECK_EQ(sizeof(DNS::Rrlist<DNS::RR_type::A>), sizeof(void*));
 
   DNS::Resolver res;
-  std::vector<std::string> addrs = DNS::get_records<DNS::RR_type::A>(res, "digilicious.com");
+  std::vector<std::string> addrs
+      = DNS::get_records<DNS::RR_type::A>(res, "digilicious.com");
 
   CHECK_EQ(addrs.size(), 1U);
   CHECK_EQ(addrs[0], "108.83.36.113");

@@ -90,17 +90,27 @@ namespace query {
 char localtime_r(...);
 
 struct has_localtime_r {
-  enum { value = sizeof localtime_r(std::declval<std::time_t*>(), std::declval<std::tm*>()) == sizeof(std::tm*) };
+  enum {
+    value
+    = sizeof localtime_r(std::declval<std::time_t*>(), std::declval<std::tm*>())
+      == sizeof(std::tm*)
+  };
 };
 
 template <bool available>
 struct safest_localtime {
-  static std::tm* call(std::time_t const* t, std::tm* r) { return localtime_r(t, r); }
+  static std::tm* call(std::time_t const* t, std::tm* r)
+  {
+    return localtime_r(t, r);
+  }
 };
 
 template <>
 struct safest_localtime<false> {
-  static std::tm* call(std::time_t const* t, std::tm* r) { return std::localtime(t); }
+  static std::tm* call(std::time_t const* t, std::tm* r)
+  {
+    return std::localtime(t);
+  }
 };
 }
 
@@ -149,11 +159,13 @@ inline void init(char const* prgrm_nm)
   char const* ev = std::getenv("GOOGLE_LOG_DIR");
   if (ev) {
     logdir = ev;
-  } else {
+  }
+  else {
     ev = std::getenv("LOG_DIR");
     if (ev) {
       logdir = ev;
-    } else {
+    }
+    else {
       logdir = "/tmp";
     }
   }
@@ -177,7 +189,8 @@ inline void init(char const* prgrm_nm)
     user = "";
   }
 
-  std::string filename = logdir + "/" + base_name(program_name) + "." + get_host_name() + "." + user + ".log." + tm_str;
+  std::string filename = logdir + "/" + base_name(program_name) + "."
+                         + get_host_name() + "." + user + ".log." + tm_str;
 
   filename += "." + boost::lexical_cast<std::string>(getpid());
 
@@ -187,8 +200,9 @@ inline void init(char const* prgrm_nm)
     log_fd = STDERR_FILENO;
   }
 
-  constexpr char const header[] = "Log line format: [IWEF] yyyy-mm-dd hh:mm:ss.uuuuuu zzzzz "
-                                  "threadid file:line] msg\n";
+  constexpr char const header[]
+      = "Log line format: [IWEF] yyyy-mm-dd hh:mm:ss.uuuuuu zzzzz "
+        "threadid file:line] msg\n";
 
   s = write(log_fd, header, sizeof(header) - 1);
   assert(s == sizeof(header) - 1);
@@ -252,7 +266,9 @@ public:
     auto t = std::chrono::system_clock::to_time_t(now);
     auto whole_second = std::chrono::system_clock::from_time_t(t);
 
-    auto us = std::chrono::duration_cast<std::chrono::microseconds>(now - whole_second).count();
+    auto us = std::chrono::duration_cast<std::chrono::microseconds>(
+                  now - whole_second)
+                  .count();
 
     std::tm tm_local;
     std::tm* tm_ptr = localtime(&t, &tm_local);
@@ -281,7 +297,8 @@ public:
     }
 
     msg_ << tm_str << "." << std::setfill('0') << std::setw(6) << us << tm_str_z
-         << boost::lexical_cast<std::string>(getpid()) << " " << file << ":" << static_cast<unsigned>(line) << "] ";
+         << boost::lexical_cast<std::string>(getpid()) << " " << file << ":"
+         << static_cast<unsigned>(line) << "] ";
   }
 
   virtual ~Message()
@@ -310,7 +327,11 @@ public:
   {
   }
 
-  ~ErrnoMessage() override { stream() << ": " << std::strerror(errno) << " [" << static_cast<unsigned>(errno) << "]"; }
+  ~ErrnoMessage() override
+  {
+    stream() << ": " << std::strerror(errno) << " ["
+             << static_cast<unsigned>(errno) << "]";
+  }
 };
 
 // A helper class for formatting "expr (V1 vs. V2)" in a CHECK_XX
@@ -363,44 +384,56 @@ std::string* MakeCheckOpString(const T1& v1, const T2& v2, const char* exprtext)
 }
 
 #define LOG_INFO Logging::Message(__FILE__, __LINE__)
-#define LOG_WARNING Logging::Message(__FILE__, __LINE__, Logging::Severity::WARNING)
+#define LOG_WARNING                                                            \
+  Logging::Message(__FILE__, __LINE__, Logging::Severity::WARNING)
 #define LOG_ERROR Logging::Message(__FILE__, __LINE__, Logging::Severity::ERROR)
 #define LOG_FATAL Logging::Message(__FILE__, __LINE__, Logging::Severity::FATAL)
 
 #define PLOG_INFO Logging::ErrnoMessage(__FILE__, __LINE__)
-#define PLOG_WARNING Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::WARNING)
-#define PLOG_ERROR Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::ERROR)
-#define PLOG_FATAL Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::FATAL)
+#define PLOG_WARNING                                                           \
+  Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::WARNING)
+#define PLOG_ERROR                                                             \
+  Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::ERROR)
+#define PLOG_FATAL                                                             \
+  Logging::ErrnoMessage(__FILE__, __LINE__, Logging::Severity::FATAL)
 
 #define LOG(severity) LOG_##severity.stream()
 #define PLOG(severity) PLOG_##severity.stream()
 
-#define LOG_IF(severity, condition) !(condition) ? (void)0 : Logging::MessageVoidify() & LOG(severity)
-#define PLOG_IF(severity, condition) !(condition) ? (void)0 : Logging::MessageVoidify() & PLOG(severity)
+#define LOG_IF(severity, condition)                                            \
+  !(condition) ? (void)0 : Logging::MessageVoidify() & LOG(severity)
+#define PLOG_IF(severity, condition)                                           \
+  !(condition) ? (void)0 : Logging::MessageVoidify() & PLOG(severity)
 
-#define CHECK(condition) LOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition))) << "Check failed: " #condition " "
-#define PCHECK(condition) PLOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition))) << "Check failed: " #condition " "
+#define CHECK(condition)                                                       \
+  LOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition)))                        \
+      << "Check failed: " #condition " "
+#define PCHECK(condition)                                                      \
+  PLOG_IF(FATAL, PREDICT_BRANCH_NOT_TAKEN(!(condition)))                       \
+      << "Check failed: " #condition " "
 
-#define CHECK_OP(name, op, val1, val2)                                                                                 \
-  while (std::string* _result = Logging::Check##name##Impl((val1), (val2), #val1 " " #op " " #val2))                   \
+#define CHECK_OP(name, op, val1, val2)                                         \
+  while (std::string* _result = Logging::Check##name##Impl(                    \
+             (val1), (val2), #val1 " " #op " " #val2))                         \
   Logging::Message(__FILE__, __LINE__, *_result).stream()
 
 // Helper functions for CHECK_OP macro.
 // The (int, int) specialization works around the issue that the compiler
 // will not instantiate the template version of the function on values of
 // unnamed enum type - see comment below.
-#define DEFINE_CHECK_OP_IMPL(name, op)                                                                                 \
-  template <typename T1, typename T2>                                                                                  \
-  inline std::string* name##Impl(const T1& v1, const T2& v2, const char* exprtext)                                     \
-  {                                                                                                                    \
-    if (PREDICT_TRUE(v1 op v2))                                                                                        \
-      return NULL;                                                                                                     \
-    else                                                                                                               \
-      return Logging::MakeCheckOpString(v1, v2, exprtext);                                                             \
-  }                                                                                                                    \
-  inline std::string* name##Impl(int v1, int v2, const char* exprtext)                                                 \
-  {                                                                                                                    \
-    return Logging::name##Impl<int, int>(v1, v2, exprtext);                                                            \
+#define DEFINE_CHECK_OP_IMPL(name, op)                                         \
+  template <typename T1, typename T2>                                          \
+  inline std::string* name##Impl(const T1& v1, const T2& v2,                   \
+                                 const char* exprtext)                         \
+  {                                                                            \
+    if (PREDICT_TRUE(v1 op v2))                                                \
+      return NULL;                                                             \
+    else                                                                       \
+      return Logging::MakeCheckOpString(v1, v2, exprtext);                     \
+  }                                                                            \
+  inline std::string* name##Impl(int v1, int v2, const char* exprtext)         \
+  {                                                                            \
+    return Logging::name##Impl<int, int>(v1, v2, exprtext);                    \
   }
 
 // We use the full name Check_EQ, Check_NE, etc. in case the file including
@@ -422,7 +455,9 @@ DEFINE_CHECK_OP_IMPL(Check_GT, > )
 #define CHECK_GE(val1, val2) CHECK_OP(_GE, >=, val1, val2)
 #define CHECK_GT(val1, val2) CHECK_OP(_GT, >, val1, val2)
 
-#define CHECK_NOTNULL(val) Logging::CheckNotNull(__FILE__, __LINE__, "'" #val "' Must not be nullptr", (val))
+#define CHECK_NOTNULL(val)                                                     \
+  Logging::CheckNotNull(__FILE__, __LINE__, "'" #val "' Must not be nullptr",  \
+                        (val))
 
 template <typename T>
 T* CheckNotNull(char const* file, int line, char const* names, T* t)

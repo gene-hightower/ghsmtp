@@ -48,8 +48,10 @@ std::vector<std::string> Rrlist<RR_type::TXT>::get() const
           ldns_rdf const* rdf = rr->_rdata_fields[j];
           if (rdf->_type == LDNS_RDF_TYPE_STR) {
             ret.push_back(rr_str(rdf));
-          } else {
-            LOG(WARNING) << "expecting TXT got:" << static_cast<unsigned>(rdf->_type);
+          }
+          else {
+            LOG(WARNING) << "expecting TXT got:"
+                         << static_cast<unsigned>(rdf->_type);
           }
         }
       }
@@ -70,8 +72,10 @@ std::vector<std::string> Rrlist<RR_type::PTR>::get() const
           ldns_rdf const* rdf = rr->_rdata_fields[j];
           if (rdf->_type == LDNS_RDF_TYPE_DNAME) {
             ret.push_back(rr_name_str(rdf));
-          } else {
-            LOG(WARNING) << "expecting PTR got:" << static_cast<unsigned>(rdf->_type);
+          }
+          else {
+            LOG(WARNING) << "expecting PTR got:"
+                         << static_cast<unsigned>(rdf->_type);
             break;
           }
         }
@@ -95,8 +99,10 @@ std::vector<std::string> Rrlist<RR_type::A>::get() const
             char str[INET_ADDRSTRLEN];
             PCHECK(inet_ntop(AF_INET, rdf->_data, str, sizeof str));
             ret.push_back(str);
-          } else {
-            LOG(WARNING) << "expecting A got:" << static_cast<unsigned>(rdf->_type);
+          }
+          else {
+            LOG(WARNING) << "expecting A got:"
+                         << static_cast<unsigned>(rdf->_type);
           }
         }
       }
@@ -128,9 +134,12 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
       unsigned char c = data[src_pos];
       if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
         str << '\\' << c;
-      } else if (!(isascii(c) && isgraph(c))) {
-        str << "0x" << std::hex << std::setfill('0') << std::setw(2) << static_cast<unsigned>(c);
-      } else {
+      }
+      else if (!(isascii(c) && isgraph(c))) {
+        str << "0x" << std::hex << std::setfill('0') << std::setw(2)
+            << static_cast<unsigned>(c);
+      }
+      else {
         str << c;
       }
       src_pos++;

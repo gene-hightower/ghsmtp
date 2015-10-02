@@ -36,7 +36,10 @@ public:
   }
   ~TLD() { freeTldTree(tree_); }
 
-  char const* get_registered_domain(char const* dom) { return getRegisteredDomain(dom, tree_); }
+  char const* get_registered_domain(char const* dom)
+  {
+    return getRegisteredDomain(dom, tree_);
+  }
 
 private:
   void* tree_;

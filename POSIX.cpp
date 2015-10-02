@@ -81,11 +81,13 @@ std::streamsize POSIX::io_fd(char const* fnm,
     if (errno == EINTR)
       continue; // try fnc again
 
-    PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN)) << "Error from POSIX " << fnm << " system call";
+    PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
+        << "Error from POSIX " << fnm << " system call";
 
     time_point<system_clock> now = system_clock::now();
     if (now < (start + timeout)) {
-      milliseconds time_left = duration_cast<milliseconds>((start + timeout) - now);
+      milliseconds time_left
+          = duration_cast<milliseconds>((start + timeout) - now);
       if (input_ready(fd, time_left))
         continue; // try fnc again
     }
