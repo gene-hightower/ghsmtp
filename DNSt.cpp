@@ -20,7 +20,7 @@
 
 int main(int argc, char const* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   CHECK_EQ(sizeof(DNS::Resolver), sizeof(void*));
   CHECK_EQ(sizeof(DNS::Domain), sizeof(void*));

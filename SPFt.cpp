@@ -22,7 +22,7 @@
 
 int main(int argc, char const* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   CHECK_EQ(sizeof(SPF::Server), sizeof(void*));
   CHECK_EQ(sizeof(SPF::Request), sizeof(void*));

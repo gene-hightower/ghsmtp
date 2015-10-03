@@ -25,7 +25,7 @@
 
 int main(int argc, char* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   char env[100] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);

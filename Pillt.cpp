@@ -23,7 +23,7 @@
 
 int main(int arcv, char* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   std::random_device rd;
 

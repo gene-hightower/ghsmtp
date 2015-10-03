@@ -36,6 +36,7 @@ struct Session_test {
 
     // These now die and never return, so maybe just the first one is
     // ever called.
+    LOG(ERROR) << "Expect: invalid sender domain";
     CHECK(!sess.verify_sender_domain("com"));
     CHECK(!sess.verify_sender_domain("zzux.com"));
     CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
@@ -44,7 +45,7 @@ struct Session_test {
 
 int main(int argc, char* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   Session_test t;
   t.test();

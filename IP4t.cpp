@@ -22,7 +22,7 @@
 
 int main(int argc, char const* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   CHECK(IP4::is_address("69.0.0.0"));
   CHECK(IP4::is_address("160.0.0.0"));

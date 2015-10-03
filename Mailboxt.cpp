@@ -26,7 +26,7 @@
 
 int main(int argc, char* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   Mailbox mb;
   CHECK(mb.empty());
