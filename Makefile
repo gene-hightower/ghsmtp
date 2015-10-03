@@ -61,13 +61,13 @@ tests = \
 	TLD-test \
 	TLS-OpenSSL-test
 
-DNSt_EXTRA = DNS
-POSIXt_EXTRA = POSIX
-SPFt_EXTRA = SPF
-Sessiont_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
-SockBuffert_EXTRA = POSIX TLS-OpenSSL
-Sockt_EXTRA = POSIX TLS-OpenSSL
-TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
+DNS-test_EXTRA = DNS
+POSIX-test_EXTRA = POSIX
+SPF-test_EXTRA = SPF
+Session-test_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
+SockBuffer-test_EXTRA = POSIX TLS-OpenSSL
+Sock-test_EXTRA = POSIX TLS-OpenSSL
+TLS-OpenSSL-test_EXTRA = POSIX TLS-OpenSSL
 
 databases = \
 	black.cdb \
