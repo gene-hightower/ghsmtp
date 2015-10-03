@@ -91,7 +91,7 @@ check: $(tests) $(TEST_MAILDIR) $(databases)
 
 coverage:
 	$(MAKE) clean
-	CXXFLAGS=--coverage $(MAKE) check
+	CXXFLAGS=--coverage LDFLAGS=-lgcov $(MAKE) check
 	$(foreach t,$(tests),gcov $(t) ;)
 
 clean::
