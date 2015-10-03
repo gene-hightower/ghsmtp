@@ -42,10 +42,10 @@ std::vector<std::string> Rrlist<RR_type::TXT>::get() const
   std::vector<std::string> ret;
   if (rrlst_) {
     for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
-      ldns_rr const* rr = rrlst_->_rrs[i];
+      auto rr = rrlst_->_rrs[i];
       if (rr) {
         for (unsigned j = 0; j < rr->_rd_count; ++j) {
-          ldns_rdf const* rdf = rr->_rdata_fields[j];
+          auto rdf = rr->_rdata_fields[j];
           if (rdf->_type == LDNS_RDF_TYPE_STR) {
             ret.push_back(rr_str(rdf));
           }
@@ -66,10 +66,10 @@ std::vector<std::string> Rrlist<RR_type::PTR>::get() const
   std::vector<std::string> ret;
   if (rrlst_) {
     for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
-      ldns_rr const* rr = rrlst_->_rrs[i];
+      auto rr = rrlst_->_rrs[i];
       if (rr) {
         for (unsigned j = 0; j < rr->_rd_count; ++j) {
-          ldns_rdf const* rdf = rr->_rdata_fields[j];
+          auto rdf = rr->_rdata_fields[j];
           if (rdf->_type == LDNS_RDF_TYPE_DNAME) {
             ret.push_back(rr_name_str(rdf));
           }
@@ -122,7 +122,7 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
     return "."; // root label
   }
 
-  unsigned char* data = static_cast<unsigned char*>(rdf->_data);
+  auto data = static_cast<unsigned char*>(rdf->_data);
 
   unsigned char src_pos = 0;
   unsigned char len = data[src_pos];
