@@ -45,21 +45,21 @@ smtp_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
 smtpd_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
 
 tests = \
-	CDBt \
-	DNSt \
-	Domaint \
-	IP4t \
-	Mailboxt \
-	Messaget \
-	Nowt \
-	POSIXt \
-	Pillt \
-	SPFt \
-	Sessiont \
-	SockBuffert \
-	Sockt \
-	TLDt \
-	TLS-OpenSSLt
+	CDB-test \
+	DNS-test \
+	Domain-test \
+	IP4-test \
+	Mailbox-test \
+	Message-test \
+	Now-test \
+	POSIX-test \
+	Pill-test \
+	SPF-test \
+	Session-test \
+	Sock-test \
+	SockBuffer-test \
+	TLD-test \
+	TLS-OpenSSL-test
 
 DNSt_EXTRA = DNS
 POSIXt_EXTRA = POSIX
