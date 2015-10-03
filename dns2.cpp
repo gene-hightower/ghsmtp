@@ -111,7 +111,7 @@ void do_domain(char const* domain)
 
 int main(int argc, char const* argv[])
 {
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   for (int i = 1; i < argc; ++i) {
     if (IP4::is_address(argv[i])) {

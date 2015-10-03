@@ -19,7 +19,7 @@
 #ifndef TLD_DOT_H
 #define TLD_DOT_H
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 extern "C" {
 #include <regdom.h>

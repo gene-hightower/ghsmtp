@@ -24,7 +24,7 @@
 #include <iostream>
 #include <random>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 // A pill is a unit of entropy.
 

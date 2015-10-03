@@ -28,7 +28,7 @@ extern "C" {
 #include <spf2/spf.h>
 }
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 namespace SPF {
 

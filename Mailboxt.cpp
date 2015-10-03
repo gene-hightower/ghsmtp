@@ -17,9 +17,10 @@
 */
 
 #include "Mailbox.hpp"
-#include "Logging.hpp"
 
 #include <iostream>
+
+#include <glog/logging.h>
 
 #include <boost/lexical_cast.hpp>
 

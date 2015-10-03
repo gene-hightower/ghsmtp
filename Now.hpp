@@ -23,7 +23,7 @@
 
 #include <iostream>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 class Now {
 public:

@@ -22,7 +22,7 @@
 #include <boost/utility/string_ref.hpp>
 #include <boost/xpressive/xpressive.hpp>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 using namespace boost::xpressive;
 

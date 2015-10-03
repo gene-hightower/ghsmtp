@@ -18,7 +18,7 @@
 
 #include "SockBuffer.hpp"
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 #include <fcntl.h>
 

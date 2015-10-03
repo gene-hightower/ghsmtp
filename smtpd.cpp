@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
 
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   // Set timeout signal handler.
   struct sigaction sact;

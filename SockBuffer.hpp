@@ -25,9 +25,10 @@
 #include <streambuf>
 #include <string>
 
-#include "Logging.hpp"
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
+
+#include <glog/logging.h>
 
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>

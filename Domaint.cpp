@@ -18,7 +18,7 @@
 
 #include "Domain.hpp"
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 int main(int argc, char const* argv[])
 {

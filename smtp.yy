@@ -602,7 +602,7 @@ void yy::Psr::error(std::string const& msg)
 int main(int argc, char const* argv[])
 {
   std::ios::sync_with_stdio(false);
-  Logging::init(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   Session session;
   session.greeting();

@@ -23,7 +23,7 @@ extern "C" {
 #include <cdb.h>
 }
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 #include "stringify.h"
 

@@ -26,7 +26,8 @@
 
 #include <openssl/rand.h>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
+
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
 

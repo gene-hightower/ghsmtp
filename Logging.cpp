@@ -1,5 +1,5 @@
 #define DLL_IMPLEMENTATION
-#include "Logging.hpp"
+#include <glog/logging.h>
 #include "dll_spec.h"
 
 #include <sstream>

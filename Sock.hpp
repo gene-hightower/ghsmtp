@@ -27,7 +27,7 @@
 
 #include <unistd.h>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 #include "SockBuffer.hpp"
 
 class Sock {

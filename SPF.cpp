@@ -32,15 +32,15 @@ std::unordered_map<Result, char const*> result_to_string{
 
 static void log_error(const char* file, int line, char const* errmsg)
 {
-  Logging::Message(file, line, Logging::Severity::FATAL).stream() << errmsg;
+  LOG(FATAL) << errmsg;
 }
 static void log_warning(const char* file, int line, char const* errmsg)
 {
-  Logging::Message(file, line, Logging::Severity::ERROR).stream() << errmsg;
+  LOG(ERROR) << errmsg;
 }
 static void log_info(const char* file, int line, char const* errmsg)
 {
-  Logging::Message(file, line, Logging::Severity::WARNING).stream() << errmsg;
+  LOG(WARNING) << errmsg;
 }
 
 struct Init {

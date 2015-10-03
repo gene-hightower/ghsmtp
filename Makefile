@@ -27,20 +27,22 @@ CXXFLAGS += \
 	-g -O2 \
 	$(warnings)
 
-LDLIBS += \
+LDFLAGS += \
 	-L/usr/local/lib \
-	-lcrypto -lssl \
-	-lldns \
-	-lspf2 \
-	-lregdom \
+
+LDLIBS += \
 	-lcdb \
-	-lm \
-	-lstdc++
+	-lcrypto \
+	-lglog \
+	-lldns \
+	-lregdom \
+	-lspf2 \
+	-lssl
 
 programs = smtp smtpd dns2
-dns2_EXTRA = DNS Logging
-smtp_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
-smtpd_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
+dns2_EXTRA = DNS
+smtp_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
+smtpd_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
 
 tests = \
 	CDBt \
@@ -59,21 +61,13 @@ tests = \
 	TLDt \
 	TLS-OpenSSLt
 
-CDBt_EXTRA = Logging
-DNSt_EXTRA = DNS Logging
-Domaint_EXTRA = Logging
-IP4t_EXTRA = Logging
-Mailboxt_EXTRA = Logging
-Messaget_EXTRA = Logging
-Nowt_EXTRA = Logging
-POSIXt_EXTRA = Logging POSIX
-Pillt_EXTRA = Logging
-SPFt_EXTRA = Logging SPF
-Sessiont_EXTRA = DNS Logging POSIX SPF Session TLS-OpenSSL
-SockBuffert_EXTRA = Logging POSIX TLS-OpenSSL
-Sockt_EXTRA = Logging POSIX TLS-OpenSSL
-TLDt_EXTRA = Logging
-TLS-OpenSSLt_EXTRA = Logging POSIX TLS-OpenSSL
+DNSt_EXTRA = DNS
+POSIXt_EXTRA = POSIX
+SPFt_EXTRA = SPF
+Sessiont_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
+SockBuffert_EXTRA = POSIX TLS-OpenSSL
+Sockt_EXTRA = POSIX TLS-OpenSSL
+TLS-OpenSSLt_EXTRA = POSIX TLS-OpenSSL
 
 databases = \
 	black.cdb \

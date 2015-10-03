@@ -18,7 +18,7 @@
 
 #include "CDB.hpp"
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 #include <iostream>
 

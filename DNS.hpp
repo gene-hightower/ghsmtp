@@ -28,7 +28,7 @@
 
 #include <arpa/inet.h>
 
-#include "Logging.hpp"
+#include <glog/logging.h>
 
 namespace DNS {
 
