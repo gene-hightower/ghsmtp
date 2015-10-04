@@ -81,7 +81,8 @@ all: $(programs) $(databases)
 
 all_programs = $(programs) $(tests)
 
-TEST_MAILDIR=/tmp/Maildir
+TMPDIR ?= /tmp
+TEST_MAILDIR=$(TMPDIR)/Maildir
 
 $(TEST_MAILDIR):
 	mkdir -p $(TEST_MAILDIR)/tmp $(TEST_MAILDIR)/new
