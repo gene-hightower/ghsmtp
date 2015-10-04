@@ -55,7 +55,7 @@ enum class Pkt_rcode {
   INTERNAL = 666,
 };
 
-extern std::unordered_map<Pkt_rcode, char const*> pkt_rcode_to_string;
+std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode);
 
 template <RR_type T>
 class Query;
@@ -198,22 +198,5 @@ inline std::vector<std::string> get_records(Resolver const& res,
 }
 
 } // namespace DNS
-
-namespace std {
-template <>
-struct hash<DNS::Pkt_rcode> {
-  size_t operator()(DNS::Pkt_rcode const& x) const
-  {
-    return static_cast<size_t>(x);
-  }
-};
-}
-
-namespace DNS {
-inline std::ostream& operator<<(std::ostream& s, Pkt_rcode pkt_rcode)
-{
-  return s << pkt_rcode_to_string[pkt_rcode];
-}
-}
 
 #endif // DNS_DOT_HPP

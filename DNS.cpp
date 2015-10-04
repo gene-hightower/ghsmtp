@@ -22,18 +22,48 @@
 
 namespace DNS {
 
-std::unordered_map<DNS::Pkt_rcode, char const*> pkt_rcode_to_string{
-    {DNS::Pkt_rcode::NOERROR, "NOERROR"},
-    {DNS::Pkt_rcode::FORMERR, "FORMERR"},
-    {DNS::Pkt_rcode::SERVFAIL, "SERVFAIL"},
-    {DNS::Pkt_rcode::NXDOMAIN, "NXDOMAIN"},
-    {DNS::Pkt_rcode::NOTIMPL, "NOTIMPL"},
-    {DNS::Pkt_rcode::REFUSED, "REFUSED"},
-    {DNS::Pkt_rcode::YXDOMAIN, "YXDOMAIN"},
-    {DNS::Pkt_rcode::YXRRSET, "YXRRSET"},
-    {DNS::Pkt_rcode::NXRRSET, "NXRRSET"},
-    {DNS::Pkt_rcode::NOTAUTH, "NOTAUTH"},
-    {DNS::Pkt_rcode::NOTZONE, "NOTZONE"},
+std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
+{
+  char const* msg = "Unknown";
+  switch (pkt_rcode) {
+  case DNS::Pkt_rcode::NOERROR:
+    msg = "NOERROR";
+    break;
+  case DNS::Pkt_rcode::FORMERR:
+    msg = "FORMERR";
+    break;
+  case DNS::Pkt_rcode::SERVFAIL:
+    msg = "SERVFAIL";
+    break;
+  case DNS::Pkt_rcode::NXDOMAIN:
+    msg = "NXDOMAIN";
+    break;
+  case DNS::Pkt_rcode::NOTIMPL:
+    msg = "NOTIMPL";
+    break;
+  case DNS::Pkt_rcode::REFUSED:
+    msg = "REFUSED";
+    break;
+  case DNS::Pkt_rcode::YXDOMAIN:
+    msg = "YXDOMAIN";
+    break;
+  case DNS::Pkt_rcode::YXRRSET:
+    msg = "YXRRSET";
+    break;
+  case DNS::Pkt_rcode::NXRRSET:
+    msg = "NXRRSET";
+    break;
+  case DNS::Pkt_rcode::NOTAUTH:
+    msg = "NOTAUTH";
+    break;
+  case DNS::Pkt_rcode::NOTZONE:
+    msg = "NOTZONE";
+    break;
+  case DNS::Pkt_rcode::INTERNAL:
+    msg = "INTERNAL";
+    break;
+  }
+  return os << msg;
 };
 
 template <>

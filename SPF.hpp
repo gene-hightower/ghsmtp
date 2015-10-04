@@ -43,7 +43,7 @@ enum class Result {
   PERMERROR = SPF_RESULT_PERMERROR,
 };
 
-extern std::unordered_map<Result, char const*> result_to_string;
+std::ostream& operator<<(std::ostream& os, Result result);
 
 class Server {
 public:
@@ -128,22 +128,5 @@ private:
 };
 
 } // namespace SPF
-
-namespace std {
-template <>
-struct hash<SPF::Result> {
-  size_t operator()(SPF::Result const& x) const
-  {
-    return static_cast<size_t>(x);
-  }
-};
-}
-
-namespace SPF {
-inline std::ostream& operator<<(std::ostream& s, Result result)
-{
-  return s << result_to_string[result];
-}
-}
 
 #endif // SPF_DOT_HPP

@@ -20,11 +20,36 @@
 
 namespace SPF {
 
-std::unordered_map<Result, char const*> result_to_string{
-    {Result::INVALID, "INVALID"},     {Result::NEUTRAL, "NEUTRAL"},
-    {Result::PASS, "PASS"},           {Result::FAIL, "FAIL"},
-    {Result::SOFTFAIL, "SOFTFAIL"},   {Result::NONE, "NONE"},
-    {Result::TEMPERROR, "TEMPERROR"}, {Result::PERMERROR, "PERMERROR"},
+std::ostream& operator<<(std::ostream& os, Result result)
+{
+  char const* msg = "Unknown";
+  switch (result) {
+  case Result::INVALID:
+    msg = "INVALID";
+    break;
+  case Result::NEUTRAL:
+    msg = "NEUTRAL";
+    break;
+  case Result::PASS:
+    msg = "PASS";
+    break;
+  case Result::FAIL:
+    msg = "FAIL";
+    break;
+  case Result::SOFTFAIL:
+    msg = "SOFTFAIL";
+    break;
+  case Result::NONE:
+    msg = "NONE";
+    break;
+  case Result::TEMPERROR:
+    msg = "TEMPERROR";
+    break;
+  case Result::PERMERROR:
+    msg = "PERMERROR";
+    break;
+  }
+  return os << msg;
 };
 
 // We map libspf2's levels of error, warning, info and debug to our
