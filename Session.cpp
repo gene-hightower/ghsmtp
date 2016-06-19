@@ -45,7 +45,7 @@ constexpr char const* const very_bad_recipients[] = {
 };
 
 constexpr char const* const bad_recipients[] = {
-    "gene-next", "mixmaster", "nobody",
+    "mixmaster", "nobody",
 };
 
 constexpr char const* const rbls[] = {
