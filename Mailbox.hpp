@@ -26,7 +26,7 @@
 
 class Mailbox {
 public:
-  Mailbox(std::string const& local_part, std::string const& domain)
+  Mailbox(std::string local_part, std::string domain)
     : local_part_(local_part)
     , domain_(domain)
   {
