@@ -19,9 +19,10 @@
 #ifndef SESSION_DOT_HPP
 #define SESSION_DOT_HPP
 
+#include <random>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "Mailbox.hpp"
 #include "Sock.hpp"
