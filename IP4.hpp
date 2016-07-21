@@ -24,12 +24,12 @@
 
 #include <glog/logging.h>
 
-using namespace boost::xpressive;
-
 namespace IP4 {
 
 inline bool is_address(char const* addr)
 {
+  using namespace boost::xpressive;
+
   cregex octet = (as_xpr('2') >> '5' >> range('0', '5'))
                  | ('2' >> range('0', '4') >> _d)
                  | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
@@ -40,6 +40,8 @@ inline bool is_address(char const* addr)
 
 inline std::string reverse(char const* addr)
 {
+  using namespace boost::xpressive;
+
   cregex octet = (as_xpr('2') >> '5' >> range('0', '5'))
                  | ('2' >> range('0', '4') >> _d)
                  | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
