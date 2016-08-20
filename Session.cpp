@@ -90,8 +90,7 @@ void Session::greeting()
 
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
-      // Silent exit, no log file written.  Don't spin up any disks.
-      // LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
+      LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
       exit(0);
     }
 
