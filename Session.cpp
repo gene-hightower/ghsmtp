@@ -91,7 +91,7 @@ void Session::greeting()
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
       LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
-      exit(0);
+      std::exit(EXIT_SUCCESS);
     }
 
     LOG(INFO) << "connect from " << sock_.them_c_str();
