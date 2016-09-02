@@ -19,8 +19,8 @@
 #ifndef MAILBOX_DOT_HPP
 #define MAILBOX_DOT_HPP
 
-#include <string>
 #include <ostream>
+#include <string>
 
 #include <boost/algorithm/string/predicate.hpp>
 

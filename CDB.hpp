@@ -27,9 +27,9 @@ extern "C" {
 
 #include "stringify.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 class CDB {
 public:
