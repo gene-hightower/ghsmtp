@@ -170,6 +170,9 @@ void Session::ehlo(std::string const& client_identity)
     }
     out() << "250 8BITMIME\r\n" << std::flush;
   }
+  else {
+    std::exit(EXIT_SUCCESS);
+  }
 }
 
 void Session::helo(std::string const& client_identity)
@@ -178,6 +181,9 @@ void Session::helo(std::string const& client_identity)
   if (verify_client(client_identity)) {
     reset();
     out() << "250 " << fqdn_ << "\r\n" << std::flush;
+  }
+  else {
+    std::exit(EXIT_SUCCESS);
   }
 }
 
@@ -217,6 +223,9 @@ void Session::mail_from(
     reverse_path_ = reverse_path;
     out() << "250 mail ok\r\n" << std::flush;
   }
+  else {
+    std::exit(EXIT_SUCCESS);
+  }
 }
 
 void Session::rcpt_to(
@@ -239,6 +248,7 @@ void Session::rcpt_to(
     forward_path_.push_back(forward_path);
     out() << "250 rcpt ok\r\n" << std::flush;
   }
+  // We're lenient on most bad recipients, no exit here.
 }
 
 void Session::data()
@@ -365,7 +375,8 @@ void Session::starttls()
 /////////////////////////////////////////////////////////////////////////////
 
 // All of the verify_* functions send their own error messages back to
-// the client.
+// the client on failure, and return false.  The exception is the very
+// bad recipient list that exits right away.
 
 bool Session::verify_client(std::string const& client_identity)
 {
@@ -385,7 +396,7 @@ bool Session::verify_client(std::string const& client_identity)
       out() << "421 liar\r\n" << std::flush;
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
-      std::exit(EXIT_SUCCESS);
+      return false;
     }
   }
 
@@ -397,7 +408,7 @@ bool Session::verify_client(std::string const& client_identity)
     out() << "421 invalid sender\r\n" << std::flush;
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   CDB black("black");
@@ -405,7 +416,7 @@ bool Session::verify_client(std::string const& client_identity)
     out() << "421 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   TLD tld_db;
@@ -417,7 +428,7 @@ bool Session::verify_client(std::string const& client_identity)
     out() << "421 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   // Log this client
@@ -503,13 +514,13 @@ bool Session::verify_sender_domain(std::string const& sender)
 
   if (labels.size() < 2) { // This is not a valid domain.
     out() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
-    LOG(ERROR) << "invalid sender domain " << domain;
-    std::exit(EXIT_SUCCESS);
+    LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
+    return false;
   }
 
   CDB white("white");
   if (white.lookup(domain.c_str())) {
-    LOG(INFO) << "sender " << domain << " whitelisted";
+    LOG(INFO) << "sender \"" << domain << "\" whitelisted";
     return true;
   }
 
@@ -519,7 +530,7 @@ bool Session::verify_sender_domain(std::string const& sender)
     tld = domain.c_str(); // If ingoing domain is a TLD.
   }
   if (white.lookup(tld)) {
-    LOG(INFO) << "sender tld " << tld << " whitelisted";
+    LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";
     return true;
   }
 
@@ -539,9 +550,9 @@ bool Session::verify_sender_domain(std::string const& sender)
       }
       else {
         out() << "421 bad sender domain\r\n" << std::flush;
-        LOG(ERROR) << sender
-                   << " blocked by exact match on three-level-tlds list";
-        std::exit(EXIT_SUCCESS);
+        LOG(ERROR) << "sender \"" << sender
+                   << "\" blocked by exact match on three-level-tlds list";
+        return false;
       }
     }
   }
@@ -554,8 +565,9 @@ bool Session::verify_sender_domain(std::string const& sender)
     }
     else {
       out() << "421 bad sender domain\r\n" << std::flush;
-      LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
-      std::exit(EXIT_SUCCESS);
+      LOG(ERROR) << "sender \"" << sender
+                 << "\" blocked by exact match on two-level-tlds list";
+      return false;
     }
   }
 
@@ -573,7 +585,7 @@ bool Session::verify_sender_domain_uribl(std::string const& sender)
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out() << "421 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
-      std::exit(EXIT_SUCCESS);
+      return false;
     }
   }
 
@@ -598,7 +610,7 @@ bool Session::verify_sender_spf(Mailbox const& sender)
   if (spf_res.result() == SPF::Result::FAIL) {
     out() << "421 " << spf_res.smtp_comment() << std::flush;
     LOG(ERROR) << spf_res.header_comment();
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   LOG(INFO) << spf_res.header_comment();

@@ -25,7 +25,7 @@
 #include <sys/types.h>
 
 struct Session_test {
-  void test()
+  static void test()
   {
     std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
 
@@ -34,9 +34,7 @@ struct Session_test {
 
     Session sess(STDIN_FILENO, fd_null, "example.com");
 
-    // These now die and never return, so maybe just the first one is
-    // ever called.
-    LOG(ERROR) << "Expect: invalid sender domain";
+    LOG(ERROR) << "Expect: some invalid sender domains";
     CHECK(!sess.verify_sender_domain("com"));
     CHECK(!sess.verify_sender_domain("zzux.com"));
     CHECK(!sess.verify_sender_domain("blogspot.com.ar"));
@@ -47,6 +45,5 @@ int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  Session_test t;
-  t.test();
+  Session_test::test();
 }
