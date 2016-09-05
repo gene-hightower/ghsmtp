@@ -41,7 +41,7 @@
 
 namespace Config {
 constexpr char const* const very_bad_recipients[] = {
-    "a", "ene", "oq6_2nbq",
+    "a", "ene", "lizard", "oq6_2nbq",
 };
 
 constexpr char const* const bad_recipients[] = {
