@@ -534,7 +534,7 @@ bool Session::verify_sender_domain(std::string const& sender)
     return true;
   }
 
-  // Based on <www.surbl.org/guidelines>
+  // Based on <http://www.surbl.org/guidelines>
 
   std::string two_level
       = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
