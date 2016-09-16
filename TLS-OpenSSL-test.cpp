@@ -27,7 +27,6 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   TLS tls;
-  TLS tls2(tls);
 
   std::cout << "sizeof(TLS) == " << sizeof(TLS) << std::endl;
 }
