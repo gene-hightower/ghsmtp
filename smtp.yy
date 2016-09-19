@@ -604,7 +604,7 @@ int main(int argc, char const* argv[])
   std::ios::sync_with_stdio(false);
   google::InitGoogleLogging(argv[0]);
  
- close(2);
+  close(2);
 
   Session session;
   session.greeting();
