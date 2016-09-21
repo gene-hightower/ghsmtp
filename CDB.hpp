@@ -16,8 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CDB_DOT_H
-#define CDB_DOT_H
+#ifndef CDB_DOT_HPP
+#define CDB_DOT_HPP
 
 extern "C" {
 #include <cdb.h>
@@ -61,4 +61,4 @@ private:
   struct cdb cdb_;
 };
 
-#endif // CDB_DOT_H
+#endif // CDB_DOT_HPP
