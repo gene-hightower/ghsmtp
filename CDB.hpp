@@ -23,6 +23,8 @@ extern "C" {
 #include <cdb.h>
 }
 
+#include <experimental/string_view>
+
 #include <glog/logging.h>
 
 #include "stringify.h"
@@ -33,11 +35,11 @@ extern "C" {
 
 class CDB {
 public:
-  CDB(char const* db)
+  CDB(std::experimental::string_view db)
   {
     std::string dbpath = STRINGIFY(SMTP_HOME) "/";
-    dbpath += db;
-    dbpath += ".cdb";
+    dbpath.append(db.begin(), db.end());
+    dbpath.append(".cdb");
 
     fd_ = open(dbpath.c_str(), O_RDONLY);
     PCHECK(fd_ >= 0) << " can't open " << dbpath;
@@ -48,9 +50,9 @@ public:
     close(fd_);
     cdb_free(&cdb_);
   }
-  bool lookup(char const* key)
+  bool lookup(std::experimental::string_view key)
   {
-    if (cdb_find(&cdb_, key, strlen(key)) > 0) {
+    if (cdb_find(&cdb_, key.data(), key.length()) > 0) {
       return true;
     }
     return false;

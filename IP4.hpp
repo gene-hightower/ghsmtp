@@ -19,14 +19,15 @@
 #ifndef IP4_DOT_HPP
 #define IP4_DOT_HPP
 
-#include <boost/utility/string_ref.hpp>
+#include <experimental/string_view>
+
 #include <boost/xpressive/xpressive.hpp>
 
 #include <glog/logging.h>
 
 namespace IP4 {
 
-inline bool is_address(char const* addr)
+inline bool is_address(std::experimental::string_view addr)
 {
   using namespace boost::xpressive;
 
@@ -35,10 +36,10 @@ inline bool is_address(char const* addr)
                  | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
   cregex re = octet >> '.' >> octet >> '.' >> octet >> '.' >> octet;
   cmatch matches;
-  return regex_match(addr, matches, re);
+  return regex_match(addr.begin(), addr.end(), matches, re);
 }
 
-inline std::string reverse(char const* addr)
+inline std::string reverse(std::experimental::string_view addr)
 {
   using namespace boost::xpressive;
 
@@ -48,13 +49,13 @@ inline std::string reverse(char const* addr)
   cregex re = (s1 = octet) >> '.' >> (s2 = octet) >> '.' >> (s3 = octet) >> '.'
               >> (s4 = octet);
   cmatch matches;
-  CHECK(regex_match(addr, matches, re))
+  CHECK(regex_match(addr.begin(), addr.end(), matches, re))
       << "reverse_ip4 called with bad dotted quad: " << addr;
 
   std::ostringstream reverse;
   for (int n = 4; n > 0; --n) {
-    boost::string_ref octet(matches[n].first,
-                            matches[n].second - matches[n].first);
+    std::experimental::string_view octet(matches[n].first,
+                                         matches[n].second - matches[n].first);
     reverse << octet << '.'; // and leave a trailing '.'
   }
   return reverse.str();

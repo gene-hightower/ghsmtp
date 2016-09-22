@@ -20,11 +20,12 @@
 #define DOMAIN_DOT_HPP
 
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/utility/string_ref.hpp>
+#include <experimental/string_view>
 
 namespace Domain {
 
-inline bool match(boost::string_ref a, boost::string_ref b)
+inline bool match(std::experimental::string_view a,
+                  std::experimental::string_view b)
 {
   if ((0 != a.length()) && ('.' == a.back())) {
     a.remove_suffix(1);

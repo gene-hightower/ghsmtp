@@ -34,7 +34,7 @@ struct Session_test {
 
     Session sess(STDIN_FILENO, fd_null, "example.com");
 
-    LOG(ERROR) << "Expect: some invalid sender domains";
+    LOG(ERROR) << "Expect: 3 invalid sender domains:";
     CHECK(!sess.verify_sender_domain("com"));
     CHECK(!sess.verify_sender_domain("zzux.com"));
     CHECK(!sess.verify_sender_domain("blogspot.com.ar"));

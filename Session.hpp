@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <experimental/string_view>
+
 #include "Mailbox.hpp"
 #include "Sock.hpp"
 
@@ -32,17 +34,17 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  Session(int fd_in = STDIN_FILENO,
-          int fd_out = STDOUT_FILENO,
-          std::string const& fqdn = "");
+  explicit Session(int fd_in = STDIN_FILENO,
+                   int fd_out = STDOUT_FILENO,
+                   std::string fqdn = "");
 
   void greeting();
-  void ehlo(std::string const& client_identity);
-  void helo(std::string const& client_identity);
+  void ehlo(std::string client_identity);
+  void helo(std::string client_identity);
   void
-  mail_from(Mailbox const& reverse_path,
+  mail_from(Mailbox reverse_path,
             std::unordered_map<std::string, std::string> const& parameters);
-  void rcpt_to(Mailbox const& forward_path,
+  void rcpt_to(Mailbox forward_path,
                std::unordered_map<std::string, std::string> const& parameters);
   void data();
   void rset();
@@ -50,7 +52,7 @@ public:
   void vrfy();
   void help();
   void quit();
-  void error(std::string const& msg);
+  void error(std::experimental::string_view msg);
   void time();
   void starttls();
 
@@ -87,11 +89,11 @@ private:
 
   std::string received_spf_; // from libspf2
 
-  char const* protocol_;
+  char const* protocol_ = "";
 
   std::random_device rd_;
 
-  bool reverse_path_verified_;
+  bool reverse_path_verified_ = false;
 };
 
 #endif // SESSION_DOT_HPP

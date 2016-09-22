@@ -60,11 +60,9 @@ constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
 }
 
-Session::Session(int fd_in, int fd_out, std::string const& fqdn)
+Session::Session(int fd_in, int fd_out, std::string fqdn)
   : sock_(fd_in, fd_out)
-  , fqdn_(fqdn)
-  , protocol_("")
-  , reverse_path_verified_(false)
+  , fqdn_{std::move(fqdn)}
 {
   if (fqdn_.empty()) {
     utsname un;
@@ -159,10 +157,11 @@ void Session::greeting()
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
 }
 
-void Session::ehlo(std::string const& client_identity)
+void Session::ehlo(std::string client_identity)
 {
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   if (verify_client(client_identity)) {
+    client_identity_ = std::move(client_identity);
     reset();
     out() << "250-" << fqdn_ << "\r\n250-PIPELINING\r\n";
     if (!sock_.tls()) {
@@ -175,10 +174,11 @@ void Session::ehlo(std::string const& client_identity)
   }
 }
 
-void Session::helo(std::string const& client_identity)
+void Session::helo(std::string client_identity)
 {
   protocol_ = "SMTP";
   if (verify_client(client_identity)) {
+    client_identity_ = std::move(client_identity);
     reset();
     out() << "250 " << fqdn_ << "\r\n" << std::flush;
   }
@@ -188,7 +188,7 @@ void Session::helo(std::string const& client_identity)
 }
 
 void Session::mail_from(
-    Mailbox const& reverse_path,
+    Mailbox reverse_path,
     std::unordered_map<std::string, std::string> const& parameters)
 {
   if (client_identity_.empty()) {
@@ -220,7 +220,7 @@ void Session::mail_from(
 
   if (verify_sender(reverse_path)) {
     reset();
-    reverse_path_ = reverse_path;
+    reverse_path_ = std::move(reverse_path);
     out() << "250 mail ok\r\n" << std::flush;
   }
   else {
@@ -229,7 +229,7 @@ void Session::mail_from(
 }
 
 void Session::rcpt_to(
-    Mailbox const& forward_path,
+    Mailbox forward_path,
     std::unordered_map<std::string, std::string> const& parameters)
 {
   if (!reverse_path_verified_) {
@@ -245,7 +245,7 @@ void Session::rcpt_to(
                  << p.second;
   }
   if (verify_recipient(forward_path)) {
-    forward_path_.push_back(forward_path);
+    forward_path_.push_back(std::move(forward_path));
     out() << "250 rcpt ok\r\n" << std::flush;
   }
   // We're lenient on most bad recipients, no exit here.
@@ -346,7 +346,7 @@ void Session::quit()
   std::exit(EXIT_SUCCESS);
 }
 
-void Session::error(std::string const& msg)
+void Session::error(std::experimental::string_view msg)
 {
   out() << "500 command unrecognized\r\n" << std::flush;
   LOG(WARNING) << msg;
@@ -380,7 +380,7 @@ void Session::starttls()
 
 bool Session::verify_client(std::string const& client_identity)
 {
-  if (IP4::is_address(client_identity.c_str())
+  if (IP4::is_address(client_identity)
       && (client_identity != sock_.them_c_str())) {
     LOG(WARNING) << "client claiming questionable IP address "
                  << client_identity;
@@ -412,7 +412,7 @@ bool Session::verify_client(std::string const& client_identity)
   }
 
   CDB black("black");
-  if (black.lookup(client_identity.c_str())) {
+  if (black.lookup(client_identity)) {
     out() << "421 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
@@ -445,7 +445,6 @@ bool Session::verify_client(std::string const& client_identity)
     LOG(INFO) << protocol_ << " connection claiming " << client_identity;
   }
 
-  client_identity_ = client_identity;
   return true;
 }
 
@@ -505,7 +504,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   }
 
   std::string domain = sender;
-  boost::algorithm::to_lower(domain);
+  std::transform(domain.begin(), domain.end(), domain.begin(), ::tolower);
 
   // Break sender domain into labels:
 
@@ -519,7 +518,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   }
 
   CDB white("white");
-  if (white.lookup(domain.c_str())) {
+  if (white.lookup(domain)) {
     LOG(INFO) << "sender \"" << domain << "\" whitelisted";
     return true;
   }
