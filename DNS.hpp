@@ -134,7 +134,7 @@ public:
   }
 
 private:
-  ldns_pkt* p_;
+  ldns_pkt* p_{nullptr};
 
   friend class Rrlist<T>;
 };
@@ -146,7 +146,6 @@ public:
   Rrlist& operator=(Rrlist const&) = delete;
 
   explicit Rrlist(Query<T> const& q)
-    : rrlst_(nullptr)
   {
     if (q.p_) {
       rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
@@ -163,7 +162,7 @@ public:
   std::vector<std::string> get() const;
 
 private:
-  ldns_rr_list* rrlst_;
+  ldns_rr_list* rrlst_{nullptr};
 
   std::string rr_name_str(ldns_rdf const* rdf) const;
   std::string rr_str(ldns_rdf const* rdf) const;

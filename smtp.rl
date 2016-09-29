@@ -1,11 +1,9 @@
-#include <fstream>
-#include <iostream>
-
-#include <boost/utility/string_ref.hpp>
-
 #include "Session.hpp"
 
-constexpr unsigned BUFSIZE = 128;
+using std::experimental::string_view;
+using std::string;
+
+constexpr size_t BUFSIZE = 128;
 
 %%{
 machine smtp;
@@ -31,15 +29,18 @@ UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
 
 UTF8_non_ascii = UTF8_2 | UTF8_3 | UTF8_4;
 
-crlf = '\r\n';
+CRLF = "\r\n";
+# CRLF = '\n' | '\r\n';
 
-let_dig = alpha | digit;
+SP = ' ';
 
-ldh_str = (alpha | digit | '-')* let_dig;
+Let_dig = alpha | digit;
 
-sub_domain = let_dig ldh_str?;
+Ldh_str = (alpha | digit | '-')* Let_dig;
 
-domain = sub_domain ('.' sub_domain)*;
+sub_domain = Let_dig Ldh_str?;
+
+Domain = sub_domain ('.' sub_domain)*;
 
 snum = ('2' '5' '0'..'5')
      | ('2' '0'..'4' digit)
@@ -47,88 +48,136 @@ snum = ('2' '5' '0'..'5')
      | digit{1,2}
      ;
 
-ipv4_address_literal = snum ('.'  snum){3};
+IPv4_address_literal = snum ('.' snum){3};
 
-ipv6_hex = xdigit{1,4};
+IPv6_hex = xdigit{1,4};
 
-ipv6_full = ipv6_hex (':' ipv6_hex){7};
+IPv6_full = IPv6_hex (':' IPv6_hex){7};
 
-ipv6_comp = (ipv6_hex (':' ipv6_hex){0,5})? '::' (ipv6_hex (':' ipv6_hex){0,5})?;
+IPv6_comp = (IPv6_hex (':' IPv6_hex){0,5})? '::' (IPv6_hex (':' IPv6_hex){0,5})?;
 
-ipv6v4_full = ipv6_hex (':' ipv6_hex){5} ':' ipv4_address_literal;
+IPv6v4_full = IPv6_hex (':' IPv6_hex){5} ':' IPv4_address_literal;
 
-ipv6v4_comp = (ipv6_hex (':' ipv6_hex){0,3})? '::' (ipv6_hex (':' ipv6_hex){0,3} ':')? ipv4_address_literal;
+IPv6v4_comp = (IPv6_hex (':' IPv6_hex){0,3})? '::' (IPv6_hex (':' IPv6_hex){0,3} ':')? IPv4_address_literal;
 
-ipv6_addr = ipv6_full | ipv6_comp | ipv6v4_full | ipv6v4_comp;
+IPv6_addr = IPv6_full | IPv6_comp | IPv6v4_full | IPv6v4_comp;
 
-ipv6_address_literal = 'ipv6:' ipv6_addr;
+IPv6_address_literal = 'IPv6:' IPv6_addr;
 
-dcontent = graph - '[';
+dcontent = graph - '\[' - '\\' - '\]';   # 33..90 | 94..126
 
-standardized_tag = ldh_str;
+standardized_tag = Ldh_str;
 
-general_address_literal = standardized_tag ':' dcontent{1};
+General_address_literal = standardized_tag ':' dcontent{1};
 
 # See rfc 5321 Section 4.1.3
-address_literal = '[' (ipv4_address_literal | ipv6_address_literal | general_address_literal) ']';
+address_literal = '[' (IPv4_address_literal |
+                  IPv6_address_literal | General_address_literal) ']';
 
-at_domain = '@' domain;
+At_domain = '@' Domain;
 
-a_d_l = at_domain (',' at_domain)*;
+A_d_l = At_domain (',' At_domain)*;
 
-qtext_smtp = print - '"' - '\\';
+qtextSMTP = print - '"' - '\\';   # 32..33 | 35..91 | 93..126
 
-quoted_pair_smtp = '\\' print;
+quoted_pairSMTP = '\\' print;
 
-qcontent_smtp = qtext_smtp | quoted_pair_smtp;
+QcontentSMTP = qtextSMTP | quoted_pairSMTP;
 
-quoted_string = '"' qcontent_smtp* '"';
+Quoted_string = '"' QcontentSMTP* '"';
 
-atext = alpha | digit
-      | '!' | '#' | '$' | '%' | '&' | "'"
-      | '*' | '+' | '-' | '/' | '=' | '?'
-      | '^' | '_' | '`' | '{' | '|' | '}'
-      | '~'
-      | UTF8_non_ascii
-      ;
+atext = alpha | digit |
+        '!' | '#' |
+        '$' | '%' |
+        '&' | "'" |
+        '*' | '+' |
+        '-' | '/' |
+        '=' | '?' |
+        '^' | '_' |
+        '`' | '{' |
+        '|' | '}' |
+        '~' |
+        UTF8_non_ascii;
 
-wsp = ' ' | 9;
+WSP = ' ' | '\t';
 
-obs_fws = wsp+ (crlf wsp+)*;
+obs_FWS = WSP+ (CRLF WSP+)*;
 
-fws = ((wsp* crlf)? wsp+) | obs_fws;
+FWS = ((WSP* CRLF)? WSP+) | obs_FWS;
 
 # ccontent = ctext | quoted_pair | comment;
 # comment = '(' (fws? ccontent)* fws? ')';
 # cfws = ((fws? comment)+ fws?) | fws;
 
-# atom = cfws atext+ cfws;
+# Atom = cfws atext+ cfws;
 
-atom = atext+;
+Atom = atext+;
 
-dot_string = atom ('.'  atom)*;
+Dot_string = Atom ('.'  Atom)*;
 
-local_part = dot_string | quoted_string;
+Local_part = Dot_string | Quoted_string;
 
-mailbox = local_part '@' (domain | address_literal);
+action mb_loc_beg {
+  mb_loc_beg = fpc;
+}
 
-path = '<' (a_d_l ':')? mailbox '>';
+action mb_dom_beg {
+  mb_dom_beg = fpc;
+}
 
-reverse_path = path | '<>';
+action mb_loc_end {
+  CHECK_NOTNULL(mb_loc_beg);
 
-esmtp_keyword = (alpha | digit) (alpha | digit | '-')*;
+  mb_loc_end = fpc;
+  mb_loc = string(mb_loc_beg, mb_loc_end - mb_loc_beg);
 
-esmtp_value = (graph - '=')+;
+  mb_loc_beg = nullptr;
+  mb_loc_end = nullptr;
+}
 
-esmtp_param = esmtp_keyword ('=' esmtp_value)?;
+action mb_dom_end {
+  CHECK_NOTNULL(mb_dom_beg);
 
-mail_parameters = esmtp_param (' ' esmtp_param)*;
+  mb_dom_end = fpc;
+  mb_dom = string(mb_dom_beg, mb_dom_end - mb_dom_beg);
 
-forward_path = path;
+  mb_dom_beg = nullptr;
+  mb_dom_end = nullptr;
+}
 
-rcpt_parameters = esmtp_param (' ' esmtp_param)*;
+Mailbox = Local_part >mb_loc_beg %mb_loc_end '@' ((Domain | address_literal) >mb_dom_beg %mb_dom_end);
 
-string = atom | quoted_string;
+Path = "<" ((A_d_l ":")? Mailbox) ">";
+
+Reverse_path = Path | "<>";
+
+Forward_path = Path;
+
+action key_end {
+  param.first += ::toupper(fc);
+}
+
+esmtp_keyword = ((alpha | digit) (alpha | digit | '-')*) @key_end;
+
+action val_end {
+  param.second += fc;
+}
+
+esmtp_value = ((graph - '=')+) @val_end;
+
+action param {
+  parameters.insert(param);
+  param.first.clear();  
+  param.second.clear();  
+}
+
+esmtp_param = (esmtp_keyword ('=' esmtp_value)?) %param;
+
+Mail_parameters = esmtp_param (' ' esmtp_param)*;
+
+Rcpt_parameters = esmtp_param (' ' esmtp_param)*;
+
+String = Atom | Quoted_string;
 
 action protocol_err {
   fhold; fgoto line;
@@ -136,48 +185,112 @@ action protocol_err {
 
 data := |*
 
-  /[^\.].+\r\n/ => { std::cout << "0\n"; };
+ /[^\.\r\n]/ /[^\r\n]/+ CRLF =>
+ {
+   LOG(INFO) << "X0 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+ };
 
-  /\..+\r\n/ => { std::cout << "1\n"; };
+ ',' /[^\r\n]/+ CRLF =>
+ {
+   LOG(INFO) << "X1 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+ };
 
-  /\.\r\n/ => { std::cout << "2\n"; fret; };
+ '.' CRLF =>
+ {
+   LOG(INFO) << "X2 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+   fgoto main;
+ };
+
+ CRLF =>
+ {
+   LOG(INFO) << "X3 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+ };
+
+ any =>
+ {
+   LOG(ERROR) << "data protocol error [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+ };
 
 *|;
 
 main := |*
 
- 'ehlo'i ' ' (domain | address_literal) crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "EHLO"i SP (Domain | address_literal) CRLF =>
+ {
+   char const* beg = ts + 5;
+   char const* end = te - 2;
+   session.ehlo(string(beg, end - beg));
+ };
 
- 'helo'i ' ' domain crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "HELO"i SP Domain CRLF =>
+ {
+   char const* beg = ts + 5;
+   char const* end = te - 2;
+   session.helo(string(beg, end - beg));
+ };
 
- 'mail from:'i reverse_path (' ' mail_parameters)? crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "MAIL FROM:"i Reverse_path (SP Mail_parameters)? CRLF =>
+ {
+   LOG(INFO) << "path == " << mb_loc << "@" << mb_dom;
+   for (auto& p : parameters) {
+     LOG(INFO) << p.first << " == " << p.second;
+   }
 
- 'rcpt to:'i forward_path (' ' rcpt_parameters)? crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+   session.mail_from(Mailbox(mb_loc, mb_dom), parameters);
 
- 'data'i crlf =>
- { std::cout << "calling data\n"; fcall data; };
+   mb_loc.clear();
+   mb_dom.clear();
+   parameters.clear();
+ };
 
- 'rset'i crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "RCPT TO:"i Forward_path (SP Rcpt_parameters)? CRLF =>
+ {
+   LOG(INFO) << "path == " << mb_loc << "@" << mb_dom;
+   for (auto& p : parameters) {
+     LOG(INFO) << p.first << " == " << p.second;
+   }
 
- 'noop'i (' ' string)? crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+   session.rcpt_to(Mailbox(mb_loc, mb_dom), parameters);
 
- 'vrfy'i (' ' string)? crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+   mb_loc.clear();
+   mb_dom.clear();
+   parameters.clear();
+ };
 
- 'help'i (' ' string)? crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "DATA"i CRLF =>
+ {
+   LOG(INFO) << "calling data\n"; fgoto data;
+ };
 
- 'starttls'i crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "RSET"i CRLF =>
+ {
+   session.rset();
+ };
 
- 'quit'i crlf =>
- { std::cout << boost::string_ref(ts, static_cast<size_t>(te - ts)); };
+ "NOOP"i (SP String)? CRLF =>
+ {
+   session.noop();
+ };
+
+ "VRFY"i (SP String)? CRLF =>
+ {
+   session.vrfy();
+ };
+
+ "HELP"i (SP String)? CRLF =>
+ {
+   session.help();
+ };
+
+ "STARTTLS"i CRLF =>
+ {
+   session.starttls();
+ };
+
+ "QUIT"i CRLF =>
+ {
+   session.quit();
+ };
 
 *|;
 
@@ -185,27 +298,55 @@ main := |*
 
 %% write data nofinal;
 
+template <typename T>
+class Stack {
+public:
+  using size_type = size_t;
+
+  T& operator[](size_type idx)
+  {
+    CHECK_EQ(idx, 0);
+    return x_;
+  }
+
+  Stack() { x_ = 0; }
+
+private:
+  T x_;
+};
+
 void scanner(Session& session)
 {
+  char const* mb_loc_beg{nullptr};
+  char const* mb_loc_end{nullptr};
+  char const* mb_dom_beg{nullptr};
+  char const* mb_dom_end{nullptr};
+
+  std::string mb_loc;
+  std::string mb_dom;
+
+  std::pair<string, string> param;
+  std::unordered_map<string, string> parameters;
+
   static char buf[BUFSIZE];
 
-  char* ts;
+  char* ts = nullptr;
   char* te = nullptr;
+  char* pe = nullptr;
 
-  int cs;
-  int have = 0;
+  size_t have = 0;
+  bool done = false;
 
-  int done = 0;
-  int act;
-  int stack[1];
-  int top;
+  Stack<int> stack;
+
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+  char const* eof = nullptr;
+  int cs, act;
 
   %% write init;
 
   while (!done) {
-    char* p = buf + have;
-    char* eof = nullptr;
-    int space = BUFSIZE - have;
+    std::streamsize space = BUFSIZE - have;
 
     if (space == 0) {
       // We've used up the entire buffer storing an already-parsed token
@@ -214,28 +355,53 @@ void scanner(Session& session)
       LOG(FATAL) << "out of buffer space";
     }
 
+    char* p = buf + have;
     session.in().peek(); // buffer up some input
     std::streamsize len = session.in().readsome(p, space);
-    char *pe = p + len;
+    pe = p + len;
+    eof = nullptr;
 
     // Check if this is the end of file.
-    if (len < space) {
-      done = 1;
+    if (len == 0) {
+      if (have == 0) {
+        LOG(INFO) << "no more input";
+        std::exit(EXIT_SUCCESS);
+      }
+      eof = pe;
+      LOG(INFO) << "done";
+      done = true;
     }
 
+    LOG(INFO) << "exec \'" << string_view(buf, have + len) << "'";
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+
     %% write exec;
+
+#pragma GCC diagnostic pop
 
     if (cs == smtp_error) {
       session.error("parse error");
       break;
     }
 
-    if (ts == 0) {
+    if (ts == nullptr) {
       have = 0;
-    } else {
+    }
+    else {
       // There is a prefix to preserve, shift it over.
       have = pe - ts;
       memmove(buf, ts, have);
+
+      // adjust ptrs
+      auto delta = ts - buf;
+
+      mb_loc_beg -= delta;
+      mb_loc_end -= delta;
+      mb_dom_beg -= delta;
+      mb_dom_end -= delta;
+
       te = buf + (te - ts);
       ts = buf;
     }
@@ -245,10 +411,11 @@ void scanner(Session& session)
 int main(int argc, char const* argv[])
 {
   std::ios::sync_with_stdio(false);
-  Logging::init(argv[0]);
+  //  google::InitGoogleLogging(argv[0]);
 
   Session session;
   session.greeting();
 
   scanner(session);
+  LOG(INFO) << "scanner returned";
 }

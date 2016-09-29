@@ -58,7 +58,7 @@ public:
   ~Server() { SPF_server_free(srv_); }
 
 private:
-  SPF_server_t* srv_;
+  SPF_server_t* srv_{nullptr};
 
   friend class Request;
 };
@@ -87,7 +87,7 @@ public:
   }
 
 private:
-  SPF_request_t* req_;
+  SPF_request_t* req_{nullptr};
 
   friend class Response;
 };
@@ -98,7 +98,6 @@ public:
   Response& operator=(Response const&) = delete;
 
   explicit Response(Request const& req)
-    : res_(nullptr)
   {
     // We ignore the return code from this call, as everything we need
     // to know is in the SPF_response_t struct.
@@ -124,7 +123,7 @@ public:
   }
 
 private:
-  SPF_response_t* res_;
+  SPF_response_t* res_{nullptr};
 };
 
 } // namespace SPF

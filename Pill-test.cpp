@@ -18,8 +18,8 @@
 
 #include "Pill.hpp"
 
-#include <string.h>
 #include <iostream>
+#include <string.h>
 
 int main(int arcv, char* argv[])
 {

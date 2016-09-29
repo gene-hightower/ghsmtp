@@ -34,8 +34,6 @@
 #include "stringify.h"
 
 TLS::TLS()
-  : ctx_(nullptr)
-  , ssl_(nullptr)
 {
   SSL_load_error_strings();
   SSL_library_init();
@@ -89,12 +87,12 @@ TLS::TLS()
 
 TLS::~TLS()
 {
+  if (ssl_) {
+    SSL_free(ssl_);
+  }
   if (ctx_) {
     EVP_cleanup();
     SSL_CTX_free(ctx_);
-  }
-  if (ssl_) {
-    SSL_free(ssl_);
   }
 }
 

@@ -28,13 +28,6 @@
 class TLS {
 public:
   TLS& operator=(const TLS&) = delete;
-  TLS(const TLS& that)
-    : ctx_(that.ctx_)
-    , ssl_(that.ssl_)
-  {
-    that.ctx_ = nullptr;
-    that.ssl_ = nullptr;
-  }
 
   TLS();
   ~TLS();
@@ -67,8 +60,8 @@ private:
   static void ssl_error();
 
 private:
-  mutable SSL_CTX* ctx_;
-  mutable SSL* ssl_;
+  SSL_CTX* ctx_{nullptr};
+  SSL* ssl_{nullptr};
 };
 
 #endif // OPENSSL_DOT_HPP

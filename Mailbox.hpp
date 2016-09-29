@@ -19,19 +19,18 @@
 #ifndef MAILBOX_DOT_HPP
 #define MAILBOX_DOT_HPP
 
-#include <string>
 #include <ostream>
-
-#include <boost/algorithm/string/predicate.hpp>
+#include <string>
+#include <utility>
 
 class Mailbox {
 public:
+  Mailbox() = default;
   Mailbox(std::string local_part, std::string domain)
-    : local_part_(local_part)
-    , domain_(domain)
+    : local_part_{std::move(local_part)}
+    , domain_{std::move(domain)}
   {
   }
-  Mailbox() = default;
   void clear()
   {
     local_part_.clear();

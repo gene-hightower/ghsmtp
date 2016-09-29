@@ -16,8 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef TLD_DOT_H
-#define TLD_DOT_H
+#ifndef TLD_DOT_HPP
+#define TLD_DOT_HPP
 
 #include <glog/logging.h>
 
@@ -45,4 +45,4 @@ private:
   void* tree_;
 };
 
-#endif // TLD_DOT_H
+#endif // TLD_DOT_HPP

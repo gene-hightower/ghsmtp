@@ -22,7 +22,6 @@ warnings = \
 
 CXXFLAGS += \
 	-DSMTP_HOME=$(shell pwd) \
-	-std=c++14 \
 	-MMD \
 	-g -O2 \
 	$(warnings)
@@ -90,6 +89,9 @@ $(TEST_MAILDIR):
 check: $(tests) $(TEST_MAILDIR) $(databases)
 	$(foreach t,$(tests),./$(t) ;)
 
+vg: $(tests) $(TEST_MAILDIR) $(databases)
+	$(foreach t,$(tests),valgrind ./$(t) ;)
+
 coverage:
 	$(MAKE) clean
 	CXXFLAGS=--coverage LDFLAGS=-lgcov $(MAKE) check
@@ -106,8 +108,11 @@ regression: $(programs) $(TEST_MAILDIR)
 smtp.hpp stack.hh: smtp.cpp
 	@true
 
-smtp.cpp: smtp.yy
-	bison -o smtp.cpp smtp.yy
+#smtp.cpp: smtp.yy
+#	bison -o smtp.cpp smtp.yy
+
+smtp.cpp: smtp.rl
+	ragel -o smtp.cpp smtp.rl
 
 clean::
 	rm -f smtp.cpp smtp.hpp stack.hh

@@ -24,8 +24,8 @@
 #include <random>
 #include <sstream>
 
-#include <sys/types.h>
 #include <pwd.h>
+#include <sys/types.h>
 
 #include "Now.hpp"
 #include "Pill.hpp"

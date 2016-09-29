@@ -27,8 +27,8 @@
 
 #include <unistd.h>
 
-#include <glog/logging.h>
 #include "SockBuffer.hpp"
+#include <glog/logging.h>
 
 class Sock {
 public:
@@ -37,8 +37,6 @@ public:
 
   Sock(int fd_in, int fd_out)
     : iostream_(fd_in, fd_out)
-    , us_addr_str_{'\0'}
-    , them_addr_str_{'\0'}
   {
     sockaddr_storage us_addr;
     sockaddr_storage them_addr;
@@ -61,11 +59,12 @@ public:
       case sizeof(sockaddr_in6):
         LOG(WARNING)
             << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
-        PCHECK(inet_ntop(AF_INET6,
-                         &(reinterpret_cast<struct sockaddr_in6*>(&us_addr)
-                               ->sin6_addr),
-                         us_addr_str_, sizeof us_addr_str_)
-               != nullptr);
+        PCHECK(
+            inet_ntop(
+                AF_INET6,
+                &(reinterpret_cast<struct sockaddr_in6*>(&us_addr)->sin6_addr),
+                us_addr_str_, sizeof us_addr_str_)
+            != nullptr);
         break;
       default:
         LOG(ERROR) << "bogus address length (" << us_addr_len
@@ -83,11 +82,12 @@ public:
                           &them_addr_len)) {
       switch (them_addr_len) {
       case sizeof(sockaddr_in):
-        PCHECK(inet_ntop(AF_INET,
-                         &(reinterpret_cast<struct sockaddr_in*>(&them_addr)
-                               ->sin_addr),
-                         them_addr_str_, sizeof them_addr_str_)
-               != nullptr);
+        PCHECK(
+            inet_ntop(
+                AF_INET,
+                &(reinterpret_cast<struct sockaddr_in*>(&them_addr)->sin_addr),
+                them_addr_str_, sizeof them_addr_str_)
+            != nullptr);
         break;
       case sizeof(sockaddr_in6):
         LOG(WARNING)
@@ -126,8 +126,8 @@ public:
 private:
   boost::iostreams::stream<SockBuffer> iostream_;
 
-  char us_addr_str_[INET6_ADDRSTRLEN];
-  char them_addr_str_[INET6_ADDRSTRLEN];
+  char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
+  char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
 };
 
 #endif // SOCK_DOT_HPP

@@ -105,8 +105,7 @@ int main(int argc, char* argv[])
         std::string local(matches[1].first, matches[1].second);
         std::string dom(matches[2].first, matches[2].second);
 
-        Mailbox rp(local, dom);
-        session.mail_from(rp, std::unordered_map<std::string, std::string>());
+        session.mail_from(Mailbox(local, dom), std::unordered_map<std::string, std::string>());
       }
       continue;
     }
@@ -123,8 +122,7 @@ int main(int argc, char* argv[])
         std::string local(matches[1].first, matches[1].second);
         std::string dom(matches[2].first, matches[2].second);
 
-        Mailbox rto(local, dom);
-        session.rcpt_to(rto, std::unordered_map<std::string, std::string>());
+        session.rcpt_to(Mailbox(local, dom), std::unordered_map<std::string, std::string>());
       }
       continue;
     }

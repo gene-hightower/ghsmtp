@@ -41,7 +41,7 @@
 
 namespace Config {
 constexpr char const* const very_bad_recipients[] = {
-    "a", "ene", "oq6_2nbq",
+    "a", "ene", "lizard", "oq6_2nbq",
 };
 
 constexpr char const* const bad_recipients[] = {
@@ -60,11 +60,9 @@ constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
 }
 
-Session::Session(int fd_in, int fd_out, std::string const& fqdn)
+Session::Session(int fd_in, int fd_out, std::string fqdn)
   : sock_(fd_in, fd_out)
-  , fqdn_(fqdn)
-  , protocol_("")
-  , reverse_path_verified_(false)
+  , fqdn_{std::move(fqdn)}
 {
   if (fqdn_.empty()) {
     utsname un;
@@ -159,30 +157,39 @@ void Session::greeting()
   out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
 }
 
-void Session::ehlo(std::string const& client_identity)
+void Session::ehlo(std::string client_identity)
 {
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   if (verify_client(client_identity)) {
+    client_identity_ = std::move(client_identity);
     reset();
     out() << "250-" << fqdn_ << "\r\n250-PIPELINING\r\n";
     if (!sock_.tls()) {
       out() << "250-STARTTLS\r\n";
     }
-    out() << "250 8BITMIME\r\n" << std::flush;
+    out() << "250-8BITMIME\r\n" << std::flush;
+    out() << "250 SMTPUTF8\r\n" << std::flush;
+  }
+  else {
+    std::exit(EXIT_SUCCESS);
   }
 }
 
-void Session::helo(std::string const& client_identity)
+void Session::helo(std::string client_identity)
 {
   protocol_ = "SMTP";
   if (verify_client(client_identity)) {
+    client_identity_ = std::move(client_identity);
     reset();
     out() << "250 " << fqdn_ << "\r\n" << std::flush;
+  }
+  else {
+    std::exit(EXIT_SUCCESS);
   }
 }
 
 void Session::mail_from(
-    Mailbox const& reverse_path,
+    Mailbox&& reverse_path,
     std::unordered_map<std::string, std::string> const& parameters)
 {
   if (client_identity_.empty()) {
@@ -214,13 +221,16 @@ void Session::mail_from(
 
   if (verify_sender(reverse_path)) {
     reset();
-    reverse_path_ = reverse_path;
+    reverse_path_ = std::move(reverse_path);
     out() << "250 mail ok\r\n" << std::flush;
+  }
+  else {
+    std::exit(EXIT_SUCCESS);
   }
 }
 
 void Session::rcpt_to(
-    Mailbox const& forward_path,
+    Mailbox&& forward_path,
     std::unordered_map<std::string, std::string> const& parameters)
 {
   if (!reverse_path_verified_) {
@@ -236,9 +246,10 @@ void Session::rcpt_to(
                  << p.second;
   }
   if (verify_recipient(forward_path)) {
-    forward_path_.push_back(forward_path);
+    forward_path_.push_back(std::move(forward_path));
     out() << "250 rcpt ok\r\n" << std::flush;
   }
+  // We're lenient on most bad recipients, no exit here.
 }
 
 void Session::data()
@@ -336,7 +347,7 @@ void Session::quit()
   std::exit(EXIT_SUCCESS);
 }
 
-void Session::error(std::string const& msg)
+void Session::error(std::experimental::string_view msg)
 {
   out() << "500 command unrecognized\r\n" << std::flush;
   LOG(WARNING) << msg;
@@ -365,11 +376,12 @@ void Session::starttls()
 /////////////////////////////////////////////////////////////////////////////
 
 // All of the verify_* functions send their own error messages back to
-// the client.
+// the client on failure, and return false.  The exception is the very
+// bad recipient list that exits right away.
 
 bool Session::verify_client(std::string const& client_identity)
 {
-  if (IP4::is_address(client_identity.c_str())
+  if (IP4::is_address(client_identity)
       && (client_identity != sock_.them_c_str())) {
     LOG(WARNING) << "client claiming questionable IP address "
                  << client_identity;
@@ -385,7 +397,7 @@ bool Session::verify_client(std::string const& client_identity)
       out() << "421 liar\r\n" << std::flush;
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
-      std::exit(EXIT_SUCCESS);
+      return false;
     }
   }
 
@@ -397,15 +409,15 @@ bool Session::verify_client(std::string const& client_identity)
     out() << "421 invalid sender\r\n" << std::flush;
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   CDB black("black");
-  if (black.lookup(client_identity.c_str())) {
+  if (black.lookup(client_identity)) {
     out() << "421 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   TLD tld_db;
@@ -417,7 +429,7 @@ bool Session::verify_client(std::string const& client_identity)
     out() << "421 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   // Log this client
@@ -434,7 +446,6 @@ bool Session::verify_client(std::string const& client_identity)
     LOG(INFO) << protocol_ << " connection claiming " << client_identity;
   }
 
-  client_identity_ = client_identity;
   return true;
 }
 
@@ -494,7 +505,7 @@ bool Session::verify_sender_domain(std::string const& sender)
   }
 
   std::string domain = sender;
-  boost::algorithm::to_lower(domain);
+  std::transform(domain.begin(), domain.end(), domain.begin(), ::tolower);
 
   // Break sender domain into labels:
 
@@ -503,13 +514,13 @@ bool Session::verify_sender_domain(std::string const& sender)
 
   if (labels.size() < 2) { // This is not a valid domain.
     out() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
-    LOG(ERROR) << "invalid sender domain " << domain;
-    std::exit(EXIT_SUCCESS);
+    LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
+    return false;
   }
 
   CDB white("white");
-  if (white.lookup(domain.c_str())) {
-    LOG(INFO) << "sender " << domain << " whitelisted";
+  if (white.lookup(domain)) {
+    LOG(INFO) << "sender \"" << domain << "\" whitelisted";
     return true;
   }
 
@@ -519,11 +530,11 @@ bool Session::verify_sender_domain(std::string const& sender)
     tld = domain.c_str(); // If ingoing domain is a TLD.
   }
   if (white.lookup(tld)) {
-    LOG(INFO) << "sender tld " << tld << " whitelisted";
+    LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";
     return true;
   }
 
-  // Based on <www.surbl.org/guidelines>
+  // Based on <http://www.surbl.org/guidelines>
 
   std::string two_level
       = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
@@ -539,9 +550,9 @@ bool Session::verify_sender_domain(std::string const& sender)
       }
       else {
         out() << "421 bad sender domain\r\n" << std::flush;
-        LOG(ERROR) << sender
-                   << " blocked by exact match on three-level-tlds list";
-        std::exit(EXIT_SUCCESS);
+        LOG(ERROR) << "sender \"" << sender
+                   << "\" blocked by exact match on three-level-tlds list";
+        return false;
       }
     }
   }
@@ -554,8 +565,9 @@ bool Session::verify_sender_domain(std::string const& sender)
     }
     else {
       out() << "421 bad sender domain\r\n" << std::flush;
-      LOG(ERROR) << sender << " blocked by exact match on two-level-tlds list";
-      std::exit(EXIT_SUCCESS);
+      LOG(ERROR) << "sender \"" << sender
+                 << "\" blocked by exact match on two-level-tlds list";
+      return false;
     }
   }
 
@@ -573,7 +585,7 @@ bool Session::verify_sender_domain_uribl(std::string const& sender)
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out() << "421 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
-      std::exit(EXIT_SUCCESS);
+      return false;
     }
   }
 
@@ -598,7 +610,7 @@ bool Session::verify_sender_spf(Mailbox const& sender)
   if (spf_res.result() == SPF::Result::FAIL) {
     out() << "421 " << spf_res.smtp_comment() << std::flush;
     LOG(ERROR) << spf_res.header_comment();
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   LOG(INFO) << spf_res.header_comment();

@@ -48,15 +48,11 @@ public:
   SockBuffer(const SockBuffer& that)
     : fd_in_(that.fd_in_)
     , fd_out_(that.fd_out_)
-    , timed_out_(false)
-    , tls_active_(false)
   {
   }
   SockBuffer(int fd_in, int fd_out)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
-    , timed_out_(false)
-    , tls_active_(false)
   {
     POSIX::set_nonblocking(fd_in_);
     POSIX::set_nonblocking(fd_out_);
@@ -100,10 +96,10 @@ private:
   int fd_in_;
   int fd_out_;
 
-  bool timed_out_;
+  bool timed_out_{false};
 
   TLS tls_;
-  bool tls_active_;
+  bool tls_active_{false};
 };
 
 #endif // SOCKBUFFER_DOT_HPP

@@ -39,7 +39,7 @@ public:
     int resp = b32_ndigits_;
     b32_str_[resp] = '\0';
 
-    // http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
+    // <http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt>
 
     static constexpr const char* const b32_charset
         = "ybndrfg8ejkmcpqxot1uwisza345h769";
