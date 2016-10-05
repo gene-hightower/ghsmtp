@@ -8,6 +8,52 @@ constexpr size_t BUFSIZE = 128;
 %%{
 machine smtp;
 
+action mb_loc_beg {
+  mb_loc_beg = fpc;
+}
+
+action mb_dom_beg {
+  mb_dom_beg = fpc;
+}
+
+action mb_loc_end {
+  CHECK_NOTNULL(mb_loc_beg);
+
+  mb_loc_end = fpc;
+  mb_loc = string(mb_loc_beg, mb_loc_end - mb_loc_beg);
+
+  mb_loc_beg = nullptr;
+  mb_loc_end = nullptr;
+}
+
+action mb_dom_end {
+  CHECK_NOTNULL(mb_dom_beg);
+
+  mb_dom_end = fpc;
+  mb_dom = string(mb_dom_beg, mb_dom_end - mb_dom_beg);
+
+  mb_dom_beg = nullptr;
+  mb_dom_end = nullptr;
+}
+
+action key_end {
+  param.first += ::toupper(fc);
+}
+
+action val_end {
+  param.second += fc;
+}
+
+action param {
+  parameters.insert(param);
+  param.first.clear();
+  param.second.clear();
+}
+
+action last {
+  last = true;
+}
+
 UTF8_tail = 0x80..0xBF;
 
 UTF8_1 = 0x00..0x7F;
@@ -117,34 +163,6 @@ Dot_string = Atom ('.'  Atom)*;
 
 Local_part = Dot_string | Quoted_string;
 
-action mb_loc_beg {
-  mb_loc_beg = fpc;
-}
-
-action mb_dom_beg {
-  mb_dom_beg = fpc;
-}
-
-action mb_loc_end {
-  CHECK_NOTNULL(mb_loc_beg);
-
-  mb_loc_end = fpc;
-  mb_loc = string(mb_loc_beg, mb_loc_end - mb_loc_beg);
-
-  mb_loc_beg = nullptr;
-  mb_loc_end = nullptr;
-}
-
-action mb_dom_end {
-  CHECK_NOTNULL(mb_dom_beg);
-
-  mb_dom_end = fpc;
-  mb_dom = string(mb_dom_beg, mb_dom_end - mb_dom_beg);
-
-  mb_dom_beg = nullptr;
-  mb_dom_end = nullptr;
-}
-
 Mailbox = Local_part >mb_loc_beg %mb_loc_end '@' ((Domain | address_literal) >mb_dom_beg %mb_dom_end);
 
 Path = "<" ((A_d_l ":")? Mailbox) ">";
@@ -153,23 +171,9 @@ Reverse_path = Path | "<>";
 
 Forward_path = Path;
 
-action key_end {
-  param.first += ::toupper(fc);
-}
-
 esmtp_keyword = ((alpha | digit) (alpha | digit | '-')*) @key_end;
 
-action val_end {
-  param.second += fc;
-}
-
 esmtp_value = ((graph - '=')+) @val_end;
-
-action param {
-  parameters.insert(param);
-  param.first.clear();  
-  param.second.clear();  
-}
 
 esmtp_param = (esmtp_keyword ('=' esmtp_value)?) %param;
 
@@ -179,9 +183,7 @@ Rcpt_parameters = esmtp_param (' ' esmtp_param)*;
 
 String = Atom | Quoted_string;
 
-action protocol_err {
-  fhold; fgoto line;
-}
+chunk_size = digit+;
 
 data := |*
 
@@ -262,6 +264,13 @@ main := |*
    LOG(INFO) << "calling data\n"; fgoto data;
  };
 
+ "BDAT"i SP chunk_size (SP "LAST"i @last)? CRLF =>
+ {
+   LOG(FATAL) << "BDAT not supported";
+   // eat data from our buffer
+   last = false;
+ };
+
  "RSET"i CRLF =>
  {
    session.rset();
@@ -321,6 +330,8 @@ void scanner(Session& session)
   char const* mb_loc_end{nullptr};
   char const* mb_dom_beg{nullptr};
   char const* mb_dom_end{nullptr};
+
+  bool last{false};
 
   std::string mb_loc;
   std::string mb_dom;
