@@ -180,6 +180,9 @@ void Session::ehlo(std::string client_identity)
   else {
     std::exit(EXIT_SUCCESS);
   }
+  else {
+    std::exit(EXIT_SUCCESS);
+  }
 }
 
 void Session::helo(std::string client_identity)

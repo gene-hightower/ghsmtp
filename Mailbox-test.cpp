@@ -42,5 +42,5 @@ int main(int argc, char* argv[])
   dg.clear();
   CHECK(dg.empty());
 
-  std::cout << "sizeof(Mailbox) == " << sizeof(Mailbox) << std::endl;
+  std::cout << "sizeof(Mailbox) == " << sizeof(Mailbox) << '\n';
 }

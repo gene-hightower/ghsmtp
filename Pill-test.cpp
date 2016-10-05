@@ -43,5 +43,5 @@ int main(int arcv, char* argv[])
   Pill red2(red);
   CHECK_EQ(red, red2);
 
-  std::cout << "sizeof(Pill) == " << sizeof(Pill) << std::endl;
+  std::cout << "sizeof(Pill) == " << sizeof(Pill) << '\n';
 }

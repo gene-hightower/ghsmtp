@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 
   Now then;
 
-  std::cout << "sizeof(Now) == " << sizeof(Now) << std::endl;
+  std::cout << "sizeof(Now) == " << sizeof(Now) << '\n';
 
   std::stringstream then_str;
   then_str << then;

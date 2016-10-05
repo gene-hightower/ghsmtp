@@ -26,13 +26,13 @@ int main(int argc, char* argv[])
 
   char const* us = sock.us_c_str();
   if (*us) {
-    std::cout << us << std::endl;
+    std::cout << us << '\n';
   }
 
   char const* them = sock.them_c_str();
   if (*them) {
-    std::cout << them << std::endl;
+    std::cout << them << '\n';
   }
 
-  std::cout << "sizeof(Sock) == " << sizeof(Sock) << std::endl;
+  std::cout << "sizeof(Sock) == " << sizeof(Sock) << '\n';
 }

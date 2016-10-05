@@ -49,5 +49,5 @@ int main(int argc, char* argv[])
 
   msg2.trash();
 
-  std::cout << "sizeof(Message) == " << sizeof(Message) << std::endl;
+  std::cout << "sizeof(Message) == " << sizeof(Message) << '\n';
 }
