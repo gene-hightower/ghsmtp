@@ -45,8 +45,10 @@ int main(int argc, char* argv[])
 
   std::string line;
   while (std::getline(iostream, line)) {
-    iostream << line << std::endl;
+    iostream << line << '\n';
   }
+
+  iostream << std::flush;
 
   std::string diff_cmd = "diff ";
   diff_cmd += infile;
@@ -56,5 +58,5 @@ int main(int argc, char* argv[])
 
   PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;
 
-  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << std::endl;
+  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n';
 }

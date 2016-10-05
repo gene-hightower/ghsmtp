@@ -28,5 +28,5 @@ int main(int argc, char* argv[])
 
   TLS tls;
 
-  std::cout << "sizeof(TLS) == " << sizeof(TLS) << std::endl;
+  std::cout << "sizeof(TLS) == " << sizeof(TLS) << '\n';
 }

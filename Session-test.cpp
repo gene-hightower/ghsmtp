@@ -27,7 +27,7 @@
 struct Session_test {
   static void test()
   {
-    std::cout << "sizeof(Session) == " << sizeof(Session) << std::endl;
+    std::cout << "sizeof(Session) == " << sizeof(Session) << '\n';
 
     int fd_null = open("/dev/null", O_WRONLY);
     PCHECK(fd_null >= 0) << " can't open /dev/null";

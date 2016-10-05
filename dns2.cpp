@@ -40,20 +40,20 @@ void do_dotted_quad(char const* addr)
       DNS::Rrlist<DNS::RR_type::A> rrlst(q);
 
       if (!rrlst.empty()) {
-        std::cout << "found in " << rbl << std::endl;
+        std::cout << "found in " << rbl << '\n';
         std::vector<std::string> codes = rrlst.get();
         for (auto code : codes) {
-          std::cout << code << std::endl;
+          std::cout << code << '\n';
         }
       }
     }
     else {
       if (q.get_rcode() == DNS::Pkt_rcode::NXDOMAIN) {
-        std::cout << "not found in " << rbl << std::endl;
+        std::cout << "not found in " << rbl << '\n';
       }
       else {
         std::cout << "Error from lookup at " << rbl << " " << q.get_rcode()
-                  << std::endl;
+                  << '\n';
       }
     }
   }
@@ -79,16 +79,16 @@ void do_dotted_quad(char const* addr)
     }
   }
 
-  std::cout << "no fcrdns" << std::endl;
+  std::cout << "no fcrdns\n";
   return;
 
 found:
-  std::cout << fcrdns << std::endl;
+  std::cout << fcrdns << '\n';
 
   std::vector<std::string> txts
       = DNS::get_records<DNS::RR_type::TXT>(res, fcrdns);
   for (const auto txt : txts) {
-    std::cout << "\"" << txt << "\"" << std::endl;
+    std::cout << "\"" << txt << "\"\n";
   }
 }
 
@@ -99,13 +99,13 @@ void do_domain(char const* domain)
   std::vector<std::string> addrs
       = DNS::get_records<DNS::RR_type::A>(res, domain);
   for (const auto a : addrs) {
-    std::cout << a << std::endl;
+    std::cout << a << '\n';
   }
 
   std::vector<std::string> txts
       = DNS::get_records<DNS::RR_type::TXT>(res, domain);
   for (const auto txt : txts) {
-    std::cout << "\"" << txt << "\"" << std::endl;
+    std::cout << "\"" << txt << "\"\n";
   }
 }
 
