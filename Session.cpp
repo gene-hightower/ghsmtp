@@ -58,6 +58,8 @@ constexpr char const* const uribls[] = {
 
 constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
+
+constexpr size_t size = 150 * 1024 * 1024;
 }
 
 Session::Session(int fd_in, int fd_out, std::string fqdn)
@@ -95,7 +97,7 @@ void Session::greeting()
     LOG(INFO) << "connect from " << sock_.them_c_str();
 
     // This is just a teaser, the first line of a multi-line response.
-    out() << "220-" << fqdn_ << " ESMTP\r\n" << std::flush;
+    out() << "220-" << fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
 
     using namespace DNS;
     Resolver res;
@@ -154,7 +156,7 @@ void Session::greeting()
     }
   } // if (sock_.has_peername())
 
-  out() << "220 " << fqdn_ << " ESMTP\r\n" << std::flush;
+  out() << "220 " << fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
 }
 
 void Session::ehlo(std::string client_identity)
@@ -163,12 +165,17 @@ void Session::ehlo(std::string client_identity)
   if (verify_client(client_identity)) {
     client_identity_ = std::move(client_identity);
     reset();
-    out() << "250-" << fqdn_ << "\r\n250-PIPELINING\r\n";
+    out() << "250-" << fqdn_ << "\r\n";
+    // out() << "250-SIZE " << Config::size << "\r\n";
+    out() << "250-8BITMIME\r\n";
     if (!sock_.tls()) {
       out() << "250-STARTTLS\r\n";
     }
-    out() << "250-8BITMIME\r\n" << std::flush;
-    out() << "250 SMTPUTF8\r\n" << std::flush;
+    // out() << "250-ENHANCEDSTATUSCODES\r\n";
+    out() << "250-PIPELINING\r\n";
+    // out() << "250-CHUNKING\r\n";
+    out() << "250 SMTPUTF8\r\n";
+    out() << std::flush;
   }
   else {
     std::exit(EXIT_SUCCESS);
