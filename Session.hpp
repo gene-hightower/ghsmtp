@@ -62,20 +62,20 @@ public:
 private:
   friend struct Session_test;
 
-  std::ostream& out() { return sock_.out(); }
+  std::ostream& out_() { return sock_.out(); }
 
-  void reset()
+  void reset_()
   {
     reverse_path_.clear();
     forward_path_.clear();
   }
 
-  bool verify_client(std::string const& client_identity);
-  bool verify_recipient(Mailbox const& recipient);
-  bool verify_sender(Mailbox const& sender);
-  bool verify_sender_domain(std::string const& sender);
-  bool verify_sender_domain_uribl(std::string const& sender);
-  bool verify_sender_spf(Mailbox const& sender);
+  bool verify_client_(std::string const& client_identity);
+  bool verify_recipient_(Mailbox const& recipient);
+  bool verify_sender_(Mailbox const& sender);
+  bool verify_sender_domain_(std::string const& sender);
+  bool verify_sender_domain_uribl_(std::string const& sender);
+  bool verify_sender_spf_(Mailbox const& sender);
 
 private:
   Sock sock_;

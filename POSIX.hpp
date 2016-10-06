@@ -40,7 +40,7 @@ public:
                               std::chrono::milliseconds timeout,
                               bool& t_o)
   {
-    return io_fd("read", ::read, fd_in, s, n, timeout, t_o);
+    return io_fd_("read", ::read, fd_in, s, n, timeout, t_o);
   }
 
   static std::streamsize write(int fd_out,
@@ -49,18 +49,18 @@ public:
                                std::chrono::milliseconds timeout,
                                bool& t_o)
   {
-    return io_fd("write", ::write, fd_out, const_cast<char*>(s), n, timeout,
-                 t_o);
+    return io_fd_("write", ::write, fd_out, const_cast<char*>(s), n, timeout,
+                  t_o);
   }
 
 private:
-  static std::streamsize io_fd(char const* fnm,
-                               std::function<ssize_t(int, void*, size_t)> fnc,
-                               int fd,
-                               char* s,
-                               std::streamsize n,
-                               std::chrono::milliseconds timeout,
-                               bool& t_o);
+  static std::streamsize io_fd_(char const* fnm,
+                                std::function<ssize_t(int, void*, size_t)> fnc,
+                                int fd,
+                                char* s,
+                                std::streamsize n,
+                                std::chrono::milliseconds timeout,
+                                bool& t_o);
 };
 
 #endif // POSIX_DOT_HPP
