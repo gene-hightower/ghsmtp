@@ -150,12 +150,12 @@ std::string TLS::info()
   return info.str();
 }
 
-std::streamsize TLS::io_tls(char const* fnm,
-                            std::function<int(SSL*, void*, int)> fnc,
-                            char* s,
-                            std::streamsize n,
-                            std::chrono::milliseconds wait,
-                            bool& t_o)
+std::streamsize TLS::io_tls_(char const* fnm,
+                             std::function<int(SSL*, void*, int)> fnc,
+                             char* s,
+                             std::streamsize n,
+                             std::chrono::milliseconds wait,
+                             bool& t_o)
 {
   using namespace std::chrono;
   time_point<system_clock> start = system_clock::now();

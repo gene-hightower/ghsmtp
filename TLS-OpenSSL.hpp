@@ -37,25 +37,25 @@ public:
   std::streamsize
   read(char* s, std::streamsize n, std::chrono::milliseconds wait, bool& t_o)
   {
-    return io_tls("SSL_read", SSL_read, s, n, wait, t_o);
+    return io_tls_("SSL_read", SSL_read, s, n, wait, t_o);
   }
   std::streamsize write(const char* s,
                         std::streamsize n,
                         std::chrono::milliseconds wait,
                         bool& t_o)
   {
-    return io_tls("SSL_write", SSL_write, const_cast<char*>(s), n, wait, t_o);
+    return io_tls_("SSL_write", SSL_write, const_cast<char*>(s), n, wait, t_o);
   }
 
   std::string info();
 
 private:
-  std::streamsize io_tls(char const* fnm,
-                         std::function<int(SSL*, void*, int)> fnc,
-                         char* s,
-                         std::streamsize n,
-                         std::chrono::milliseconds wait,
-                         bool& t_o);
+  std::streamsize io_tls_(char const* fnm,
+                          std::function<int(SSL*, void*, int)> fnc,
+                          char* s,
+                          std::streamsize n,
+                          std::chrono::milliseconds wait,
+                          bool& t_o);
 
   static void ssl_error();
 
