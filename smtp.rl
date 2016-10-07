@@ -267,7 +267,9 @@ main := |*
  {
    LOG(FATAL) << "BDAT not supported";
    // eat data from our buffer
-   last = false;
+   if (last) {
+     last = false;
+   }
  };
 
  "RSET"i CRLF =>
