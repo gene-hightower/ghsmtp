@@ -32,12 +32,11 @@
 
 class Message {
 public:
-  Message(Message const&) = delete;
-  Message& operator=(Message const&) = delete;
-
-  Message(std::string const& fqdn, std::random_device& rd)
-    : s_(rd)
+  Message(std::string const& fqdn)
   {
+    if (fqdn.empty())
+      return;
+
     std::string maildir;
 
     char const* ev = getenv("MAILDIR");

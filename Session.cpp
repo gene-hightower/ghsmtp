@@ -195,9 +195,7 @@ void Session::helo(std::string client_identity)
   }
 }
 
-void Session::mail_from(
-    Mailbox&& reverse_path,
-    std::unordered_map<std::string, std::string> const& parameters)
+void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   if (client_identity_.empty()) {
     out_() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
@@ -236,9 +234,7 @@ void Session::mail_from(
   }
 }
 
-void Session::rcpt_to(
-    Mailbox&& forward_path,
-    std::unordered_map<std::string, std::string> const& parameters)
+void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   if (!reverse_path_verified_) {
     out_() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
@@ -256,26 +252,31 @@ void Session::rcpt_to(
     forward_path_.push_back(std::move(forward_path));
     out_() << "250 rcpt ok\r\n" << std::flush;
   }
-  // We're lenient on most bad recipients, no exit here.
+  LOG(INFO) << "RCPT TO " << forward_path_.back();
+  // We're lenient on most bad recipients, no else/exit here.
 }
 
-void Session::data()
+bool Session::data_start()
 {
   if (!reverse_path_verified_) {
     out_() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
     LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
-    return;
+    return false;
   }
   if (forward_path_.empty()) {
     out_() << "554 no valid recipients\r\n" << std::flush;
     LOG(WARNING) << "no valid recipients";
-    return;
+    return false;
   }
+  out_() << "354 go\r\n" << std::flush;
+  LOG(INFO) << "DATA";
+  return true;
+}
 
-  Message msg(fqdn_, rd_);
-
-  // The headers Return-Path, X-Original-To and Received are added to
-  // the top of the message.
+std::string Session::added_headers_(Message const& msg)
+{
+  // The headers Return-Path, X-Original-To and Received are returned
+  // as a string.
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\n";
@@ -298,59 +299,61 @@ void Session::data()
   if (!received_spf_.empty()) {
     headers << received_spf_ << "\n";
   }
-  msg.out() << headers.str();
 
-  out_() << "354 go\r\n" << std::flush;
+  return headers.str();
+}
 
-  std::string line;
+Message Session::data_msg() // called /after/ data_start
+{
+  Message msg(fqdn_);
 
-  while (std::getline(sock_.in(), line)) {
-    int last = line.length() - 1;
-    if ((-1 == last) || ('\r' != line.at(last))) {
-      out_() << "421 bare linefeed in message data\r\n" << std::flush;
-      LOG(ERROR) << "bare linefeed in message with id " << msg.id();
-      std::exit(EXIT_SUCCESS);
-    }
-    line.erase(last, 1); // so eat that cr
-    if ("." == line) {   // just a dot is <cr><lf>.<cr><lf>
-      msg.save();
-      LOG(INFO) << "message delivered with id " << msg.id();
-      out_() << "250 data ok\r\n" << std::flush;
-      return;
-    }
-    line += '\n'; // add standard newline
-    if ('.' == line.at(0))
-      line.erase(0, 1); // eat leading dot
-    msg.out() << line;
-  }
+  // The headers Return-Path, X-Original-To and Received are added to
+  // the top of the message.
 
-  if (sock_.timed_out())
-    time();
+  msg.out() << added_headers_(msg);
 
-  LOG(WARNING) << "unexpected end of data in message with id " << msg.id();
-  out_() << "554 data NOT ok\r\n" << std::flush;
+  return msg;
+}
+
+void Session::data_msg_done(Message& msg)
+{
+  msg.save();
+  LOG(INFO) << "message delivered with id " << msg.id();
+  out_() << "250 data ok\r\n" << std::flush;
+  LOG(INFO) << "end DATA";
 }
 
 void Session::rset()
 {
   reset_();
   out_() << "250 ok\r\n" << std::flush;
+  LOG(INFO) << "RSET";
 }
 
-void Session::noop() { out_() << "250 nook\r\n" << std::flush; }
+void Session::noop()
+{
+  out_() << "250 nook\r\n" << std::flush;
+  LOG(INFO) << "NOOP";
+}
 
-void Session::vrfy() { out_() << "252 try it\r\n" << std::flush; }
+void Session::vrfy()
+{
+  out_() << "252 try it\r\n" << std::flush;
+  LOG(INFO) << "VRFY";
+}
 
 void Session::help()
 {
   out_() << "214-see https://digilicious.com/smtp.html\r\n"
             "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n"
          << std::flush;
+  LOG(INFO) << "HELP";
 }
 
 void Session::quit()
 {
   out_() << "221 bye\r\n" << std::flush;
+  LOG(INFO) << "QUIT";
   std::exit(EXIT_SUCCESS);
 }
 

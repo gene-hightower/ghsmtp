@@ -189,28 +189,33 @@ data := |*
 
  /[^\.\r\n]/ /[^\r\n]/+ CRLF =>
  {
-   LOG(INFO) << "X0 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+   auto len = te - ts - 2; // minus crlf
+   msg.out().write(ts, len);
+   msg.out() << '\n';
  };
 
- ',' /[^\r\n]/+ CRLF =>
+ '.' /[^\r\n]/+ CRLF =>
  {
-   LOG(INFO) << "X1 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
- };
-
- '.' CRLF =>
- {
-   LOG(INFO) << "X2 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
-   fgoto main;
+   auto len = te - ts - 3; // minus crlf and leading '.'
+   msg.out().write(ts + 1, len);
+   msg.out() << '\n';
  };
 
  CRLF =>
  {
-   LOG(INFO) << "X3 [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+   msg.out() << '\n';
+ };
+
+ '.' CRLF =>
+ {
+   session.data_msg_done(msg);
+   fgoto main;
  };
 
  any =>
  {
    LOG(ERROR) << "data protocol error [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
+   fgoto main;
  };
 
 *|;
@@ -233,11 +238,6 @@ main := |*
 
  "MAIL FROM:"i Reverse_path (SP Mail_parameters)? CRLF =>
  {
-   LOG(INFO) << "path == " << mb_loc << "@" << mb_dom;
-   for (auto& p : parameters) {
-     LOG(INFO) << p.first << " == " << p.second;
-   }
-
    session.mail_from(Mailbox(mb_loc, mb_dom), parameters);
 
    mb_loc.clear();
@@ -247,11 +247,6 @@ main := |*
 
  "RCPT TO:"i Forward_path (SP Rcpt_parameters)? CRLF =>
  {
-   LOG(INFO) << "path == " << mb_loc << "@" << mb_dom;
-   for (auto& p : parameters) {
-     LOG(INFO) << p.first << " == " << p.second;
-   }
-
    session.rcpt_to(Mailbox(mb_loc, mb_dom), parameters);
 
    mb_loc.clear();
@@ -261,7 +256,11 @@ main := |*
 
  "DATA"i CRLF =>
  {
-   LOG(INFO) << "calling data\n"; fgoto data;
+   if (session.data_start()) {
+     msg = session.data_msg();
+     LOG(INFO) << "calling data\n";
+     fgoto data;
+   }
  };
 
  "BDAT"i SP chunk_size (SP "LAST"i @last)? CRLF =>
@@ -326,6 +325,8 @@ private:
 
 void scanner(Session& session)
 {
+  Message msg("");
+
   char const* mb_loc_beg{nullptr};
   char const* mb_loc_end{nullptr};
   char const* mb_dom_beg{nullptr};

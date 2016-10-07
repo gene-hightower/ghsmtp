@@ -30,13 +30,12 @@ int main(int argc, char* argv[])
   char env[100] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 
-  std::random_device rd;
-  Message msg("example.com", rd);
+  Message msg("example.com");
 
   msg.out() << "foo bar baz";
   msg.save();
 
-  Message msg2("example.com", rd);
+  Message msg2("example.com");
 
   CHECK(msg.id() != msg2.id());
 

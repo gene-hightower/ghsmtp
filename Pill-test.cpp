@@ -25,9 +25,7 @@ int main(int arcv, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  std::random_device rd;
-
-  Pill red(rd), blue(rd);
+  Pill red, blue;
   CHECK(red != blue);
 
   std::stringstream red_str, blue_str;

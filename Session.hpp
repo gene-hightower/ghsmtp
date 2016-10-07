@@ -27,10 +27,13 @@
 #include <experimental/string_view>
 
 #include "Mailbox.hpp"
+#include "Message.hpp"
 #include "Sock.hpp"
 
 class Session {
 public:
+  using parameters_t = std::unordered_map<std::string, std::string>;
+
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
@@ -41,12 +44,13 @@ public:
   void greeting();
   void ehlo(std::string client_identity);
   void helo(std::string client_identity);
-  void
-  mail_from(Mailbox&& reverse_path,
-            std::unordered_map<std::string, std::string> const& parameters);
-  void rcpt_to(Mailbox&& forward_path,
-               std::unordered_map<std::string, std::string> const& parameters);
-  void data();
+  void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
+  void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
+
+  bool data_start();
+  Message data_msg();
+  void data_msg_done(Message& msg);
+
   void rset();
   void noop();
   void vrfy();
@@ -63,6 +67,8 @@ private:
   friend struct Session_test;
 
   std::ostream& out_() { return sock_.out(); }
+
+  std::string added_headers_(Message const& msg);
 
   void reset_()
   {

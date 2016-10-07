@@ -38,7 +38,7 @@ LDLIBS += \
 	-lspf2 \
 	-lssl
 
-programs = smtp smtpd dns2
+programs = smtp
 dns2_EXTRA = DNS
 smtp_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
 smtpd_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
