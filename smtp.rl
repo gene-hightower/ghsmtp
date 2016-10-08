@@ -204,7 +204,7 @@ chunk_size = digit+;
 
 data := |*
 
- /[^\.\r\n]/ /[^\r\n]/+ CRLF =>
+ /[^\.\r\n]/ /[^\r\n]/* CRLF =>
  {
    auto len = te - ts - 2; // minus crlf
    msg.out().write(ts, len);
