@@ -3,6 +3,7 @@
 using std::experimental::string_view;
 using std::string;
 
+// for real use, must be > 1024 (ie max line length)
 constexpr size_t BUFSIZE = 128;
 
 %%{
@@ -54,6 +55,8 @@ action last {
   last = true;
 }
 
+#############################################################################
+
 UTF8_tail = 0x80..0xBF;
 
 UTF8_1 = 0x00..0x7F;
@@ -75,16 +78,31 @@ UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
 
 UTF8_non_ascii = UTF8_2 | UTF8_3 | UTF8_4;
 
-CRLF = "\r\n";
-# CRLF = '\n' | '\r\n';
+# various definitions from RFC 5234
 
-SP = ' ';
+CR = 0x0D;
+LF = 0x0A;
+
+CRLF = CR LF;
+
+SP = 0x20;
+HTAB = 0x09;
+
+WSP = SP | HTAB;
 
 Let_dig = alpha | digit;
 
 Ldh_str = (alpha | digit | '-')* Let_dig;
 
-sub_domain = Let_dig Ldh_str?;
+U_Let_dig = alpha | digit | UTF8_non_ascii;
+
+U_Ldh_str = (alpha | digit | '-' | UTF8_non_ascii)* U_Let_dig;
+
+U_label = U_Let_dig U_Ldh_str?;
+
+A_label = Let_dig Ldh_str?;
+
+sub_domain = A_label | U_label;
 
 Domain = sub_domain ('.' sub_domain)*;
 
@@ -145,8 +163,6 @@ atext = alpha | digit |
         '~' |
         UTF8_non_ascii;
 
-WSP = ' ' | '\t';
-
 obs_FWS = WSP+ (CRLF WSP+)*;
 
 FWS = ((WSP* CRLF)? WSP+) | obs_FWS;
@@ -185,6 +201,8 @@ String = Atom | Quoted_string;
 
 chunk_size = digit+;
 
+#############################################################################
+
 data := |*
 
  /[^\.\r\n]/ /[^\r\n]/+ CRLF =>
@@ -219,6 +237,8 @@ data := |*
  };
 
 *|;
+
+#............................................................................
 
 main := |*
 
@@ -307,6 +327,8 @@ main := |*
 }%%
 
 %% write data nofinal;
+
+//...........................................................................
 
 template <typename T>
 class Stack {
@@ -425,7 +447,7 @@ void scanner(Session& session)
 int main(int argc, char const* argv[])
 {
   std::ios::sync_with_stdio(false);
-  //  google::InitGoogleLogging(argv[0]);
+  // google::InitGoogleLogging(argv[0]);
 
   Session session;
   session.greeting();
