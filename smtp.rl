@@ -351,7 +351,7 @@ void scanner(Session& session)
   size_t have = 0;
   bool done = false;
 
-  Stack<int> stack;
+//  Stack<int> stack;
 
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
   char const* eof = nullptr;
