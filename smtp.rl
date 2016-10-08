@@ -3,8 +3,7 @@
 using std::experimental::string_view;
 using std::string;
 
-// for real use, must be > 1024 (ie max line length)
-constexpr size_t BUFSIZE = 128;
+constexpr size_t BUFSIZE = 4 * 1024;
 
 %%{
 machine smtp;
@@ -74,7 +73,7 @@ UTF8_4 = (0xF0 0x90..0xBF UTF8_tail{2})
        | (0xF4 0x80..0x8F UTF8_tail{2})
        ;
 
-UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
+# UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
 
 UTF8_non_ascii = UTF8_2 | UTF8_3 | UTF8_4;
 
@@ -168,8 +167,8 @@ obs_FWS = WSP+ (CRLF WSP+)*;
 FWS = ((WSP* CRLF)? WSP+) | obs_FWS;
 
 # ccontent = ctext | quoted_pair | comment;
-# comment = '(' (fws? ccontent)* fws? ')';
-# cfws = ((fws? comment)+ fws?) | fws;
+# comment = '(' (FWS? ccontent)* FWS? ')';
+# CFWS = ((FWS? comment)+ FWS?) | FWS;
 
 # Atom = cfws atext+ cfws;
 
@@ -447,7 +446,7 @@ void scanner(Session& session)
 int main(int argc, char const* argv[])
 {
   std::ios::sync_with_stdio(false);
-  // google::InitGoogleLogging(argv[0]);
+  google::InitGoogleLogging(argv[0]);
 
   Session session;
   session.greeting();
