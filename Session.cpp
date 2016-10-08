@@ -256,8 +256,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (verify_recipient_(forward_path)) {
     forward_path_.push_back(std::move(forward_path));
     out_() << "250 rcpt ok\r\n" << std::flush;
+    LOG(INFO) << "RCPT TO " << forward_path_.back();
   }
-  LOG(INFO) << "RCPT TO " << forward_path_.back();
   // We're lenient on most bad recipients, no else/exit here.
 }
 
