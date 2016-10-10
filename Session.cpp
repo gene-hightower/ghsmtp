@@ -213,6 +213,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       else if (p.second == "7BIT") {
         LOG(WARNING) << "7BIT transport requested";
       }
+      else if (p.second == "BINARYMIME") {
+        LOG(WARNING) << "We don't support BINARYMIME yet";
+      }
       else {
         LOG(WARNING) << "unrecognized BODY type \"" << p.second
                      << "\" requested";

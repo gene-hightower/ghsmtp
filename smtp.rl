@@ -141,7 +141,7 @@ At_domain = '@' Domain;
 
 A_d_l = At_domain (',' At_domain)*;
 
-qtextSMTP = print - '"' - '\\';   # 32..33 | 35..91 | 93..126
+qtextSMTP = print - '"' - '\\' | UTF8_non_ascii;
 
 quoted_pairSMTP = '\\' print;
 
@@ -188,7 +188,7 @@ Forward_path = Path;
 
 esmtp_keyword = ((alpha | digit) (alpha | digit | '-')*) @key_end;
 
-esmtp_value = ((graph - '=')+) @val_end;
+esmtp_value = ((graph - '=' | UTF8_non_ascii)+) @val_end;
 
 esmtp_param = (esmtp_keyword ('=' esmtp_value)?) %param;
 
