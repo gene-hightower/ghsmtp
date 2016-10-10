@@ -14,20 +14,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-warnings = \
-	-Wall \
-	-Wformat=2 \
-	-Wold-style-cast \
-	-Woverloaded-virtual
-
-CXXFLAGS += \
-	-DSMTP_HOME=$(shell pwd) \
-	-MMD \
-	-g -O2 \
-	$(warnings)
-
-LDFLAGS += \
-	-L/usr/local/lib \
+CXXFLAGS += -DSMTP_HOME=$(shell pwd)
 
 LDLIBS += \
 	-lcdb \
@@ -38,12 +25,11 @@ LDLIBS += \
 	-lspf2 \
 	-lssl
 
-programs = smtp
-dns2_EXTRA = DNS
-smtp_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
-smtpd_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
+PROGRAMS = smtp
 
-tests = \
+smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL
+
+TESTS = \
 	CDB-test \
 	DNS-test \
 	Domain-test \
@@ -60,13 +46,13 @@ tests = \
 	TLD-test \
 	TLS-OpenSSL-test
 
-DNS-test_EXTRA = DNS
-POSIX-test_EXTRA = POSIX
-SPF-test_EXTRA = SPF
-Session-test_EXTRA = DNS POSIX SPF Session TLS-OpenSSL
-SockBuffer-test_EXTRA = POSIX TLS-OpenSSL
-Sock-test_EXTRA = POSIX TLS-OpenSSL
-TLS-OpenSSL-test_EXTRA = POSIX TLS-OpenSSL
+DNS-test_STEMS = DNS
+POSIX-test_STEMS = POSIX
+SPF-test_STEMS = SPF
+Session-test_STEMS = DNS POSIX SPF Session TLS-OpenSSL
+SockBuffer-test_STEMS = POSIX TLS-OpenSSL
+Sock-test_STEMS = POSIX TLS-OpenSSL
+TLS-OpenSSL-test_STEMS = POSIX TLS-OpenSSL
 
 databases = \
 	black.cdb \
@@ -76,9 +62,7 @@ databases = \
 	two-level-tlds.cdb \
 	white.cdb \
 
-all: $(programs) $(databases)
-
-all_programs = $(programs) $(tests)
+all:: $(databases)
 
 TMPDIR ?= /tmp
 TEST_MAILDIR=$(TMPDIR)/Maildir
@@ -86,42 +70,13 @@ TEST_MAILDIR=$(TMPDIR)/Maildir
 $(TEST_MAILDIR):
 	mkdir -p $(TEST_MAILDIR)/tmp $(TEST_MAILDIR)/new
 
-check: $(tests) $(TEST_MAILDIR) $(databases)
-	$(foreach t,$(tests),./$(t) ;)
-
-vg: $(tests) $(TEST_MAILDIR) $(databases)
-	$(foreach t,$(tests),valgrind ./$(t) ;)
-
-coverage:
-	$(MAKE) clean
-	CXXFLAGS=--coverage LDFLAGS=-lgcov $(MAKE) check
-	$(foreach t,$(tests),gcov $(t) ;)
-
-clean::
-	rm -f *.gcno *.gcda *.gcov
-
-regression: $(programs) $(TEST_MAILDIR)
-	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
-	ls -l smtp
-	size smtp
-
-smtp.hpp stack.hh: smtp.cpp
-	@true
-
-#smtp.cpp: smtp.yy
-#	bison -o smtp.cpp smtp.yy
+check:: $(TEST_MAILDIR)
 
 smtp.cpp: smtp.rl
 	ragel -o smtp.cpp smtp.rl
 
 clean::
 	rm -f smtp.cpp smtp.hpp stack.hh
-
-TAGS:
-	etags *.[ch]* *.yy
-
-clean::
-	rm -f TAGS
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@
@@ -139,22 +94,4 @@ white.cdb: white cdb-gen
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
 
-define link_cmd
-$(1)_STEMS = $(1) $$($(1)_EXTRA)
-$(1)_OBJS = $$(patsubst %,%.o,$$($(1)_STEMS))
-$(1)_DEPS = $$(patsubst %,%.d,$$($(1)_STEMS))
-
--include $$($(1)_DEPS)
-
-$(1): $$($(1)_OBJS)
-	$(CXX) -o $$@ $$^ $(LDFLAGS) $(LOADLIBES) $(LDLIBS)
-
-clean::
-	rm -f $(1) $$($(1)_OBJS) $$($(1)_DEPS)
-endef
-
-$(foreach prog,$(all_programs),$(eval $(call link_cmd,$(prog))))
-
-.PHONY: all check coverage regression clean freshen
-
-.PRECIOUS: %.pem
+include ../MKUltra/rules
