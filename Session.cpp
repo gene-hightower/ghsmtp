@@ -176,6 +176,7 @@ void Session::ehlo(std::string client_identity)
     // out_() << "250-CHUNKING\r\n";
     out_() << "250 SMTPUTF8\r\n";
     out_() << std::flush;
+    LOG(INFO) << "EHLO " << client_identity_;
   }
   else {
     std::exit(EXIT_SUCCESS);
@@ -189,6 +190,7 @@ void Session::helo(std::string client_identity)
     client_identity_ = std::move(client_identity);
     reset_();
     out_() << "250 " << fqdn_ << "\r\n" << std::flush;
+    LOG(INFO) << "HELO " << client_identity_;
   }
   else {
     std::exit(EXIT_SUCCESS);
@@ -236,6 +238,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     reset_();
     reverse_path_ = std::move(reverse_path);
     out_() << "250 mail ok\r\n" << std::flush;
+    LOG(INFO) << "MAIL FROM " << reverse_path_;
   }
   else {
     std::exit(EXIT_SUCCESS);
