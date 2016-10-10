@@ -156,7 +156,7 @@ void Session::greeting()
     }
   } // if (sock_.has_peername())
 
-  out_() << "220 " << fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
+  out_() << "220 " << fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
 }
 
 void Session::ehlo(std::string client_identity)
