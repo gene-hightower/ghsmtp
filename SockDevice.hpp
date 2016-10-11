@@ -16,8 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef SOCKBUFFER_DOT_HPP
-#define SOCKBUFFER_DOT_HPP
+#ifndef SOCKDEVICE_DOT_HPP
+#define SOCKDEVICE_DOT_HPP
 
 #include <cerrno>
 #include <chrono>
@@ -41,16 +41,16 @@ constexpr auto write_timeout = std::chrono::seconds(10);
 constexpr auto starttls_timeout = std::chrono::seconds(10);
 }
 
-class SockBuffer
+class SockDevice
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
-  SockBuffer& operator=(const SockBuffer&) = delete;
-  SockBuffer(const SockBuffer& that)
+  SockDevice& operator=(const SockDevice&) = delete;
+  SockDevice(const SockDevice& that)
     : fd_in_(that.fd_in_)
     , fd_out_(that.fd_out_)
   {
   }
-  SockBuffer(int fd_in, int fd_out)
+  SockDevice(int fd_in, int fd_out)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
   {
@@ -102,4 +102,4 @@ private:
   bool tls_active_{false};
 };
 
-#endif // SOCKBUFFER_DOT_HPP
+#endif // SOCKDEVICE_DOT_HPP

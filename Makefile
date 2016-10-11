@@ -42,7 +42,7 @@ TESTS = \
 	SPF-test \
 	Session-test \
 	Sock-test \
-	SockBuffer-test \
+	SockDevice-test \
 	TLD-test \
 	TLS-OpenSSL-test
 
@@ -50,7 +50,7 @@ DNS-test_STEMS = DNS
 POSIX-test_STEMS = POSIX
 SPF-test_STEMS = SPF
 Session-test_STEMS = DNS POSIX SPF Session TLS-OpenSSL
-SockBuffer-test_STEMS = POSIX TLS-OpenSSL
+SockDevice-test_STEMS = POSIX TLS-OpenSSL
 Sock-test_STEMS = POSIX TLS-OpenSSL
 TLS-OpenSSL-test_STEMS = POSIX TLS-OpenSSL
 

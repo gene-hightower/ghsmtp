@@ -27,7 +27,7 @@
 
 #include <unistd.h>
 
-#include "SockBuffer.hpp"
+#include "SockDevice.hpp"
 #include <glog/logging.h>
 
 class Sock {
@@ -124,7 +124,7 @@ public:
   std::string tls_info() { return iostream_->tls_info(); }
 
 private:
-  boost::iostreams::stream<SockBuffer> iostream_;
+  boost::iostreams::stream<SockDevice> iostream_;
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
