@@ -178,7 +178,8 @@ Dot_string = Atom ('.'  Atom)*;
 
 Local_part = Dot_string | Quoted_string;
 
-Mailbox = Local_part >mb_loc_beg %mb_loc_end '@' ((Domain | address_literal) >mb_dom_beg %mb_dom_end);
+Mailbox = Local_part >mb_loc_beg %mb_loc_end '@'
+          ((Domain | address_literal) >mb_dom_beg %mb_dom_end);
 
 Path = "<" ((A_d_l ":")? Mailbox) ">";
 
@@ -329,23 +330,6 @@ main := |*
 
 //...........................................................................
 
-template <typename T>
-class Stack {
-public:
-  using size_type = size_t;
-
-  T& operator[](size_type idx)
-  {
-    CHECK_EQ(idx, 0);
-    return x_;
-  }
-
-  Stack() { x_ = 0; }
-
-private:
-  T x_;
-};
-
 void scanner(Session& session)
 {
   Message msg("");
@@ -371,8 +355,6 @@ void scanner(Session& session)
 
   size_t have = 0;
   bool done = false;
-
-//  Stack<int> stack;
 
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
   char const* eof = nullptr;
