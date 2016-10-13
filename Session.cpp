@@ -223,7 +223,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
                      << "\" requested";
       }
     }
-    if (p.first == "SMTPUTF8") {
+    else if (p.first == "SMTPUTF8") {
       if (p.second != "") {
         LOG(WARNING) << "SMTPUTF8 parameter has a value: " << p.second;
       }
