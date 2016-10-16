@@ -30,9 +30,6 @@
 
 #include <glog/logging.h>
 
-#include <boost/iostreams/concepts.hpp>
-#include <boost/iostreams/stream.hpp>
-
 namespace Config {
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
@@ -41,8 +38,7 @@ constexpr auto write_timeout = std::chrono::seconds(10);
 constexpr auto starttls_timeout = std::chrono::seconds(10);
 }
 
-class SockDevice
-    : public boost::iostreams::device<boost::iostreams::bidirectional> {
+class SockDevice {
 public:
   SockDevice& operator=(const SockDevice&) = delete;
   SockDevice(const SockDevice& that)

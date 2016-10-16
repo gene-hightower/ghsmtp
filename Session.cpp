@@ -347,8 +347,7 @@ Message Session::data_msg() // called /after/ data_start
   // The headers Return-Path, X-Original-To, Received and Received-SPF
   // are added to the top of the message.
 
-  auto headers = added_headers_(msg);
-  write_(headers.data(), headers.size());
+  msg.out() << added_headers_(msg);
 
   return msg;
 }
