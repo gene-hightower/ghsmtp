@@ -125,6 +125,7 @@ public:
   std::streamsize write(const char* s, std::streamsize n)
   {
     sock_.write(s, n);
+    sock_.flush();
     return n;
   }
 
