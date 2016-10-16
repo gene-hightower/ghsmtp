@@ -162,9 +162,9 @@ atext = alpha | digit |
         '~' |
         UTF8_non_ascii;
 
-obs_FWS = WSP+ (CRLF WSP+)*;
+# obs_FWS = WSP+ (CRLF WSP+)*;
 
-FWS = ((WSP* CRLF)? WSP+) | obs_FWS;
+# FWS = ((WSP* CRLF)? WSP+) | obs_FWS;
 
 # ccontent = ctext | quoted_pair | comment;
 # comment = '(' (FWS? ccontent)* FWS? ')';
