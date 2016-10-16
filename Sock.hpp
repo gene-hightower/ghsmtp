@@ -35,7 +35,7 @@ public:
   Sock& operator=(const Sock&) = delete;
 
   Sock(int fd_in, int fd_out)
-    : sock_(fd_in, fd_out)
+    : iostream_(fd_in, fd_out)
   {
     sockaddr_storage us_addr;
     sockaddr_storage them_addr;
@@ -113,28 +113,28 @@ public:
   bool has_peername() const { return them_addr_str_[0] != '\0'; }
   bool input_ready(std::chrono::milliseconds wait)
   {
-    return sock_->input_ready(wait);
+    return iostream_->input_ready(wait);
   }
-  bool timed_out() { return sock_->timed_out(); }
+  bool timed_out() { return iostream_->timed_out(); }
 
   std::streamsize read(char* s, std::streamsize n)
   {
-    sock_.peek(); // buffer up some input
-    return sock_.readsome(s, n);
+    iostream_.peek(); // buffer up some input
+    return iostream_.readsome(s, n);
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
-    sock_.write(s, n);
-    sock_.flush();
+    iostream_.write(s, n);
+    iostream_.flush();
     return n;
   }
 
-  void starttls() { sock_->starttls(); }
-  bool tls() { return sock_->tls(); }
-  std::string tls_info() { return sock_->tls_info(); }
+  void starttls() { iostream_->starttls(); }
+  bool tls() { return iostream_->tls(); }
+  std::string tls_info() { return iostream_->tls_info(); }
 
 private:
-  boost::iostreams::stream<SockDevice> sock_;
+  boost::iostreams::stream<SockDevice> iostream_;
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
