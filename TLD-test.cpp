@@ -36,4 +36,7 @@ int main(int argc, char const* argv[])
   CHECK(nullptr == tld.get_registered_domain("not_a_domain_at_all"));
   CHECK(nullptr == tld.get_registered_domain(".com"));
   CHECK(nullptr == tld.get_registered_domain("."));
+
+  CHECK(!strcmp(tld.get_registered_domain("reward.yournewestbonuspoints.com"),
+                "yournewestbonuspoints.com"));
 }

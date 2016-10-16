@@ -62,6 +62,8 @@ constexpr auto greeting_min_wait_ms = 500;
 constexpr size_t size = 150 * 1024 * 1024;
 }
 
+using namespace std::string_literals;
+
 Session::Session(int fd_in, int fd_out, std::string fqdn)
   : sock_(fd_in, fd_out)
   , fqdn_{std::move(fqdn)}
@@ -73,9 +75,7 @@ Session::Session(int fd_in, int fd_out, std::string fqdn)
 
     if (fqdn_.find('.') == std::string::npos) {
       if (sock_.us_c_str()[0]) {
-        std::ostringstream ss;
-        ss << "[" << sock_.us_c_str() << "]";
-        fqdn_ = ss.str();
+        fqdn_ = "["s + sock_.us_c_str() + "]"s;
       }
     }
     else {
@@ -97,7 +97,8 @@ void Session::greeting()
     LOG(INFO) << "connect from " << sock_.them_c_str();
 
     // This is just a teaser, the first line of a multi-line response.
-    out_() << "220-" << fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
+    auto bfr = "220-"s + fqdn_ + " ESMTP ghsmtp\r\n"s;
+    write_(bfr.data(), bfr.size());
 
     using namespace DNS;
     Resolver res;
@@ -137,7 +138,8 @@ void Session::greeting()
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          out_() << "421 blocked by " << rbl << "\r\n" << std::flush;
+          auto bfr = "421 blocked by "s + rbl + "\r\n"s;
+          write_(bfr.data(), bfr.size());
           LOG(ERROR) << client_ << " blocked by " << rbl;
           std::exit(EXIT_SUCCESS);
         }
@@ -150,13 +152,15 @@ void Session::greeting()
     std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
-      out_() << "421 input before greeting\r\n" << std::flush;
+      auto bfr = "421 input before greeting\r\n";
+      write_(bfr, sizeof(bfr));
       LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
 
-  out_() << "220 " << fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
+  auto bfr = "220 "s + fqdn_ + " ESMTP ghsmtp\r\n"s;
+  write_(bfr.data(), bfr.size());
 }
 
 void Session::ehlo(std::string client_identity)
@@ -165,17 +169,19 @@ void Session::ehlo(std::string client_identity)
   if (verify_client_(client_identity)) {
     client_identity_ = std::move(client_identity);
     reset_();
-    out_() << "250-" << fqdn_ << "\r\n";
-    // out_() << "250-SIZE " << Config::size << "\r\n";
-    out_() << "250-8BITMIME\r\n";
+
+    auto out = "250-"s + fqdn_ + "\r\n"s;
+    // "250-SIZE " << Config::size << "\r\n";
+    out += "250-8BITMIME\r\n";
     if (!sock_.tls()) {
-      out_() << "250-STARTTLS\r\n";
+      out += "250-STARTTLS\r\n";
     }
-    // out_() << "250-ENHANCEDSTATUSCODES\r\n";
-    out_() << "250-PIPELINING\r\n";
-    // out_() << "250-CHUNKING\r\n";
-    out_() << "250 SMTPUTF8\r\n";
-    out_() << std::flush;
+    // out += "250-ENHANCEDSTATUSCODES\r\n";
+    out += "250-PIPELINING\r\n";
+    // out += "250-CHUNKING\r\n";
+    out += "250 SMTPUTF8\r\n";
+    write_(out.data(), out.size());
+
     LOG(INFO) << "EHLO " << client_identity_;
   }
   else {
@@ -187,9 +193,11 @@ void Session::helo(std::string client_identity)
 {
   protocol_ = "SMTP";
   if (verify_client_(client_identity)) {
-    client_identity_ = std::move(client_identity);
     reset_();
-    out_() << "250 " << fqdn_ << "\r\n" << std::flush;
+    client_identity_ = std::move(client_identity);
+
+    auto bfr = "250 "s + fqdn_ + "\r\n"s;
+    write_(bfr.data(), bfr.size());
     LOG(INFO) << "HELO " << client_identity_;
   }
   else {
@@ -200,7 +208,8 @@ void Session::helo(std::string client_identity)
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   if (client_identity_.empty()) {
-    out_() << "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
+    auto bfr = "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -237,7 +246,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reset_();
     reverse_path_ = std::move(reverse_path);
-    out_() << "250 mail ok\r\n" << std::flush;
+    auto bfr = "250 mail ok\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(INFO) << "MAIL FROM " << reverse_path_;
   }
   else {
@@ -248,7 +258,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   if (!reverse_path_verified_) {
-    out_() << "503 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
+    auto bfr = "503 'RCPT TO' before 'MAIL FROM'\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -261,7 +272,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
   if (verify_recipient_(forward_path)) {
     forward_path_.push_back(std::move(forward_path));
-    out_() << "250 rcpt ok\r\n" << std::flush;
+    auto bfr = "250 OK\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(INFO) << "RCPT TO " << forward_path_.back();
   }
   // We're lenient on most bad recipients, no else/exit here.
@@ -270,16 +282,19 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 bool Session::data_start()
 {
   if (!reverse_path_verified_) {
-    out_() << "503 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
+    auto bfr = "503 need 'MAIL FROM' before 'DATA'\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    out_() << "554 no valid recipients\r\n" << std::flush;
+    auto bfr = "554 no valid recipients\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "no valid recipients";
     return false;
   }
-  out_() << "354 go\r\n" << std::flush;
+  auto bfr = "354 go\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "DATA";
   return true;
 }
@@ -321,7 +336,8 @@ Message Session::data_msg() // called /after/ data_start
   // The headers Return-Path, X-Original-To and Received are added to
   // the top of the message.
 
-  msg.out() << added_headers_(msg);
+  auto headers = added_headers_(msg);
+  write_(headers.data(), headers.size());
 
   return msg;
 }
@@ -330,53 +346,60 @@ void Session::data_msg_done(Message& msg)
 {
   msg.save();
   LOG(INFO) << "message delivered with id " << msg.id();
-  out_() << "250 data ok\r\n" << std::flush;
+  auto bfr = "250 OK\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "end DATA";
 }
 
 void Session::rset()
 {
   reset_();
-  out_() << "250 ok\r\n" << std::flush;
+  auto bfr = "250 OK\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "RSET";
 }
 
 void Session::noop()
 {
-  out_() << "250 nook\r\n" << std::flush;
+  auto bfr = "250 OK\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "NOOP";
 }
 
 void Session::vrfy()
 {
-  out_() << "252 try it\r\n" << std::flush;
+  auto bfr = "252 try it\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "VRFY";
 }
 
 void Session::help()
 {
-  out_() << "214-see https://digilicious.com/smtp.html\r\n"
-            "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n"
-         << std::flush;
+  auto bfr = "214-see https://digilicious.com/smtp.html\r\n"
+             "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "HELP";
 }
 
 void Session::quit()
 {
-  out_() << "221 bye\r\n" << std::flush;
+  auto bfr = "221 bye\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(INFO) << "QUIT";
   std::exit(EXIT_SUCCESS);
 }
 
 void Session::error(std::experimental::string_view msg)
 {
-  out_() << "500 command unrecognized\r\n" << std::flush;
+  auto bfr = "500 command unrecognized\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(WARNING) << msg;
 }
 
 void Session::time()
 {
-  out_() << "421 timeout\r\n" << std::flush;
+  auto bfr = "421 timeout\r\n";
+  write_(bfr, sizeof(bfr));
   LOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
 }
@@ -384,11 +407,13 @@ void Session::time()
 void Session::starttls()
 {
   if (sock_.tls()) {
-    out_() << "554 TLS already active\r\n" << std::flush;
+    auto bfr = "554 TLS already active\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "STARTTLS issued with TLS already active";
   }
   else {
-    out_() << "220 go ahead\r\n" << std::flush;
+    auto bfr = "220 go ahead\r\n";
+    write_(bfr, sizeof(bfr));
     sock_.starttls();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
@@ -415,7 +440,8 @@ bool Session::verify_client_(std::string const& client_identity)
 
     if (!Domain::match(fqdn_, fcrdns_)
         && strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      out_() << "421 liar\r\n" << std::flush;
+      auto bfr = "421 liar\r\n";
+      write_(bfr, sizeof(bfr));
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       return false;
@@ -427,7 +453,8 @@ bool Session::verify_client_(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    out_() << "421 invalid sender\r\n" << std::flush;
+    auto bfr = "421 invalid sender\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
     return false;
@@ -435,7 +462,8 @@ bool Session::verify_client_(std::string const& client_identity)
 
   CDB black("black");
   if (black.lookup(client_identity)) {
-    out_() << "421 blacklisted identity\r\n" << std::flush;
+    auto bfr = "421 blacklisted identity\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
     return false;
@@ -447,11 +475,18 @@ bool Session::verify_client_(std::string const& client_identity)
     tld = client_identity.c_str();
   }
   if (black.lookup(tld)) {
-    out_() << "421 blacklisted identity\r\n" << std::flush;
+    auto bfr = "421 blacklisted identity\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
     return false;
   }
+  else {
+    LOG(INFO) << "unblack TLD " << tld;
+  }
+
+  // At this point, check whois for tld, if it's less than 48 hours
+  // old, we may want to take action.
 
   // Log this client
   if (sock_.has_peername()) {
@@ -474,7 +509,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 {
   // Make sure the domain matches.
   if (!Domain::match(recipient.domain(), fqdn_)) {
-    out_() << "554 relay access denied\r\n" << std::flush;
+    auto bfr = "554 relay access denied\r\n";
+    write_(bfr, sizeof(bfr));
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
   }
@@ -482,7 +518,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
-      out_() << "550 no such mailbox " << recipient << "\r\n" << std::flush;
+      auto bfr = "550 no such mailbox "s + static_cast<std::string>(recipient)
+                 + "\r\n"s;
+      write_(bfr.data(), bfr.size());
       LOG(WARNING) << "no such mailbox " << recipient;
       return false;
     }
@@ -491,7 +529,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject with prejudice.
   for (const auto very_bad_recipient : Config::very_bad_recipients) {
     if (0 == recipient.local_part().compare(very_bad_recipient)) {
-      out_() << "421 very bad recipient " << recipient << "\r\n" << std::flush;
+      auto bfr = "421 very bad recipient "s
+                 + static_cast<std::string>(recipient) + "\r\n"s;
+      write_(bfr.data(), bfr.size());
       LOG(ERROR) << "very bad recipient " << recipient;
       std::exit(EXIT_SUCCESS);
     }
@@ -534,7 +574,8 @@ bool Session::verify_sender_domain_(std::string const& sender)
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    out_() << "421 invalid sender domain " << domain << "\r\n" << std::flush;
+    auto bfr = "421 invalid sender domain "s + domain + "\r\n"s;
+    write_(bfr.data(), bfr.size());
     LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
     return false;
   }
@@ -570,7 +611,8 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                            + three_level);
       }
       else {
-        out_() << "421 bad sender domain\r\n" << std::flush;
+        auto bfr = "421 bad sender domain\r\n";
+        write_(bfr, sizeof(bfr));
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
         return false;
@@ -585,7 +627,8 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                          + two_level);
     }
     else {
-      out_() << "421 bad sender domain\r\n" << std::flush;
+      auto bfr = "421 bad sender domain\r\n";
+      write_(bfr, sizeof(bfr));
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
       return false;
@@ -604,7 +647,8 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out_() << "421 blocked by " << uribl << "\r\n" << std::flush;
+      auto bfr = "421 blocked by "s + uribl + "\r\n"s;
+      write_(bfr.data(), bfr.size());
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }
@@ -629,7 +673,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    out_() << "421 " << spf_res.smtp_comment() << std::flush;
+    auto bfr = "421 "s + spf_res.smtp_comment();
+    write_(bfr.data(), bfr.size());
     LOG(ERROR) << spf_res.header_comment();
     return false;
   }

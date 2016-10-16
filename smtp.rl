@@ -3,7 +3,7 @@
 using std::experimental::string_view;
 using std::string;
 
-constexpr size_t BUFSIZE = 4 * 1024;
+constexpr size_t BUFSIZE = 10 * 4 * 1024;
 
 %%{
 machine smtp;
@@ -373,8 +373,7 @@ void scanner(Session& session)
     }
 
     char* p = buf + have;
-    session.in().peek(); // buffer up some input
-    std::streamsize len = session.in().readsome(p, space);
+    std::streamsize len = session.read(p, space);
     pe = p + len;
     eof = nullptr;
 
@@ -409,6 +408,7 @@ void scanner(Session& session)
     else {
       // There is a prefix to preserve, shift it over.
       have = pe - ts;
+      CHECK_NE(have, 0ul);
       memmove(buf, ts, have);
 
       // adjust ptrs

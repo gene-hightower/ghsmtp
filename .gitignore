@@ -3,13 +3,9 @@
 *.d
 *.cdb
 smtp.cpp
-smtp.hpp
-stack.hh
 cdb-gen
-dns2
 smtp
 smtp.pem
-smtpd
 *-test
 three-level-tlds
 three-level-tlds.cdb

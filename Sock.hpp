@@ -19,7 +19,6 @@
 #ifndef SOCK_DOT_HPP
 #define SOCK_DOT_HPP
 
-#include <iostream>
 #include <string>
 
 #include <arpa/inet.h>
@@ -36,7 +35,7 @@ public:
   Sock& operator=(const Sock&) = delete;
 
   Sock(int fd_in, int fd_out)
-    : iostream_(fd_in, fd_out)
+    : sock_(fd_in, fd_out)
   {
     sockaddr_storage us_addr;
     sockaddr_storage them_addr;
@@ -114,17 +113,22 @@ public:
   bool has_peername() const { return them_addr_str_[0] != '\0'; }
   bool input_ready(std::chrono::milliseconds wait)
   {
-    return iostream_->input_ready(wait);
+    return sock_.input_ready(wait);
   }
-  bool timed_out() { return iostream_->timed_out(); }
-  std::istream& in() { return iostream_; }
-  std::ostream& out() { return iostream_; }
-  void starttls() { iostream_->starttls(); }
-  bool tls() { return iostream_->tls(); }
-  std::string tls_info() { return iostream_->tls_info(); }
+  bool timed_out() { return sock_.timed_out(); }
+
+  std::streamsize read(char* s, std::streamsize n) { return sock_.read(s, n); }
+  std::streamsize write(const char* s, std::streamsize n)
+  {
+    return sock_.write(s, n);
+  }
+
+  void starttls() { sock_.starttls(); }
+  bool tls() { return sock_.tls(); }
+  std::string tls_info() { return sock_.tls_info(); }
 
 private:
-  boost::iostreams::stream<SockDevice> iostream_;
+  SockDevice sock_;
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};

@@ -61,12 +61,16 @@ public:
   void starttls();
 
   bool timed_out() { return sock_.timed_out(); }
-  std::istream& in() { return sock_.in(); }
+
+  std::streamsize read(char* s, std::streamsize n) { return sock_.read(s, n); }
 
 private:
   friend struct Session_test;
 
-  std::ostream& out_() { return sock_.out(); }
+  std::streamsize write_(const char* s, std::streamsize n)
+  {
+    return sock_.write(s, n);
+  }
 
   std::string added_headers_(Message const& msg);
 
