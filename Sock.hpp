@@ -113,22 +113,27 @@ public:
   bool has_peername() const { return them_addr_str_[0] != '\0'; }
   bool input_ready(std::chrono::milliseconds wait)
   {
-    return sock_.input_ready(wait);
+    return sock_->input_ready(wait);
   }
-  bool timed_out() { return sock_.timed_out(); }
+  bool timed_out() { return sock_->timed_out(); }
 
-  std::streamsize read(char* s, std::streamsize n) { return sock_.read(s, n); }
+  std::streamsize read(char* s, std::streamsize n)
+  {
+    sock_.peek(); // buffer up some input
+    return sock_.readsome(s, n);
+  }
   std::streamsize write(const char* s, std::streamsize n)
   {
-    return sock_.write(s, n);
+    sock_.write(s, n);
+    return n;
   }
 
-  void starttls() { sock_.starttls(); }
-  bool tls() { return sock_.tls(); }
-  std::string tls_info() { return sock_.tls_info(); }
+  void starttls() { sock_->starttls(); }
+  bool tls() { return sock_->tls(); }
+  std::string tls_info() { return sock_->tls_info(); }
 
 private:
-  SockDevice sock_;
+  boost::iostreams::stream<SockDevice> sock_;
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
