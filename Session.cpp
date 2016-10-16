@@ -171,14 +171,24 @@ void Session::ehlo(std::string client_identity)
     reset_();
 
     auto out = "250-"s + fqdn_ + "\r\n"s;
+
+    // RFC 1870
     // "250-SIZE " << Config::size << "\r\n";
+
     out += "250-8BITMIME\r\n";
+
+    // If we're not already TLS, offer TLS
     if (!sock_.tls()) {
       out += "250-STARTTLS\r\n";
     }
+
     // out += "250-ENHANCEDSTATUSCODES\r\n";
+
     out += "250-PIPELINING\r\n";
+
+    // RFC 3030
     // out += "250-CHUNKING\r\n";
+
     out += "250 SMTPUTF8\r\n";
     write_(out.data(), out.size());
 
@@ -195,7 +205,6 @@ void Session::helo(std::string client_identity)
   if (verify_client_(client_identity)) {
     reset_();
     client_identity_ = std::move(client_identity);
-
     auto bfr = "250 "s + fqdn_ + "\r\n"s;
     write_(bfr.data(), bfr.size());
     LOG(INFO) << "HELO " << client_identity_;
@@ -301,8 +310,8 @@ bool Session::data_start()
 
 std::string Session::added_headers_(Message const& msg)
 {
-  // The headers Return-Path, X-Original-To and Received are returned
-  // as a string.
+  // The headers Return-Path, X-Original-To, Received and Received-SPF
+  // are returned as a string.
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\n";
@@ -322,6 +331,8 @@ std::string Session::added_headers_(Message const& msg)
     headers << "\n\t(" << tls_info << ")";
   }
   headers << ";\n\t" << msg.when() << "\n";
+
+  // Received-SPF:
   if (!received_spf_.empty()) {
     headers << received_spf_ << "\n";
   }
@@ -333,8 +344,8 @@ Message Session::data_msg() // called /after/ data_start
 {
   Message msg(fqdn_);
 
-  // The headers Return-Path, X-Original-To and Received are added to
-  // the top of the message.
+  // The headers Return-Path, X-Original-To, Received and Received-SPF
+  // are added to the top of the message.
 
   auto headers = added_headers_(msg);
   write_(headers.data(), headers.size());
@@ -468,21 +479,26 @@ bool Session::verify_client_(std::string const& client_identity)
                << client_ << " claiming " << client_identity;
     return false;
   }
+  else {
+    LOG(INFO) << "unblack client identity " << client_identity;
+  }
 
   TLD tld_db;
   char const* tld = tld_db.get_registered_domain(client_identity.c_str());
   if (!tld) {
     tld = client_identity.c_str();
   }
-  if (black.lookup(tld)) {
-    auto bfr = "421 blacklisted identity\r\n";
-    write_(bfr, sizeof(bfr));
-    LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
-    return false;
-  }
   else {
-    LOG(INFO) << "unblack TLD " << tld;
+    if (black.lookup(tld)) {
+      auto bfr = "421 blacklisted identity\r\n";
+      write_(bfr, sizeof(bfr));
+      LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
+      return false;
+    }
+    else {
+      LOG(INFO) << "unblack TLD " << tld;
+    }
   }
 
   // At this point, check whois for tld, if it's less than 48 hours
