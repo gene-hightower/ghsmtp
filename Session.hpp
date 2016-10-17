@@ -106,4 +106,8 @@ private:
   bool reverse_path_verified_ = false;
 };
 
+namespace Config {
+constexpr size_t size = 150 * 1024 * 1024;
+}
+
 #endif // SESSION_DOT_HPP

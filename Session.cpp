@@ -58,8 +58,6 @@ constexpr char const* const uribls[] = {
 
 constexpr auto greeting_max_wait_ms = 10'000;
 constexpr auto greeting_min_wait_ms = 500;
-
-constexpr size_t size = 150 * 1024 * 1024;
 }
 
 using namespace std::string_literals;
@@ -165,53 +163,61 @@ void Session::greeting()
 
 void Session::ehlo(std::string client_identity)
 {
-  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
-  if (verify_client_(client_identity)) {
-    client_identity_ = std::move(client_identity);
-    reset_();
-
-    auto out = "250-"s + fqdn_ + "\r\n"s;
-
-    // RFC 1870
-    // "250-SIZE " << Config::size << "\r\n";
-
-    out += "250-8BITMIME\r\n";
-
-    // If we're not already TLS, offer TLS
-    if (!sock_.tls()) {
-      out += "250-STARTTLS\r\n";
-    }
-
-    // out += "250-ENHANCEDSTATUSCODES\r\n";
-
-    out += "250-PIPELINING\r\n";
-
-    // RFC 3030
-    // out += "250-CHUNKING\r\n";
-
-    out += "250 SMTPUTF8\r\n";
-    write_(out.data(), out.size());
-
-    LOG(INFO) << "EHLO " << client_identity_;
-  }
-  else {
+  if (!verify_client_(client_identity)) {
     std::exit(EXIT_SUCCESS);
   }
+
+  reset_();
+  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
+  client_identity_ = std::move(client_identity);
+
+  std::ostringstream out;
+  out << "250-" << fqdn_ << "\r\n";
+
+  // RFC 1870
+  out << "250-SIZE " << Config::size << "\r\n";
+
+  // RFC 6152
+  out << "250-8BITMIME\r\n";
+
+  // If we're not already TLS, offer TLS
+  if (!sock_.tls()) {
+    // RFC 3207
+    out << "250-STARTTLS\r\n";
+  }
+
+  // RFC 2034
+  // out << "250-ENHANCEDSTATUSCODES\r\n";
+
+  // RFC 2920
+  out << "250-PIPELINING\r\n";
+
+  // RFC 3030
+  // out << "250-CHUNKING\r\n";
+
+  // RFC 6531
+  out << "250 SMTPUTF8\r\n";
+
+  auto out_str = out.str();
+  write_(out_str.data(), out_str.size());
+
+  LOG(INFO) << "EHLO " << client_identity_;
 }
 
 void Session::helo(std::string client_identity)
 {
-  protocol_ = "SMTP";
-  if (verify_client_(client_identity)) {
-    reset_();
-    client_identity_ = std::move(client_identity);
-    auto bfr = "250 "s + fqdn_ + "\r\n"s;
-    write_(bfr.data(), bfr.size());
-    LOG(INFO) << "HELO " << client_identity_;
-  }
-  else {
+  if (!verify_client_(client_identity)) {
     std::exit(EXIT_SUCCESS);
   }
+
+  reset_();
+  protocol_ = "SMTP";
+  client_identity_ = std::move(client_identity);
+
+  auto bfr = "250 "s + fqdn_ + "\r\n"s;
+  write_(bfr.data(), bfr.size());
+
+  LOG(INFO) << "HELO " << client_identity_;
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
@@ -226,29 +232,57 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   // Take a look at the optional parameters:
   for (auto const& p : parameters) {
-    if (p.first == "BODY") {
-      if (p.second == "8BITMIME") {
+    std::string name = p.first;
+    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+
+    std::string val = p.second;
+    std::transform(val.begin(), val.end(), val.begin(), ::toupper);
+
+    if (name == "BODY") {
+      if (val == "8BITMIME") {
         // everything is cool, this is our default...
       }
-      else if (p.second == "7BIT") {
+      else if (val == "7BIT") {
         LOG(WARNING) << "7BIT transport requested";
       }
-      else if (p.second == "BINARYMIME") {
-        LOG(WARNING) << "We don't support BINARYMIME yet";
+      else if (val == "BINARYMIME") {
+        // everything is cool, this is our default...
       }
       else {
-        LOG(WARNING) << "unrecognized BODY type \"" << p.second
-                     << "\" requested";
+        LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
       }
     }
-    else if (p.first == "SMTPUTF8") {
-      if (p.second != "") {
-        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << p.second;
+    else if (name == "SMTPUTF8") {
+      if (!val.empty()) {
+        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
+      }
+    }
+    else if (name == "SIZE") {
+      if (val.empty()) {
+        LOG(WARNING) << "SIZE parameter has no value.";
+      }
+      else {
+        try {
+          size_t sz = stoll(val);
+          if (sz > Config::size) {
+            char bfr[]
+                = "552 message size exceeds fixed maximium message size\r\n";
+            write_(bfr, sizeof(bfr) - 1);
+            LOG(WARNING) << "SIZE parameter too large: " << sz;
+            return;
+          }
+        }
+        catch (std::invalid_argument const& e) {
+          LOG(WARNING) << "SIZE parameter has invalid value: " << p.second;
+        }
+        catch (std::out_of_range const& e) {
+          LOG(WARNING) << "SIZE parameter has out-of-range value: " << p.second;
+        }
+        // I guess we just ignore bad size parameters.
       }
     }
     else {
-      LOG(WARNING) << "unrecognized MAIL FROM parameter " << p.first << "="
-                   << p.second;
+      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "=" << val;
     }
   }
 

@@ -210,6 +210,10 @@ data := |*
    auto len = te - ts - 2; // minus crlf
    msg.out().write(ts, len);
    msg.out() << '\n';
+   msg_bytes += len;
+   if (msg_bytes > Config::size) {
+     LOG(WARNING) << "message size " << msg_bytes << " exceeds maximium of " << Config::size;
+   }
  };
 
  '.' /[^\r\n]/+ CRLF =>
@@ -217,6 +221,10 @@ data := |*
    auto len = te - ts - 3; // minus crlf and leading '.'
    msg.out().write(ts + 1, len);
    msg.out() << '\n';
+   msg_bytes += len;
+   if (msg_bytes > Config::size) {
+     LOG(WARNING) << "message size " << msg_bytes << " exceeds maximium of " << Config::size;
+   }
  };
 
  CRLF =>
@@ -277,6 +285,7 @@ main := |*
  "DATA"i CRLF =>
  {
    if (session.data_start()) {
+     msg_bytes = 0;
      msg = session.data_msg();
      LOG(INFO) << "calling data\n";
      fgoto data;
@@ -285,7 +294,6 @@ main := |*
 
  "BDAT"i SP chunk_size (SP "LAST"i @last)? CRLF =>
  {
-   LOG(FATAL) << "BDAT not supported";
    // eat data from our buffer
    if (last) {
      last = false;
@@ -333,6 +341,7 @@ main := |*
 void scanner(Session& session)
 {
   Message msg("");
+  size_t msg_bytes{0};
 
   char const* mb_loc_beg{nullptr};
   char const* mb_loc_end{nullptr};
@@ -388,7 +397,7 @@ void scanner(Session& session)
       done = true;
     }
 
-    LOG(INFO) << "exec \'" << string_view(buf, have + len) << "'";
+    // LOG(INFO) << "exec \'" << string_view(buf, have + len) << "'";
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
