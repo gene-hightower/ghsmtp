@@ -544,11 +544,11 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject with prejudice.
   for (const auto very_bad_recipient : Config::very_bad_recipients) {
     if (0 == recipient.local_part().compare(very_bad_recipient)) {
-      auto bfr = "421 very bad recipient "s
+      auto bfr = "550 very bad recipient "s
                  + static_cast<std::string>(recipient) + "\r\n"s;
       write_(bfr.data(), bfr.size());
-      LOG(ERROR) << "very bad recipient " << recipient;
-      std::exit(EXIT_SUCCESS);
+      LOG(WARNING) << "very bad recipient " << recipient;
+      return false;
     }
   }
 
