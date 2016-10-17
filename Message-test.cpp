@@ -30,12 +30,14 @@ int main(int argc, char* argv[])
   char env[100] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 
-  Message msg("example.com");
+  Message msg;
+  msg.set_domain("example.com");
 
   msg.out() << "foo bar baz";
   msg.save();
 
-  Message msg2("example.com");
+  Message msg2;
+  msg2.set_domain("example.com");
 
   CHECK(msg.id() != msg2.id());
 
