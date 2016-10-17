@@ -163,12 +163,13 @@ void Session::greeting()
 
 void Session::ehlo(std::string client_identity)
 {
+  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
+
   if (!verify_client_(client_identity)) {
     std::exit(EXIT_SUCCESS);
   }
 
   reset_();
-  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_ = std::move(client_identity);
 
   std::ostringstream out;
@@ -206,12 +207,13 @@ void Session::ehlo(std::string client_identity)
 
 void Session::helo(std::string client_identity)
 {
+  protocol_ = "SMTP";
+
   if (!verify_client_(client_identity)) {
     std::exit(EXIT_SUCCESS);
   }
 
   reset_();
-  protocol_ = "SMTP";
   client_identity_ = std::move(client_identity);
 
   auto bfr = "250 "s + fqdn_ + "\r\n"s;
