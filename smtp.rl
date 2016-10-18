@@ -312,13 +312,13 @@ main := |*
    LOG(INFO) << "space == " << space;
 
    if (last) {
-     last = false;
    }
    chunk_sz = 0;
  };
 
  "RSET"i CRLF =>
  {
+   last = false;
    session.rset();
  };
 
