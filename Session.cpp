@@ -40,12 +40,8 @@
 #include <boost/lexical_cast.hpp>
 
 namespace Config {
-constexpr char const* const very_bad_recipients[] = {
-    "a", "ene", "lizard", "oq6_2nbq",
-};
-
 constexpr char const* const bad_recipients[] = {
-    "mixmaster", "nobody",
+    "a", "ene", "h.gene", "jay", "lizard", "mixmaster", "nobody", "oq6_2nbq",
 };
 
 constexpr char const* const rbls[] = {
@@ -573,17 +569,6 @@ bool Session::verify_recipient_(Mailbox const& recipient)
                  + "\r\n"s;
       write_(bfr.data(), bfr.size());
       LOG(WARNING) << "no such mailbox " << recipient;
-      return false;
-    }
-  }
-
-  // Check for local addresses we reject with prejudice.
-  for (const auto very_bad_recipient : Config::very_bad_recipients) {
-    if (0 == recipient.local_part().compare(very_bad_recipient)) {
-      auto bfr = "550 very bad recipient "s
-                 + static_cast<std::string>(recipient) + "\r\n"s;
-      write_(bfr.data(), bfr.size());
-      LOG(WARNING) << "very bad recipient " << recipient;
       return false;
     }
   }
