@@ -481,6 +481,8 @@ void scanner(Session& session)
 
 int main(int argc, char const* argv[])
 {
+  close(2); // hackage to stop glog from spewing
+
   std::ios::sync_with_stdio(false);
   google::InitGoogleLogging(argv[0]);
 
