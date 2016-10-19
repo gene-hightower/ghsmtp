@@ -48,7 +48,7 @@ public:
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
   bool data_start();
-  Message data_msg();
+  void data_msg(Message& msg);
   void data_msg_done(Message& msg);
 
   void rset();
@@ -103,7 +103,8 @@ private:
 
   std::random_device rd_;
 
-  bool reverse_path_verified_ = false;
+  bool reverse_path_verified_{false};
+  bool binarymime_{false};
 };
 
 namespace Config {

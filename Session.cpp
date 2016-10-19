@@ -132,7 +132,7 @@ void Session::greeting()
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          auto bfr = "421 blocked by "s + rbl + "\r\n"s;
+          auto bfr = "421 4.7.1 blocked by "s + rbl + "\r\n"s;
           write_(bfr.data(), bfr.size());
           LOG(ERROR) << client_ << " blocked by " << rbl;
           std::exit(EXIT_SUCCESS);
@@ -146,7 +146,7 @@ void Session::greeting()
     std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
-      char bfr[] = "421 input before greeting\r\n";
+      char bfr[] = "421 4.3.2 input before greeting\r\n";
       write_(bfr, sizeof(bfr) - 1);
       LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
@@ -184,7 +184,7 @@ void Session::ehlo(std::string client_identity)
   }
 
   // RFC 2034
-  // out << "250-ENHANCEDSTATUSCODES\r\n";
+  out << "250-ENHANCEDSTATUSCODES\r\n";
 
   // RFC 2920
   out << "250-PIPELINING\r\n";
@@ -197,8 +197,6 @@ void Session::ehlo(std::string client_identity)
 
   auto out_str = out.str();
   write_(out_str.data(), out_str.size());
-
-  LOG(INFO) << "EHLO " << client_identity_;
 }
 
 void Session::helo(std::string client_identity)
@@ -214,14 +212,12 @@ void Session::helo(std::string client_identity)
 
   auto bfr = "250 "s + fqdn_ + "\r\n"s;
   write_(bfr.data(), bfr.size());
-
-  LOG(INFO) << "HELO " << client_identity_;
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   if (client_identity_.empty()) {
-    char bfr[] = "503 'MAIL FROM' before 'HELO' or 'EHLO'\r\n";
+    char bfr[] = "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
@@ -244,7 +240,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         LOG(WARNING) << "7BIT transport requested";
       }
       else if (val == "BINARYMIME") {
-        // everything is cool, this is our default...
+        LOG(WARNING) << "BINARYMIME transport requested";
+        binarymime_ = true;
       }
       else {
         LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
@@ -263,8 +260,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         try {
           size_t sz = stoll(val);
           if (sz > Config::size) {
-            char bfr[]
-                = "552 message size exceeds fixed maximium message size\r\n";
+            char bfr[] = "552 5.3.4 message size exceeds fixed maximium "
+                         "message size\r\n";
             write_(bfr, sizeof(bfr) - 1);
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return;
@@ -287,7 +284,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reset_();
     reverse_path_ = std::move(reverse_path);
-    char bfr[] = "250 mail ok\r\n";
+    char bfr[] = "250 2.1.0 mail ok\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(INFO) << "MAIL FROM " << reverse_path_;
   }
@@ -299,7 +296,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   if (!reverse_path_verified_) {
-    char bfr[] = "503 'RCPT TO' before 'MAIL FROM'\r\n";
+    char bfr[] = "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
@@ -313,7 +310,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
   if (verify_recipient_(forward_path)) {
     forward_path_.push_back(std::move(forward_path));
-    char bfr[] = "250 OK\r\n";
+    char bfr[] = "250 2.1.5 OK\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(INFO) << "RCPT TO " << forward_path_.back();
   }
@@ -322,19 +319,25 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
 bool Session::data_start()
 {
+  if (binarymime_) {
+    char bfr[] = "503 5.5.1 DATA does not support BINARYMIME\r\n";
+    write_(bfr, sizeof(bfr) - 1);
+    LOG(WARNING) << "DATA does not support BINARYMIME";
+    return false;
+  }
   if (!reverse_path_verified_) {
-    char bfr[] = "503 need 'MAIL FROM' before 'DATA'\r\n";
+    char bfr[] = "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    char bfr[] = "554 no valid recipients\r\n";
+    char bfr[] = "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "no valid recipients";
     return false;
   }
-  char bfr[] = "354 go\r\n";
+  char bfr[] = "354 go, end with <CR><LF>.<CR><LF>\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "DATA";
   return true;
@@ -372,23 +375,21 @@ std::string Session::added_headers_(Message const& msg)
   return headers.str();
 }
 
-Message Session::data_msg() // called /after/ data_start
+void Session::data_msg(Message& msg) // called /after/ data_start
 {
-  Message msg(fqdn_);
+  msg.set_domain(fqdn_);
 
   // The headers Return-Path, X-Original-To, Received and Received-SPF
   // are added to the top of the message.
 
   msg.out() << added_headers_(msg);
-
-  return msg;
 }
 
 void Session::data_msg_done(Message& msg)
 {
   msg.save();
   LOG(INFO) << "message delivered with id " << msg.id();
-  char bfr[] = "250 OK\r\n";
+  char bfr[] = "250 2.0.0 OK\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "end DATA";
 }
@@ -396,21 +397,21 @@ void Session::data_msg_done(Message& msg)
 void Session::rset()
 {
   reset_();
-  char bfr[] = "250 OK\r\n";
+  char bfr[] = "250 2.0.0 OK\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "RSET";
 }
 
 void Session::noop()
 {
-  char bfr[] = "250 OK\r\n";
+  char bfr[] = "250 2.0.0 OK\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "NOOP";
 }
 
 void Session::vrfy()
 {
-  char bfr[] = "252 try it\r\n";
+  char bfr[] = "252 2.0.0 try it\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "VRFY";
 }
@@ -425,7 +426,7 @@ void Session::help()
 
 void Session::quit()
 {
-  char bfr[] = "221 bye\r\n";
+  char bfr[] = "221 2.0.0 bye\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(INFO) << "QUIT";
   std::exit(EXIT_SUCCESS);
@@ -433,14 +434,14 @@ void Session::quit()
 
 void Session::error(std::experimental::string_view msg)
 {
-  char bfr[] = "500 command unrecognized\r\n";
+  char bfr[] = "502 5.2.2 command unrecognized\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(WARNING) << msg;
 }
 
 void Session::time()
 {
-  char bfr[] = "421 timeout\r\n";
+  char bfr[] = "421 4.4.2 timeout\r\n";
   write_(bfr, sizeof(bfr) - 1);
   LOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
@@ -449,12 +450,12 @@ void Session::time()
 void Session::starttls()
 {
   if (sock_.tls()) {
-    char bfr[] = "554 TLS already active\r\n";
+    char bfr[] = "554 5.5.1 TLS already active\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "STARTTLS issued with TLS already active";
   }
   else {
-    char bfr[] = "220 go ahead\r\n";
+    char bfr[] = "220 2.0.0 go for TLS\r\n";
     write_(bfr, sizeof(bfr) - 1);
     sock_.starttls();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
@@ -482,7 +483,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
     if (!Domain::match(fqdn_, fcrdns_)
         && strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      char bfr[] = "421 liar\r\n";
+      char bfr[] = "421 4.7.1 liar\r\n";
       write_(bfr, sizeof(bfr) - 1);
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
@@ -495,7 +496,7 @@ bool Session::verify_client_(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    char bfr[] = "421 invalid sender\r\n";
+    char bfr[] = "421 4.1.8 invalid sender system address\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
@@ -504,7 +505,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
   CDB black("black");
   if (black.lookup(client_identity)) {
-    char bfr[] = "421 blacklisted identity\r\n";
+    char bfr[] = "421 4.7.0 blacklisted identity\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
@@ -521,7 +522,7 @@ bool Session::verify_client_(std::string const& client_identity)
   }
   else {
     if (black.lookup(tld)) {
-      char bfr[] = "421 blacklisted identity\r\n";
+      char bfr[] = "421 5.7.0 blacklisted identity\r\n";
       write_(bfr, sizeof(bfr) - 1);
       LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
@@ -556,7 +557,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 {
   // Make sure the domain matches.
   if (!Domain::match(recipient.domain(), fqdn_)) {
-    char bfr[] = "554 relay access denied\r\n";
+    char bfr[] = "554 5.1.2 relay access denied\r\n";
     write_(bfr, sizeof(bfr) - 1);
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
@@ -565,10 +566,10 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
-      auto bfr = "550 no such mailbox "s + static_cast<std::string>(recipient)
-                 + "\r\n"s;
+      auto bfr = "550 5.1.1 bad recipient "s
+                 + static_cast<std::string>(recipient) + "\r\n"s;
       write_(bfr.data(), bfr.size());
-      LOG(WARNING) << "no such mailbox " << recipient;
+      LOG(WARNING) << "bad recipient " << recipient;
       return false;
     }
   }
@@ -610,7 +611,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    auto bfr = "421 invalid sender domain "s + domain + "\r\n"s;
+    auto bfr = "421 5.7.1 invalid sender domain "s + domain + "\r\n"s;
     write_(bfr.data(), bfr.size());
     LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
     return false;
@@ -647,7 +648,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                            + three_level);
       }
       else {
-        char bfr[] = "421 bad sender domain\r\n";
+        char bfr[] = "421 5.7.1 bad sender domain\r\n";
         write_(bfr, sizeof(bfr) - 1);
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
@@ -663,7 +664,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                          + two_level);
     }
     else {
-      char bfr[] = "421 bad sender domain\r\n";
+      char bfr[] = "421 5.7.1 bad sender domain\r\n";
       write_(bfr, sizeof(bfr) - 1);
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
@@ -683,7 +684,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      auto bfr = "421 blocked by "s + uribl + "\r\n"s;
+      auto bfr = "421 5.7.1 blocked by "s + uribl + "\r\n"s;
       write_(bfr.data(), bfr.size());
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
@@ -713,7 +714,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    auto bfr = "421 "s + spf_res.smtp_comment();
+    auto bfr = "421 5.7.23 "s + spf_res.smtp_comment();
     write_(bfr.data(), bfr.size());
     LOG(ERROR) << spf_res.header_comment();
     return false;

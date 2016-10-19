@@ -54,6 +54,17 @@ action last {
   last = true;
 }
 
+action chunk_size_beg {
+  chunk_sz_beg = fpc;
+}
+
+action chunk_size_end {
+  chunk_sz_end = fpc;
+  chunk_sz = stoll(string(chunk_sz_beg, chunk_sz_end - chunk_sz_beg));
+  chunk_sz_beg = nullptr;
+  chunk_sz_end = nullptr;
+}
+
 #############################################################################
 
 UTF8_tail = 0x80..0xBF;
@@ -285,23 +296,29 @@ main := |*
  "DATA"i CRLF =>
  {
    if (session.data_start()) {
+     session.data_msg(msg);
      msg_bytes = 0;
-     msg = session.data_msg();
      LOG(INFO) << "calling data\n";
      fgoto data;
    }
  };
 
- "BDAT"i SP chunk_size (SP "LAST"i @last)? CRLF =>
+ "BDAT"i SP (chunk_size >chunk_size_beg %chunk_size_end) (SP "LAST"i @last)? CRLF =>
  {
+   LOG(INFO) << "BDAT " << chunk_sz << (last ? " LAST" : "");
+
    // eat data from our buffer
+   auto space = pe - ts;
+   LOG(INFO) << "space == " << space;
+
    if (last) {
-     last = false;
    }
+   chunk_sz = 0;
  };
 
  "RSET"i CRLF =>
  {
+   last = false;
    session.rset();
  };
 
@@ -340,8 +357,12 @@ main := |*
 
 void scanner(Session& session)
 {
-  Message msg("");
+  Message msg;
   size_t msg_bytes{0};
+
+  char const* chunk_sz_beg{nullptr};
+  char const* chunk_sz_end{nullptr};
+  size_t chunk_sz{0};
 
   char const* mb_loc_beg{nullptr};
   char const* mb_loc_end{nullptr};

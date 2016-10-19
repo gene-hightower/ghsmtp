@@ -32,7 +32,8 @@
 
 class Message {
 public:
-  Message(std::string const& fqdn)
+  Message() = default;
+  void set_domain(std::string const& fqdn)
   {
     if (fqdn.empty())
       return;
