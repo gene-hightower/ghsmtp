@@ -57,9 +57,9 @@ enum class Pkt_rcode {
 
 std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode);
 
-template <RR_type T>
+template <RR_type type>
 class Query;
-template <RR_type T>
+template <RR_type type>
 class Rrlist;
 
 class Resolver {
@@ -100,7 +100,7 @@ private:
   friend class Query<RR_type::TXT>;
 };
 
-template <RR_type T>
+template <RR_type type>
 class Query {
 public:
   Query(Query const&) = delete;
@@ -109,7 +109,7 @@ public:
   Query(Resolver const& res, Domain const& dom)
   {
     ldns_status stat = ldns_resolver_query_status(
-        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(T),
+        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(type),
         LDNS_RR_CLASS_IN, LDNS_RD);
 
     if (stat != LDNS_STATUS_OK) {
@@ -136,20 +136,20 @@ public:
 private:
   ldns_pkt* p_{nullptr};
 
-  friend class Rrlist<T>;
+  friend class Rrlist<type>;
 };
 
-template <RR_type T>
+template <RR_type type>
 class Rrlist {
 public:
   Rrlist(Rrlist const&) = delete;
   Rrlist& operator=(Rrlist const&) = delete;
 
-  explicit Rrlist(Query<T> const& q)
+  explicit Rrlist(Query<type> const& q)
   {
     if (q.p_) {
-      rrlst_ = ldns_pkt_rr_list_by_type(q.p_, static_cast<ldns_enum_rr_type>(T),
-                                        LDNS_SECTION_ANSWER);
+      rrlst_ = ldns_pkt_rr_list_by_type(
+          q.p_, static_cast<ldns_enum_rr_type>(type), LDNS_SECTION_ANSWER);
     }
   }
   ~Rrlist()
@@ -168,8 +168,8 @@ private:
   std::string rr_str(ldns_rdf const* rdf) const;
 };
 
-template <RR_type T>
-inline std::string Rrlist<T>::rr_str(ldns_rdf const* rdf) const
+template <RR_type type>
+inline std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 {
   char const* data = static_cast<char const*>(rdf->_data);
   unsigned char const* udata = static_cast<unsigned char const*>(rdf->_data);
@@ -177,22 +177,22 @@ inline std::string Rrlist<T>::rr_str(ldns_rdf const* rdf) const
   return std::string(data + 1, static_cast<size_t>(*udata));
 }
 
-template <RR_type T>
+template <RR_type type>
 inline bool has_record(Resolver const& res, std::string const& addr)
 {
   Domain dom(addr.c_str());
-  Query<T> q(res, dom);
-  Rrlist<T> rrlst(q);
+  Query<type> q(res, dom);
+  Rrlist<type> rrlst(q);
   return !rrlst.empty();
 }
 
-template <RR_type T>
+template <RR_type type>
 inline std::vector<std::string> get_records(Resolver const& res,
                                             std::string const& addr)
 {
   Domain dom(addr.c_str());
-  Query<T> q(res, dom);
-  Rrlist<T> rrlst(q);
+  Query<type> q(res, dom);
+  Rrlist<type> rrlst(q);
   return rrlst.get();
 }
 
