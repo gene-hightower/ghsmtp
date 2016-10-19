@@ -716,7 +716,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    auto bfr = "421 5.7.23 "s + spf_res.smtp_comment();
+    auto bfr = "421 5.7.23 "s + spf_res.smtp_comment() + "\r\n"s;
     write_(bfr.data(), bfr.size());
     LOG(ERROR) << spf_res.header_comment();
     return false;
