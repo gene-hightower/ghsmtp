@@ -470,10 +470,12 @@ void Session::starttls()
 
 bool Session::verify_client_(std::string const& client_identity)
 {
-  if (IP4::is_address(client_identity)
-      && (client_identity != sock_.them_c_str())) {
-    LOG(WARNING) << "client claiming questionable IP address "
-                 << client_identity;
+  if (IP4::is_address(client_identity)) {
+    if (client_identity != sock_.them_c_str()) {
+      LOG(WARNING) << "client claiming questionable IP address "
+                   << client_identity;
+    }
+    return true;
   }
 
   // Bogus clients claim to be us or some local host.

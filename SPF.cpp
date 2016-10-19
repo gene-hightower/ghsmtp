@@ -56,6 +56,9 @@ std::ostream& operator<<(std::ostream& os, Result result)
 // own fatal, error, warning and info log levels.
 
 static void log_error(const char* file, int line, char const* errmsg)
+#ifdef __clang__
+__attribute__((noreturn))
+#endif
 {
   LOG(FATAL) << errmsg;
 }
