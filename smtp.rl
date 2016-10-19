@@ -275,6 +275,11 @@ data := |*
 
 main := |*
 
+ "AUTH LOGIN"i CRLF =>
+ {
+   session.error("AUTH not supported");
+ };
+
  "EHLO"i SP (Domain | address_literal) CRLF =>
  {
    char const* beg = ts + 5;
@@ -289,7 +294,8 @@ main := |*
    session.helo(string(beg, end - beg));
  };
 
- "MAIL FROM:"i Reverse_path (SP Mail_parameters)? CRLF =>
+ # optional space not specified by RFC 5321
+ "MAIL FROM:"i SP? Reverse_path (SP Mail_parameters)? CRLF =>
  {
    session.mail_from(Mailbox(mb_loc, mb_dom), parameters);
 
@@ -298,7 +304,8 @@ main := |*
    parameters.clear();
  };
 
- "RCPT TO:"i Forward_path (SP Rcpt_parameters)? CRLF =>
+ # optional space not specified by RFC 5321
+ "RCPT TO:"i SP? Forward_path (SP Rcpt_parameters)? CRLF =>
  {
    session.rcpt_to(Mailbox(mb_loc, mb_dom), parameters);
 
