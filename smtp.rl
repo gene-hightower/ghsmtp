@@ -428,8 +428,14 @@ void scanner(Session& session)
 
     char* p = buf + have;
     std::streamsize len = session.read(p, space);
-    pe = p + len;
-    eof = nullptr;
+
+    if (len == -1) { // EOF processing
+      pe = p;
+      len = 0;
+    } else {
+      pe = p + len;
+      eof = nullptr;
+    }
 
     // Check if this is the end of file.
     if (len == 0) {
@@ -442,7 +448,7 @@ void scanner(Session& session)
       done = true;
     }
 
-    // LOG(INFO) << "exec \'" << string_view(buf, have + len) << "'";
+    LOG(INFO) << "exec \'" << string_view(buf, have + len) << "'";
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
