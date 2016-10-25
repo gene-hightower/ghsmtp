@@ -17,6 +17,8 @@
 CXXFLAGS += -DSMTP_HOME=$(shell pwd)
 
 LDLIBS += \
+	-lboost_filesystem \
+	-lboost_system \
 	-lcdb \
 	-lcrypto \
 	-lglog \
@@ -67,16 +69,11 @@ all:: $(databases)
 TMPDIR ?= /tmp
 TEST_MAILDIR=$(TMPDIR)/Maildir
 
-$(TEST_MAILDIR):
-	mkdir -p $(TEST_MAILDIR)/tmp $(TEST_MAILDIR)/new
-
-check:: $(TEST_MAILDIR)
-
 smtp.cpp: smtp.rl
 	ragel -o smtp.cpp smtp.rl
 
 clean::
-	rm -f smtp.cpp smtp.hpp stack.hh
+	rm -f smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@

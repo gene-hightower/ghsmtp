@@ -24,6 +24,8 @@
 #include <random>
 #include <sstream>
 
+#include <boost/filesystem.hpp>
+
 #include <pwd.h>
 #include <sys/types.h>
 
@@ -33,12 +35,15 @@
 class Message {
 public:
   Message() = default;
-  void set_domain(std::string const& fqdn)
+
+  enum class SpamStatus : bool { ham, spam };
+
+  void open(std::string const& fqdn, SpamStatus spam)
   {
     if (fqdn.empty())
       return;
 
-    std::string maildir;
+    boost::filesystem::path maildir;
 
     char const* ev = getenv("MAILDIR");
     if (ev) {
@@ -56,7 +61,11 @@ public:
         PCHECK(pw = getpwuid(getuid()));
         maildir = pw->pw_dir;
       }
-      maildir += "/Maildir";
+      maildir /= "Maildir";
+    }
+
+    if (spam == SpamStatus::spam) {
+      maildir /= ".Junk";
     }
 
     // Unique name, see: <http://cr.yp.to/proto/maildir.html>
@@ -64,8 +73,19 @@ public:
     uniq << then_.sec() << "."
          << "R" << s_ << "." << fqdn;
 
-    tmpfn_ = maildir + "/tmp/" + uniq.str();
-    newfn_ = maildir + "/new/" + uniq.str();
+    tmpfn_ = maildir;
+    newfn_ = maildir;
+
+    tmpfn_ /= "tmp";
+    newfn_ /= "new";
+
+    // mkdirs for tmpfn_ and newfn_
+    boost::system::error_code ec;
+    create_directories(tmpfn_, ec);
+    create_directories(newfn_, ec);
+
+    tmpfn_ /= uniq.str();
+    newfn_ /= uniq.str();
 
     // open
     ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -91,8 +111,8 @@ private:
 
   std::ofstream ofs_;
 
-  std::string tmpfn_;
-  std::string newfn_;
+  boost::filesystem::path tmpfn_;
+  boost::filesystem::path newfn_;
 };
 
 #endif // MESSAGE_DOT_HPP
