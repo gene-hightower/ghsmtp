@@ -39,6 +39,19 @@ inline bool is_address(std::experimental::string_view addr)
   return regex_match(addr.begin(), addr.end(), matches, re);
 }
 
+inline bool is_bracket_address(std::experimental::string_view addr)
+{
+  using namespace boost::xpressive;
+
+  cregex octet = (as_xpr('2') >> '5' >> range('0', '5'))
+                 | ('2' >> range('0', '4') >> _d)
+                 | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+  cregex re
+      = '[' >> octet >> '.' >> octet >> '.' >> octet >> '.' >> octet >> ']';
+  cmatch matches;
+  return regex_match(addr.begin(), addr.end(), matches, re);
+}
+
 inline std::string reverse(std::experimental::string_view addr)
 {
   using namespace boost::xpressive;

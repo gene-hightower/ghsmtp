@@ -470,12 +470,10 @@ void Session::starttls()
 
 bool Session::verify_client_(std::string const& client_identity)
 {
-  if (IP4::is_address(client_identity)) {
-    if (client_identity != sock_.them_c_str()) {
-      LOG(WARNING) << "client claiming questionable IP address "
-                   << client_identity;
-    }
-    return true;
+  if (IP4::is_bracket_address(client_identity)) {
+    char bfr[] = "421 4.7.1 need domain name\r\n";
+    write_(bfr, sizeof(bfr) - 1);
+    return false;
   }
 
   // Bogus clients claim to be us or some local host.

@@ -24,6 +24,12 @@ int main(int argc, char const* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
+  CHECK(IP4::is_bracket_address("[69.0.0.0]"));
+  CHECK(!IP4::is_bracket_address("69.0.0.0]"));
+  CHECK(!IP4::is_bracket_address("[69.0.0.0"));
+  CHECK(!IP4::is_bracket_address("[]"));
+  CHECK(!IP4::is_bracket_address("[1234]"));
+
   CHECK(IP4::is_address("69.0.0.0"));
   CHECK(IP4::is_address("160.0.0.0"));
   CHECK(IP4::is_address("250.0.0.0"));

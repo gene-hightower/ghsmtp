@@ -36,20 +36,6 @@ action mb_dom_end {
   mb_dom_end = nullptr;
 }
 
-action mb_ip_beg {
-  mb_dom_beg = fpc + 1;
-}
-
-action mb_ip_end {
-  CHECK_NOTNULL(mb_dom_beg);
-
-  mb_dom_end = fpc - 1;
-  mb_dom = string(mb_dom_beg, mb_dom_end - mb_dom_beg);
-
-  mb_dom_beg = nullptr;
-  mb_dom_end = nullptr;
-}
-
 action key_end {
   param.first += ::toupper(fc);
 }
@@ -204,7 +190,7 @@ Dot_string = Atom ('.'  Atom)*;
 Local_part = Dot_string | Quoted_string;
 
 Mailbox = Local_part >mb_loc_beg %mb_loc_end '@'
-          ((Domain >mb_dom_beg %mb_dom_end) | (address_literal >mb_ip_beg %mb_ip_end));
+          ((Domain | address_literal) >mb_dom_beg %mb_dom_end);
 
 Path = "<" ((A_d_l ":")? Mailbox) ">";
 
