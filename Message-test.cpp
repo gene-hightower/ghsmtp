@@ -27,17 +27,17 @@ int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  char env[100] = "MAILDIR=/tmp/Maildir";
+  char env[] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 
   Message msg;
-  msg.set_domain("example.com");
+  msg.open("example.com", Message::SpamStatus::ham);
 
   msg.out() << "foo bar baz";
   msg.save();
 
   Message msg2;
-  msg2.set_domain("example.com");
+  msg2.open("example.com", Message::SpamStatus::spam);
 
   CHECK(msg.id() != msg2.id());
 
