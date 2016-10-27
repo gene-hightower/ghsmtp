@@ -377,7 +377,8 @@ std::string Session::added_headers_(Message const& msg)
 
 void Session::data_msg(Message& msg) // called /after/ data_start
 {
-  msg.open(fqdn_, Message::SpamStatus::ham);
+  msg.open(fqdn_,
+           sock_.tls() ? Message::SpamStatus::ham : Message::SpamStatus::spam);
 
   // The headers Return-Path, X-Original-To, Received and Received-SPF
   // are added to the top of the message.
