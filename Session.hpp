@@ -103,8 +103,9 @@ private:
 
   std::random_device rd_;
 
-  bool reverse_path_verified_{false};
   bool binarymime_{false};
+  bool ip_whitelisted_{false};
+  bool reverse_path_verified_{false};
 };
 
 namespace Config {

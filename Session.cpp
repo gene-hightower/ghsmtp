@@ -127,6 +127,7 @@ void Session::greeting()
     CDB white("ip-white");
     if (white.lookup(sock_.them_c_str())) {
       LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+      ip_whitelisted_ = true;
     }
     else {
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
@@ -587,7 +588,7 @@ bool Session::verify_sender_(Mailbox const& sender)
       return false;
   }
 
-  if (sock_.has_peername()) {
+  if (sock_.has_peername() && !ip_whitelisted_) {
     if (!verify_sender_spf_(sender))
       return false;
   }
