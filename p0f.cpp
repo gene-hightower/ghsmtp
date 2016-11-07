@@ -101,12 +101,13 @@ int main(int argc, char const* argv[])
   for (auto i = 1; i < argc; ++i) {
     if (IP4::is_address(argv[i])) {
 
-      p0f_api_query q;
+      p0f_api_query query_msg;
 
-      if (inet_pton(AF_INET, argv[i], reinterpret_cast<void*>(&q.addr)) == 1) {
-        q.addr_type = P0fAddr::IPV4;
+      if (inet_pton(AF_INET, argv[i], reinterpret_cast<void*>(&query_msg.addr))
+          == 1) {
+        query_msg.addr_type = P0fAddr::IPV4;
         auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        PCHECK(fd >= 0) << "open failed";
+        PCHECK(fd >= 0) << "socket() failed";
 
         sockaddr_un addr;
         memset(&addr, 0, sizeof(addr));
@@ -115,29 +116,34 @@ int main(int argc, char const* argv[])
 
         PCHECK(
             connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr))
-            >= 0);
+            == 0)
+            << "p0f api connect() failed";
 
-        PCHECK(write(fd, reinterpret_cast<void const*>(&q), sizeof(q)))
-            << "p0f api write failed";
+        PCHECK(write(fd, reinterpret_cast<void const*>(&query_msg),
+                     sizeof(query_msg))
+               == sizeof(query_msg))
+            << "p0f api write() failed";
 
-        p0f_api_response r;
+        p0f_api_response response_msg;
 
-        PCHECK(read(fd, reinterpret_cast<void*>(&r), sizeof(r)))
-            << "p0f api read failed";
+        PCHECK(read(fd, reinterpret_cast<void*>(&response_msg),
+                    sizeof(response_msg))
+               == sizeof(response_msg))
+            << "p0f api read() failed";
 
-        PCHECK(close(fd) >= 0) << "p0f api close failed";
+        PCHECK(close(fd) == 0) << "p0f api close failed";
 
-        CHECK(r.magic == P0fMagic::RESP);
+        CHECK(response_msg.magic == P0fMagic::RESP);
 
-        switch (r.status) {
+        switch (response_msg.status) {
         case P0fStatus::BADQUERY:
           LOG(ERROR) << "bad query";
           break;
         case P0fStatus::OK:
-          std::cout << "os_match_q == " << static_cast<int>(r.os_match_q)
-                    << "\n";
-          std::cout << "os_name    == " << r.os_name << "\n";
-          std::cout << "os_flavor  == " << r.os_flavor << "\n";
+          std::cout << "os_match_q == "
+                    << static_cast<int>(response_msg.os_match_q) << "\n";
+          std::cout << "os_name    == " << response_msg.os_name << "\n";
+          std::cout << "os_flavor  == " << response_msg.os_flavor << "\n";
           break;
         case P0fStatus::NOMATCH:
           LOG(ERROR) << "no match";
