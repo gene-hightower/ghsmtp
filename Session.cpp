@@ -88,7 +88,7 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    LOG(INFO) << "connect from " << sock_.them_c_str();
+    // LOG(INFO) << "connect from " << sock_.them_c_str();
 
     // This is just a teaser, the first line of a multi-line response.
     auto bfr = "220-"s + fqdn_ + " ESMTP ghsmtp\r\n"s;
@@ -118,7 +118,7 @@ void Session::greeting()
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
       client_ = fcrdns_ + " [" + sock_.them_c_str() + "]";
-      LOG(INFO) << "connect from " << fcrdns_;
+      // LOG(INFO) << "connect from " << fcrdns_;
     }
     else {
       client_ = std::string("unknown [") + sock_.them_c_str() + "]";
@@ -135,10 +135,11 @@ void Session::greeting()
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           auto bfr = "421 4.7.1 blocked by "s + rbl + "\r\n"s;
           write_(bfr.data(), bfr.size());
-          LOG(ERROR) << client_ << " blocked by " << rbl;
+          // LOG(ERROR) << client_ << " blocked by " << rbl;
           std::exit(EXIT_SUCCESS);
         }
       }
+      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
     }
 
     // Wait a (random) bit of time for pre-greeting traffic.
@@ -149,13 +150,15 @@ void Session::greeting()
     if (sock_.input_ready(wait)) {
       char bfr[] = "421 4.3.2 input before greeting\r\n";
       write_(bfr, sizeof(bfr) - 1);
-      LOG(ERROR) << client_ << " input before greeting";
+      // LOG(ERROR) << client_ << " input before greeting";
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
 
   auto bfr = "220 "s + fqdn_ + " ESMTP ghsmtp\r\n"s;
   write_(bfr.data(), bfr.size());
+
+  LOG(INFO) << "connect from " << client_;
 }
 
 void Session::ehlo(std::string client_identity)
