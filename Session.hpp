@@ -90,10 +90,10 @@ private:
 private:
   Sock sock_;
 
-  std::string fqdn_;                  // who we identify as
+  std::string our_fqdn_;              // who we identify as
   std::string fcrdns_;                // who they look-up as
   std::string client_;                // (fcrdns_ [sock_.them_c_str()])
-  std::string client_identity_;       // ehlo/helo
+  std::string client_identity_;       // from ehlo/helo
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 
