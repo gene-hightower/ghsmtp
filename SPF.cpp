@@ -22,34 +22,25 @@ namespace SPF {
 
 std::ostream& operator<<(std::ostream& os, Result result)
 {
-  char const* msg = "Unknown";
   switch (result) {
   case Result::INVALID:
-    msg = "INVALID";
-    break;
+    return os << "INVALID";
   case Result::NEUTRAL:
-    msg = "NEUTRAL";
-    break;
+    return os << "NEUTRAL";
   case Result::PASS:
-    msg = "PASS";
-    break;
+    return os << "PASS";
   case Result::FAIL:
-    msg = "FAIL";
-    break;
+    return os << "FAIL";
   case Result::SOFTFAIL:
-    msg = "SOFTFAIL";
-    break;
+    return os << "SOFTFAIL";
   case Result::NONE:
-    msg = "NONE";
-    break;
+    return os << "NONE";
   case Result::TEMPERROR:
-    msg = "TEMPERROR";
-    break;
+    return os << "TEMPERROR";
   case Result::PERMERROR:
-    msg = "PERMERROR";
-    break;
+    return os << "PERMERROR";
   }
-  return os << msg;
+  return os << "Unknown";
 };
 
 // We map libspf2's levels of error, warning, info and debug to our
@@ -57,18 +48,18 @@ std::ostream& operator<<(std::ostream& os, Result result)
 
 static void log_error(const char* file, int line, char const* errmsg)
 #ifdef __clang__
-__attribute__((noreturn))
+    __attribute__((noreturn))
 #endif
 {
-  LOG(FATAL) << errmsg;
+  LOG(FATAL) << file << ":" << line << " " << errmsg;
 }
 static void log_warning(const char* file, int line, char const* errmsg)
 {
-  LOG(ERROR) << errmsg;
+  LOG(ERROR) << file << ":" << line << " " << errmsg;
 }
 static void log_info(const char* file, int line, char const* errmsg)
 {
-  LOG(WARNING) << errmsg;
+  LOG(WARNING) << file << ":" << line << " " << errmsg;
 }
 
 struct Init {
