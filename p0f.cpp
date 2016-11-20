@@ -98,6 +98,18 @@ struct p0f_api_response {
 
 int main(int argc, char const* argv[])
 {
+  auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  PCHECK(fd >= 0) << "socket() failed";
+
+  sockaddr_un addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, "/run/p0f.sock", sizeof(addr.sun_path) - 1);
+
+  PCHECK(connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr))
+         == 0)
+      << "p0f api connect() failed";
+
   for (auto i = 1; i < argc; ++i) {
     if (IP4::is_address(argv[i])) {
 
@@ -106,18 +118,6 @@ int main(int argc, char const* argv[])
       if (inet_pton(AF_INET, argv[i], reinterpret_cast<void*>(&query_msg.addr))
           == 1) {
         query_msg.addr_type = P0fAddr::IPV4;
-        auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
-        PCHECK(fd >= 0) << "socket() failed";
-
-        sockaddr_un addr;
-        memset(&addr, 0, sizeof(addr));
-        addr.sun_family = AF_UNIX;
-        strncpy(addr.sun_path, "/run/p0f.sock", sizeof(addr.sun_path) - 1);
-
-        PCHECK(
-            connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr))
-            == 0)
-            << "p0f api connect() failed";
 
         PCHECK(write(fd, reinterpret_cast<void const*>(&query_msg),
                      sizeof(query_msg))
@@ -130,8 +130,6 @@ int main(int argc, char const* argv[])
                     sizeof(response_msg))
                == sizeof(response_msg))
             << "p0f api read() failed";
-
-        PCHECK(close(fd) == 0) << "p0f api close failed";
 
         CHECK(response_msg.magic == P0fMagic::RESP);
 
@@ -152,4 +150,6 @@ int main(int argc, char const* argv[])
       }
     }
   }
+
+  PCHECK(close(fd) == 0) << "p0f api close failed";
 }
