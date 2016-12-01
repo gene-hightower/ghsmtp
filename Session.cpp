@@ -392,6 +392,11 @@ void Session::data_msg(Message& msg) // called /after/ data_start
     status = Message::SpamStatus::ham;
   }
 
+  CDB white("white");
+  if (white.lookup(client_identity_)) {
+    status = Message::SpamStatus::ham;
+  }
+
   // I will allow this as sort of the gold standard for naming.
   if (client_identity_ == fcrdns_) {
     status = Message::SpamStatus::ham;
