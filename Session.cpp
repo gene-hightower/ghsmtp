@@ -330,19 +330,19 @@ bool Session::data_start()
   if (binarymime_) {
     char rply[] = "503 5.5.1 DATA does not support BINARYMIME\r\n";
     write_(rply, sizeof(rply) - 1);
-    LOG(WARNING) << "DATA does not support BINARYMIME";
+    LOG(ERROR) << "DATA does not support BINARYMIME";
     return false;
   }
   if (!reverse_path_verified_) {
     char rply[] = "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n";
     write_(rply, sizeof(rply) - 1);
-    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
+    LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
     char rply[] = "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n";
     write_(rply, sizeof(rply) - 1);
-    LOG(WARNING) << "no valid recipients";
+    LOG(ERROR) << "no valid recipients";
     return false;
   }
   char rply[] = "354 go, end with <CR><LF>.<CR><LF>\r\n";
@@ -461,7 +461,7 @@ void Session::error(std::experimental::string_view m)
 {
   char rply[] = "502 5.2.2 command unrecognized\r\n";
   write_(rply, sizeof(rply) - 1);
-  LOG(WARNING) << m;
+  LOG(ERROR) << m;
 }
 
 void Session::time()
@@ -477,7 +477,7 @@ void Session::starttls()
   if (sock_.tls()) {
     char rply[] = "554 5.5.1 TLS already active\r\n";
     write_(rply, sizeof(rply) - 1);
-    LOG(WARNING) << "STARTTLS issued with TLS already active";
+    LOG(ERROR) << "STARTTLS issued with TLS already active";
   }
   else {
     char rply[] = "220 2.0.0 go for TLS\r\n";
@@ -701,7 +701,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
   }
 
   if (two_level.compare(tld)) {
-    LOG(WARNING) << "two level " << two_level << " != tld " << tld;
+    LOG(INFO) << "two level " << two_level << " != tld " << tld;
   }
 
   return verify_sender_domain_uribl_(tld);
