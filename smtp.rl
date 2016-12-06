@@ -249,12 +249,6 @@ data := |*
    fgoto main;
  };
 
- any =>
- {
-   LOG(ERROR) << "data protocol error [[" << string(ts, static_cast<size_t>(te - ts)) << "]]";
-   fgoto main;
- };
-
 *|;
 
 #............................................................................
