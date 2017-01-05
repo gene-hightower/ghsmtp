@@ -73,7 +73,7 @@ smtp.cpp: smtp.rl
 	ragel -o smtp.cpp smtp.rl
 
 clean::
-	rm -f smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
+	rm -rf smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@
