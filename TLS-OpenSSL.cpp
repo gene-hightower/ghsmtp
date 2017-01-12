@@ -40,7 +40,7 @@ TLS::TLS()
   CHECK(SSL_CTX_check_private_key(ctx_))
       << "Private key does not match the public certificate";
 
-  constexpr char dh_ike_23_pem[]
+  constexpr auto dh_ike_23_pem
       = "-----BEGIN DH PARAMETERS-----\n"
         "MIICCgKCAQEArRB+HpEjqdDWYPqnlVnFH6INZOVoO5/RtUsVl7YdCnXm+hQd+VpW\n"
         "26+aPEB7od8V6z1oijCcGA4d5rhaEnSgpm0/gVKtasISkDfJ7e/aTfjZHo/vVbc5\n"
