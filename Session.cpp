@@ -28,7 +28,8 @@
 
 namespace Config {
 constexpr char const* const bad_recipients[] = {
-    "a", "ene", "h.gene", "jay", "lizard", "mixmaster", "nobody", "oq6_2nbq",
+    "a",         "ene",    "h.gene",   "jay",         "lizard",
+    "mixmaster", "nobody", "oq6_2nbq", "truthfinder",
 };
 
 constexpr char const* const rbls[] = {
