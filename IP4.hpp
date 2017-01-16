@@ -18,9 +18,12 @@ inline boost::xpressive::cregex single_octet()
 {
   using namespace boost::xpressive;
 
+  // clang-format off
   return (as_xpr('2') >> '5' >> range('0', '5'))
          | ('2' >> range('0', '4') >> _d)
-         | (range('0', '1') >> repeat<1, 2>(_d)) | repeat<1, 2>(_d);
+         | (range('0', '1') >> repeat<2>(_d))
+         | repeat<1, 2>(_d);
+  // clang-format on
 }
 
 inline bool is_address(std::experimental::string_view addr)
