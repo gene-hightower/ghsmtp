@@ -28,11 +28,8 @@ constexpr auto starttls_timeout = std::chrono::seconds(10);
 class SockDevice {
 public:
   SockDevice& operator=(const SockDevice&) = delete;
-  SockDevice(const SockDevice& that)
-    : fd_in_(that.fd_in_)
-    , fd_out_(that.fd_out_)
-  {
-  }
+  SockDevice(const SockDevice& that) = delete;
+
   SockDevice(int fd_in, int fd_out)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
