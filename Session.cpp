@@ -19,7 +19,6 @@
 #include "Message.hpp"
 #include "SPF.hpp"
 #include "Session.hpp"
-#include "TLD.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -380,8 +379,12 @@ void Session::data_msg(Message& msg) // called /after/ data_start
     status = Message::SpamStatus::ham;
   }
 
+  char const* tld = tld_db_.get_registered_domain(client_identity_.c_str());
+  if (!tld) {
+    tld = client_identity_.c_str();
+  }
   CDB white("white");
-  if (white.lookup(client_identity_)) {
+  if (white.lookup(tld)) {
     status = Message::SpamStatus::ham;
   }
 
@@ -531,8 +534,7 @@ bool Session::verify_client_(std::string const& client_identity)
     LOG(INFO) << "unblack client identity " << client_identity;
   }
 
-  TLD tld_db;
-  char const* tld = tld_db.get_registered_domain(client_identity.c_str());
+  char const* tld = tld_db_.get_registered_domain(client_identity.c_str());
   if (!tld) {
     tld = client_identity.c_str();
   }
@@ -639,10 +641,9 @@ bool Session::verify_sender_domain_(std::string const& sender)
     return true;
   }
 
-  TLD tld_db;
-  char const* tld = tld_db.get_registered_domain(domain.c_str());
+  char const* tld = tld_db_.get_registered_domain(domain.c_str());
   if (!tld) {
-    tld = domain.c_str(); // If ingoing domain is a TLD.
+    tld = domain.c_str();
   }
   if (white.lookup(tld)) {
     LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";

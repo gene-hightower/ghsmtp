@@ -20,6 +20,9 @@ int main(int argc, char const* argv[])
   CHECK(!strcmp(tld.get_registered_domain("pi.digilicious.com"),
                 "digilicious.com"));
 
+  CHECK(!strcmp(tld.get_registered_domain("outmail14.phi.meetup.com"),
+                "meetup.com"));
+
   CHECK(nullptr == tld.get_registered_domain("not_a_domain_at_all"));
   CHECK(nullptr == tld.get_registered_domain(".com"));
   CHECK(nullptr == tld.get_registered_domain("."));

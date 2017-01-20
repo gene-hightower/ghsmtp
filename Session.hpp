@@ -16,6 +16,7 @@
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Sock.hpp"
+#include "TLD.hpp"
 
 class Session {
 public:
@@ -89,6 +90,8 @@ private:
   char const* protocol_{""};
 
   std::random_device rd_;
+
+  TLD tld_db_;
 
   bool binarymime_{false};
   bool ip_whitelisted_{false};
