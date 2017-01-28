@@ -38,7 +38,7 @@ private:
 
 inline std::ostream& operator<<(std::ostream& s, Mailbox const& mb)
 {
-  return s << mb.local_part() << '@' << mb.domain();
+  return s << static_cast<std::string>(mb);
 }
 
 #endif // MAILBOX_DOT_HPP
