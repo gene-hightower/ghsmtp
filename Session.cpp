@@ -573,6 +573,11 @@ bool Session::verify_client_(std::string const& client_identity)
 
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
+  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
+    LOG(INFO) << "magic Postmaster address";
+    return true;
+  }
+
   // Make sure the domain matches.
   if (!Domain::match(recipient.domain(), our_fqdn_)) {
     char rply[] = "554 5.1.2 relay access denied\r\n";

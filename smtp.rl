@@ -36,6 +36,11 @@ action mb_dom_end {
   mb_dom_end = nullptr;
 }
 
+action magic_postmaster {
+  mb_loc = string("Postmaster");
+  mb_dom.clear();
+}
+
 action key_end {
   param.first += ::toupper(fc);
 }
@@ -196,7 +201,7 @@ Path = "<" ((A_d_l ":")? Mailbox) ">";
 
 Reverse_path = Path | "<>";
 
-Forward_path = Path;
+Forward_path = Path | "<Postmaster>"i %magic_postmaster;
 
 esmtp_keyword = ((alpha | digit) (alpha | digit | '-')*) @key_end;
 
