@@ -26,7 +26,10 @@ public:
   std::string const& domain() const { return domain_; }
   std::string const& local_part() const { return local_part_; }
   bool empty() const { return local_part_.empty() && domain_.empty(); }
-  operator std::string() const { return local_part() + "@" + domain(); }
+  operator std::string() const
+  {
+    return local_part() + (domain().empty() ? "" : ("@" + domain()));
+  }
 
 private:
   std::string local_part_;
