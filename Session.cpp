@@ -619,7 +619,7 @@ bool Session::verify_sender_(Mailbox const& sender)
 
 bool Session::verify_sender_domain_(std::string const& sender)
 {
-  if (0 == sender.length()) {
+  if (sender.empty()) {
     // MAIL FROM:<>
     // is used to send bounce messages.
     return true;
