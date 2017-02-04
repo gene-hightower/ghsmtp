@@ -76,8 +76,8 @@ void Session::greeting()
     if (black.lookup(sock_.them_c_str())) {
       char rply[] = "421 4.7.1 IP address blacklisted\r\n";
       write_(rply, sizeof(rply) - 1);
-      // LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
-      sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+      LOG(ERROR) << "IP address " << sock_.them_c_str() << " blacklisted";
+      sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
       std::exit(EXIT_SUCCESS);
     }
 
@@ -128,8 +128,8 @@ void Session::greeting()
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           auto rply = "421 4.7.1 blocked by "s + rbl + "\r\n"s;
           write_(rply.data(), rply.size());
-          // LOG(ERROR) << client_ << " blocked by " << rbl;
-          sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+          LOG(ERROR) << client_ << " blocked by " << rbl;
+          sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
           std::exit(EXIT_SUCCESS);
         }
       }
@@ -144,8 +144,8 @@ void Session::greeting()
     if (sock_.input_ready(wait)) {
       char rply[] = "421 4.5.0 input before greeting\r\n";
       write_(rply, sizeof(rply) - 1);
-      // LOG(ERROR) << client_ << " input before greeting";
-      sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+      LOG(ERROR) << client_ << " input before greeting";
+      sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
@@ -161,7 +161,7 @@ void Session::ehlo(std::string client_identity)
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
 
   if (!verify_client_(client_identity)) {
-    sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+    sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
 
@@ -204,7 +204,7 @@ void Session::helo(std::string client_identity)
   protocol_ = "SMTP";
 
   if (!verify_client_(client_identity)) {
-    sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+    sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
 
@@ -290,7 +290,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     LOG(INFO) << "MAIL FROM " << reverse_path_;
   }
   else {
-    sd_journal_print(LOG_NOTICE, "ghsmtp: bad host [%s]", sock_.them_c_str());
+    sd_journal_print(LOG_NOTICE, "bad host [%s]", sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
 }
