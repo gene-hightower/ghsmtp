@@ -16,7 +16,9 @@
 
 USES = ldns openssl
 
-CXXFLAGS += -DSMTP_HOME=$(shell pwd)
+# Ragel generated code requires signed chars
+
+CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
