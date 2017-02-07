@@ -14,7 +14,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES = ldns openssl
+USES := ldns openssl
 
 # Ragel generated code requires signed chars
 
@@ -29,11 +29,11 @@ LDLIBS += \
 	-lregdom \
 	-lspf2
 
-PROGRAMS = smtp
+PROGRAMS := smtp
 
 smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL
 
-TESTS = \
+TESTS := \
 	CDB-test \
 	DNS-test \
 	Domain-test \
@@ -50,15 +50,15 @@ TESTS = \
 	TLD-test \
 	TLS-OpenSSL-test
 
-DNS-test_STEMS = DNS
-POSIX-test_STEMS = POSIX
-SPF-test_STEMS = SPF
-Session-test_STEMS = DNS POSIX SPF Session TLS-OpenSSL
-SockDevice-test_STEMS = POSIX TLS-OpenSSL
-Sock-test_STEMS = POSIX TLS-OpenSSL
-TLS-OpenSSL-test_STEMS = POSIX TLS-OpenSSL
+DNS-test_STEMS := DNS
+POSIX-test_STEMS := POSIX
+SPF-test_STEMS := SPF
+Session-test_STEMS := DNS POSIX SPF Session TLS-OpenSSL
+SockDevice-test_STEMS := POSIX TLS-OpenSSL
+Sock-test_STEMS := POSIX TLS-OpenSSL
+TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 
-databases = \
+databases := \
 	black.cdb \
 	ip-black.cdb \
 	ip-white.cdb \
