@@ -28,6 +28,8 @@
 #include <syslog.h>
 
 namespace Config {
+constexpr char const* const accept_domains[] = {};
+
 constexpr char const* const bad_recipients[] = {
     "a",         "ene",    "h.gene",   "jay",         "lizard",
     "mixmaster", "nobody", "oq6_2nbq", "truthfinder",
@@ -589,8 +591,16 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return true;
   }
 
+  auto accepted_domain = false;
+  for (const auto d : Config::accept_domains) {
+    if (Domain::match(recipient.domain(), d)) {
+      accepted_domain = true;
+      break;
+    }
+  }
+
   // Make sure the domain matches.
-  if (!Domain::match(recipient.domain(), our_fqdn_)) {
+  if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)) {
     char rply[] = "554 5.1.2 relay access denied\r\n";
     write_(rply, sizeof(rply) - 1);
     LOG(WARNING) << "relay access denied for " << recipient;
