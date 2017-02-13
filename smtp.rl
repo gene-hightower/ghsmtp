@@ -55,20 +55,20 @@ action param {
   param.second.clear();
 }
 
-action last {
-  last = true;
-}
+# action last {
+#   last = true;
+# }
 
-action chunk_size_beg {
-  chunk_sz_beg = fpc;
-}
+# action chunk_size_beg {
+#   chunk_sz_beg = fpc;
+# }
 
-action chunk_size_end {
-  chunk_sz_end = fpc;
-  chunk_sz = stoll(string(chunk_sz_beg, chunk_sz_end - chunk_sz_beg));
-  chunk_sz_beg = nullptr;
-  chunk_sz_end = nullptr;
-}
+# action chunk_size_end {
+#   chunk_sz_end = fpc;
+#   chunk_sz = stoll(string(chunk_sz_beg, chunk_sz_end - chunk_sz_beg));
+#   chunk_sz_beg = nullptr;
+#   chunk_sz_end = nullptr;
+# }
 
 #############################################################################
 
