@@ -664,13 +664,13 @@ bool Session::verify_sender_domain_(std::string const& sender)
     return false;
   }
 
-  CDB white("white");
+  auto white = CDB("white");
   if (white.lookup(domain)) {
     LOG(INFO) << "sender \"" << domain << "\" whitelisted";
     return true;
   }
 
-  char const* tld = tld_db_.get_registered_domain(domain.c_str());
+  auto tld = tld_db_.get_registered_domain(domain.c_str());
   if (!tld) {
     tld = domain.c_str();
   }
@@ -681,11 +681,10 @@ bool Session::verify_sender_domain_(std::string const& sender)
 
   // Based on <http://www.surbl.org/guidelines>
 
-  std::string two_level
-      = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+  auto two_level = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
 
   if (labels.size() > 2) {
-    std::string three_level = labels[labels.size() - 3] + "." + two_level;
+    auto three_level = labels[labels.size() - 3] + "." + two_level;
 
     CDB three_tld("three-level-tlds");
     if (three_tld.lookup(three_level.c_str())) {
@@ -703,7 +702,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
     }
   }
 
-  CDB two_tld("two-level-tlds");
+  auto two_tld = CDB("two-level-tlds");
   if (two_tld.lookup(two_level.c_str())) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
