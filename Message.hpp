@@ -6,9 +6,8 @@
 #ifndef MESSAGE_DOT_HPP
 #define MESSAGE_DOT_HPP
 
+#include <cstdlib>
 #include <fstream>
-#include <iomanip>
-#include <random>
 #include <sstream>
 
 #include <boost/filesystem.hpp>
