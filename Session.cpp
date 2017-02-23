@@ -392,12 +392,15 @@ void Session::data_msg(Message& msg) // called /after/ data_start
     status = Message::SpamStatus::ham;
   }
 
-  char const* tld = tld_db_.get_registered_domain(client_identity_.c_str());
-  if (!tld) {
-    tld = client_identity_.c_str();
-  }
+  auto client_identity_c_str = client_identity_.c_str();
+
   CDB white("white");
-  if (white.lookup(tld)) {
+  if (white.lookup(client_identity_c_str)) {
+    status = Message::SpamStatus::ham;
+  }
+
+  char const* tld = tld_db_.get_registered_domain(client_identity_c_str);
+  if (tld && white.lookup(tld)) {
     status = Message::SpamStatus::ham;
   }
 
