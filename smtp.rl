@@ -475,6 +475,12 @@ int main(int argc, char const* argv[])
   close(2); // hackage to stop glog from spewing
 
   std::ios::sync_with_stdio(false);
+
+  auto logdir = getenv("GOOGLE_LOG_DIR");
+  if (logdir) {
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(logdir, ec); // ignore errors;
+  }
   google::InitGoogleLogging(argv[0]);
 
   Session session;
