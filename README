@@ -1,11 +1,11 @@
-Gene's simple SMTP server.
+Gene Hightower's simple SMTP server.
 
 A program to receive Internet (RFC 5321) mail.
 
 Free software — AGPLv3
 
-Written using Standard C++ — plus OpenSSL, boost, ldns, spf2, regdom,
-cdb etc.  Compiles with recent GCC and clang.
+Written using Standard C++ — plus Ragel, OpenSSL, boost, ldns, spf2,
+regdom, TinyCDB, glog etc.  Compiles with recent GCC and clang.
 
 No runtime configuration file — code as configuration.
 
