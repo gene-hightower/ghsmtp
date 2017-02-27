@@ -66,6 +66,8 @@ private:
   {
     reverse_path_.clear();
     forward_path_.clear();
+    binarymime_ = false;
+    reverse_path_verified_ = false;
   }
 
   bool verify_client_(std::string const& client_identity);
