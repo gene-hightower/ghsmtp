@@ -286,8 +286,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
+  reset_();
+
   if (verify_sender_(reverse_path)) {
-    forward_path_.clear();
     reverse_path_ = std::move(reverse_path);
     char rply[] = "250 2.1.0 mail ok\r\n";
     write_(rply, sizeof(rply) - 1);
