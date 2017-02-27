@@ -429,6 +429,8 @@ void Session::data_msg_done(Message& msg)
 void Session::rset()
 {
   reset_();
+  binarymime_ = false;
+  reverse_path_verified_ = false;
   char rply[] = "250 2.0.0 OK\r\n";
   write_(rply, sizeof(rply) - 1);
   LOG(INFO) << "RSET";
