@@ -19,7 +19,7 @@ public:
 
     s_ = uni_dist(rd);
 
-    int resp = b32_ndigits_;
+    auto resp = b32_ndigits_;
     b32_str_[resp] = '\0';
 
     // <http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt>
@@ -68,7 +68,7 @@ public:
 private:
   unsigned long long s_;
 
-  static constexpr int b32_ndigits_ = ((sizeof(s_) * CHAR_BIT) + 4) / 5;
+  static constexpr size_t b32_ndigits_ = ((sizeof(s_) * CHAR_BIT) + 4) / 5;
   char b32_str_[b32_ndigits_ + 1];
 
   friend std::ostream& operator<<(std::ostream& s, Pill const& p)
