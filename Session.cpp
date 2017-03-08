@@ -388,20 +388,30 @@ void Session::data_msg(Message& msg) // called /after/ data_start
     status = Message::SpamStatus::ham;
   }
 
-  auto client_identity_c_str = client_identity_.c_str();
-
   CDB white("white");
-  if (white.lookup(client_identity_c_str)) {
+
+  if (!fcrdns_.empty()) {
+    if (white.lookup(fcrdns_.c_str())) {
+      status = Message::SpamStatus::ham;
+    }
+
+    char const* tld = tld_db_.get_registered_domain(fcrdns_.c_str());
+    if (tld && white.lookup(tld)) {
+      status = Message::SpamStatus::ham;
+    }
+
+    // I will allow this as sort of the gold standard for naming.
+    if (client_identity_ == fcrdns_) {
+      status = Message::SpamStatus::ham;
+    }
+  }
+
+  if (white.lookup(client_identity_.c_str())) {
     status = Message::SpamStatus::ham;
   }
 
-  char const* tld = tld_db_.get_registered_domain(client_identity_c_str);
-  if (tld && white.lookup(tld)) {
-    status = Message::SpamStatus::ham;
-  }
-
-  // I will allow this as sort of the gold standard for naming.
-  if (client_identity_ == fcrdns_) {
+  char const* tld_client = tld_db_.get_registered_domain(client_identity_.c_str());
+  if (tld_client && white.lookup(tld_client)) {
     status = Message::SpamStatus::ham;
   }
 
