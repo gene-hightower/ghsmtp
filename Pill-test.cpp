@@ -24,4 +24,5 @@ int main(int arcv, char* argv[])
   CHECK_EQ(red, red2);
 
   std::cout << "sizeof(Pill) == " << sizeof(Pill) << '\n';
+  std::cout << red << '\n' << blue << '\n';
 }
