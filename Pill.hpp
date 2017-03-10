@@ -32,7 +32,7 @@ public:
 
     unsigned long x = 0;
 
-    switch ((osp - os) % 5) {
+    switch ((osp - os) % 5) { // Duff's device
     case 0:
       do {
         x = *--osp;
