@@ -4,6 +4,7 @@
 *.o
 *~
 cdb-gen
+msg
 p0f
 smtp
 smtp.cpp
