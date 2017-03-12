@@ -21,6 +21,7 @@ CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
+	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
@@ -33,6 +34,8 @@ PROGRAMS := smtp p0f
 p0f_STEMS := p0f
 
 smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL
+
+msg_STEMS := msg
 
 TESTS := \
 	CDB-test \
@@ -75,6 +78,9 @@ TEST_MAILDIR=$(TMPDIR)/Maildir
 smtp.cpp: smtp.rl
 	ragel -o smtp.cpp smtp.rl
 
+msg.cpp: msg.rl
+	ragel -o msg.cpp msg.rl
+
 clean::
 	rm -rf smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
 
@@ -95,3 +101,8 @@ two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
 
 include ../MKUltra/rules
+
+regression: $(programs) $(TEST_MAILDIR)
+	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
+	ls -l smtp
+	size smtp
