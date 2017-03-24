@@ -21,7 +21,6 @@ CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
-	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
