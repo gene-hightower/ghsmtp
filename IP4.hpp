@@ -14,10 +14,10 @@ inline boost::xpressive::cregex single_octet()
   using namespace boost::xpressive;
 
   // clang-format off
-  return (as_xpr('2') >> '5' >> range('0', '5'))
-         | ('2' >> range('0', '4') >> _d)
-         | (range('0', '1') >> repeat<2>(_d))
-         | repeat<1, 2>(_d);
+  return (as_xpr('2') >> '5' >> range('0', '5'))  // 250->255
+         | ('2' >> range('0', '4') >> _d)         // 200->249
+         | (range('0', '1') >> repeat<2>(_d))     // 000->199
+         | repeat<1, 2>(_d);                      //   0->99
   // clang-format on
 }
 

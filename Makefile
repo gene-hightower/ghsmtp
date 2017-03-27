@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := ldns openssl
+USES := ldns openssl libcurl
 
 # Ragel generated code requires signed chars
 
@@ -21,7 +21,6 @@ CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
-	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
@@ -33,7 +32,7 @@ PROGRAMS := smtp p0f
 
 p0f_STEMS := p0f
 
-smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL
+smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL ../date/tz
 
 msg_STEMS := msg
 
@@ -55,11 +54,13 @@ TESTS := \
 	TLS-OpenSSL-test
 
 DNS-test_STEMS := DNS
+Message-test_STEMS := ../date/tz
+Now-test_STEMS := ../date/tz
 POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
 Session-test_STEMS := DNS POSIX SPF Session TLS-OpenSSL
-SockDevice-test_STEMS := POSIX TLS-OpenSSL
 Sock-test_STEMS := POSIX TLS-OpenSSL
+SockDevice-test_STEMS := POSIX TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 
 databases := \

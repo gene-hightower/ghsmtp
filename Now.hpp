@@ -1,38 +1,48 @@
 #ifndef NOW_DOT_HPP
 #define NOW_DOT_HPP
 
-#include <sys/time.h>
-
+#include <chrono>
 #include <iostream>
 
 #include <glog/logging.h>
 
+#include "../date/tz.h"
+
 class Now {
 public:
   Now()
+    : v_{std::chrono::system_clock::now()}
   {
-    PCHECK(gettimeofday(&tv_, 0) == 0);
-    tm my_tm;
-    CHECK_NOTNULL(localtime_r(&tv_.tv_sec, &my_tm));
-    CHECK_EQ(
-        strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", &my_tm),
-        sizeof(c_str_) - 1);
+    auto tz = date::current_zone();
+    auto zoned = date::make_zoned(tz, date::floor<std::chrono::seconds>(v_));
+    // RFC 5322 date-time section 3.3.
+    str_ = date::format("%a, %d %b %Y %H:%M:%S %z", zoned);
+    CHECK_EQ(str_.length(), 31) << str_ << " is the wrong length";
   }
-  time_t sec() const { return tv_.tv_sec; }
-  suseconds_t usec() const { return tv_.tv_usec; }
-  bool operator==(Now const& that) const
+
+  auto sec() const
   {
-    return (this->sec() == that.sec()) && (this->usec() == that.usec());
+    return std::chrono::duration_cast<std::chrono::seconds>(
+               v_.time_since_epoch())
+        .count();
   }
+  auto usec() const
+  {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               v_.time_since_epoch())
+        .count();
+  }
+
+  bool operator==(Now const& that) const { return v_ == that.v_; }
   bool operator!=(Now const& that) const { return !(*this == that); }
 
 private:
-  timeval tv_;
-  char c_str_[32]; // RFC 5322 date-time section 3.3.
+  std::chrono::time_point<std::chrono::system_clock> v_;
+  std::string str_;
 
   friend std::ostream& operator<<(std::ostream& s, Now const& now)
   {
-    return s << now.c_str_;
+    return s << now.str_;
   }
 };
 
