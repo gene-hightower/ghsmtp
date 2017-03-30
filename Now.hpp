@@ -6,7 +6,7 @@
 
 #include <glog/logging.h>
 
-#include "../date/tz.h"
+#include "date/tz.h"
 
 class Now {
 public:

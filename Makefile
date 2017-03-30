@@ -32,7 +32,7 @@ PROGRAMS := smtp p0f
 
 p0f_STEMS := p0f
 
-smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL ../date/tz
+smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL date/tz
 
 msg_STEMS := msg
 
@@ -54,8 +54,8 @@ TESTS := \
 	TLS-OpenSSL-test
 
 DNS-test_STEMS := DNS
-Message-test_STEMS := ../date/tz
-Now-test_STEMS := ../date/tz
+Message-test_STEMS := date/tz
+Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
 Session-test_STEMS := DNS POSIX SPF Session TLS-OpenSSL
