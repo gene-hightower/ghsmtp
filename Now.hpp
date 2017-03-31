@@ -12,11 +12,12 @@ class Now {
 public:
   Now()
     : v_{std::chrono::system_clock::now()}
+    , str_{
+          // RFC 5322 date-time section 3.3.
+          date::format("%a, %d %b %Y %H:%M:%S %z",
+                       date::make_zoned(date::current_zone(),
+                                        date::floor<std::chrono::seconds>(v_)))}
   {
-    auto tz = date::current_zone();
-    auto zoned = date::make_zoned(tz, date::floor<std::chrono::seconds>(v_));
-    // RFC 5322 date-time section 3.3.
-    str_ = date::format("%a, %d %b %Y %H:%M:%S %z", zoned);
     CHECK_EQ(str_.length(), 31) << str_ << " is the wrong length";
   }
 
