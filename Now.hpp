@@ -13,7 +13,7 @@ public:
   Now()
     : v_{std::chrono::system_clock::now()}
     , str_{
-          // RFC 5322 date-time section 3.3.
+          // RFC 5322 section 3.3 date-time.
           date::format("%a, %d %b %Y %H:%M:%S %z",
                        date::make_zoned(date::current_zone(),
                                         date::floor<std::chrono::seconds>(v_)))}
