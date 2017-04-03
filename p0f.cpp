@@ -78,6 +78,9 @@ struct p0f_api_response {
 
 int main(int argc, char const* argv[])
 {
+  static_assert(sizeof(p0f_api_query) == 21);
+  static_assert(sizeof(p0f_api_response) == 232);
+
   auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
   PCHECK(fd >= 0) << "socket() failed";
 
