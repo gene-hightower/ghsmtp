@@ -50,7 +50,7 @@ struct p0f_api_query {
 struct p0f_api_response {
 
   P0fMagic const magic{P0fMagic::UNKNOWN};
-  P0fStatus status;
+  P0fStatus status{P0fStatus::BADQUERY};
 
   uint32_t first_seen; // First seen (unix time)
   uint32_t last_seen;  // Last seen (unix time)
