@@ -83,5 +83,5 @@ std::streamsize POSIX::io_fd_(char const* fnm,
     return static_cast<std::streamsize>(-1);
   }
 
-  return static_cast<std::streamsize>(n_ret);
+  return n_ret;
 }
