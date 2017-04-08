@@ -23,7 +23,7 @@ std::ostream& operator<<(std::ostream& os, Result result)
     return os << "PERMERROR";
   }
   return os << "Unknown";
-};
+}
 
 // We map libspf2's levels of error, warning, info and debug to our
 // own fatal, error, warning and info log levels.

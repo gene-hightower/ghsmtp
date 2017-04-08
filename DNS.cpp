@@ -46,7 +46,7 @@ std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
     break;
   }
   return os << msg;
-};
+}
 
 template <>
 std::vector<std::string> Rrlist<RR_type::TXT>::get() const
