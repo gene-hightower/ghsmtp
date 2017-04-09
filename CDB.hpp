@@ -34,7 +34,9 @@ public:
   }
   bool lookup(std::experimental::string_view key)
   {
-    if (cdb_find(&cdb_, key.data(), key.length()) > 0) {
+    CHECK_LT(key.length(), std::numeric_limits<unsigned int>::max());
+    if (cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length()))
+        > 0) {
       return true;
     }
     return false;
