@@ -8,6 +8,8 @@
 
 #include <glog/logging.h>
 
+#include <boost/config.hpp>
+
 // A pill is a unit of entropy.
 
 class Pill {
