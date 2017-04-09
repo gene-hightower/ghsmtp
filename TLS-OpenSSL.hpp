@@ -39,7 +39,7 @@ private:
                           std::chrono::milliseconds wait,
                           bool& t_o);
 
-  static void ssl_error();
+  static void ssl_error() __attribute__((noreturn));
 
 private:
   SSL_CTX* ctx_{nullptr};
