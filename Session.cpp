@@ -258,7 +258,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       }
       else {
         try {
-          size_t sz = stoll(val);
+          size_t sz = stoull(val);
           if (sz > Config::size) {
             char rply[] = "552 5.3.4 message size exceeds fixed maximium "
                           "message size\r\n";
@@ -670,7 +670,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
     return false;
   }
 
-  auto white = CDB("white");
+  CDB white("white");
   if (white.lookup(domain)) {
     LOG(INFO) << "sender \"" << domain << "\" whitelisted";
     return true;
@@ -708,7 +708,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
     }
   }
 
-  auto two_tld = CDB("two-level-tlds");
+  CDB two_tld("two-level-tlds");
   if (two_tld.lookup(two_level.c_str())) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
