@@ -21,6 +21,7 @@ CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
+	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
@@ -28,7 +29,7 @@ LDLIBS += \
 	-lregdom \
 	-lspf2
 
-PROGRAMS := smtp p0f
+PROGRAMS := smtp p0f msg
 
 p0f_STEMS := p0f
 
@@ -78,9 +79,6 @@ TEST_MAILDIR=$(TMPDIR)/Maildir
 
 smtp.cpp: smtp.rl
 	ragel -o smtp.cpp smtp.rl
-
-msg.cpp: msg.rl
-	ragel -o msg.cpp msg.rl
 
 clean::
 	rm -rf smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
