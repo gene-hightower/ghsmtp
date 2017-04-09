@@ -178,6 +178,11 @@ inline std::vector<std::string> get_records(Resolver const& res,
   return rrlst.get();
 }
 
+template <>
+std::vector<std::string> Rrlist<RR_type::A>::get() const;
+template <>
+std::vector<std::string> Rrlist<RR_type::PTR>::get() const;
+
 } // namespace DNS
 
 #endif // DNS_DOT_HPP
