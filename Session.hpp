@@ -38,9 +38,9 @@ public:
   void noop();
   void vrfy();
   void help();
-  void quit();
+  void quit() __attribute__((noreturn));
   void error(std::experimental::string_view msg);
-  void time();
+  void time() __attribute__((noreturn));
   void starttls();
 
   bool timed_out() { return sock_.timed_out(); }
