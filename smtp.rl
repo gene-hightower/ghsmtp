@@ -42,7 +42,7 @@ action magic_postmaster {
 }
 
 action key_end {
-  param.first += ::toupper(fc);
+  param.first += static_cast<char>(::toupper(fc));
 }
 
 action val_end {
