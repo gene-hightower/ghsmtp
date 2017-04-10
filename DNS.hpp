@@ -178,6 +178,14 @@ inline std::vector<std::string> get_records(Resolver const& res,
   return rrlst.get();
 }
 
+/* These two declarations are a promise that in some other translation
+   unit there are specializations defined for A and PTR records.
+
+   This could be a lie.  Only the linker knows for sure.
+
+   So why ask me to make the claim?
+ */
+
 template <>
 std::vector<std::string> Rrlist<RR_type::A>::get() const;
 template <>
