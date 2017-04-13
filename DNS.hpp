@@ -153,8 +153,8 @@ private:
 template <RR_type type>
 inline std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 {
-  char const* data = static_cast<char const*>(rdf->_data);
-  unsigned char const* udata = static_cast<unsigned char const*>(rdf->_data);
+  auto data = static_cast<char const*>(rdf->_data);
+  auto udata = static_cast<unsigned char const*>(rdf->_data);
 
   return std::string(data + 1, static_cast<size_t>(*udata));
 }
