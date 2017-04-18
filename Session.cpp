@@ -537,7 +537,7 @@ bool Session::verify_client_(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    char rply[] = "421 4.1.8 invalid sender system address\r\n";
+    char rply[] = "550 4.1.8 invalid sender system address\r\n";
     write_(rply, sizeof(rply) - 1);
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
@@ -546,7 +546,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
   CDB black("black");
   if (black.lookup(client_identity)) {
-    char rply[] = "421 4.7.1 blacklisted identity\r\n";
+    char rply[] = "550 4.7.1 blacklisted identity\r\n";
     write_(rply, sizeof(rply) - 1);
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
@@ -562,7 +562,7 @@ bool Session::verify_client_(std::string const& client_identity)
   }
   else {
     if (black.lookup(tld)) {
-      char rply[] = "421 4.7.0 blacklisted identity\r\n";
+      char rply[] = "550 4.7.0 blacklisted identity\r\n";
       write_(rply, sizeof(rply) - 1);
       LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
@@ -610,7 +610,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // Make sure the domain matches.
   if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)) {
-    char rply[] = "554 5.1.2 relay access denied\r\n";
+    char rply[] = "554 5.7.1 relay access denied\r\n";
     write_(rply, sizeof(rply) - 1);
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
@@ -664,7 +664,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    auto rply = "421 5.7.1 invalid sender domain "s + domain + "\r\n"s;
+    auto rply = "550 5.7.1 invalid sender domain "s + domain + "\r\n"s;
     write_(rply.data(), rply.size());
     LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
     return false;
@@ -699,7 +699,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                            + three_level);
       }
       else {
-        char rply[] = "421 4.7.1 bad sender domain\r\n";
+        char rply[] = "550 4.7.1 bad sender domain\r\n";
         write_(rply, sizeof(rply) - 1);
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
@@ -715,7 +715,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                          + two_level);
     }
     else {
-      char rply[] = "421 4.7.1 bad sender domain\r\n";
+      char rply[] = "550 4.7.1 bad sender domain\r\n";
       write_(rply, sizeof(rply) - 1);
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
@@ -735,7 +735,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      auto rply = "421 4.7.1 blocked by "s + uribl + "\r\n"s;
+      auto rply = "550 4.7.1 blocked by "s + uribl + "\r\n"s;
       write_(rply.data(), rply.size());
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
@@ -765,7 +765,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    auto rply = "421 4.7.23 "s + spf_res.smtp_comment() + "\r\n"s;
+    auto rply = "550 4.7.23 "s + spf_res.smtp_comment() + "\r\n"s;
     write_(rply.data(), rply.size());
     LOG(ERROR) << spf_res.header_comment();
     return false;
