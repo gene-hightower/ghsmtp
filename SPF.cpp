@@ -28,10 +28,8 @@ std::ostream& operator<<(std::ostream& os, Result result)
 // We map libspf2's levels of error, warning, info and debug to our
 // own fatal, error, warning and info log levels.
 
+static void log_error(const char* file, int line, char const* errmsg) __attribute__((noreturn));
 static void log_error(const char* file, int line, char const* errmsg)
-#ifdef __clang__
-    __attribute__((noreturn))
-#endif
 {
   LOG(FATAL) << file << ":" << line << " " << errmsg;
 }
