@@ -75,7 +75,7 @@ void Session::greeting()
 
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
-      char rply[] = "421 4.7.1 IP address blacklisted\r\n";
+      char rply[] = "550 5.3.2 service currently unavailable\r\n";
       write_(rply, sizeof(rply) - 1);
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
@@ -127,7 +127,7 @@ void Session::greeting()
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          auto rply = "421 4.7.1 blocked by "s + rbl + "\r\n"s;
+          auto rply = "554 5.7.1 blocked by "s + rbl + "\r\n"s;
           write_(rply.data(), rply.size());
           syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                  sock_.them_c_str(), rbl);
@@ -143,7 +143,7 @@ void Session::greeting()
     std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
-      char rply[] = "421 4.5.0 input before greeting\r\n";
+      char rply[] = "550 5.3.2 service currently unavailable\r\n";
       write_(rply, sizeof(rply) - 1);
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
              sock_.them_c_str());
@@ -540,7 +540,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
     if (!Domain::match(our_fqdn_, fcrdns_)
         && strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      char rply[] = "421 4.7.1 liar\r\n";
+      char rply[] = "550 5.7.1 liar\r\n";
       write_(rply, sizeof(rply) - 1);
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
