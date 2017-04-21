@@ -30,6 +30,10 @@ constexpr char const* const bad_recipients[] = {
     "mixmaster", "nobody", "oq6_2nbq", "truthfinder",
 };
 
+constexpr char const* const bad_senders[] = {
+    "kris.antoine@gmail.com",
+};
+
 constexpr char const* const rbls[] = {
     "zen.spamhaus.org", "b.barracudacentral.org",
 };
@@ -282,6 +286,17 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   reset_();
+
+  auto sender = static_cast<std::string>(reverse_path);
+
+  for (const auto bad_sender : Config::bad_senders) {
+    if (sender == bad_sender) {
+      char rply[] = "550 5.7.26 bad sender\r\n";
+      write_(rply, sizeof(rply) - 1);
+      LOG(WARNING) << "bad sender " << sender;
+      return;
+    }
+  }
 
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
