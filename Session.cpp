@@ -425,7 +425,8 @@ void Session::data_msg(Message& msg) // called /after/ data_start
     status = Message::SpamStatus::ham;
   }
 
-  char const* tld_client = tld_db_.get_registered_domain(client_identity_.c_str());
+  char const* tld_client
+      = tld_db_.get_registered_domain(client_identity_.c_str());
   if (tld_client && white.lookup(tld_client)) {
     status = Message::SpamStatus::ham;
   }
