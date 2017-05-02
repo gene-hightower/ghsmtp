@@ -16,8 +16,9 @@
 USES := ldns openssl libcurl
 
 # Ragel generated code requires signed chars
+# -fsigned-char
 
-CXXFLAGS += -DSMTP_HOME=$(shell pwd) -fsigned-char
+CXXFLAGS += -DSMTP_HOME=$(shell pwd)
 
 LDLIBS += \
 	-lboost_filesystem \
@@ -50,7 +51,7 @@ TESTS := \
 	SPF-test \
 	Session-test \
 	Sock-test \
-	SockDevice-test \
+	SockBuffer-test \
 	TLD-test \
 	TLS-OpenSSL-test
 
@@ -61,7 +62,7 @@ POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
 Session-test_STEMS := DNS POSIX SPF Session TLS-OpenSSL
 Sock-test_STEMS := POSIX TLS-OpenSSL
-SockDevice-test_STEMS := POSIX TLS-OpenSSL
+SockBuffer-test_STEMS := POSIX TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 
 databases := \
@@ -77,11 +78,11 @@ all:: $(databases)
 TMPDIR ?= /tmp
 TEST_MAILDIR=$(TMPDIR)/Maildir
 
-smtp.cpp: smtp.rl
-	ragel -o smtp.cpp smtp.rl
+#smtp.cpp: smtp.rl
+#	ragel -o smtp.cpp smtp.rl
 
 clean::
-	rm -rf smtp.cpp smtp.hpp stack.hh $(TEST_MAILDIR)
+	rm -rf stack.hh $(TEST_MAILDIR)
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@

@@ -7,7 +7,6 @@ cdb-gen
 msg
 p0f
 smtp
-smtp.cpp
 smtp.pem
 three-level-black.cdb
 three-level-tlds

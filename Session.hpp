@@ -44,18 +44,14 @@ public:
   void starttls();
 
   bool timed_out() { return sock_.timed_out(); }
-
-  std::streamsize read(char* s, std::streamsize n) { return sock_.read(s, n); }
+  std::istream& in() { return sock_.in(); }
 
 private:
   friend struct Session_test;
 
-  std::streamsize write_(const char* s, std::streamsize n)
-  {
-    return sock_.write(s, n);
-  }
-
   std::string added_headers_(Message const& msg);
+
+  std::ostream& out() { return sock_.out(); }
 
   void reset_()
   {

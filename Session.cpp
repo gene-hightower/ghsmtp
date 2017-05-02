@@ -75,8 +75,7 @@ void Session::greeting()
 
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
-      char rply[] = "550 5.3.2 service currently unavailable\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
       std::exit(EXIT_SUCCESS);
@@ -85,8 +84,7 @@ void Session::greeting()
     // LOG(INFO) << "connect from " << sock_.them_c_str();
 
     // This is just a teaser, the first line of a multi-line response.
-    auto rply = "220-"s + our_fqdn_ + " ESMTP ghsmtp\r\n"s;
-    write_(rply.data(), rply.size());
+    out() << "220-" << our_fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
 
     using namespace DNS;
     Resolver res;
@@ -127,8 +125,7 @@ void Session::greeting()
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          auto rply = "554 5.7.1 blocked by "s + rbl + "\r\n"s;
-          write_(rply.data(), rply.size());
+          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
           syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                  sock_.them_c_str(), rbl);
           std::exit(EXIT_SUCCESS);
@@ -143,16 +140,14 @@ void Session::greeting()
     std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
-      char rply[] = "550 5.3.2 service currently unavailable\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
              sock_.them_c_str());
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
 
-  auto rply = "220 "s + our_fqdn_ + " ESMTP ghsmtp\r\n"s;
-  write_(rply.data(), rply.size());
+  out() << "220 " << our_fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
 
   LOG(INFO) << "connect from " << client_;
 }
@@ -170,35 +165,31 @@ void Session::ehlo(std::string client_identity)
   reset_();
   client_identity_ = std::move(client_identity);
 
-  std::ostringstream out;
-  out << "250-" << our_fqdn_ << "\r\n";
+  out() << "250-" << our_fqdn_ << "\r\n";
 
   // RFC 1870
-  out << "250-SIZE " << Config::size << "\r\n";
+  out() << "250-SIZE " << Config::size << "\r\n";
 
   // RFC 6152
-  out << "250-8BITMIME\r\n";
+  out() << "250-8BITMIME\r\n";
 
   // If we're not already TLS, offer TLS
   if (!sock_.tls()) {
     // RFC 3207
-    out << "250-STARTTLS\r\n";
+    out() << "250-STARTTLS\r\n";
   }
 
   // RFC 2034
-  out << "250-ENHANCEDSTATUSCODES\r\n";
+  out() << "250-ENHANCEDSTATUSCODES\r\n";
 
   // RFC 2920
-  out << "250-PIPELINING\r\n";
+  out() << "250-PIPELINING\r\n";
 
   // RFC 3030
-  // out << "250-CHUNKING\r\n";
+  // out() << "250-CHUNKING\r\n";
 
   // RFC 6531
-  out << "250 SMTPUTF8\r\n";
-
-  auto out_str = out.str();
-  write_(out_str.data(), out_str.size());
+  out() << "250 SMTPUTF8\r\n" << std::flush;
 }
 
 void Session::helo(std::string client_identity)
@@ -214,15 +205,13 @@ void Session::helo(std::string client_identity)
   reset_();
   client_identity_ = std::move(client_identity);
 
-  auto rply = "250 "s + our_fqdn_ + "\r\n"s;
-  write_(rply.data(), rply.size());
+  out() << "250 " << our_fqdn_ << "\r\n" << std::flush;
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   if (client_identity_.empty()) {
-    char rply[] = "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
     LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -264,9 +253,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         try {
           size_t sz = stoull(val);
           if (sz > Config::size) {
-            char rply[] = "552 5.3.4 message size exceeds fixed maximium "
-                          "message size\r\n";
-            write_(rply, sizeof(rply) - 1);
+            out() << "552 5.3.4 message size exceeds fixed maximium message "
+                     "size\r\n"
+                  << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return;
           }
@@ -291,8 +280,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   for (const auto bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
-      char rply[] = "550 5.7.26 bad sender\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 5.7.26 bad sender\r\n" << std::flush;
       LOG(WARNING) << "bad sender " << sender;
       return;
     }
@@ -300,8 +288,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
-    char rply[] = "250 2.1.0 mail ok\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "250 2.1.0 mail ok\r\n" << std::flush;
     LOG(INFO) << "MAIL FROM " << reverse_path_;
   }
   else {
@@ -314,8 +301,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   if (!reverse_path_verified_) {
-    char rply[] = "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -329,8 +315,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   if (verify_recipient_(forward_path)) {
     forward_path_.push_back(std::move(forward_path));
-    char rply[] = "250 2.1.5 OK\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "250 2.1.5 OK\r\n" << std::flush;
     LOG(INFO) << "RCPT TO " << forward_path_.back();
   }
   // We're lenient on most bad recipients, no else/exit here.
@@ -339,25 +324,21 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 bool Session::data_start()
 {
   if (binarymime_) {
-    char rply[] = "503 5.5.1 DATA does not support BINARYMIME\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
     LOG(ERROR) << "DATA does not support BINARYMIME";
     return false;
   }
   if (!reverse_path_verified_) {
-    char rply[] = "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
     LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    char rply[] = "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
     LOG(ERROR) << "no valid recipients";
     return false;
   }
-  char rply[] = "354 go, end with <CR><LF>.<CR><LF>\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
   LOG(INFO) << "DATA";
   return true;
 }
@@ -443,60 +424,53 @@ void Session::data_msg_done(Message& msg)
 {
   msg.save();
   LOG(INFO) << "message delivered with id " << msg.id();
-  char rply[] = "250 2.0.0 OK\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "end DATA";
 }
 
 void Session::rset()
 {
   reset_();
-  char rply[] = "250 2.0.0 OK\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "RSET";
 }
 
 void Session::noop()
 {
-  char rply[] = "250 2.0.0 OK\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "NOOP";
 }
 
 void Session::vrfy()
 {
-  char rply[] = "252 2.0.0 try it\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "252 2.0.0 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY";
 }
 
 void Session::help()
 {
-  char rply[] = "214-see https://digilicious.com/smtp.html\r\n"
-                "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "214-see https://digilicious.com/smtp.html\r\n"
+           "214 and https://www.ietf.org/rfc/rfc5321.txt\r\n"
+        << std::flush;
   LOG(INFO) << "HELP";
 }
 
 void Session::quit()
 {
-  char rply[] = "221 2.0.0 bye\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "221 2.0.0 bye\r\n" << std::flush;
   LOG(INFO) << "QUIT";
   std::exit(EXIT_SUCCESS);
 }
 
 void Session::error(std::experimental::string_view m)
 {
-  char rply[] = "502 5.2.2 command unrecognized\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "502 5.2.2 command unrecognized\r\n" << std::flush;
   LOG(ERROR) << m;
 }
 
 void Session::time()
 {
-  char rply[] = "421 4.4.2 timeout\r\n";
-  write_(rply, sizeof(rply) - 1);
+  out() << "421 4.4.2 timeout\r\n" << std::flush;
   LOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
 }
@@ -504,13 +478,11 @@ void Session::time()
 void Session::starttls()
 {
   if (sock_.tls()) {
-    char rply[] = "554 5.5.1 TLS already active\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "554 5.5.1 TLS already active\r\n" << std::flush;
     LOG(ERROR) << "STARTTLS issued with TLS already active";
   }
   else {
-    char rply[] = "220 2.0.0 go for TLS\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "220 2.0.0 go for TLS\r\n" << std::flush;
     sock_.starttls();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
@@ -526,8 +498,7 @@ bool Session::verify_client_(std::string const& client_identity)
 // check the identity from the HELO/EHLO
 {
   if (IP4::is_bracket_address(client_identity)) {
-    char rply[] = "421 4.7.1 need domain name\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "421 4.7.1 need domain name\r\n" << std::flush;
     LOG(ERROR) << "need domain name not " << client_identity;
     return false;
   }
@@ -540,8 +511,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
     if (!Domain::match(our_fqdn_, fcrdns_)
         && strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      char rply[] = "550 5.7.1 liar\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 5.7.1 liar\r\n" << std::flush;
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       return false;
@@ -553,8 +523,7 @@ bool Session::verify_client_(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    char rply[] = "550 4.1.8 invalid sender system address\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
     return false;
@@ -562,8 +531,7 @@ bool Session::verify_client_(std::string const& client_identity)
 
   CDB black("black");
   if (black.lookup(client_identity)) {
-    char rply[] = "550 4.7.1 blacklisted identity\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
     return false;
@@ -578,8 +546,7 @@ bool Session::verify_client_(std::string const& client_identity)
   }
   else {
     if (black.lookup(tld)) {
-      char rply[] = "550 4.7.0 blacklisted identity\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
       LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       return false;
@@ -626,8 +593,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // Make sure the domain matches.
   if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)) {
-    char rply[] = "554 5.7.1 relay access denied\r\n";
-    write_(rply, sizeof(rply) - 1);
+    out() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
   }
@@ -635,9 +601,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
-      auto rply = "550 5.1.1 bad recipient "s
-                  + static_cast<std::string>(recipient) + "\r\n"s;
-      write_(rply.data(), rply.size());
+      out() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
       return false;
     }
@@ -680,8 +644,8 @@ bool Session::verify_sender_domain_(std::string const& sender)
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    auto rply = "550 5.7.1 invalid sender domain "s + domain + "\r\n"s;
-    write_(rply.data(), rply.size());
+    out() << "550 5.7.1 invalid sender domain "s + domain + "\r\n"s
+          << std::flush;
     LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
     return false;
   }
@@ -715,8 +679,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                            + three_level);
       }
       else {
-        char rply[] = "550 4.7.1 bad sender domain\r\n";
-        write_(rply, sizeof(rply) - 1);
+        out() << "550 4.7.1 bad sender domain\r\n" << std::flush;
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
         return false;
@@ -731,8 +694,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
                                          + two_level);
     }
     else {
-      char rply[] = "550 4.7.1 bad sender domain\r\n";
-      write_(rply, sizeof(rply) - 1);
+      out() << "550 4.7.1 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
       return false;
@@ -751,8 +713,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      auto rply = "550 4.7.1 blocked by "s + uribl + "\r\n"s;
-      write_(rply.data(), rply.size());
+      out() << "550 4.7.1 blocked by "s + uribl + "\r\n"s << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }
@@ -781,8 +742,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    auto rply = "550 4.7.23 "s + spf_res.smtp_comment() + "\r\n"s;
-    write_(rply.data(), rply.size());
+    out() << "550 4.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
     LOG(ERROR) << spf_res.header_comment();
     return false;
   }
