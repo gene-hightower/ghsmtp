@@ -1,23 +1,33 @@
 #include "Session.hpp"
 
-#include <boost/spirit/home/x3.hpp>
-#include <boost/spirit/include/support_istream_iterator.hpp>
-
-namespace spirit = boost::spirit;
+#include <tao/pegtl.hpp>
 
 namespace smtp {
-namespace x3 = boost::spirit::x3;
 
-template <typename Iterator>
-bool parse(Iterator first, Iterator last, Session& session)
-{
-  bool r = parse(first, last,
-                 //  Begin grammar
-                 (x3::no_case[x3::lit("EHLO")] >> x3::lit("\r\n"))
-                 //  End grammar
-                 );
-  return r && (first == last);
-}
+struct ehlo : tao::pegtl::istring<'E', 'H', 'L', 'O', ' '> {
+};
+
+struct domain : tao::pegtl::plus<tao::pegtl::alpha> {
+};
+
+struct crlf : tao::pegtl::string<'\r', '\n'> {
+};
+
+struct grammar : tao::pegtl::must<ehlo, domain, crlf, tao::pegtl::eof> {
+};
+
+template <typename Rule>
+struct action : tao::pegtl::nothing<Rule> {
+};
+
+template <>
+struct action<domain> {
+  template <typename Input>
+  static void apply(const Input& in, std::string& name)
+  {
+    name = in.string();
+  }
+};
 }
 
 int main(int argc, char const* argv[])
@@ -29,8 +39,19 @@ int main(int argc, char const* argv[])
   session.greeting();
 
   session.in().unsetf(std::ios::skipws);
-  spirit::istream_iterator begin(session.in());
-  spirit::istream_iterator end;
 
-  return smtp::parse(begin, end, session) ? 0 : 1;
+  std::string dom;
+
+  tao::pegtl::istream_input<tao::pegtl::crlf_eol> in(session.in(), 1024,
+                                                     "session");
+
+  try {
+    tao::pegtl::parse<smtp::grammar, smtp::action>(in, dom);
+  }
+  catch (tao::pegtl::parse_error const& e) {
+    std::cout << e.what() << '\n';
+    return 1;
+  }
+
+  std::cout << dom << '\n';
 }
