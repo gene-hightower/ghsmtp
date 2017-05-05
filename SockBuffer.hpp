@@ -27,11 +27,8 @@ class SockBuffer
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
   SockBuffer& operator=(const SockBuffer&) = delete;
-  SockBuffer(const SockBuffer& that)
-    : fd_in_(that.fd_in_)
-    , fd_out_(that.fd_out_)
-  {
-  }
+  SockBuffer(const SockBuffer& that) = delete;
+
   SockBuffer(int fd_in, int fd_out)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
