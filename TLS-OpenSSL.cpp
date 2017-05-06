@@ -8,29 +8,45 @@
 
 #include <openssl/rand.h>
 
+#include <openssl/opensslv.h>
+
 #include <glog/logging.h>
 
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
 
-#include "stringify.h"
+TLS::TLS() {}
 
-TLS::TLS()
+TLS::~TLS()
+{
+  if (ssl_) {
+    SSL_free(ssl_);
+  }
+  if (ctx_) {
+    SSL_CTX_free(ctx_);
+  }
+}
+
+void TLS::starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
   SSL_library_init();
+#else
+  OPENSSL_init_ssl(0, nullptr);
+#endif
+
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
   OpenSSL_add_all_algorithms();
 
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-  char const* cert = STRINGIFY(SMTP_HOME) "/smtp.pem";
-
-  CHECK(SSL_CTX_use_certificate_file(ctx_, cert, SSL_FILETYPE_PEM) > 0)
-      << "Can't load certificate file \"" << cert << "\"";
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert, SSL_FILETYPE_PEM) > 0)
-      << "Can't load private key file \"" << cert << "\"";
+  CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load certificate file \"" << cert_path << "\"";
+  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load private key file \"" << cert_path << "\"";
 
   CHECK(SSL_CTX_check_private_key(ctx_))
       << "Private key does not match the public certificate";
@@ -65,21 +81,7 @@ TLS::TLS()
   BIO_free(bio);
 
   // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
-}
 
-TLS::~TLS()
-{
-  if (ssl_) {
-    SSL_free(ssl_);
-  }
-  if (ctx_) {
-    EVP_cleanup();
-    SSL_CTX_free(ctx_);
-  }
-}
-
-void TLS::starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout)
-{
   ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);

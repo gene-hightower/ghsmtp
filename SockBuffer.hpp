@@ -27,7 +27,13 @@ class SockBuffer
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
   SockBuffer& operator=(const SockBuffer&) = delete;
-  SockBuffer(const SockBuffer& that) = delete;
+  SockBuffer(SockBuffer const& that)
+    : fd_in_(that.fd_in_)
+    , fd_out_(that.fd_out_)
+  {
+    CHECK(!that.timed_out_);
+    CHECK(!that.tls_active_);
+  }
 
   SockBuffer(int fd_in, int fd_out)
     : fd_in_(fd_in)
@@ -77,8 +83,8 @@ private:
 
   bool timed_out_{false};
 
-  TLS tls_;
   bool tls_active_{false};
+  TLS tls_;
 };
 
 #endif // SOCKBUFFER_DOT_HPP
