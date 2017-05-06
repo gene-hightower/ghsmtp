@@ -1,31 +1,67 @@
 #include "Session.hpp"
 
 #include <tao/pegtl.hpp>
+#include <tao/pegtl/contrib/abnf.hpp>
+#include <tao/pegtl/contrib/alphabet.hpp>
+
+using namespace tao::pegtl;
+using namespace tao::pegtl::abnf;
+using namespace tao::pegtl::alphabet;
 
 namespace smtp {
 
-struct ehlo : tao::pegtl::istring<'E', 'H', 'L', 'O', ' '> {
+struct ehlo : istring<e, h, l, o, ' '> {
 };
 
-struct domain : tao::pegtl::plus<tao::pegtl::alpha> {
+struct quit : istring<q, u, i, t> {
 };
 
-struct crlf : tao::pegtl::string<'\r', '\n'> {
+struct sub_domain : plus<ALPHA> {
 };
 
-struct grammar : tao::pegtl::must<ehlo, domain, crlf, tao::pegtl::eof> {
+struct domain : list_must<sub_domain, string<'.'>> {
+};
+
+struct ehlo_cmd : seq<ehlo, domain, CRLF> {
+};
+
+struct quit_cmd : seq<quit, CRLF> {
+};
+
+struct any_cmd : sor<ehlo_cmd, quit_cmd> {
+};
+
+struct cmds : star<any_cmd> {
+};
+
+struct grammar : seq<cmds, eof> {
 };
 
 template <typename Rule>
-struct action : tao::pegtl::nothing<Rule> {
+struct action : nothing<Rule> {
 };
 
 template <>
-struct action<domain> {
+struct action<ehlo_cmd> {
   template <typename Input>
-  static void apply(const Input& in, std::string& name)
+  static void apply(const Input& in, Session& session)
   {
-    name = in.string();
+    auto ln = in.string();
+    // 5 is the length of "EHLO " and two more for the CRLF.
+    auto dom = ln.substr(5, ln.length() - 7);
+
+    std::cout << dom << '\n';
+    session.ehlo(dom);
+  }
+};
+
+template <>
+struct action<quit_cmd> {
+  template <typename Input>
+  static void apply(const Input& in, Session& session)
+  {
+    std::cout << "quit\n";
+    session.quit();
   }
 };
 }
@@ -35,23 +71,21 @@ int main(int argc, char const* argv[])
   std::ios::sync_with_stdio(false);
   google::InitGoogleLogging(argv[0]);
 
+  // Don't wait for STARTTLS to fail if no cert.
+  CHECK(boost::filesystem::exists(TLS::cert_path)) << "can't find cert file";
+
   Session session;
   session.greeting();
 
   session.in().unsetf(std::ios::skipws);
 
-  std::string dom;
-
-  tao::pegtl::istream_input<tao::pegtl::crlf_eol> in(session.in(), 1024,
-                                                     "session");
+  istream_input<crlf_eol> in(session.in(), 1024, "session");
 
   try {
-    tao::pegtl::parse<smtp::grammar, smtp::action>(in, dom);
+    parse<smtp::grammar, smtp::action>(in, session);
   }
-  catch (tao::pegtl::parse_error const& e) {
+  catch (parse_error const& e) {
     std::cout << e.what() << '\n';
     return 1;
   }
-
-  std::cout << dom << '\n';
 }
