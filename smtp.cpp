@@ -4,13 +4,23 @@
 #include <tao/pegtl/contrib/abnf.hpp>
 #include <tao/pegtl/contrib/alphabet.hpp>
 
-// #include <tao/pegtl/tracer.hpp>
+#include <tao/pegtl/tracer.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
 
 namespace smtp {
+
+struct Ctx {
+  Session session;
+  Message msg;
+  std::string mb_loc;
+  std::string mb_dom;
+
+  std::pair<std::string, std::string> param;
+  std::unordered_map<std::string, std::string> parameters;
+};
 
 struct no_last_dash {
   template <tao::pegtl::apply_mode A,
@@ -147,7 +157,7 @@ struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {
 struct print : range<32, 126> {
 };
 
-struct quoted_pairSMTP : sor<one<'\\'>, print> {
+struct quoted_pairSMTP : seq<one<'\\'>, print> {
 };
 
 struct QcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {
@@ -178,16 +188,28 @@ struct Atom : plus<atext> {
 struct Dot_string : list<Atom, one<'.'>> {
 };
 
-struct Local_part : sor<Dot_string, Quoted_string> {
+struct Local_part : sor<Quoted_string, Dot_string> {
 };
 
-struct Mailbox : seq<Local_part, one<'@'>, sor<Domain, address_literal>> {
+struct Non_local_part : sor<address_literal, Domain> {
 };
 
-struct Path : seq<one<'<'>, seq<opt<seq<A_d_l, colon>, Mailbox>, one<'>'>>> {
+struct Mailbox : seq<Local_part, one<'@'>, Non_local_part> {
 };
 
-struct Reverse_path : sor<Path, TAOCPP_PEGTL_STRING("<>")> {
+struct Path : seq<one<'<'>, seq<opt<seq<A_d_l, colon>>, Mailbox, one<'>'>>> {
+};
+
+struct bounce_path : TAOCPP_PEGTL_STRING("<>") {
+};
+
+struct Reverse_path : sor<Path, bounce_path> {
+};
+
+struct magic_postmaster : TAOCPP_PEGTL_STRING("<Postmaster>") {
+};
+
+struct Forward_path : sor<Path, magic_postmaster> {
 };
 
 struct esmtp_keyword
@@ -203,6 +225,12 @@ struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {
 struct Mail_parameters : list<esmtp_param, SP> {
 };
 
+struct Rcpt_parameters : list<esmtp_param, SP> {
+};
+
+struct String : sor<Quoted_string, Atom> {
+};
+
 struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO "), Domain, CRLF> {
 };
 
@@ -215,13 +243,47 @@ struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL FROM:"),
                        CRLF> {
 };
 
+struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT TO:"),
+                     Forward_path,
+                     opt<seq<SP, Rcpt_parameters>>,
+                     CRLF> {
+};
+
+struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {
+};
+
+struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
+};
+
+struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, String>>, CRLF> {
+};
+
+struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, String>>, CRLF> {
+};
+
+struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, String>>, CRLF> {
+};
+
+struct starttls : seq<TAOCPP_PEGTL_ISTRING("STARTTLS"), CRLF> {
+};
+
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
 };
 
-struct any_cmd : sor<helo, ehlo, mail_from, quit> {
+struct any_cmd : sor<helo,
+                     ehlo,
+                     mail_from,
+                     rcpt_to,
+                     data,
+                     rset,
+                     noop,
+                     vrfy,
+                     help,
+                     starttls,
+                     quit> {
 };
 
-struct cmds : star<any_cmd> {
+struct cmds : plus<any_cmd> {
 };
 
 struct grammar : seq<cmds, eof> {
@@ -232,54 +294,165 @@ struct action : nothing<Rule> {
 };
 
 template <>
+struct action<esmtp_keyword> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.param.first = in.string();
+  }
+};
+
+template <>
+struct action<esmtp_value> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.param.second = in.string();
+  }
+};
+
+template <>
+struct action<esmtp_param> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.parameters.insert(ctx.param);
+    ctx.param.first.clear();
+    ctx.param.second.clear();
+  }
+};
+
+template <>
+struct action<Local_part> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.mb_loc = in.string();
+  }
+};
+
+template <>
+struct action<Non_local_part> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.mb_dom = in.string();
+  }
+};
+
+template <>
+struct action<magic_postmaster> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.mb_loc = std::string("Postmaster");
+    ctx.mb_dom.clear();
+  }
+};
+
+template <>
+struct action<any_cmd> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "cmd: " << in.string();
+  }
+};
+
+template <>
 struct action<helo> {
   template <typename Input>
-  static void apply(const Input& in, Session& session)
+  static void apply(const Input& in, Ctx& ctx)
   {
     auto ln = in.string();
     // 5 is the length of "HELO " and two more for the CRLF.
     auto dom = ln.substr(5, ln.length() - 7);
-    session.helo(dom);
+    ctx.session.helo(dom);
   }
 };
 
 template <>
 struct action<ehlo> {
   template <typename Input>
-  static void apply(const Input& in, Session& session)
+  static void apply(const Input& in, Ctx& ctx)
   {
     auto ln = in.string();
     // 5 is the length of "EHLO " and two more for the CRLF.
     auto dom = ln.substr(5, ln.length() - 7);
-    session.ehlo(dom);
+    ctx.session.ehlo(dom);
+  }
+};
+
+template <>
+struct action<mail_from> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.mail_from(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
+
+    ctx.mb_loc.clear();
+    ctx.mb_dom.clear();
+    ctx.parameters.clear();
+  }
+};
+
+template <>
+struct action<rcpt_to> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.rcpt_to(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
+
+    ctx.mb_loc.clear();
+    ctx.mb_dom.clear();
+    ctx.parameters.clear();
+  }
+};
+
+template <>
+struct action<rset> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.rset();
+  }
+};
+
+template <>
+struct action<noop> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.noop();
+  }
+};
+
+template <>
+struct action<vrfy> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.vrfy();
+  }
+};
+
+template <>
+struct action<help> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.session.help();
   }
 };
 
 template <>
 struct action<quit> {
   template <typename Input>
-  static void apply(const Input& in, Session& session)
+  static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "quit";
-    session.quit();
+    ctx.session.quit();
   }
 };
-
-// template<>
-// struct u_no_last_dash<U_Ldh_str> {
-//   template <typename Input>
-//   static void apply(const Input& in, Session& session)
-//   {
-//   }
-// };
-
-// template<>
-// struct no_last_dash<Ldh_str> {
-//   template <typename Input>
-//   static void apply(const Input& in, Session& session)
-//   {
-//   }
-// };
 }
 
 int main(int argc, char const* argv[])
@@ -290,16 +463,21 @@ int main(int argc, char const* argv[])
   // Don't wait for STARTTLS to fail if no cert.
   CHECK(boost::filesystem::exists(TLS::cert_path)) << "can't find cert file";
 
-  Session session;
-  session.greeting();
+  smtp::Ctx ctx;
 
-  session.in().unsetf(std::ios::skipws);
+  ctx.session.greeting();
 
-  istream_input<crlf_eol> in(session.in(), 1024, "session");
+  ctx.session.in().unsetf(std::ios::skipws);
+
+  istream_input<crlf_eol> in(ctx.session.in(), 1024, "session");
 
   try {
     LOG(INFO) << "calling parse";
-    parse<smtp::grammar, smtp::action>(in, session);
+#if 0
+    parse<smtp::grammar, smtp::action, tracer>(in, ctx);
+#else
+    parse<smtp::grammar, smtp::action>(in, ctx);
+#endif
     LOG(INFO) << "parse return";
   }
   catch (parse_error const& e) {
