@@ -390,7 +390,7 @@ struct action<helo> {
   {
     auto ln = in.string();
     // 5 is the length of "HELO "
-    auto dom = ln.substr(5, ln.length() - 5);
+    auto dom = ln.substr(5, ln.length() - 7);
     ctx.session.helo(dom);
   }
 };
@@ -402,7 +402,7 @@ struct action<ehlo> {
   {
     auto ln = in.string();
     // 5 is the length of "EHLO "
-    auto dom = ln.substr(5, ln.length() - 5);
+    auto dom = ln.substr(5, ln.length() - 7);
     ctx.session.ehlo(dom);
   }
 };
