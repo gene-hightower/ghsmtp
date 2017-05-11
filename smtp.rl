@@ -115,9 +115,9 @@ U_Ldh_str = (alpha | digit | '-' | UTF8_non_ascii)* U_Let_dig;
 
 U_label = U_Let_dig U_Ldh_str?;
 
-A_label = Let_dig Ldh_str?;
+label = Let_dig Ldh_str?;
 
-sub_domain = A_label | U_label;
+sub_domain = label | U_label;
 
 Domain = sub_domain ('.' sub_domain)*;
 
@@ -226,10 +226,7 @@ data := |*
    auto len = te - ts - 2; // minus crlf
    msg.out().write(ts, len);
    msg.out() << '\n';
-   msg_bytes += len;
-   if (msg_bytes > Config::size) {
-     LOG(WARNING) << "message size " << msg_bytes << " exceeds maximium of " << Config::size;
-   }
+   msg_bytes += len + 1;
  };
 
  '.' /[^\r\n]/+ CRLF =>
@@ -237,20 +234,21 @@ data := |*
    auto len = te - ts - 3; // minus crlf and leading '.'
    msg.out().write(ts + 1, len);
    msg.out() << '\n';
-   msg_bytes += len;
-   if (msg_bytes > Config::size) {
-     LOG(WARNING) << "message size " << msg_bytes << " exceeds maximium of " << Config::size;
-   }
+   msg_bytes += len + 1;
  };
 
  CRLF =>
  {
    msg.out() << '\n';
+   msg_bytes++;
  };
 
  '.' CRLF =>
  {
    session.data_msg_done(msg);
+   if (msg_bytes > Config::size) {
+     LOG(WARNING) << "message size " << msg_bytes << " exceeds maximium of " << Config::size;
+   }
    fgoto main;
  };
 
