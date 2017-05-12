@@ -494,7 +494,7 @@ struct action<data> {
       ctx.session.data_msg(ctx.msg);
       ctx.msg_bytes = 0;
 
-      istream_input<eol::crlf> data_in(ctx.session.in(), 1024, "data");
+      istream_input<eol::crlf> data_in(ctx.session.in(), 4*1024, "data");
 
       LOG(INFO) << "parsing data_grammar\n";
       parse_nested<smtp::data_grammar, smtp::data_action>(in, data_in, ctx);
@@ -548,7 +548,7 @@ int main(int argc, char const* argv[])
 
   ctx.session.in().unsetf(std::ios::skipws);
 
-  istream_input<eol::crlf> in(ctx.session.in(), 100, "session");
+  istream_input<eol::crlf> in(ctx.session.in(), 4*1024, "session");
 
   try {
     if (!parse<smtp::grammar, smtp::action>(in, ctx)) {
