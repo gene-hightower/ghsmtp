@@ -24,6 +24,7 @@ struct Ctx {
 };
 
 struct no_last_dash {
+  // Something like this to fix up U_ldh_str and Ldh_str rules.
   template <tao::pegtl::apply_mode A,
             tao::pegtl::rewind_mode M,
             template <typename...> class Action,
@@ -62,6 +63,9 @@ struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
 // UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
 
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
+};
+
+struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
 };
 
 using dot = one<'.'>;
@@ -292,16 +296,16 @@ struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
 // commands in size order
 
 struct any_cmd : seq<sor<data,
+                         quit,
                          rset,
                          noop,
                          vrfy,
                          help,
-                         quit,
                          helo,
                          ehlo,
                          starttls,
-                         mail_from,
-                         rcpt_to>,
+                         rcpt_to,
+                         mail_from>,
                      discard> {
 };
 
@@ -437,6 +441,10 @@ struct data_action<data_end> {
   {
     LOG(INFO) << "data_end";
     ctx.session.data_msg_done(ctx.msg);
+    if (ctx.msg_bytes > Config::size) {
+      LOG(WARNING) << "message size " << ctx.msg_bytes
+                   << " exceeds maximium of " << Config::size;
+    }
   }
 };
 
@@ -447,10 +455,6 @@ struct data_action<data_blank> {
     LOG(INFO) << "data_blank";
     ctx.msg.out() << '\n';
     ctx.msg_bytes++;
-    if (ctx.msg_bytes > Config::size) {
-      LOG(WARNING) << "message size " << ctx.msg_bytes
-                   << " exceeds maximium of " << Config::size;
-    }
   }
 };
 
@@ -464,10 +468,6 @@ struct data_action<data_plain> {
     ctx.msg.out().write(in.string().data(), len);
     ctx.msg.out() << '\n';
     ctx.msg_bytes += len + 1;
-    if (ctx.msg_bytes > Config::size) {
-      LOG(WARNING) << "message size " << ctx.msg_bytes
-                   << " exceeds maximium of " << Config::size;
-    }
   }
 };
 
@@ -481,10 +481,6 @@ struct data_action<data_dot> {
     ctx.msg.out().write(in.string().data() + 1, len);
     ctx.msg.out() << '\n';
     ctx.msg_bytes += len + 1;
-    if (ctx.msg_bytes > Config::size) {
-      LOG(WARNING) << "message size " << ctx.msg_bytes
-                   << " exceeds maximium of " << Config::size;
-    }
   }
 };
 
@@ -555,12 +551,14 @@ int main(int argc, char const* argv[])
   istream_input<eol::crlf> in(ctx.session.in(), 100, "session");
 
   try {
-    LOG(INFO) << "calling parse";
-    parse<smtp::grammar, smtp::action>(in, ctx);
-    LOG(INFO) << "parse return";
+    if (!parse<smtp::grammar, smtp::action>(in, ctx)) {
+      ctx.session.error("syntax error from parser");
+      return 1;
+    }
   }
   catch (parse_error const& e) {
-    std::cout << e.what() << '\n';
+    ctx.session.error(e.what());
     return 1;
   }
+  ctx.session.error("unknown parser problem");
 }
