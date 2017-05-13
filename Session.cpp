@@ -345,7 +345,7 @@ bool Session::data_start()
 
 std::string Session::added_headers_(Message const& msg)
 {
-  // The headers Return-Path, X-Original-To, Received and Received-SPF
+  // The headers Return-Path, Received, X-Original-To and Received-SPF
   // are returned as a string.
 
   std::ostringstream headers;
@@ -415,7 +415,7 @@ void Session::data_msg(Message& msg) // called /after/ data_start
 
   msg.open(our_fqdn_, status);
 
-  // The headers Return-Path, X-Original-To, Received and Received-SPF
+  // The headers Return-Path, Received, X-Original-To and Received-SPF
   // are added to the top of the message.
 
   msg.out() << added_headers_(msg);
