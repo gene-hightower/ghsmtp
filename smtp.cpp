@@ -160,10 +160,10 @@ struct A_d_l : list<At_domain, one<','>> {
 struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {
 };
 
-struct print : range<32, 126> {
+struct graphic : range<32, 126> {
 };
 
-struct quoted_pairSMTP : seq<one<'\\'>, print> {
+struct quoted_pairSMTP : seq<one<'\\'>, graphic> {
 };
 
 struct QcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {
@@ -369,21 +369,10 @@ struct action<Non_local_part> {
 
 template <>
 struct action<magic_postmaster> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply0(Ctx& ctx)
   {
     ctx.mb_loc = std::string("Postmaster");
     ctx.mb_dom.clear();
-  }
-};
-
-template <>
-struct action<any_cmd> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    // just did a discard
-    // LOG(INFO) << "cmd: " << in.string();
   }
 };
 
@@ -494,7 +483,7 @@ struct action<data> {
       ctx.session.data_msg(ctx.msg);
       ctx.msg_bytes = 0;
 
-      istream_input<eol::crlf> data_in(ctx.session.in(), 4*1024, "data");
+      istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 
       LOG(INFO) << "parsing data_grammar\n";
       parse_nested<smtp::data_grammar, smtp::data_action>(in, data_in, ctx);
@@ -548,7 +537,7 @@ int main(int argc, char const* argv[])
 
   ctx.session.in().unsetf(std::ios::skipws);
 
-  istream_input<eol::crlf> in(ctx.session.in(), 4*1024, "session");
+  istream_input<eol::crlf> in(ctx.session.in(), 4 * 1024, "session");
 
   try {
     if (!parse<smtp::grammar, smtp::action>(in, ctx)) {
