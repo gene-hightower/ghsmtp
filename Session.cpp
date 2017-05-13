@@ -369,10 +369,6 @@ std::string Session::added_headers_(Message const& msg)
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\n";
-  headers << "X-Original-To: <" << forward_path_[0] << ">\n";
-  for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << "\t<" << forward_path_[i] << ">\n";
-  }
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " (" << client_ << ")";
@@ -385,6 +381,11 @@ std::string Session::added_headers_(Message const& msg)
     headers << "\n\t(" << tls_info << ")";
   }
   headers << ";\n\t" << msg.when() << "\n";
+
+  headers << "X-Original-To: <" << forward_path_[0] << ">\n";
+  for (size_t i = 1; i < forward_path_.size(); ++i) {
+    headers << "\t<" << forward_path_[i] << ">\n";
+  }
 
   // Received-SPF:
   if (!received_spf_.empty()) {
