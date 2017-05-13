@@ -352,25 +352,26 @@ std::string Session::added_headers_(Message const& msg)
   headers << "Return-Path: <" << reverse_path_ << ">\n";
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
-    headers << " (" << client_ << ")";
+    headers << " (" << client_ << ')';
   }
   headers << "\n\tby " << our_fqdn_ << " with " << protocol_ << " id "
           << msg.id() << "\n\tfor <" << forward_path_[0] << '>';
 
   std::string tls_info{sock_.tls_info()};
   if (tls_info.length()) {
-    headers << "\n\t(" << tls_info << ")";
+    headers << "\n\t(" << tls_info << ')';
   }
-  headers << ";\n\t" << msg.when() << "\n";
+  headers << ";\n\t" << msg.when() << '\n';
 
-  headers << "X-Original-To: <" << forward_path_[0] << ">\n";
+  headers << "X-Original-To: <" << forward_path_[0] << '>';
   for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << "\t<" << forward_path_[i] << ">\n";
+    headers << ",\n\t<" << forward_path_[i] << '>';
   }
+  headers << '\n';
 
   // Received-SPF:
   if (!received_spf_.empty()) {
-    headers << received_spf_ << "\n";
+    headers << received_spf_ << '\n';
   }
 
   return headers.str();
