@@ -428,7 +428,6 @@ template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    LOG(INFO) << "data_end";
     ctx.session.data_msg_done(ctx.msg);
     if (ctx.msg_bytes > Config::size) {
       LOG(WARNING) << "message size " << ctx.msg_bytes
@@ -441,7 +440,6 @@ template <>
 struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
-    LOG(INFO) << "data_blank";
     ctx.msg.out() << '\n';
     ctx.msg_bytes++;
   }
@@ -452,7 +450,6 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "data_plain";
     auto len = in.string().length() - 2;
     ctx.msg.out().write(in.string().data(), len);
     ctx.msg.out() << '\n';
@@ -465,7 +462,6 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "data_dot";
     auto len = in.string().length() - 3;
     ctx.msg.out().write(in.string().data() + 1, len);
     ctx.msg.out() << '\n';
@@ -478,16 +474,13 @@ struct action<data> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "data";
     if (ctx.session.data_start()) {
       ctx.session.data_msg(ctx.msg);
       ctx.msg_bytes = 0;
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 
-      LOG(INFO) << "parsing data_grammar\n";
       parse_nested<smtp::data_grammar, smtp::data_action>(in, data_in, ctx);
-      LOG(INFO) << "data_action parse return\n";
     }
   }
 };
