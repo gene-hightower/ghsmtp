@@ -11,6 +11,8 @@
 #include <tao/pegtl/contrib/abnf.hpp>
 #include <tao/pegtl/contrib/alphabet.hpp>
 
+#include <tao/pegtl/contrib/tracer.hpp>
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
@@ -177,7 +179,7 @@ struct address_list : list<address, one<','>> {
 struct group_list : sor<mailbox_list, CFWS> {
 };
 
-struct day : seq<opt<FWS>, plus<rep<2, DIGIT>>, FWS> {
+struct day : seq<opt<FWS>, plus<rep_min_max<1, 2, DIGIT>>, FWS> {
 };
 
 struct month : sor<TAOCPP_PEGTL_ISTRING("Jan"),
@@ -320,8 +322,9 @@ struct resent_to : seq<TAOCPP_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
 struct resent_cc : seq<TAOCPP_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {
 };
 
-struct resent_bcc
-    : seq<TAOCPP_PEGTL_ISTRING("Resent-Bcc:"), sor<address_list, CFWS>, eol> {
+struct resent_bcc : seq<TAOCPP_PEGTL_ISTRING("Resent-Bcc:"),
+                        opt<sor<address_list, CFWS>>,
+                        eol> {
 };
 
 struct resent_msg_id
@@ -333,7 +336,7 @@ struct resent_msg_id
 struct return_path : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"), path, eol> {
 };
 
-struct received_token : sor<word, angle_addr, addr_spec, domain> {
+struct received_token : sor<angle_addr, addr_spec, domain, word> {
 };
 
 struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
@@ -343,7 +346,22 @@ struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
                       eol> {
 };
 
-struct trace : seq<opt<return_path>, plus<received>> {
+struct old_x_original_to
+    : seq<TAOCPP_PEGTL_ISTRING("X-Original-To:"), unstructured, eol> {
+};
+
+struct delivered_to
+    : seq<TAOCPP_PEGTL_ISTRING("Delivered-To:"), addr_spec, eol> {
+};
+
+struct trace : seq<opt<delivered_to>,
+                   opt<return_path>,
+                   opt<old_x_original_to>,
+                   plus<received>> {
+};
+
+struct x_original_to
+    : seq<TAOCPP_PEGTL_ISTRING("X-Original-To:"), address_list, eol> {
 };
 
 // Optional Fields
@@ -360,10 +378,37 @@ struct field_value : unstructured {
 struct optional_field : seq<field_name, one<':'>, field_value, eol> {
 };
 
+struct optional0_field : seq<not_at<sor<resent_date,
+                                        resent_from,
+                                        resent_sender,
+                                        resent_to,
+                                        resent_cc,
+                                        resent_bcc,
+                                        resent_msg_id,
+                                        orig_date,
+                                        from,
+                                        sender,
+                                        reply_to,
+                                        to,
+                                        cc,
+                                        bcc,
+                                        message_id,
+                                        in_reply_to,
+                                        references,
+                                        subject,
+                                        comments,
+                                        keywords>>,
+                             optional_field> {
+};
+
+struct optional1_field : seq<field_name, one<':'>, field_value, eol> {
+};
+
 // message header
 
 struct fields : seq<star<seq<trace,
-                             star<optional_field>,
+                             opt<x_original_to>,
+                             star<optional0_field>,
                              star<sor<resent_date,
                                       resent_from,
                                       resent_sender,
@@ -384,7 +429,7 @@ struct fields : seq<star<seq<trace,
                              subject,
                              comments,
                              keywords,
-                             optional_field>>>
+                             optional0_field>>>
 
 {
 };
@@ -397,61 +442,18 @@ struct action : nothing<Rule> {
 };
 
 template <>
-struct action<field_name> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << in.string() << ':';
-  }
-};
-
-template <>
-struct action<field_value> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << in.string() << '\n';
-  }
-};
-
-template <>
-struct action<to> {
+struct action<orig_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
     std::cout << in.string();
   }
 };
+
+// Originator Fields
 
 template <>
 struct action<from> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << in.string();
-  }
-};
-
-template <>
-struct action<subject> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << in.string();
-  }
-};
-
-template <>
-struct action<message_id> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << in.string();
-  }
-};
-
-template <>
-struct action<orig_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
@@ -465,6 +467,190 @@ struct action<sender> {
   static void apply(const Input& in, Ctx& ctx)
   {
     std::cout << in.string();
+  }
+};
+
+template <>
+struct action<reply_to> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+// Destination Address Fields
+
+template <>
+struct action<to> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<cc> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<bcc> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+// Identification Fields
+
+template <>
+struct action<message_id> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+template <>
+struct action<in_reply_to> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+template <>
+struct action<references> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+// Informational Fields
+
+template <>
+struct action<subject> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+template <>
+struct action<comments> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+template <>
+struct action<keywords> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+// Resent Fields
+
+template <>
+struct action<resent_date> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<resent_to> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<resent_cc> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<resent_bcc> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<resent_msg_id> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+// Trace Fields
+
+template <>
+struct action<return_path> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<trace> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+  }
+};
+
+template <>
+struct action<received> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << in.string();
+  }
+};
+
+template <>
+struct action<received_token> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+  }
+};
+
+template <>
+struct action<optional_field> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    std::cout << "optional_field# " << in.string();
   }
 };
 
