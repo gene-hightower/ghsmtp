@@ -15,10 +15,7 @@
 
 USES := ldns openssl libcurl
 
-# Ragel generated code requires signed chars
-# -fsigned-char
-
-CXXFLAGS += -DSMTP_HOME=$(shell pwd)
+CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
 LDLIBS += \
 	-lboost_filesystem \
