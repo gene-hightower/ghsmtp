@@ -1,5 +1,7 @@
 #include "Session.hpp"
 
+#include <cstdlib>
+
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 #include <tao/pegtl/contrib/alphabet.hpp>
@@ -21,6 +23,18 @@ struct Ctx {
 
   std::pair<std::string, std::string> param;
   std::unordered_map<std::string, std::string> parameters;
+
+  size_t chunk_size;
+  bool chunk_first{true};
+  bool chunk_last{false};
+  bool bdat_error{false};
+
+  void bdat_rset()
+  {
+    chunk_first = true;
+    chunk_last = false;
+    bdat_error = false;
+  }
 };
 
 struct no_last_dash {
@@ -254,6 +268,16 @@ struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT TO:"),
                      CRLF> {
 };
 
+struct chunk_size : plus<DIGIT> {
+};
+
+struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {
+};
+
+struct bdat
+    : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, opt<end_marker>, CRLF> {
+};
+
 struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {
 };
 
@@ -303,6 +327,7 @@ struct any_cmd : seq<sor<data,
                          help,
                          helo,
                          ehlo,
+                         bdat,
                          starttls,
                          rcpt_to,
                          mail_from>,
@@ -382,9 +407,10 @@ struct action<helo> {
   static void apply(const Input& in, Ctx& ctx)
   {
     auto ln = in.string();
-    // 5 is the length of "HELO "
+    // 5 is the length of "HELO ", plus 2 for the CRLF
     auto dom = ln.substr(5, ln.length() - 7);
     ctx.session.helo(dom);
+    ctx.bdat_rset();
   }
 };
 
@@ -394,9 +420,10 @@ struct action<ehlo> {
   static void apply(const Input& in, Ctx& ctx)
   {
     auto ln = in.string();
-    // 5 is the length of "EHLO "
+    // 5 is the length of "EHLO ", plus 2 for the CRLF
     auto dom = ln.substr(5, ln.length() - 7);
     ctx.session.ehlo(dom);
+    ctx.bdat_rset();
   }
 };
 
@@ -425,13 +452,80 @@ struct action<rcpt_to> {
 };
 
 template <>
+struct action<chunk_size> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.chunk_size = std::strtoul(in.string().c_str(), nullptr, 10);
+  }
+};
+
+template <>
+struct action<end_marker> {
+  static void apply0(Ctx& ctx) { ctx.chunk_last = true; }
+};
+
+template <>
+struct action<bdat> {
+  static void apply0(Ctx& ctx)
+  {
+    if (ctx.chunk_first) {
+      if (!ctx.session.data_start()) {
+        ctx.bdat_error = true;
+      }
+      else {
+        ctx.session.data_msg(ctx.msg);
+      }
+      ctx.msg_bytes = 0;
+      ctx.chunk_first = false;
+    }
+    if (ctx.chunk_size) {
+
+      if ((ctx.msg_bytes + ctx.chunk_size) > Config::size) {
+        ctx.session.data_size_error();
+        ctx.bdat_error = true;
+
+        LOG(WARNING) << "message size " << ctx.msg_bytes
+                     << " exceeds maximium of " << Config::size;
+      }
+
+      std::vector<char> bfr;
+      bfr.reserve(ctx.chunk_size);
+
+      ctx.session.in().read(bfr.data(), ctx.chunk_size);
+
+      if (!ctx.bdat_error) {
+        ctx.msg.out().write(bfr.data(), ctx.chunk_size);
+        ctx.msg_bytes += ctx.chunk_size;
+      }
+    }
+
+    if (ctx.bdat_error) {
+      ctx.session.data_error();
+    }
+    else {
+      if (ctx.chunk_last) {
+        ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
+      }
+      else {
+        ctx.session.bdat_msg(ctx.msg, ctx.msg_bytes);
+      }
+    }
+  }
+};
+
+template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    ctx.session.data_msg_done(ctx.msg);
     if (ctx.msg_bytes > Config::size) {
       LOG(WARNING) << "message size " << ctx.msg_bytes
                    << " exceeds maximium of " << Config::size;
+      ctx.session.data_size_error();
+      ctx.msg.trash();
+    }
+    else {
+      ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
     }
   }
 };
@@ -440,8 +534,10 @@ template <>
 struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
-    ctx.msg.out() << '\n';
-    ctx.msg_bytes++;
+    ctx.msg_bytes += 2;
+    if (ctx.msg_bytes <= Config::size) {
+      ctx.msg.out() << "\r\n";
+    }
   }
 };
 
@@ -450,10 +546,11 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    auto len = in.string().length() - 2;
-    ctx.msg.out().write(in.string().data(), len);
-    ctx.msg.out() << '\n';
-    ctx.msg_bytes += len + 1;
+    auto len = in.string().length();
+    ctx.msg_bytes += len;
+    if (ctx.msg_bytes <= Config::size) {
+      ctx.msg.out().write(in.string().data(), len);
+    }
   }
 };
 
@@ -462,10 +559,11 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    auto len = in.string().length() - 3;
-    ctx.msg.out().write(in.string().data() + 1, len);
-    ctx.msg.out() << '\n';
-    ctx.msg_bytes += len + 1;
+    auto len = in.string().length() - 1;
+    ctx.msg_bytes += len;
+    if (ctx.msg_bytes <= Config::size) {
+      ctx.msg.out().write(in.string().data() + 1, len);
+    }
   }
 };
 
@@ -487,7 +585,11 @@ struct action<data> {
 
 template <>
 struct action<rset> {
-  static void apply0(Ctx& ctx) { ctx.session.rset(); }
+  static void apply0(Ctx& ctx)
+  {
+    ctx.session.rset();
+    ctx.bdat_rset();
+  }
 };
 
 template <>
@@ -534,7 +636,12 @@ int main(int argc, char const* argv[])
 
   try {
     if (!parse<smtp::grammar, smtp::action>(in, ctx)) {
-      ctx.session.error("syntax error from parser");
+      if (ctx.session.timed_out()) {
+        ctx.session.time_out();
+      }
+      else {
+        ctx.session.error("syntax error from parser");
+      }
       return 1;
     }
   }

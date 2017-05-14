@@ -32,7 +32,10 @@ public:
 
   bool data_start();
   void data_msg(Message& msg);
-  void data_msg_done(Message& msg);
+  void data_msg_done(Message& msg, size_t n);
+  void data_size_error();
+  void data_error();
+  void bdat_msg(Message& msg, size_t n);
 
   void rset();
   void noop();
@@ -40,7 +43,7 @@ public:
   void help();
   void quit() __attribute__((noreturn));
   void error(std::experimental::string_view msg);
-  void time() __attribute__((noreturn));
+  void time_out() __attribute__((noreturn));
   void starttls();
 
   bool timed_out() { return sock_.timed_out(); }

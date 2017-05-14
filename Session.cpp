@@ -186,7 +186,7 @@ void Session::ehlo(std::string client_identity)
   out() << "250-PIPELINING\r\n";
 
   // RFC 3030
-  // out() << "250-CHUNKING\r\n";
+  out() << "250-CHUNKING\r\n";
 
   // RFC 6531
   out() << "250 SMTPUTF8\r\n" << std::flush;
@@ -349,29 +349,33 @@ std::string Session::added_headers_(Message const& msg)
   // are returned as a string.
 
   std::ostringstream headers;
-  headers << "Return-Path: <" << reverse_path_ << ">\n";
+  headers << "Return-Path: <" << reverse_path_ << ">\r\n";
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
   }
-  headers << "\n\tby " << our_fqdn_ << " with " << protocol_ << " id "
-          << msg.id() << "\n\tfor <" << forward_path_[0] << '>';
+  headers << "\r\n        by " << our_fqdn_ << " with " << protocol_ << " id "
+          << msg.id() << "\r\n        for <" << forward_path_[0] << '>';
 
   std::string tls_info{sock_.tls_info()};
   if (tls_info.length()) {
-    headers << "\n\t(" << tls_info << ')';
+    headers << "\r\n        (" << tls_info << ')';
   }
-  headers << ";\n\t" << msg.when() << '\n';
+  headers << ";\r\n        " << msg.when() << "\r\n";
 
-  headers << "X-Original-To: <" << forward_path_[0] << '>';
-  for (size_t i = 1; i < forward_path_.size(); ++i) {
-    headers << ",\n\t<" << forward_path_[i] << '>';
+  // Only include X-Original-To header if it's more than just what's
+  // in the Received: line.
+  if (forward_path_.size() > 1) {
+    headers << "X-Original-To: <" << forward_path_[0] << '>';
+    for (size_t i = 1; i < forward_path_.size(); ++i) {
+      headers << ",\r\n        <" << forward_path_[i] << '>';
+    }
+    headers << "\r\n";
   }
-  headers << '\n';
 
   // Received-SPF:
   if (!received_spf_.empty()) {
-    headers << received_spf_ << '\n';
+    headers << received_spf_ << "\r\n";
   }
 
   return headers.str();
@@ -415,19 +419,32 @@ void Session::data_msg(Message& msg) // called /after/ data_start
   }
 
   msg.open(our_fqdn_, status);
-
-  // The headers Return-Path, Received, X-Original-To and Received-SPF
-  // are added to the top of the message.
-
   msg.out() << added_headers_(msg);
 }
 
-void Session::data_msg_done(Message& msg)
+void Session::data_msg_done(Message& msg, size_t n)
 {
   msg.save();
-  LOG(INFO) << "message delivered with id " << msg.id();
-  out() << "250 2.0.0 OK\r\n" << std::flush;
-  LOG(INFO) << "end DATA";
+  out() << "250 2.6.0 OK " << n << " octets\r\n" << std::flush;
+  LOG(INFO) << "DATA message delivered with id " << msg.id();
+}
+
+void Session::data_size_error()
+{
+  out() << "552 5.3.4 Channel size limit exceeded\r\n" << std::flush;
+  LOG(WARNING) << "DATA size error";
+}
+
+void Session::data_error()
+{
+  out() << "550 5.3.5 system error\r\n" << std::flush;
+  LOG(WARNING) << "DATA error";
+}
+
+void Session::bdat_msg(Message& msg, size_t n)
+{
+  out() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
+  LOG(INFO) << "";
 }
 
 void Session::rset()
@@ -466,14 +483,14 @@ void Session::quit()
 
 void Session::error(std::experimental::string_view m)
 {
-  out() << "502 5.2.2 command unrecognized\r\n" << std::flush;
+  out() << "502 5.5.1 command unrecognized\r\n" << std::flush;
   LOG(ERROR) << m;
 }
 
-void Session::time()
+void Session::time_out()
 {
-  out() << "421 4.4.2 timeout\r\n" << std::flush;
-  LOG(ERROR) << "timeout" << (sock_.has_peername() ? " from " : "") << client_;
+  out() << "421 4.4.2 time-out\r\n" << std::flush;
+  LOG(ERROR) << "time-out" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
 }
 
@@ -646,7 +663,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
   boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    out() << "550 5.7.1 invalid sender domain "s + domain + "\r\n"s
+    out() << "550 5.7.1 invalid sender domain " << domain << "\r\n"
           << std::flush;
     LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
     return false;
@@ -715,7 +732,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out() << "550 4.7.1 blocked by "s + uribl + "\r\n"s << std::flush;
+      out() << "550 4.7.1 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }
