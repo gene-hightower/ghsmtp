@@ -70,7 +70,7 @@ public:
 
     // open
     ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    ofs_.open(tmpfn_.c_str());
+    ofs_.open(tmpfn_.string());
   }
   Pill const& id() const { return s_; }
   Now const& when() const { return then_; }
