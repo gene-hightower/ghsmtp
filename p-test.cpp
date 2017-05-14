@@ -18,13 +18,13 @@ struct Ctx {
 struct String : plus<sor<ALPHA, DIGIT>> {
 };
 
-struct baz : seq<TAOCPP_PEGTL_ISTRING("BAZ"), CRLF> {
-};
-
 struct foo : seq<TAOCPP_PEGTL_ISTRING("FOO"), opt<SP, String>, CRLF> {
 };
 
 struct bar : seq<TAOCPP_PEGTL_ISTRING("BAR "), String, CRLF> {
+};
+
+struct baz : seq<TAOCPP_PEGTL_ISTRING("BAZ"), CRLF> {
 };
 
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
@@ -51,7 +51,10 @@ struct action<foo> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << "foo\n";
+    std::cout << "foo";
+    if (in.string().length())
+      std::cout << " " << in.string();
+    std::cout << "\n";
   }
 };
 
@@ -60,17 +63,13 @@ struct action<bar> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << "bar\n";
+    std::cout << "bar " << in.string() << '\n';
   }
 };
 
 template <>
 struct action<baz> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << "baz\n";
-  }
+  static void apply0(Ctx& ctx) { std::cout << "baz\n"; }
 };
 
 template <>
@@ -85,7 +84,7 @@ int main(int argc, char const* argv[])
   google::InitGoogleLogging(argv[0]);
 
   smtp::Ctx ctx;
-  istream_input<crlf_eol> in(std::cin, 20, "cin");
+  istream_input<eol::crlf> in(std::cin, 20, "cin");
 
   std::cout << "250 start\n";
 
