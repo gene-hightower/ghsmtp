@@ -426,7 +426,7 @@ void Session::data_msg_done(Message& msg, size_t n)
 {
   msg.save();
   out() << "250 2.6.0 OK, " << n << " octets received\r\n" << std::flush;
-  LOG(INFO) << "DATA message delivered with id " << msg.id();
+  LOG(INFO) << "message delivered, " << n << " octets, with id " << msg.id();
 }
 
 void Session::data_size_error()
