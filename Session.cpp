@@ -381,7 +381,7 @@ std::string Session::added_headers_(Message const& msg)
   return headers.str();
 }
 
-void Session::data_msg(Message& msg) // called /after/ data_start
+void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
   auto status = Message::SpamStatus::spam;
 
@@ -425,7 +425,7 @@ void Session::data_msg(Message& msg) // called /after/ data_start
 void Session::data_msg_done(Message& msg, size_t n)
 {
   msg.save();
-  out() << "250 2.6.0 OK " << n << " octets\r\n" << std::flush;
+  out() << "250 2.6.0 OK, " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "DATA message delivered with id " << msg.id();
 }
 
@@ -441,10 +441,26 @@ void Session::data_error()
   LOG(WARNING) << "DATA error";
 }
 
+bool Session::bdat_start()
+{
+  if (!reverse_path_verified_) {
+    out() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
+    LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
+    return false;
+  }
+  if (forward_path_.empty()) {
+    out() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
+    LOG(ERROR) << "no valid recipients";
+    return false;
+  }
+  LOG(INFO) << "BDAT";
+  return true;
+}
+
 void Session::bdat_msg(Message& msg, size_t n)
 {
-  out() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
-  LOG(INFO) << "";
+  out() << "250 2.0.0 OK, " << n << " octets received\r\n" << std::flush;
+  LOG(INFO) << "BDAT " << n << " octets received";
 }
 
 void Session::rset()

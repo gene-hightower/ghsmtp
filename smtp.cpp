@@ -470,7 +470,7 @@ struct action<bdat> {
   static void apply0(Ctx& ctx)
   {
     if (ctx.chunk_first) {
-      if (!ctx.session.data_start()) {
+      if (!ctx.session.bdat_start()) {
         ctx.bdat_error = true;
       }
       else {
