@@ -35,6 +35,7 @@ public:
   void data_msg_done(Message& msg, size_t n);
   void data_size_error();
   void data_error();
+  bool bdat_start();
   void bdat_msg(Message& msg, size_t n);
 
   void rset();
