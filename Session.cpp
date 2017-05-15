@@ -425,7 +425,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 void Session::data_msg_done(Message& msg, size_t n)
 {
   msg.save();
-  out() << "250 2.6.0 OK, " << n << " octets received\r\n" << std::flush;
+  out() << "250 2.6.0 Message OK, " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << n << " octets, with id " << msg.id();
 }
 
@@ -459,7 +459,7 @@ bool Session::bdat_start()
 
 void Session::bdat_msg(Message& msg, size_t n)
 {
-  out() << "250 2.0.0 OK, " << n << " octets received\r\n" << std::flush;
+  out() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " octets received";
 }
 
