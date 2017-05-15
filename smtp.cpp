@@ -274,8 +274,11 @@ struct chunk_size : plus<DIGIT> {
 struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {
 };
 
-struct bdat
-    : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, opt<end_marker>, CRLF> {
+struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, CRLF> {
+};
+
+struct bdat_last
+    : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, end_marker, CRLF> {
 };
 
 struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {
@@ -328,6 +331,7 @@ struct any_cmd : seq<sor<data,
                          helo,
                          ehlo,
                          bdat,
+                         bdat_last,
                          starttls,
                          rcpt_to,
                          mail_from>,
@@ -465,74 +469,85 @@ struct action<end_marker> {
   static void apply0(Ctx& ctx) { ctx.chunk_last = true; }
 };
 
-template <>
-struct action<bdat> {
-  static void apply0(Ctx& ctx)
-  {
-    LOG(INFO) << "bdat::apply0";
-    LOG(INFO) << "ctx.chunk_size == " << ctx.chunk_size;
-    LOG(INFO) << "ctx.chunk_first == " << (ctx.chunk_first ? "true" : "false");
-    LOG(INFO) << "ctx.chunk_last == " << (ctx.chunk_last ? "true" : "false");
-    LOG(INFO) << "ctx.bdat_error == " << (ctx.bdat_error ? "true" : "false");
+void bdat_act(Ctx& ctx)
+{
+  LOG(INFO) << "bdat::apply0";
+  LOG(INFO) << "ctx.chunk_size == " << ctx.chunk_size;
+  LOG(INFO) << "ctx.chunk_first == " << (ctx.chunk_first ? "true" : "false");
+  LOG(INFO) << "ctx.chunk_last == " << (ctx.chunk_last ? "true" : "false");
+  LOG(INFO) << "ctx.bdat_error == " << (ctx.bdat_error ? "true" : "false");
 
-    // First off, for every BDAT, we /must/ read the data.
-    std::vector<char> bfr;
+  // First off, for every BDAT, we /must/ read the data.
+  std::vector<char> bfr;
 
-    if (ctx.chunk_size) {
-      bfr.reserve(ctx.chunk_size);
-      LOG(INFO) << "read " << ctx.chunk_size << " octets";
-      ctx.session.in().read(bfr.data(), ctx.chunk_size);
-    }
-    else {
-      LOG(INFO) << "chunk_size is zero";
-    }
+  if (ctx.chunk_size) {
+    bfr.reserve(ctx.chunk_size);
+    LOG(INFO) << "read " << ctx.chunk_size << " octets";
+    ctx.session.in().read(bfr.data(), ctx.chunk_size);
+    if (ctx.session.in())
+      LOG(INFO) << "read ok";
+    else
+      LOG(FATAL) << "only " << ctx.session.in().gcount() << " could be read";
+  }
+  else {
+    LOG(INFO) << "chunk_size is zero";
+  }
 
-    // If we've already failed
-    if (ctx.bdat_error) {
-      ctx.session.data_error();
-      LOG(WARNING) << "continuing data_error";
+  // If we've already failed
+  if (ctx.bdat_error) {
+    ctx.session.data_error();
+    LOG(WARNING) << "continuing data_error";
+    return;
+  }
+
+  if (ctx.chunk_first) {
+    if (!ctx.session.bdat_start()) {
+      ctx.bdat_error = true;
+      LOG(WARNING) << "bdat_start() returned error!";
       return;
     }
 
-    if (ctx.chunk_first) {
-      if (!ctx.session.bdat_start()) {
-        ctx.bdat_error = true;
-        LOG(WARNING) << "bdat_start() returned error!";
-        return;
-      }
+    LOG(INFO) << "data_msg";
+    ctx.session.data_msg(ctx.msg);
 
-      LOG(INFO) << "data_msg";
-      ctx.session.data_msg(ctx.msg);
-
-      ctx.msg_bytes = 0;
-      ctx.chunk_first = false;
-    }
-
-    if (ctx.chunk_size) {
-
-      if ((ctx.msg_bytes + ctx.chunk_size) > Config::size) {
-        ctx.session.data_size_error();
-        ctx.bdat_error = true;
-        LOG(WARNING) << "message size of " << ctx.msg_bytes
-                     << " plus new chunk of " << ctx.chunk_size
-                     << " exceeds maximium of " << Config::size;
-        return;
-      }
-
-      LOG(INFO) << "write " << ctx.chunk_size << " octets";
-      ctx.msg.out().write(bfr.data(), ctx.chunk_size);
-      ctx.msg_bytes += ctx.chunk_size;
-    }
-
-    if (ctx.chunk_last) {
-      LOG(INFO) << "calling data_msg_done()";
-      ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
-    }
-    else {
-      LOG(INFO) << "calling bdat_msg()";
-      ctx.session.bdat_msg(ctx.msg, ctx.msg_bytes);
-    }
+    ctx.msg_bytes = 0;
+    ctx.chunk_first = false;
   }
+
+  if (ctx.chunk_size) {
+
+    if ((ctx.msg_bytes + ctx.chunk_size) > Config::size) {
+      ctx.session.data_size_error();
+      ctx.bdat_error = true;
+      LOG(WARNING) << "message size of " << ctx.msg_bytes
+                   << " plus new chunk of " << ctx.chunk_size
+                   << " exceeds maximium of " << Config::size;
+      return;
+    }
+
+    LOG(INFO) << "write " << ctx.chunk_size << " octets";
+    ctx.msg.out().write(bfr.data(), ctx.chunk_size);
+    ctx.msg_bytes += ctx.chunk_size;
+  }
+
+  if (ctx.chunk_last) {
+    LOG(INFO) << "calling data_msg_done()";
+    ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
+  }
+  else {
+    LOG(INFO) << "calling bdat_msg()";
+    ctx.session.bdat_msg(ctx.msg, ctx.msg_bytes);
+  }
+}
+
+template <>
+struct action<bdat> {
+  static void apply0(Ctx& ctx) { bdat_act(ctx); }
+};
+
+template <>
+struct action<bdat_last> {
+  static void apply0(Ctx& ctx) { bdat_act(ctx); }
 };
 
 template <>
