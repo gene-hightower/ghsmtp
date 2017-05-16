@@ -424,7 +424,8 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 void Session::data_msg_done(Message& msg, size_t n)
 {
   msg.save();
-  out() << "250 2.6.0 Message OK, " << n << " octets received\r\n" << std::flush;
+  out() << "250 2.6.0 Message OK, " << n << " octets received\r\n"
+        << std::flush;
   LOG(INFO) << "message delivered, " << n << " octets, with id " << msg.id();
 }
 
@@ -612,9 +613,12 @@ bool Session::verify_client_(std::string const& client_identity)
 
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
-  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
-    LOG(INFO) << "magic Postmaster address";
-    return true;
+  if ((recipient.local_part() == "Postmaster")) {
+    if ((recipient.domain() == "")
+        || (recipient.domain() == "["s + sock_.us_c_str() + "]"s)) {
+      LOG(INFO) << "magic Postmaster address";
+      return true;
+    }
   }
 
   auto accepted_domain = false;
