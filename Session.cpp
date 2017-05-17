@@ -613,12 +613,9 @@ bool Session::verify_client_(std::string const& client_identity)
 
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
-  if ((recipient.local_part() == "Postmaster")) {
-    if ((recipient.domain() == "")
-        || (recipient.domain() == "["s + sock_.us_c_str() + "]"s)) {
-      LOG(INFO) << "magic Postmaster address";
-      return true;
-    }
+  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
+    LOG(INFO) << "magic Postmaster address";
+    return true;
   }
 
   auto accepted_domain = false;
@@ -630,7 +627,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Make sure the domain matches.
-  if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)) {
+  if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)
+      && !(recipient.domain() == "["s + sock_.us_c_str() + "]"s)) {
     out() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
