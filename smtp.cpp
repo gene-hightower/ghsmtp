@@ -1,6 +1,7 @@
 #include "Session.hpp"
 
 #include <cstdlib>
+#include <memory>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -15,7 +16,7 @@ namespace smtp {
 struct Ctx {
   Session session;
 
-  Message msg;
+  std::unique_ptr<Message> msg;
   size_t msg_bytes{0};
 
   std::string mb_loc;
@@ -320,6 +321,9 @@ struct starttls : seq<TAOCPP_PEGTL_ISTRING("STARTTLS"), CRLF> {
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
 };
 
+struct auth : seq<TAOCPP_PEGTL_ISTRING("AUTH LOGIN"), CRLF> {
+};
+
 // commands in size order
 
 struct any_cmd : seq<sor<data,
@@ -333,6 +337,7 @@ struct any_cmd : seq<sor<data,
                          bdat,
                          bdat_last,
                          starttls,
+                         auth,
                          rcpt_to,
                          mail_from>,
                      discard> {
@@ -507,8 +512,8 @@ void bdat_act(Ctx& ctx)
       return;
     }
 
-    LOG(INFO) << "data_msg";
-    ctx.session.data_msg(ctx.msg);
+    ctx.msg = std::make_unique<Message>();
+    ctx.session.data_msg(*ctx.msg);
 
     ctx.msg_bytes = 0;
     ctx.chunk_first = false;
@@ -526,17 +531,18 @@ void bdat_act(Ctx& ctx)
     }
 
     LOG(INFO) << "write " << ctx.chunk_size << " octets";
-    ctx.msg.out().write(bfr.data(), ctx.chunk_size);
+    ctx.msg->out().write(bfr.data(), ctx.chunk_size);
     ctx.msg_bytes += ctx.chunk_size;
   }
 
   if (ctx.chunk_last) {
     LOG(INFO) << "calling data_msg_done()";
-    ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
+    ctx.session.data_msg_done(*ctx.msg, ctx.msg_bytes);
+    ctx.msg.reset();
   }
   else {
     LOG(INFO) << "calling bdat_msg()";
-    ctx.session.bdat_msg(ctx.msg, ctx.msg_bytes);
+    ctx.session.bdat_msg(*ctx.msg, ctx.msg_bytes);
   }
 }
 
@@ -558,10 +564,12 @@ struct data_action<data_end> {
       LOG(WARNING) << "message size " << ctx.msg_bytes
                    << " exceeds maximium of " << Config::size;
       ctx.session.data_size_error();
-      ctx.msg.trash();
+      ctx.msg->trash();
+      ctx.msg.reset();
     }
     else {
-      ctx.session.data_msg_done(ctx.msg, ctx.msg_bytes);
+      ctx.session.data_msg_done(*ctx.msg, ctx.msg_bytes);
+      ctx.msg.reset();
     }
   }
 };
@@ -572,7 +580,7 @@ struct data_action<data_blank> {
   {
     if ((ctx.msg_bytes + 2) <= Config::size) {
       ctx.msg_bytes += 2;
-      ctx.msg.out() << "\r\n";
+      ctx.msg->out() << "\r\n";
     }
   }
 };
@@ -585,7 +593,7 @@ struct data_action<data_plain> {
     auto len = in.string().length();
     if ((ctx.msg_bytes + len) <= Config::size) {
       ctx.msg_bytes += len;
-      ctx.msg.out().write(in.string().data(), len);
+      ctx.msg->out().write(in.string().data(), len);
     }
   }
 };
@@ -598,7 +606,7 @@ struct data_action<data_dot> {
     auto len = in.string().length() - 1;
     if ((ctx.msg_bytes + len) <= Config::size) {
       ctx.msg_bytes += len;
-      ctx.msg.out().write(in.string().data() + 1, len);
+      ctx.msg->out().write(in.string().data() + 1, len);
     }
   }
 };
@@ -609,7 +617,8 @@ struct action<data> {
   static void apply(const Input& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      ctx.session.data_msg(ctx.msg);
+      ctx.msg = std::make_unique<Message>();
+      ctx.session.data_msg(*ctx.msg);
       ctx.msg_bytes = 0;
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
@@ -646,6 +655,11 @@ struct action<help> {
 template <>
 struct action<starttls> {
   static void apply0(Ctx& ctx) { ctx.session.starttls(); }
+};
+
+template <>
+struct action<auth> {
+  static void apply0(Ctx& ctx) { ctx.session.error("AUTH not supported"); }
 };
 
 template <>
