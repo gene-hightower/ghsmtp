@@ -27,9 +27,7 @@ LDLIBS += \
 	-lregdom \
 	-lspf2
 
-PROGRAMS := smtp p0f msg
-
-p0f_STEMS := p0f
+PROGRAMS := smtp msg
 
 smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL date/tz
 
