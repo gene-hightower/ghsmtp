@@ -17,7 +17,7 @@ struct Ctx {
   Session session;
 
   std::unique_ptr<Message> msg;
-  size_t msg_bytes{0};
+  size_t msg_size{0};
 
   std::string mb_loc;
   std::string mb_dom;
@@ -502,13 +502,13 @@ void bdat_act(Ctx& ctx)
     ctx.msg = std::make_unique<Message>();
     ctx.session.data_msg(*ctx.msg);
 
-    ctx.msg_bytes = 0;
+    ctx.msg_size = 0;
     ctx.chunk_first = false;
   }
 
   if (ctx.chunk_size) {
-    if ((ctx.msg_bytes + ctx.chunk_size) > Config::size) {
-      LOG(WARNING) << "message size of " << ctx.msg_bytes
+    if ((ctx.msg_size + ctx.chunk_size) > Config::size) {
+      LOG(WARNING) << "message size of " << ctx.msg_size
                    << " plus new chunk of " << ctx.chunk_size
                    << " exceeds maximium of " << Config::size;
       ctx.session.data_size_error();
@@ -519,15 +519,15 @@ void bdat_act(Ctx& ctx)
     }
 
     ctx.msg->out().write(bfr.data(), ctx.chunk_size);
-    ctx.msg_bytes += ctx.chunk_size;
+    ctx.msg_size += ctx.chunk_size;
   }
 
   if (ctx.chunk_last) {
-    ctx.session.data_msg_done(*ctx.msg, ctx.msg_bytes);
+    ctx.session.data_msg_done(*ctx.msg, ctx.msg_size);
     ctx.msg.reset();
   }
   else {
-    ctx.session.bdat_msg(*ctx.msg, ctx.msg_bytes);
+    ctx.session.bdat_msg(*ctx.msg, ctx.msg_size);
   }
 }
 
@@ -545,16 +545,16 @@ template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    if (ctx.msg_bytes > Config::size) {
-      LOG(WARNING) << "message size " << ctx.msg_bytes
-                   << " exceeds maximium of " << Config::size;
+    if (ctx.msg_size > Config::size) {
+      LOG(WARNING) << "message size " << ctx.msg_size << " exceeds maximium of "
+                   << Config::size;
       ctx.session.data_size_error();
       ctx.bdat_error = true;
       ctx.msg->trash();
       ctx.msg.reset();
     }
     else {
-      ctx.session.data_msg_done(*ctx.msg, ctx.msg_bytes);
+      ctx.session.data_msg_done(*ctx.msg, ctx.msg_size);
       ctx.msg.reset();
     }
   }
@@ -564,8 +564,8 @@ template <>
 struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
-    if ((ctx.msg_bytes + 2) <= Config::size) {
-      ctx.msg_bytes += 2;
+    if ((ctx.msg_size + 2) <= Config::size) {
+      ctx.msg_size += 2;
       ctx.msg->out() << "\r\n";
     }
   }
@@ -577,8 +577,8 @@ struct data_action<data_plain> {
   static void apply(const Input& in, Ctx& ctx)
   {
     auto len = in.string().length();
-    if ((ctx.msg_bytes + len) <= Config::size) {
-      ctx.msg_bytes += len;
+    if ((ctx.msg_size + len) <= Config::size) {
+      ctx.msg_size += len;
       ctx.msg->out().write(in.string().data(), len);
     }
   }
@@ -590,8 +590,8 @@ struct data_action<data_dot> {
   static void apply(const Input& in, Ctx& ctx)
   {
     auto len = in.string().length() - 1;
-    if ((ctx.msg_bytes + len) <= Config::size) {
-      ctx.msg_bytes += len;
+    if ((ctx.msg_size + len) <= Config::size) {
+      ctx.msg_size += len;
       ctx.msg->out().write(in.string().data() + 1, len);
     }
   }
@@ -605,7 +605,7 @@ struct action<data> {
     if (ctx.session.data_start()) {
       ctx.msg = std::make_unique<Message>();
       ctx.session.data_msg(*ctx.msg);
-      ctx.msg_bytes = 0;
+      ctx.msg_size = 0;
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 
