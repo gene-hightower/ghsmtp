@@ -17,7 +17,8 @@ struct Ctx {
   Session session;
 
   std::unique_ptr<Message> msg;
-  size_t msg_size{0};
+
+  std::string hdr;
 
   std::string mb_loc;
   std::string mb_dom;
@@ -30,11 +31,21 @@ struct Ctx {
   bool chunk_last{false};
   bool bdat_error{false};
 
+  bool hdr_end{false};
+
   void bdat_rset()
   {
     chunk_first = true;
     chunk_last = false;
     bdat_error = false;
+  }
+
+  void new_msg()
+  {
+    msg = std::make_unique<Message>();
+    hdr.clear();
+    hdr_end = false;
+    session.data_msg(*msg);
   }
 };
 
@@ -357,7 +368,7 @@ struct data_action : nothing<Rule> {
 template <>
 struct action<esmtp_keyword> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.param.first = in.string();
   }
@@ -366,7 +377,7 @@ struct action<esmtp_keyword> {
 template <>
 struct action<esmtp_value> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.param.second = in.string();
   }
@@ -375,7 +386,7 @@ struct action<esmtp_value> {
 template <>
 struct action<esmtp_param> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.parameters.insert(ctx.param);
     ctx.param.first.clear();
@@ -386,7 +397,7 @@ struct action<esmtp_param> {
 template <>
 struct action<Local_part> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_loc = in.string();
   }
@@ -395,7 +406,7 @@ struct action<Local_part> {
 template <>
 struct action<Non_local_part> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_dom = in.string();
   }
@@ -413,7 +424,7 @@ struct action<magic_postmaster> {
 template <>
 struct action<helo> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     auto ln = in.string();
     // 5 is the length of "HELO ", plus 2 for the CRLF
@@ -426,7 +437,7 @@ struct action<helo> {
 template <>
 struct action<ehlo> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     auto ln = in.string();
     // 5 is the length of "EHLO ", plus 2 for the CRLF
@@ -463,7 +474,7 @@ struct action<rcpt_to> {
 template <>
 struct action<chunk_size> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     ctx.chunk_size = std::strtoul(in.string().c_str(), nullptr, 10);
   }
@@ -477,19 +488,31 @@ struct action<end_marker> {
 void bdat_act(Ctx& ctx)
 {
   // First off, for every BDAT, we /must/ read the data, if there is any.
-  std::vector<char> bfr;
+  std::string bfr;
 
   if (ctx.chunk_size) {
     bfr.reserve(ctx.chunk_size);
-    ctx.session.in().read(bfr.data(), ctx.chunk_size);
+    ctx.session.in().read(&bfr[0], ctx.chunk_size);
     CHECK(ctx.session.in()) << "read failed";
   }
+  LOG(INFO) << "BDAT " << ctx.chunk_size << " octets";
 
   // If we've already failed...
   if (ctx.bdat_error) {
-    ctx.session.data_error();
+    ctx.session.data_error(*ctx.msg);
     LOG(WARNING) << "continuing data_error";
     return;
+  }
+
+  if (ctx.chunk_size && !ctx.hdr_end) {
+    auto e = bfr.find("\r\n\r\n");
+    if (e == std::string::npos) {
+      LOG(WARNING) << "may not have all headers in this chunk";
+    }
+    else {
+      ctx.hdr_end = true;
+    }
+    ctx.hdr.append(bfr.substr(0, e));
   }
 
   if (ctx.chunk_first) {
@@ -499,35 +522,32 @@ void bdat_act(Ctx& ctx)
       return;
     }
 
-    ctx.msg = std::make_unique<Message>();
-    ctx.session.data_msg(*ctx.msg);
+    ctx.new_msg();
 
-    ctx.msg_size = 0;
     ctx.chunk_first = false;
   }
 
   if (ctx.chunk_size) {
-    if ((ctx.msg_size + ctx.chunk_size) > Config::size) {
-      LOG(WARNING) << "message size of " << ctx.msg_size
+    ctx.msg->write(&bfr[0], ctx.chunk_size);
+    if (ctx.msg->size_error()) {
+      LOG(WARNING) << "message size of " << ctx.msg->count()
                    << " plus new chunk of " << ctx.chunk_size
-                   << " exceeds maximium of " << Config::size;
-      ctx.session.data_size_error();
+                   << " exceeds maximium of " << Config::max_msg_size;
+      ctx.session.data_size_error(*ctx.msg);
       ctx.bdat_error = true;
-      ctx.msg->trash();
       ctx.msg.reset();
       return;
     }
-
-    ctx.msg->out().write(bfr.data(), ctx.chunk_size);
-    ctx.msg_size += ctx.chunk_size;
   }
 
   if (ctx.chunk_last) {
-    ctx.session.data_msg_done(*ctx.msg, ctx.msg_size);
+    LOG(INFO) << "hdr == " << ctx.hdr;
+    LOG(INFO) << "hdr_end == " << ctx.hdr_end;
+    ctx.session.data_msg_done(*ctx.msg);
     ctx.msg.reset();
   }
   else {
-    ctx.session.bdat_msg(*ctx.msg, ctx.msg_size);
+    ctx.session.bdat_msg(*ctx.msg, ctx.chunk_size);
   }
 }
 
@@ -538,23 +558,25 @@ struct action<bdat> {
 
 template <>
 struct action<bdat_last> {
-  static void apply0(Ctx& ctx) { bdat_act(ctx); }
+  static void apply0(Ctx& ctx)
+  {
+    bdat_act(ctx);
+    ctx.bdat_error = true; // to make next BDAT fail.
+  }
 };
 
 template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    if (ctx.msg_size > Config::size) {
-      LOG(WARNING) << "message size " << ctx.msg_size << " exceeds maximium of "
-                   << Config::size;
-      ctx.session.data_size_error();
-      ctx.bdat_error = true;
-      ctx.msg->trash();
+    LOG(INFO) << "hdr == " << ctx.hdr;
+    LOG(INFO) << "hdr_end == " << ctx.hdr_end;
+    if (ctx.msg->size_error()) {
+      ctx.session.data_size_error(*ctx.msg);
       ctx.msg.reset();
     }
     else {
-      ctx.session.data_msg_done(*ctx.msg, ctx.msg_size);
+      ctx.session.data_msg_done(*ctx.msg);
       ctx.msg.reset();
     }
   }
@@ -562,24 +584,24 @@ struct data_action<data_end> {
 
 template <>
 struct data_action<data_blank> {
-  static void apply0(Ctx& ctx)
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
   {
-    if ((ctx.msg_size + 2) <= Config::size) {
-      ctx.msg_size += 2;
-      ctx.msg->out() << "\r\n";
-    }
+    ctx.hdr_end = true;
+    auto instr = in.string();
+    ctx.msg->write(instr);
   }
 };
 
 template <>
 struct data_action<data_plain> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
-    auto len = in.string().length();
-    if ((ctx.msg_size + len) <= Config::size) {
-      ctx.msg_size += len;
-      ctx.msg->out().write(in.string().data(), len);
+    auto instr = in.string();
+    ctx.msg->write(instr);
+    if (!ctx.hdr_end) {
+      ctx.hdr += instr;
     }
   }
 };
@@ -587,12 +609,14 @@ struct data_action<data_plain> {
 template <>
 struct data_action<data_dot> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
-    auto len = in.string().length() - 1;
-    if ((ctx.msg_size + len) <= Config::size) {
-      ctx.msg_size += len;
-      ctx.msg->out().write(in.string().data() + 1, len);
+    auto instr = in.string();
+    auto len = instr.length() - 1;
+    ctx.msg->write(instr.data() + 1, len);
+    if (!ctx.hdr_end) {
+      LOG(WARNING) << "suspicious encoding used in header";
+      ctx.hdr += instr.substr(1, len);
     }
   }
 };
@@ -600,12 +624,10 @@ struct data_action<data_dot> {
 template <>
 struct action<data> {
   template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
+  static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      ctx.msg = std::make_unique<Message>();
-      ctx.session.data_msg(*ctx.msg);
-      ctx.msg_size = 0;
+      ctx.new_msg();
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 

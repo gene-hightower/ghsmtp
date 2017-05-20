@@ -168,7 +168,7 @@ void Session::ehlo(std::string client_identity)
   out() << "250-" << our_fqdn_ << "\r\n";
 
   // RFC 1870
-  out() << "250-SIZE " << Config::size << "\r\n";
+  out() << "250-SIZE " << Config::max_msg_size << "\r\n";
 
   // RFC 6152
   out() << "250-8BITMIME\r\n";
@@ -251,7 +251,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       else {
         try {
           size_t sz = stoull(val);
-          if (sz > Config::size) {
+          if (sz > Config::max_msg_size) {
             out() << "552 5.3.4 message size exceeds fixed maximium message "
                      "size\r\n"
                   << std::flush;
@@ -418,25 +418,29 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
   }
 
   msg.open(our_fqdn_, status);
-  msg.out() << added_headers_(msg);
+  auto hdrs = added_headers_(msg);
+  msg.write(hdrs.data(), hdrs.size());
 }
 
-void Session::data_msg_done(Message& msg, size_t n)
+void Session::data_msg_done(Message& msg)
 {
   msg.save();
-  out() << "250 2.6.0 Message OK, " << n << " octets received\r\n"
+  out() << "250 2.6.0 Message OK, " << msg.count() << " octets received\r\n"
         << std::flush;
-  LOG(INFO) << "message delivered, " << n << " octets, with id " << msg.id();
+  LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
+            << msg.id();
 }
 
-void Session::data_size_error()
+void Session::data_size_error(Message& msg)
 {
+  msg.trash();
   out() << "552 5.3.4 Channel size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "DATA size error";
 }
 
-void Session::data_error()
+void Session::data_error(Message& msg)
 {
+  msg.trash();
   out() << "550 5.3.5 system error\r\n" << std::flush;
   LOG(WARNING) << "DATA error";
 }
@@ -453,14 +457,12 @@ bool Session::bdat_start()
     LOG(ERROR) << "no valid recipients";
     return false;
   }
-  LOG(INFO) << "BDAT";
   return true;
 }
 
 void Session::bdat_msg(Message& msg, size_t n)
 {
   out() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
-  LOG(INFO) << "BDAT " << n << " octets received";
 }
 
 void Session::rset()

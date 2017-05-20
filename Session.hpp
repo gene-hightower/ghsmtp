@@ -32,9 +32,10 @@ public:
 
   bool data_start();
   void data_msg(Message& msg);
-  void data_msg_done(Message& msg, size_t n);
-  void data_size_error();
-  void data_error();
+  void data_msg_done(Message& msg);
+  void data_size_error(Message& msg);
+  void data_error(Message& msg);
+
   bool bdat_start();
   void bdat_msg(Message& msg, size_t n);
 
@@ -94,9 +95,5 @@ private:
   bool ip_whitelisted_{false};
   bool reverse_path_verified_{false};
 };
-
-namespace Config {
-constexpr size_t size = 150 * 1024 * 1024;
-}
 
 #endif // SESSION_DOT_HPP

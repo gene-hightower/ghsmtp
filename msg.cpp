@@ -378,7 +378,11 @@ struct field_value : unstructured {
 struct optional_field : seq<field_name, one<':'>, field_value, eol> {
 };
 
-struct optional0_field : seq<not_at<sor<resent_date,
+struct optional0_field : seq<not_at<sor<delivered_to,
+                                        return_path,
+                                        old_x_original_to,
+                                        received,
+                                        resent_date,
                                         resent_from,
                                         resent_sender,
                                         resent_to,

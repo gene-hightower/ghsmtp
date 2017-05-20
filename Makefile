@@ -29,7 +29,7 @@ LDLIBS += \
 
 PROGRAMS := smtp msg
 
-smtp_STEMS := smtp DNS POSIX SPF Session TLS-OpenSSL date/tz
+smtp_STEMS := smtp DNS Message POSIX SPF Session TLS-OpenSSL date/tz
 
 msg_STEMS := msg
 
@@ -51,7 +51,7 @@ TESTS := \
 	TLS-OpenSSL-test
 
 DNS-test_STEMS := DNS
-Message-test_STEMS := date/tz
+Message-test_STEMS := date/tz Message
 Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
@@ -83,7 +83,11 @@ clean::
 	./cdb-gen < $< | cdb -c $@
 
 clean::
-	rm -f two-level-*.cdb three-level-*.cdb white.cdb cdb-gen
+	rm -f two-level-tlds
+	rm -f two-level-tlds.cdb
+	rm -f three-level-tlds
+	rm -f three-level-tlds.cdb
+	rm -f white.cdb cdb-gen
 
 black.cdb: black cdb-gen
 ip-black.cdb: ip-black cdb-gen

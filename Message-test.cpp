@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <sys/utsname.h>
 
+using namespace std::string_literals;
+
 int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
@@ -15,7 +17,8 @@ int main(int argc, char* argv[])
   Message msg;
   msg.open("example.com", Message::SpamStatus::ham);
 
-  msg.out() << "foo bar baz";
+  auto ms = "foo bar baz"s;
+  msg.write(ms.data(), ms.size());
   msg.save();
 
   Message msg2;
