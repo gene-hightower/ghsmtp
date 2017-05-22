@@ -11,6 +11,11 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
 
+namespace Config {
+constexpr std::streamsize max_chunk_size = max_msg_size;
+constexpr std::streamsize hdr_max = 16 * 1024;
+}
+
 namespace smtp {
 
 struct Ctx {
@@ -32,12 +37,15 @@ struct Ctx {
   bool bdat_error{false};
 
   bool hdr_end{false};
+  bool hdr_parsed{false};
 
   void bdat_rset()
   {
     chunk_first = true;
     chunk_last = false;
     bdat_error = false;
+    hdr_end = false;
+    hdr_parsed = false;
   }
 
   void new_msg()
@@ -45,11 +53,31 @@ struct Ctx {
     msg = std::make_unique<Message>();
     hdr.clear();
     hdr_end = false;
+    hdr_parsed = false;
     session.data_msg(*msg);
+  }
+
+  bool hdr_parse()
+  {
+    if (hdr_parsed)
+      return true;
+
+    if (!hdr_end) {
+      LOG(ERROR) << "may not have whole header";
+      return false;
+    }
+    if (hdr.size() > Config::hdr_max) {
+      LOG(ERROR) << "header size too large";
+      return false;
+    }
+
+    // parse header
+
+    return hdr_parsed = true;
   }
 };
 
-struct no_last_dash {
+struct no_last_dash {           // not used now...
   // Something like this to fix up U_ldh_str and Ldh_str rules.
   template <tao::pegtl::apply_mode A,
             tao::pegtl::rewind_mode M,
@@ -487,35 +515,6 @@ struct action<end_marker> {
 
 void bdat_act(Ctx& ctx)
 {
-  // First off, for every BDAT, we /must/ read the data, if there is any.
-  std::string bfr;
-
-  if (ctx.chunk_size) {
-    bfr.reserve(ctx.chunk_size);
-    ctx.session.in().read(&bfr[0], ctx.chunk_size);
-    CHECK(ctx.session.in()) << "read failed";
-  }
-  LOG(INFO) << "BDAT " << ctx.chunk_size << " octets";
-
-  // If we've already failed...
-  if (ctx.bdat_error) {
-    ctx.session.data_error(*ctx.msg);
-    LOG(WARNING) << "continuing data_error";
-    return;
-  }
-
-  if (ctx.chunk_size && !ctx.hdr_end) {
-    auto e = bfr.find("\r\n\r\n");
-    ctx.hdr.append(bfr.substr(0, e));
-    if (e == std::string::npos) {
-      LOG(WARNING) << "may not have all headers in this chunk";
-    }
-    else {
-      ctx.hdr_end = true;
-      // parse headers
-    }
-  }
-
   if (ctx.chunk_first) {
     if (!ctx.session.bdat_start()) {
       ctx.bdat_error = true;
@@ -528,8 +527,61 @@ void bdat_act(Ctx& ctx)
     ctx.chunk_first = false;
   }
 
+  if (ctx.bdat_error) {
+    // If we've already failed...
+
+    ctx.session.data_error(*ctx.msg);
+
+    // seek over BDAT data
+    auto pos = ctx.session.in().tellg();
+    pos += ctx.chunk_size;
+    ctx.session.in().seekg(pos, ctx.session.in().beg);
+    LOG(INFO) << "BDAT continuing data error, skiping " << ctx.chunk_size
+              << " octets";
+
+    return;
+  }
+  else if (ctx.chunk_size > Config::max_chunk_size) {
+    ctx.session.data_size_error(*ctx.msg);
+
+    ctx.bdat_error = true;
+    ctx.msg.reset();
+
+    // seek over BDAT data
+    auto pos = ctx.session.in().tellg();
+    pos += ctx.chunk_size;
+    ctx.session.in().seekg(pos, ctx.session.in().beg);
+    LOG(INFO) << "BDAT size error " << ctx.chunk_size << " octets";
+
+    return;
+  }
+
+  // First off, for every BDAT, we /must/ read the data, if there is any.
+  std::string bfr;
+
   if (ctx.chunk_size) {
+
+    bfr.reserve(ctx.chunk_size);
+
+    ctx.session.in().read(&bfr[0], ctx.chunk_size);
+    CHECK(ctx.session.in()) << "read failed";
+    LOG(INFO) << "BDAT read " << ctx.chunk_size << " octets";
+
+    if (!ctx.hdr_end) {
+      auto e = bfr.find("\r\n\r\n");
+      if (ctx.hdr.size() < Config::hdr_max) {
+        ctx.hdr += bfr.substr(0, e);
+        if (e == std::string::npos) {
+          LOG(WARNING) << "may not have all headers in this chunk";
+        }
+        else {
+          ctx.hdr_end = true;
+        }
+      }
+    }
+
     ctx.msg->write(&bfr[0], ctx.chunk_size);
+
     if (ctx.msg->size_error()) {
       LOG(WARNING) << "message size of " << ctx.msg->count()
                    << " plus new chunk of " << ctx.chunk_size
@@ -542,8 +594,6 @@ void bdat_act(Ctx& ctx)
   }
 
   if (ctx.chunk_last) {
-    LOG(INFO) << "hdr == " << ctx.hdr;
-    LOG(INFO) << "hdr_end == " << ctx.hdr_end;
     ctx.session.data_msg_done(*ctx.msg);
     ctx.msg.reset();
   }
@@ -570,8 +620,6 @@ template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    LOG(INFO) << "hdr == " << ctx.hdr;
-    LOG(INFO) << "hdr_end == " << ctx.hdr_end;
     if (ctx.msg->size_error()) {
       ctx.session.data_size_error(*ctx.msg);
       ctx.msg.reset();
@@ -591,7 +639,6 @@ struct data_action<data_blank> {
     auto instr = in.string();
     ctx.msg->write(instr);
     ctx.hdr_end = true;
-    // parse headers
   }
 };
 
@@ -603,7 +650,9 @@ struct data_action<data_plain> {
     auto instr = in.string();
     ctx.msg->write(instr);
     if (!ctx.hdr_end) {
-      ctx.hdr += instr;
+      if (ctx.hdr.size() < Config::hdr_max) {
+        ctx.hdr += instr;
+      }
     }
   }
 };
@@ -618,7 +667,9 @@ struct data_action<data_dot> {
     ctx.msg->write(instr.data() + 1, len);
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
-      ctx.hdr += instr.substr(1, len);
+      if (ctx.hdr.size() < Config::hdr_max) {
+        ctx.hdr += instr.substr(1, len);
+      }
     }
   }
 };
