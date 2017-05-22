@@ -69,13 +69,13 @@ public:
   Domain& operator=(Domain const&) = delete;
 
   explicit Domain(char const* domain)
-    : domain_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
+    : drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
   {
   }
-  ~Domain() { ldns_rdf_deep_free(domain_); }
+  ~Domain() { ldns_rdf_deep_free(drdfp_); }
 
 private:
-  ldns_rdf* domain_;
+  ldns_rdf* drdfp_;
 
   friend class Query<RR_type::A>;
   friend class Query<RR_type::PTR>;
@@ -91,7 +91,7 @@ public:
   Query(Resolver const& res, Domain const& dom)
   {
     ldns_status stat = ldns_resolver_query_status(
-        &p_, res.res_, dom.domain_, static_cast<ldns_enum_rr_type>(type),
+        &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
         LDNS_RR_CLASS_IN, LDNS_RD);
 
     if (stat != LDNS_STATUS_OK) {
