@@ -561,7 +561,7 @@ void bdat_act(Ctx& ctx)
 
   if (ctx.chunk_size) {
 
-    bfr.reserve(ctx.chunk_size);
+    bfr.resize(ctx.chunk_size);
 
     ctx.session.in().read(&bfr[0], ctx.chunk_size);
     CHECK(ctx.session.in()) << "read failed";
