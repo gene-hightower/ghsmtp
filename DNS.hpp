@@ -68,13 +68,15 @@ public:
   Domain(Domain const&) = delete;
   Domain& operator=(Domain const&) = delete;
 
-  explicit Domain(char const* domain)
-    : drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
+  explicit Domain(std::string domain)
+    : domain_(domain)
+    , drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain_.c_str())))
   {
   }
   ~Domain() { ldns_rdf_deep_free(drdfp_); }
 
 private:
+  std::string domain_;
   ldns_rdf* drdfp_;
 
   friend class Query<RR_type::A>;
@@ -95,7 +97,8 @@ public:
         LDNS_RR_CLASS_IN, LDNS_RD);
 
     if (stat != LDNS_STATUS_OK) {
-      LOG(ERROR) << "ldns_resolver_query_status failed: stat=="
+      LOG(ERROR) << "Query(" << dom.domain_ << ") "
+                 << "ldns_resolver_query_status failed: stat=="
                  << static_cast<unsigned>(stat) << " "
                  << ldns_get_errorstr_by_id(stat);
     }
@@ -160,9 +163,9 @@ inline std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 }
 
 template <RR_type type>
-inline bool has_record(Resolver const& res, std::string const& addr)
+inline bool has_record(Resolver const& res, std::string addr)
 {
-  Domain dom(addr.c_str());
+  Domain dom(addr);
   Query<type> q(res, dom);
   Rrlist<type> rrlst(q);
   return !rrlst.empty();
@@ -170,9 +173,9 @@ inline bool has_record(Resolver const& res, std::string const& addr)
 
 template <RR_type type>
 inline std::vector<std::string> get_records(Resolver const& res,
-                                            std::string const& addr)
+                                            std::string addr)
 {
-  Domain dom(addr.c_str());
+  Domain dom(addr);
   Query<type> q(res, dom);
   Rrlist<type> rrlst(q);
   return rrlst.get();
