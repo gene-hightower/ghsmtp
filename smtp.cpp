@@ -506,13 +506,14 @@ void bdat_act(Ctx& ctx)
 
   if (ctx.chunk_size && !ctx.hdr_end) {
     auto e = bfr.find("\r\n\r\n");
+    ctx.hdr.append(bfr.substr(0, e));
     if (e == std::string::npos) {
       LOG(WARNING) << "may not have all headers in this chunk";
     }
     else {
       ctx.hdr_end = true;
+      // parse headers
     }
-    ctx.hdr.append(bfr.substr(0, e));
   }
 
   if (ctx.chunk_first) {
@@ -587,9 +588,10 @@ struct data_action<data_blank> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.hdr_end = true;
     auto instr = in.string();
     ctx.msg->write(instr);
+    ctx.hdr_end = true;
+    // parse headers
   }
 };
 
