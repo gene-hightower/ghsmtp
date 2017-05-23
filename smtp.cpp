@@ -587,9 +587,7 @@ void bdat_act(Ctx& ctx)
   }
 
   if (ctx.msg->size_error()) {
-    LOG(WARNING) << "message size of " << ctx.msg->count()
-                 << " plus new chunk exceeds maximium of "
-                 << Config::max_msg_size;
+    LOG(ERROR) << "message size error";
     ctx.session.data_size_error(*ctx.msg);
     ctx.bdat_error = true;
     ctx.msg.reset();
