@@ -12,6 +12,7 @@ using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
 
 namespace Config {
+constexpr std::streamsize max_bfr_size = 64 * 1024;
 constexpr std::streamsize max_chunk_size = max_msg_size;
 constexpr std::streamsize hdr_max = 16 * 1024;
 }
@@ -77,7 +78,7 @@ struct Ctx {
   }
 };
 
-struct no_last_dash {           // not used now...
+struct no_last_dash { // not used now...
   // Something like this to fix up U_ldh_str and Ldh_str rules.
   template <tao::pegtl::apply_mode A,
             tao::pegtl::rewind_mode M,
@@ -518,6 +519,7 @@ void bdat_act(Ctx& ctx)
   if (ctx.chunk_first) {
     if (!ctx.session.bdat_start()) {
       ctx.bdat_error = true;
+      // no need to ctx.msg.reset() when bdat_start fails
       LOG(WARNING) << "bdat_start() returned error!";
       return;
     }
@@ -527,9 +529,7 @@ void bdat_act(Ctx& ctx)
     ctx.chunk_first = false;
   }
 
-  if (ctx.bdat_error) {
-    // If we've already failed...
-
+  if (ctx.bdat_error) { // If we've already failed...
     ctx.session.data_error(*ctx.msg);
 
     // seek over BDAT data
@@ -543,7 +543,6 @@ void bdat_act(Ctx& ctx)
   }
   else if (ctx.chunk_size > Config::max_chunk_size) {
     ctx.session.data_size_error(*ctx.msg);
-
     ctx.bdat_error = true;
     ctx.msg.reset();
 
@@ -559,13 +558,15 @@ void bdat_act(Ctx& ctx)
   // First off, for every BDAT, we /must/ read the data, if there is any.
   std::string bfr;
 
-  if (ctx.chunk_size) {
+  std::streamsize to_xfer = ctx.chunk_size;
 
-    bfr.resize(ctx.chunk_size);
+  while (to_xfer) {
+    auto bfr_sz = std::min(to_xfer, Config::max_bfr_size);
+    bfr.resize(bfr_sz);
 
-    ctx.session.in().read(&bfr[0], ctx.chunk_size);
+    ctx.session.in().read(&bfr[0], bfr_sz);
     CHECK(ctx.session.in()) << "read failed";
-    LOG(INFO) << "BDAT read " << ctx.chunk_size << " octets";
+    LOG(INFO) << "BDAT read " << bfr_sz << " octets";
 
     if (!ctx.hdr_end) {
       auto e = bfr.find("\r\n\r\n");
@@ -580,17 +581,19 @@ void bdat_act(Ctx& ctx)
       }
     }
 
-    ctx.msg->write(&bfr[0], ctx.chunk_size);
+    ctx.msg->write(&bfr[0], bfr_sz);
 
-    if (ctx.msg->size_error()) {
-      LOG(WARNING) << "message size of " << ctx.msg->count()
-                   << " plus new chunk of " << ctx.chunk_size
-                   << " exceeds maximium of " << Config::max_msg_size;
-      ctx.session.data_size_error(*ctx.msg);
-      ctx.bdat_error = true;
-      ctx.msg.reset();
-      return;
-    }
+    to_xfer -= bfr_sz;
+  }
+
+  if (ctx.msg->size_error()) {
+    LOG(WARNING) << "message size of " << ctx.msg->count()
+                 << " plus new chunk exceeds maximium of "
+                 << Config::max_msg_size;
+    ctx.session.data_size_error(*ctx.msg);
+    ctx.bdat_error = true;
+    ctx.msg.reset();
+    return;
   }
 
   if (ctx.chunk_last) {
