@@ -763,10 +763,6 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  // address literal skips SPF test
-  if (!client_identity_.empty() && client_identity_[0] == '[')
-    return true;
-
   SPF::Server spf_srv(our_fqdn_.c_str());
   SPF::Request spf_req(spf_srv);
 
