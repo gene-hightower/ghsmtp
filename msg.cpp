@@ -48,7 +48,7 @@ struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
 };
 
-struct text : ranges<1, 9, 11, 12, 14, 127> {
+struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
 };
 
 // struct obs_body {};
@@ -59,7 +59,7 @@ struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
 };
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>> {
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {
 };
 
 struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
