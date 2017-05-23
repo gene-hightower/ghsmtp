@@ -97,7 +97,7 @@ public:
         LDNS_RR_CLASS_IN, LDNS_RD);
 
     if (stat != LDNS_STATUS_OK) {
-      LOG(ERROR) << "Query(" << dom.domain_ << ") "
+      LOG(ERROR) << "Query (" << dom.domain_ << ") "
                  << "ldns_resolver_query_status failed: stat=="
                  << static_cast<unsigned>(stat) << " "
                  << ldns_get_errorstr_by_id(stat);
