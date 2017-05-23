@@ -530,18 +530,21 @@ void bdat_act(Ctx& ctx)
   }
 
   if (ctx.bdat_error) { // If we've already failed...
+    LOG(ERROR) << "BDAT continuing data error, skiping " << ctx.chunk_size
+               << " octets";
+
     ctx.session.data_error(*ctx.msg);
 
     // seek over BDAT data
     auto pos = ctx.session.in().tellg();
     pos += ctx.chunk_size;
     ctx.session.in().seekg(pos, ctx.session.in().beg);
-    LOG(INFO) << "BDAT continuing data error, skiping " << ctx.chunk_size
-              << " octets";
 
     return;
   }
   else if (ctx.chunk_size > Config::max_chunk_size) {
+    LOG(ERROR) << "BDAT size error, skiping " << ctx.chunk_size << " octets";
+
     ctx.session.data_size_error(*ctx.msg);
     ctx.bdat_error = true;
     ctx.msg.reset();
@@ -550,7 +553,6 @@ void bdat_act(Ctx& ctx)
     auto pos = ctx.session.in().tellg();
     pos += ctx.chunk_size;
     ctx.session.in().seekg(pos, ctx.session.in().beg);
-    LOG(INFO) << "BDAT size error " << ctx.chunk_size << " octets";
 
     return;
   }
@@ -561,12 +563,12 @@ void bdat_act(Ctx& ctx)
   std::streamsize to_xfer = ctx.chunk_size;
 
   while (to_xfer) {
-    auto bfr_sz = std::min(to_xfer, Config::max_bfr_size);
-    bfr.resize(bfr_sz);
+    auto xfer_sz = std::min(to_xfer, Config::max_bfr_size);
+    bfr.resize(xfer_sz);
 
-    ctx.session.in().read(&bfr[0], bfr_sz);
+    ctx.session.in().read(&bfr[0], xfer_sz);
     CHECK(ctx.session.in()) << "read failed";
-    LOG(INFO) << "BDAT read " << bfr_sz << " octets";
+    LOG(INFO) << "BDAT read " << xfer_sz << " octets";
 
     if (!ctx.hdr_end) {
       auto e = bfr.find("\r\n\r\n");
@@ -581,13 +583,13 @@ void bdat_act(Ctx& ctx)
       }
     }
 
-    ctx.msg->write(&bfr[0], bfr_sz);
+    ctx.msg->write(&bfr[0], xfer_sz);
 
-    to_xfer -= bfr_sz;
+    to_xfer -= xfer_sz;
   }
 
   if (ctx.msg->size_error()) {
-    LOG(ERROR) << "message size error";
+    LOG(ERROR) << "message size error after " << ctx.msg->count() << " octets";
     ctx.session.data_size_error(*ctx.msg);
     ctx.bdat_error = true;
     ctx.msg.reset();
