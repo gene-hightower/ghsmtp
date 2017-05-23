@@ -52,10 +52,11 @@ private:
 
   std::ofstream ofs_;
   std::streamsize count_{0};
-  bool size_error_{false};
 
   boost::filesystem::path tmpfn_;
   boost::filesystem::path newfn_;
+
+  bool size_error_{false};
 };
 
 namespace Config {
