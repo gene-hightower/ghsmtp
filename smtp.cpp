@@ -636,7 +636,7 @@ template <>
 struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
-    constexpr char CRLF[]{"\r\n"};
+    constexpr char CRLF[]{'\r', '\n'};
     ctx.msg->write(CRLF, sizeof(CRLF));
     ctx.hdr_end = true;
   }
