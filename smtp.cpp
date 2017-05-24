@@ -455,9 +455,8 @@ struct action<helo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto ln = in.string();
-    // 5 is the length of "HELO ", plus 2 for the CRLF
-    auto dom = ln.substr(5, ln.length() - 7);
+    // +5 for the length of "HELO ", -2 for the CRLF
+    auto dom = std::string(in.begin() + 5, in.end() - 2);
     ctx.session.helo(dom);
     ctx.bdat_rset();
   }
@@ -468,9 +467,8 @@ struct action<ehlo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto ln = in.string();
-    // 5 is the length of "EHLO ", plus 2 for the CRLF
-    auto dom = ln.substr(5, ln.length() - 7);
+    // +5 for the length of "EHLO ", -2 for the CRLF
+    auto dom = std::string(in.begin() + 5, in.end() - 2);
     ctx.session.ehlo(dom);
     ctx.bdat_rset();
   }
@@ -636,11 +634,10 @@ struct data_action<data_end> {
 
 template <>
 struct data_action<data_blank> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
+  static void apply0(Ctx& ctx)
   {
-    auto instr = in.string();
-    ctx.msg->write(instr);
+    constexpr char CRLF[]{"\r\n"};
+    ctx.msg->write(CRLF, sizeof(CRLF));
     ctx.hdr_end = true;
   }
 };
@@ -650,11 +647,12 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto instr = in.string();
-    ctx.msg->write(instr);
+    size_t len = in.end() - in.begin();
+    ctx.msg->write(in.begin(), len);
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::hdr_max) {
-        ctx.hdr += instr;
+        auto hlen = std::min(len, Config::hdr_max - ctx.hdr.size());
+        std::copy_n(in.begin(), hlen, std::back_inserter(ctx.hdr));
       }
     }
   }
@@ -665,13 +663,13 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto instr = in.string();
-    auto len = instr.length() - 1;
-    ctx.msg->write(instr.data() + 1, len);
+    size_t len = in.end() - in.begin() - 1;
+    ctx.msg->write(in.begin() + 1, len);
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
       if (ctx.hdr.size() < Config::hdr_max) {
-        ctx.hdr += instr.substr(1, len);
+        auto hlen = std::min(len, Config::hdr_max - ctx.hdr.size());
+        std::copy_n(in.begin() + 1, hlen, std::back_inserter(ctx.hdr));
       }
     }
   }
