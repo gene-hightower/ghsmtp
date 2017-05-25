@@ -514,7 +514,7 @@ struct action<end_marker> {
 
 void bdat_act(Ctx& ctx)
 {
-  LOG(INFO) << "BDAT " << ctx.chunk_size << (ctx.chunk_last ? "LAST" : "");
+  LOG(INFO) << "BDAT " << ctx.chunk_size << (ctx.chunk_last ? " LAST" : "");
 
   if (ctx.chunk_first) {
     if (!ctx.session.bdat_start()) {
