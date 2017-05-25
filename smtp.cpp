@@ -514,6 +514,8 @@ struct action<end_marker> {
 
 void bdat_act(Ctx& ctx)
 {
+  LOG(INFO) << "BDAT " << ctx.chunk_size << (ctx.chunk_last ? "LAST" : "");
+
   if (ctx.chunk_first) {
     if (!ctx.session.bdat_start()) {
       ctx.bdat_error = true;
@@ -566,7 +568,6 @@ void bdat_act(Ctx& ctx)
 
     ctx.session.in().read(&bfr[0], xfer_sz);
     CHECK(ctx.session.in()) << "read failed";
-    LOG(INFO) << "BDAT read " << xfer_sz << " octets";
 
     if (!ctx.hdr_end) {
       auto e = bfr.find("\r\n\r\n");
@@ -595,6 +596,9 @@ void bdat_act(Ctx& ctx)
   }
 
   if (ctx.chunk_last) {
+    if (!ctx.hdr_end) {
+      LOG(WARNING) << "may not have all headers in this email";
+    }
     ctx.session.data_msg_done(*ctx.msg);
     ctx.msg.reset();
   }
@@ -626,6 +630,9 @@ struct data_action<data_end> {
       ctx.msg.reset();
     }
     else {
+      if (!ctx.hdr_end) {
+        LOG(WARNING) << "may not have all headers in this email";
+      }
       ctx.session.data_msg_done(*ctx.msg);
       ctx.msg.reset();
     }
