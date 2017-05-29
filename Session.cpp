@@ -42,7 +42,7 @@ constexpr char const* const uribls[] = {
     "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
 };
 
-constexpr auto greeting_max_wait_ms = 10'000;
+constexpr auto greeting_max_wait_ms = 3'000;
 constexpr auto greeting_min_wait_ms = 500;
 }
 
@@ -75,9 +75,9 @@ void Session::greeting()
 
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
-      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
+      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       std::exit(EXIT_SUCCESS);
     }
 
@@ -125,9 +125,9 @@ void Session::greeting()
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
           syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                  sock_.them_c_str(), rbl);
+          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
           std::exit(EXIT_SUCCESS);
         }
       }
@@ -140,9 +140,9 @@ void Session::greeting()
     std::chrono::milliseconds wait{uni_dist(rd_)};
 
     if (sock_.input_ready(wait)) {
-      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
              sock_.them_c_str());
+      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
@@ -501,7 +501,7 @@ void Session::quit()
 void Session::error(std::experimental::string_view m)
 {
   out() << "502 5.5.1 command unrecognized\r\n" << std::flush;
-  LOG(ERROR) << m;
+  LOG(ERROR) << "Session::error: " << m;
 }
 
 void Session::time_out()
@@ -534,8 +534,8 @@ bool Session::verify_client_(std::string const& client_identity)
 // check the identity from the HELO/EHLO
 {
   if (IP4::is_bracket_address(client_identity)) {
-    out() << "421 4.7.1 need domain name\r\n" << std::flush;
     LOG(ERROR) << "need domain name not " << client_identity;
+    out() << "421 4.7.1 need domain name\r\n" << std::flush;
     return false;
   }
 
@@ -547,9 +547,9 @@ bool Session::verify_client_(std::string const& client_identity)
 
     if (!Domain::match(our_fqdn_, fcrdns_)
         && strcmp(sock_.them_c_str(), "127.0.0.1")) {
-      out() << "550 5.7.1 liar\r\n" << std::flush;
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
+      out() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
     }
   }
@@ -559,17 +559,17 @@ bool Session::verify_client_(std::string const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    out() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
+    out() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
     return false;
   }
 
   CDB black("black");
   if (black.lookup(client_identity)) {
-    out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
+    out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
   else {
@@ -582,9 +582,9 @@ bool Session::verify_client_(std::string const& client_identity)
   }
   else {
     if (black.lookup(tld)) {
-      out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
       LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
+      out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
       return false;
     }
     else {
