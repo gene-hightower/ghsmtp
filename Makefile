@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := ldns openssl libcurl
+USES := ldns openssl libcurl opendkim
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
@@ -24,6 +24,7 @@ LDLIBS += \
 	-lcdb \
 	-lcrypto \
 	-lglog \
+	-lopendmarc \
 	-lregdom \
 	-lspf2
 
@@ -68,7 +69,7 @@ databases := \
 	two-level-tlds.cdb \
 	white.cdb \
 
-all:: $(databases)
+all:: $(databases) public_suffix_list.dat
 
 TMPDIR ?= /tmp
 TEST_MAILDIR=$(TMPDIR)/Maildir
@@ -98,6 +99,9 @@ white.cdb: white cdb-gen
 
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
+
+public_suffix_list.dat:
+	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
 include ../MKUltra/rules
 

@@ -7,6 +7,10 @@
 
 #include <iostream>
 
+#include "DKIM.hpp"
+#include "DMARC.hpp"
+#include "Mailbox.hpp"
+
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 #include <tao/pegtl/contrib/alphabet.hpp>
@@ -17,10 +21,22 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
 
+using std::experimental::string_view;
+
 namespace msg {
 
 struct Ctx {
-  // proly some headers...
+  OpenDKIM::Lib dkl;
+  OpenDKIM::Verify dkv{dkl};
+
+  OpenDMARC::Lib dmarc;
+
+  std::string mb_loc;
+  std::string mb_dom;
+
+  std::vector<::Mailbox> mb_list;
+
+  std::vector<::Mailbox> RFC5322_From;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -48,6 +64,9 @@ struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
 };
 
+struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
+};
+
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
 };
 
@@ -62,7 +81,7 @@ struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
 struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {
 };
 
-struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
+struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {
 };
 
 // clang-format off
@@ -107,7 +126,7 @@ struct quoted_string : seq<opt<CFWS>,
                            opt<CFWS>> {
 };
 
-struct unstructured : seq<star<seq<opt<FWS>, VCHAR>>, star<WSP>> {
+struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
 };
 
 struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {
@@ -354,12 +373,6 @@ struct delivered_to
     : seq<TAOCPP_PEGTL_ISTRING("Delivered-To:"), addr_spec, eol> {
 };
 
-struct trace : seq<opt<delivered_to>,
-                   opt<return_path>,
-                   opt<old_x_original_to>,
-                   plus<received>> {
-};
-
 struct x_original_to
     : seq<TAOCPP_PEGTL_ISTRING("X-Original-To:"), address_list, eol> {
 };
@@ -378,64 +391,31 @@ struct field_value : unstructured {
 struct optional_field : seq<field_name, one<':'>, field_value, eol> {
 };
 
-struct optional0_field : seq<not_at<sor<delivered_to,
-                                        return_path,
-                                        old_x_original_to,
-                                        received,
-                                        resent_date,
-                                        resent_from,
-                                        resent_sender,
-                                        resent_to,
-                                        resent_cc,
-                                        resent_bcc,
-                                        resent_msg_id,
-                                        orig_date,
-                                        from,
-                                        sender,
-                                        reply_to,
-                                        to,
-                                        cc,
-                                        bcc,
-                                        message_id,
-                                        in_reply_to,
-                                        references,
-                                        subject,
-                                        comments,
-                                        keywords>>,
-                             optional_field> {
-};
-
-struct optional1_field : seq<field_name, one<':'>, field_value, eol> {
-};
-
 // message header
 
-struct fields : seq<star<seq<trace,
-                             opt<x_original_to>,
-                             star<optional0_field>,
-                             star<sor<resent_date,
-                                      resent_from,
-                                      resent_sender,
-                                      resent_to,
-                                      resent_cc,
-                                      resent_bcc,
-                                      resent_msg_id>>>>,
-                    star<sor<orig_date,
-                             from,
-                             sender,
-                             reply_to,
-                             to,
-                             cc,
-                             bcc,
-                             message_id,
-                             in_reply_to,
-                             references,
-                             subject,
-                             comments,
-                             keywords,
-                             optional0_field>>>
-
-{
+struct fields : star<sor<return_path,
+                         received,
+                         resent_date,
+                         resent_from,
+                         resent_sender,
+                         resent_to,
+                         resent_cc,
+                         resent_bcc,
+                         resent_msg_id,
+                         orig_date,
+                         from,
+                         sender,
+                         reply_to,
+                         to,
+                         cc,
+                         bcc,
+                         message_id,
+                         in_reply_to,
+                         references,
+                         subject,
+                         comments,
+                         keywords,
+                         optional_field>> {
 };
 
 struct message : seq<fields, opt<seq<eol, body>>> {
@@ -446,11 +426,58 @@ struct action : nothing<Rule> {
 };
 
 template <>
+struct action<fields> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    LOG(INFO) << "fields";
+  }
+};
+
+template <>
+struct action<optional_field> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    LOG(INFO) << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
+  }
+};
+
+template <>
+struct action<local_part> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.mb_loc = in.string();
+  }
+};
+
+template <>
+struct action<domain> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.mb_dom = in.string();
+  }
+};
+
+template <>
+struct action<mailbox> {
+  static void apply0(Ctx& ctx)
+  {
+    ctx.mb_list.emplace_back(ctx.mb_loc, ctx.mb_dom);
+  }
+};
+
+template <>
 struct action<orig_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    LOG(INFO) << "Date:";
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 
@@ -461,7 +488,11 @@ struct action<from> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    LOG(INFO) << "From:";
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.RFC5322_From = std::move(ctx.mb_list);
+    ctx.mb_list.clear();
+    LOG(INFO) << "list length == " << ctx.RFC5322_From.size();
   }
 };
 
@@ -470,7 +501,8 @@ struct action<sender> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -479,7 +511,8 @@ struct action<reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -490,7 +523,8 @@ struct action<to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -499,7 +533,8 @@ struct action<cc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -508,7 +543,8 @@ struct action<bcc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -519,7 +555,7 @@ struct action<message_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 template <>
@@ -527,7 +563,6 @@ struct action<in_reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
   }
 };
 template <>
@@ -535,7 +570,7 @@ struct action<references> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 
@@ -546,7 +581,7 @@ struct action<subject> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 template <>
@@ -554,7 +589,7 @@ struct action<comments> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 template <>
@@ -562,7 +597,7 @@ struct action<keywords> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 
@@ -573,7 +608,27 @@ struct action<resent_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+  }
+};
+
+template <>
+struct action<resent_from> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
+  }
+};
+
+template <>
+struct action<resent_sender> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -582,7 +637,8 @@ struct action<resent_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -591,7 +647,8 @@ struct action<resent_cc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -600,7 +657,8 @@ struct action<resent_bcc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -609,7 +667,7 @@ struct action<resent_msg_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 
@@ -620,15 +678,9 @@ struct action<return_path> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
-  }
-};
-
-template <>
-struct action<trace> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
+    LOG(INFO) << "Return-Path:";
+    // ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -637,7 +689,8 @@ struct action<received> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << in.string();
+    LOG(INFO) << "Received:";
+    // ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
 
@@ -650,20 +703,15 @@ struct action<received_token> {
 };
 
 template <>
-struct action<optional_field> {
-  template <typename Input>
-  static void apply(const Input& in, Ctx& ctx)
-  {
-    std::cout << "optional_field# " << in.string();
-  }
-};
-
-template <>
 struct action<body> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    std::cout << '\n' << in.string();
+    LOG(INFO) << "body";
+    ctx.dkv.eoh();
+    ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
+    ctx.dkv.eom();
+    ctx.dkv.check();
   }
 };
 };
@@ -677,7 +725,12 @@ int main(int argc, char const* argv[])
     memory_input<> in(f.data(), f.size(), fn);
     try {
       msg::Ctx ctx;
-      parse<msg::message, msg::action>(in, ctx);
+      if (parse<msg::message, msg::action>(in, ctx)) {
+        LOG(INFO) << "parse returned true";
+      }
+      else {
+        LOG(INFO) << "parse returned false";
+      }
     }
     catch (parse_error const& e) {
       std::cerr << e.what();
