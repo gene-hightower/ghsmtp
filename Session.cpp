@@ -346,6 +346,12 @@ std::string Session::added_headers_(Message const& msg)
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
+
+  // Received-SPF:
+  if (!received_spf_.empty()) {
+    headers << received_spf_ << "\r\n";
+  }
+
   headers << "Received: from " << client_identity_;
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
@@ -367,11 +373,6 @@ std::string Session::added_headers_(Message const& msg)
       headers << ",\r\n        <" << forward_path_[i] << '>';
     }
     headers << "\r\n";
-  }
-
-  // Received-SPF:
-  if (!received_spf_.empty()) {
-    headers << received_spf_ << "\r\n";
   }
 
   return headers.str();
