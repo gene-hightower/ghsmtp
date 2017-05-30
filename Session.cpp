@@ -42,8 +42,7 @@ constexpr char const* const uribls[] = {
     "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
 };
 
-constexpr auto greeting_max_wait_ms = 3'000;
-constexpr auto greeting_min_wait_ms = 500;
+constexpr auto greeting_wait_ms = 3'000;
 }
 
 using namespace std::string_literals;
@@ -134,10 +133,8 @@ void Session::greeting()
       // LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
     }
 
-    // Wait a (random) bit of time for pre-greeting traffic.
-    std::uniform_int_distribution<> uni_dist(Config::greeting_min_wait_ms,
-                                             Config::greeting_max_wait_ms);
-    std::chrono::milliseconds wait{uni_dist(rd_)};
+    // Wait a bit of time for pre-greeting traffic.
+    std::chrono::milliseconds wait{Config::greeting_wait_ms};
 
     if (sock_.input_ready(wait)) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
