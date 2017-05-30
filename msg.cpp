@@ -2,6 +2,8 @@
 
 #include <glog/logging.h>
 
+#include <boost/algorithm/string.hpp>
+
 #define BOOST_FILESYSTEM_NO_DEPRECATED
 #include <boost/filesystem.hpp>
 
@@ -504,7 +506,7 @@ struct action<local_part> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_loc = in.string();
-    // trim whitespace?
+    boost::trim(ctx.mb_loc);
   }
 };
 
@@ -774,8 +776,7 @@ struct action<result> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.spf_result = std::move(in.string());
-    std::transform(ctx.spf_result.begin(), ctx.spf_result.end(),
-                   ctx.spf_result.begin(), ::tolower);
+    boost::to_lower(ctx.spf_result);
   }
 };
 
@@ -794,7 +795,7 @@ struct action<value> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.value = std::move(in.string());
-    // trim whitespace?
+    boost::trim(ctx.value);
   }
 };
 
@@ -813,8 +814,8 @@ struct action<key_value_list> {
   {
     for (auto kvp : ctx.kv_list) {
       auto const& k = kvp.first;
-      std::string klc;
-      std::transform(k.begin(), k.end(), std::back_inserter(klc), ::tolower);
+      std::string klc = k;
+      boost::to_lower(klc);
       ctx.spf_info[klc] = kvp.second;
     }
   }
