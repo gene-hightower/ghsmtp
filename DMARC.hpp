@@ -51,8 +51,23 @@ public:
 
   void store_from_domain(char const* from_domain)
   {
-    CHECK_EQ(opendmarc_policy_store_from_domain(pctx_, uc(from_domain)),
-             DMARC_PARSE_OKAY);
+    auto status = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
+    if (status != DMARC_PARSE_OKAY) {
+      LOG(ERROR) << "from_domain == " << from_domain;
+
+      // ??
+      if (status == DMARC_PARSE_ERROR_NO_DOMAIN) {
+        LOG(ERROR) << "DMARC_PARSE_ERROR_NO_DOMAIN";
+      }
+      if (status == DMARC_PARSE_ERROR_NO_REQUIRED_P) {
+        LOG(ERROR) << "DMARC_PARSE_ERROR_NO_REQUIRED_P";
+      }
+
+      char bfr[256];
+      opendmarc_policy_to_buf(pctx_, bfr, sizeof(bfr));
+
+      LOG(ERROR) << bfr;
+    }
   }
 
   void store_dkim(char const* d_equal_domain,

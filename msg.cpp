@@ -48,6 +48,8 @@ struct Ctx {
 
   std::unordered_map<std::string, std::string> spf_info;
   std::string spf_result;
+
+  std::string unstructured;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -413,6 +415,10 @@ struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
                           eol> {
 };
 
+struct dkim_signature
+    : seq<TAOCPP_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
+};
+
 // Optional Fields
 
 struct ftext : ranges<33, 57, 59, 126> {
@@ -452,6 +458,7 @@ struct fields : star<sor<return_path,
                          comments,
                          keywords,
                          received_spf,
+                         dkim_signature,
                          optional_field>> {
 };
 
@@ -472,13 +479,22 @@ struct action<fields> {
 };
 
 template <>
+struct action<unstructured> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.unstructured = in.string();
+  }
+};
+
+template <>
 struct action<optional_field> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    LOG(INFO) << in.string();
+    LOG(INFO) << "optional_field";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
-    ctx.mb_list.clear();
+    ctx.unstructured.clear();
   }
 };
 
@@ -488,6 +504,7 @@ struct action<local_part> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_loc = in.string();
+    // trim whitespace?
   }
 };
 
@@ -504,6 +521,8 @@ template <>
 struct action<mailbox> {
   static void apply0(Ctx& ctx)
   {
+    LOG(INFO) << "mailbox emplace_back(" << ctx.mb_loc << '@' << ctx.mb_dom
+              << ')';
     ctx.mb_list.emplace_back(ctx.mb_loc, ctx.mb_dom);
   }
 };
@@ -532,7 +551,12 @@ struct action<from> {
 
     if (ctx.RFC5322_From.size() != 1) {
       LOG(WARNING) << "multiple RFC5322.From addressed";
+      for (auto const& add : ctx.RFC5322_From) {
+        LOG(WARNING) << add;
+      }
     }
+
+    LOG(INFO) << "From domain == " << ctx.RFC5322_From[0].domain();
 
     ctx.dmp.store_from_domain(ctx.RFC5322_From[0].domain().c_str());
   }
@@ -600,13 +624,16 @@ struct action<message_id> {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
+
 template <>
 struct action<in_reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
+
 template <>
 struct action<references> {
   template <typename Input>
@@ -624,16 +651,20 @@ struct action<subject> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.unstructured.clear();
   }
 };
+
 template <>
 struct action<comments> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.unstructured.clear();
   }
 };
+
 template <>
 struct action<keywords> {
   template <typename Input>
@@ -721,7 +752,7 @@ struct action<return_path> {
   static void apply(const Input& in, Ctx& ctx)
   {
     LOG(INFO) << "Return-Path:";
-    // ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.mb_list.clear();
   }
 };
@@ -732,7 +763,8 @@ struct action<received> {
   static void apply(const Input& in, Ctx& ctx)
   {
     LOG(INFO) << "Received:";
-    // ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
   }
 };
 
@@ -762,6 +794,7 @@ struct action<value> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.value = std::move(in.string());
+    // trim whitespace?
   }
 };
 
@@ -841,16 +874,35 @@ struct action<received_spf> {
     if (dom == "<>") {
       dom = ctx.spf_info["helo"];
       origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+      LOG(INFO) << "DMARC_POLICY_SPF_ORIGIN_HELO";
     }
     else {
+      LOG(INFO) << "DMARC_POLICY_SPF_ORIGIN_MAILFROM";
       auto pos = dom.find_first_of('@');
       if (pos != std::string::npos) {
-        dom = dom.substr(pos);
+        dom = dom.substr(pos + 1);
       }
     }
 
+    LOG(INFO) << "ctx.spf_info[client-ip] == " << ctx.spf_info["client-ip"];
     ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
+
+    LOG(INFO) << "dom == " << dom;
     ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
+
+    ctx.mb_list.clear();
+  }
+};
+
+template <>
+struct action<dkim_signature> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    LOG(INFO) << "dkim_signature check";
+    CHECK(ctx.dkv.check_signature(ctx.unstructured)) << ctx.unstructured;
+    ctx.unstructured.clear();
   }
 };
 
@@ -869,6 +921,8 @@ struct action<body> {
   {
     LOG(INFO) << "body";
     ctx.dkv.eoh();
+    // constexpr char CRLF[]{'\r', '\n'};
+    // ctx.dkv.body(CRLF);
     ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
   }
 };
@@ -881,7 +935,7 @@ struct action<message> {
     LOG(INFO) << "message";
     ctx.dkv.eom();
 
-    // ctx.dkv.check();
+    ctx.dkv.check();
 
     LOG(INFO) << "foreach_sig";
 
@@ -895,7 +949,10 @@ struct action<message> {
     });
 
     if (ctx.RFC5322_From.size() != 1) {
-      LOG(WARNING) << "multiple RFC5322.From addressed";
+      LOG(WARNING) << ctx.RFC5322_From.size() << " RFC5322.From addresses";
+      for (auto& f : ctx.RFC5322_From) {
+        LOG(WARNING) << f;
+      }
       return;
     }
 

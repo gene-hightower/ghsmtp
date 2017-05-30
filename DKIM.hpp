@@ -40,14 +40,31 @@ public:
   {
     auto data
         = reinterpret_cast<unsigned char*>(const_cast<char*>(header.data()));
+
+    if (header.back() == '\n')
+      header.remove_suffix(1);
+    if (header.back() == '\r')
+      header.remove_suffix(1);
+
     CHECK_EQ((status_ = dkim_header(dkim_, data, header.length())),
              DKIM_STAT_OK)
         << "dkim_header error: " << dkim_getresultstr(status_);
+    LOG(INFO) << "processed: " << std::string(header.data(), header.length());
   }
+
   void eoh()
   {
-    CHECK_EQ((status_ = dkim_eoh(dkim_)), DKIM_STAT_OK)
-        << "dkim_eoh error: " << dkim_getresultstr(status_);
+    status_ = dkim_eoh(dkim_);
+    switch (status_) {
+    case DKIM_STAT_OK:
+    case DKIM_STAT_NOSIG:
+      // all good
+      break;
+
+    default:
+      LOG(ERROR) << "dkim_eoh error: " << dkim_getresultstr(status_);
+      break;
+    }
   }
 
   void body(std::experimental::string_view body)
@@ -57,10 +74,21 @@ public:
     CHECK_EQ((status_ = dkim_body(dkim_, data, body.length())), DKIM_STAT_OK)
         << "dkim_body error: " << dkim_getresultstr(status_);
   }
+
   void eom()
   {
-    CHECK_EQ((status_ = dkim_eom(dkim_, nullptr)), DKIM_STAT_OK)
-        << "dkim_eom error: " << dkim_getresultstr(status_);
+    status_ = dkim_eom(dkim_, nullptr);
+
+    switch (status_) {
+    case DKIM_STAT_OK:
+    case DKIM_STAT_NOSIG:
+      // all good
+      break;
+
+    default:
+      LOG(ERROR) << "dkim_eom error: " << dkim_getresultstr(status_);
+      break;
+    }
   }
 
   void chunk(std::experimental::string_view chunk)
@@ -153,7 +181,9 @@ public:
 
         u_int nhdrs = 0u;
         status_ = dkim_sig_getsignedhdrs(dkim_, sig, nullptr, 0, &nhdrs);
-        CHECK_EQ(status_, DKIM_STAT_NORESOURCE);
+        if (status_ != DKIM_STAT_NORESOURCE) {
+          return false;
+        }
 
         LOG(INFO) << "nhdrs == " << nhdrs;
 
@@ -172,6 +202,12 @@ public:
     }
 
     return false;
+  }
+
+  bool check_signature(std::experimental::string_view str)
+  {
+    auto data = reinterpret_cast<unsigned char*>(const_cast<char*>(str.data()));
+    return dkim_sig_syntax(dkim_, data, str.length()) == DKIM_STAT_OK;
   }
 
 private:
