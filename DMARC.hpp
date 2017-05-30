@@ -36,12 +36,18 @@ private:
 
 class Policy {
 public:
-  Policy(char const* ip4)
-    : pctx_(CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip4), false)))
+  ~Policy()
   {
+    if (pctx_) {
+      opendmarc_policy_connect_shutdown(pctx_);
+      pctx_ = nullptr;
+    }
   }
 
-  ~Policy() { opendmarc_policy_connect_shutdown(pctx_); }
+  void init(char const* ip4)
+  {
+    pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip4), false));
+  }
 
   void store_from_domain(char const* from_domain)
   {
@@ -53,6 +59,8 @@ public:
                   int dkim_result,
                   char const* human_result)
   {
+    LOG(INFO) << "d_equal_domain == " << d_equal_domain;
+
     CHECK_EQ(opendmarc_policy_store_dkim(pctx_, uc(d_equal_domain), dkim_result,
                                          uc(human_result)),
              DMARC_PARSE_OKAY);
@@ -74,6 +82,7 @@ public:
 
     switch (ret) {
     case DMARC_PARSE_OKAY:
+      LOG(INFO) << "parse okay";
       break;
 
     case DMARC_PARSE_ERROR_NULL_CTX:
@@ -117,7 +126,7 @@ public:
   }
 
 private:
-  DMARC_POLICY_T* pctx_;
+  DMARC_POLICY_T* pctx_{nullptr};
 };
 }
 

@@ -1,3 +1,5 @@
+#include <unordered_map>
+
 #include <glog/logging.h>
 
 #define BOOST_FILESYSTEM_NO_DEPRECATED
@@ -29,7 +31,8 @@ struct Ctx {
   OpenDKIM::Lib dkl;
   OpenDKIM::Verify dkv{dkl};
 
-  OpenDMARC::Lib dmarc;
+  OpenDMARC::Lib dml;
+  OpenDMARC::Policy dmp;
 
   std::string mb_loc;
   std::string mb_dom;
@@ -37,6 +40,14 @@ struct Ctx {
   std::vector<::Mailbox> mb_list;
 
   std::vector<::Mailbox> RFC5322_From;
+
+  std::string key;
+  std::string value;
+
+  std::vector<std::pair<std::string, std::string>> kv_list;
+
+  std::unordered_map<std::string, std::string> spf_info;
+  std::string spf_result;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -365,16 +376,41 @@ struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
                       eol> {
 };
 
-struct old_x_original_to
-    : seq<TAOCPP_PEGTL_ISTRING("X-Original-To:"), unstructured, eol> {
+struct result : sor<TAOCPP_PEGTL_ISTRING("Pass"),
+                    TAOCPP_PEGTL_ISTRING("Fail"),
+                    TAOCPP_PEGTL_ISTRING("SoftFail"),
+                    TAOCPP_PEGTL_ISTRING("Neutral"),
+                    TAOCPP_PEGTL_ISTRING("None"),
+                    TAOCPP_PEGTL_ISTRING("TempError"),
+                    TAOCPP_PEGTL_ISTRING("PermError")> {
 };
 
-struct delivered_to
-    : seq<TAOCPP_PEGTL_ISTRING("Delivered-To:"), addr_spec, eol> {
+struct key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
+                 TAOCPP_PEGTL_ISTRING("envelope-from"),
+                 TAOCPP_PEGTL_ISTRING("helo")> {
 };
 
-struct x_original_to
-    : seq<TAOCPP_PEGTL_ISTRING("X-Original-To:"), address_list, eol> {
+// This value syntax not in accordance with RFC 7208 (or 4408) but is
+// what is effectivly used by libspf2 1.2.10 and before.
+
+struct value : sor<mailbox, dot_atom, quoted_string> {
+};
+
+struct key_value_pair : seq<key, opt<CFWS>, one<'='>, value> {
+};
+
+struct key_value_list : seq<key_value_pair,
+                            star<seq<one<';'>, opt<CFWS>, key_value_pair>>,
+                            opt<one<';'>>> {
+};
+
+struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
+                          opt<CFWS>,
+                          result,
+                          FWS,
+                          opt<seq<comment, FWS>>,
+                          opt<key_value_list>,
+                          eol> {
 };
 
 // Optional Fields
@@ -415,6 +451,7 @@ struct fields : star<sor<return_path,
                          subject,
                          comments,
                          keywords,
+                         received_spf,
                          optional_field>> {
 };
 
@@ -492,7 +529,12 @@ struct action<from> {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.RFC5322_From = std::move(ctx.mb_list);
     ctx.mb_list.clear();
-    LOG(INFO) << "list length == " << ctx.RFC5322_From.size();
+
+    if (ctx.RFC5322_From.size() != 1) {
+      LOG(WARNING) << "multiple RFC5322.From addressed";
+    }
+
+    ctx.dmp.store_from_domain(ctx.RFC5322_From[0].domain().c_str());
   }
 };
 
@@ -695,6 +737,124 @@ struct action<received> {
 };
 
 template <>
+struct action<result> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.spf_result = std::move(in.string());
+    std::transform(ctx.spf_result.begin(), ctx.spf_result.end(),
+                   ctx.spf_result.begin(), ::tolower);
+  }
+};
+
+template <>
+struct action<key> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.key = std::move(in.string());
+  }
+};
+
+template <>
+struct action<value> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.value = std::move(in.string());
+  }
+};
+
+template <>
+struct action<key_value_pair> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.kv_list.emplace_back(ctx.key, ctx.value);
+  }
+};
+
+template <>
+struct action<key_value_list> {
+  static void apply0(Ctx& ctx)
+  {
+    for (auto kvp : ctx.kv_list) {
+      auto const& k = kvp.first;
+      std::string klc;
+      std::transform(k.begin(), k.end(), std::back_inserter(klc), ::tolower);
+      ctx.spf_info[klc] = kvp.second;
+    }
+  }
+};
+
+template <>
+struct action<received_spf> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "Received-SPF:";
+
+    // *** Do the check now?
+
+    // utsname un;
+    // PCHECK(uname(&un) == 0);
+    // SPF::Server spf_srv(un.nodename);
+    // SPF::Request spf_req(spf_srv);
+
+    // spf_req.set_ipv4_str(ctx.spf_info["client-ip"].c_str());
+    // spf_req.set_helo_dom(ctx.spf_info["helo"].c_str());
+    // spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
+
+    // SPF::Response spf_res(spf_req);
+    // auto res = spf_res.result();
+    // CHECK_NE(res, SPF::Result::INVALID);
+
+    // *** Get result from header:
+
+    int pol_spf = DMARC_POLICY_SPF_OUTCOME_PASS;
+
+    // Pass is the default:
+    // if (ctx.spf_result == "pass") {
+    //   pol_spf = DMARC_POLICY_SPF_OUTCOME_PASS;
+    // }
+
+    // if ((ctx.spf_result == "neutral") || (ctx.spf_result == "softfail")) {
+    //   // could also be a FAIL maybe...
+    //   pol_spf = DMARC_POLICY_SPF_OUTCOME_PASS;
+    // }
+
+    if (ctx.spf_result == "none") {
+      pol_spf = DMARC_POLICY_SPF_OUTCOME_NONE;
+    }
+
+    if (ctx.spf_result == "temperror") {
+      pol_spf = DMARC_POLICY_SPF_OUTCOME_TMPFAIL;
+    }
+
+    if ((ctx.spf_result == "fail") || (ctx.spf_result == "permerror")) {
+      pol_spf = DMARC_POLICY_SPF_OUTCOME_FAIL;
+    }
+
+    auto dom = ctx.spf_info["envelope-from"];
+    auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+
+    if (dom == "<>") {
+      dom = ctx.spf_info["helo"];
+      origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+    }
+    else {
+      auto pos = dom.find_first_of('@');
+      if (pos != std::string::npos) {
+        dom = dom.substr(pos);
+      }
+    }
+
+    ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
+    ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
+  }
+};
+
+template <>
 struct action<received_token> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
@@ -710,11 +870,39 @@ struct action<body> {
     LOG(INFO) << "body";
     ctx.dkv.eoh();
     ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
-    ctx.dkv.eom();
-    ctx.dkv.check();
   }
 };
+
+template <>
+struct action<message> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "message";
+    ctx.dkv.eom();
+
+    // ctx.dkv.check();
+
+    LOG(INFO) << "foreach_sig";
+
+    ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
+      LOG(INFO) << "dkim check for " << domain
+                << (passed ? " passed" : " failed");
+
+      int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
+                          : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+      ctx.dmp.store_dkim(domain, result, "");
+    });
+
+    if (ctx.RFC5322_From.size() != 1) {
+      LOG(WARNING) << "multiple RFC5322.From addressed";
+      return;
+    }
+
+    ctx.dmp.query_dmarc(nullptr);
+  }
 };
+}
 
 int main(int argc, char const* argv[])
 {
