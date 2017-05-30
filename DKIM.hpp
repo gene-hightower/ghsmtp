@@ -11,6 +11,11 @@
 
 namespace OpenDKIM {
 
+constexpr u_char* uc(char const* cp)
+{
+  return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
+}
+
 constexpr unsigned char id[]{"OpenDKIM::Verify"};
 
 class Verify;
@@ -38,18 +43,17 @@ public:
 
   void header(std::experimental::string_view header)
   {
-    auto data
-        = reinterpret_cast<unsigned char*>(const_cast<char*>(header.data()));
-
     if (header.back() == '\n')
       header.remove_suffix(1);
     if (header.back() == '\r')
       header.remove_suffix(1);
 
-    CHECK_EQ((status_ = dkim_header(dkim_, data, header.length())),
+    CHECK_EQ((status_ = dkim_header(dkim_, uc(header.data()), header.length())),
              DKIM_STAT_OK)
         << "dkim_header error: " << dkim_getresultstr(status_);
-    LOG(INFO) << "processed: " << std::string(header.data(), header.length());
+
+    // LOG(INFO) << "processed: " << std::string(header.data(),
+    // header.length());
   }
 
   void eoh()
@@ -69,9 +73,8 @@ public:
 
   void body(std::experimental::string_view body)
   {
-    auto data
-        = reinterpret_cast<unsigned char*>(const_cast<char*>(body.data()));
-    CHECK_EQ((status_ = dkim_body(dkim_, data, body.length())), DKIM_STAT_OK)
+    CHECK_EQ((status_ = dkim_body(dkim_, uc(body.data()), body.length())),
+             DKIM_STAT_OK)
         << "dkim_body error: " << dkim_getresultstr(status_);
   }
 
@@ -93,9 +96,8 @@ public:
 
   void chunk(std::experimental::string_view chunk)
   {
-    auto data
-        = reinterpret_cast<unsigned char*>(const_cast<char*>(chunk.data()));
-    CHECK_EQ((status_ = dkim_chunk(dkim_, data, chunk.length())), DKIM_STAT_OK)
+    CHECK_EQ((status_ = dkim_chunk(dkim_, uc(chunk.data()), chunk.length())),
+             DKIM_STAT_OK)
         << "dkim_chunk error: " << dkim_getresultstr(status_);
   }
 
@@ -104,6 +106,10 @@ public:
     int nsigs = 0;
     DKIM_SIGINFO** sigs;
     status_ = dkim_getsiglist(dkim_, &sigs, &nsigs);
+    if (status_ == DKIM_STAT_INVALID) {
+      LOG(WARNING) << "skipping DKIM sigs";
+      return;
+    }
     CHECK_EQ(status_, DKIM_STAT_OK);
 
     LOG(INFO) << "nsigs == " << nsigs;
@@ -118,8 +124,7 @@ public:
         continue;
       }
       if ((flg & DKIM_SIGFLAG_TESTKEY) == DKIM_SIGFLAG_TESTKEY) {
-        LOG(INFO) << "skiping testkey for " << dom;
-        continue;
+        LOG(INFO) << "testkey";
       }
 
       CHECK((flg & DKIM_SIGFLAG_PROCESSED) == DKIM_SIGFLAG_PROCESSED)
@@ -206,8 +211,7 @@ public:
 
   bool check_signature(std::experimental::string_view str)
   {
-    auto data = reinterpret_cast<unsigned char*>(const_cast<char*>(str.data()));
-    return dkim_sig_syntax(dkim_, data, str.length()) == DKIM_STAT_OK;
+    return dkim_sig_syntax(dkim_, uc(str.data()), str.length()) == DKIM_STAT_OK;
   }
 
 private:

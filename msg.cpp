@@ -474,7 +474,7 @@ struct action<fields> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    LOG(INFO) << "fields";
+    // LOG(INFO) << "fields";
   }
 };
 
@@ -492,7 +492,7 @@ struct action<optional_field> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    LOG(INFO) << "optional_field";
+    // LOG(INFO) << "optional_field";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.unstructured.clear();
   }
@@ -521,8 +521,8 @@ template <>
 struct action<mailbox> {
   static void apply0(Ctx& ctx)
   {
-    LOG(INFO) << "mailbox emplace_back(" << ctx.mb_loc << '@' << ctx.mb_dom
-              << ')';
+    // LOG(INFO) << "mailbox emplace_back(" << ctx.mb_loc << '@' << ctx.mb_dom
+    // << ')';
     ctx.mb_list.emplace_back(ctx.mb_loc, ctx.mb_dom);
   }
 };
@@ -532,7 +532,7 @@ struct action<orig_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Date:";
+    // LOG(INFO) << "Date:";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
   }
 };
@@ -544,7 +544,7 @@ struct action<from> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "From:";
+    // LOG(INFO) << "From:";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.RFC5322_From = std::move(ctx.mb_list);
     ctx.mb_list.clear();
@@ -751,7 +751,7 @@ struct action<return_path> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Return-Path:";
+    // LOG(INFO) << "Return-Path:";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.mb_list.clear();
   }
@@ -762,7 +762,7 @@ struct action<received> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Received:";
+    // LOG(INFO) << "Received:";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.mb_list.clear();
   }
@@ -825,7 +825,7 @@ struct action<received_spf> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Received-SPF:";
+    // LOG(INFO) << "Received-SPF:";
 
     // *** Do the check now?
 
@@ -900,7 +900,7 @@ struct action<dkim_signature> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
-    LOG(INFO) << "dkim_signature check";
+    // LOG(INFO) << "dkim_signature check";
     CHECK(ctx.dkv.check_signature(ctx.unstructured)) << ctx.unstructured;
     ctx.unstructured.clear();
   }
@@ -919,7 +919,7 @@ struct action<body> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "body";
+    // LOG(INFO) << "body";
     ctx.dkv.eoh();
     // constexpr char CRLF[]{'\r', '\n'};
     // ctx.dkv.body(CRLF);
@@ -932,16 +932,16 @@ struct action<message> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "message";
+    // LOG(INFO) << "message";
     ctx.dkv.eom();
 
-    ctx.dkv.check();
+    // ctx.dkv.check();
 
-    LOG(INFO) << "foreach_sig";
+    // LOG(INFO) << "foreach_sig";
 
     ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
-      LOG(INFO) << "dkim check for " << domain
-                << (passed ? " passed" : " failed");
+      // LOG(INFO) << "dkim check for " << domain
+      // << (passed ? " passed" : " failed");
 
       int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                           : DMARC_POLICY_DKIM_OUTCOME_FAIL;
@@ -957,6 +957,8 @@ struct action<message> {
     }
 
     ctx.dmp.query_dmarc(nullptr);
+
+    LOG(INFO) << "Final DMARC advice: " << Advice_to_string(ctx.dmp.get_policy());
   }
 };
 }

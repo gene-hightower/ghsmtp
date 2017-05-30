@@ -14,21 +14,46 @@ constexpr u_char* uc(char const* cp)
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
 }
 
+enum class Advice {
+  ACCEPT,
+  REJECT,
+  QUARANTINE,
+  NONE,
+};
+
+constexpr char const* Advice_to_string(Advice adv)
+{
+  switch (adv) {
+  case Advice::ACCEPT:
+    return "accept";
+
+  case Advice::REJECT:
+    return "reject";
+
+  case Advice::QUARANTINE:
+    return "quarantine";
+
+  case Advice::NONE:
+    break;
+  }
+  return "none";
+}
+
 class Lib {
 public:
   Lib()
   {
     lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
     constexpr auto cert_path = STRINGIFY(SMTP_HOME) "/public_suffix_list.dat";
+    CHECK_LT(strlen(cert_path), MAXPATHLEN);
     strncpy(reinterpret_cast<char*>(lib_.tld_source_file), cert_path,
             MAXPATHLEN);
+    auto status = opendmarc_policy_library_init(&lib_);
+    CHECK_EQ(status, DMARC_PARSE_OKAY)
+        << opendmarc_policy_status_to_str(status);
+  }
 
-    CHECK_EQ(opendmarc_policy_library_init(&lib_), DMARC_PARSE_OKAY);
-  }
-  ~Lib()
-  {
-    CHECK_EQ(opendmarc_policy_library_shutdown(&lib_), DMARC_PARSE_OKAY);
-  }
+  ~Lib() { opendmarc_policy_library_shutdown(&lib_); }
 
 private:
   OPENDMARC_LIB_T lib_;
@@ -54,19 +79,7 @@ public:
     auto status = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
     if (status != DMARC_PARSE_OKAY) {
       LOG(ERROR) << "from_domain == " << from_domain;
-
-      // ??
-      if (status == DMARC_PARSE_ERROR_NO_DOMAIN) {
-        LOG(ERROR) << "DMARC_PARSE_ERROR_NO_DOMAIN";
-      }
-      if (status == DMARC_PARSE_ERROR_NO_REQUIRED_P) {
-        LOG(ERROR) << "DMARC_PARSE_ERROR_NO_REQUIRED_P";
-      }
-
-      char bfr[256];
-      opendmarc_policy_to_buf(pctx_, bfr, sizeof(bfr));
-
-      LOG(ERROR) << bfr;
+      LOG(ERROR) << opendmarc_policy_status_to_str(status);
     }
   }
 
@@ -74,11 +87,12 @@ public:
                   int dkim_result,
                   char const* human_result)
   {
-    LOG(INFO) << "d_equal_domain == " << d_equal_domain;
-
-    CHECK_EQ(opendmarc_policy_store_dkim(pctx_, uc(d_equal_domain), dkim_result,
-                                         uc(human_result)),
-             DMARC_PARSE_OKAY);
+    auto status = opendmarc_policy_store_dkim(pctx_, uc(d_equal_domain),
+                                              dkim_result, uc(human_result));
+    if (status != DMARC_PARSE_OKAY) {
+      LOG(ERROR) << "d_equal_domain == " << d_equal_domain;
+      LOG(ERROR) << opendmarc_policy_status_to_str(status);
+    }
   }
 
   void store_spf(char const* domain,
@@ -86,58 +100,56 @@ public:
                  int origin,
                  char const* human_readable)
   {
-    CHECK_EQ(opendmarc_policy_store_spf(pctx_, uc(domain), result, origin,
-                                        uc(human_readable)),
-             DMARC_PARSE_OKAY);
+    auto status = opendmarc_policy_store_spf(pctx_, uc(domain), result, origin,
+                                             uc(human_readable));
+    if (status != DMARC_PARSE_OKAY) {
+      LOG(ERROR) << "domain == " << domain;
+      LOG(ERROR) << opendmarc_policy_status_to_str(status);
+    }
   }
 
   void query_dmarc(char const* domain)
   {
-    auto ret = opendmarc_policy_query_dmarc(pctx_, uc(domain));
-
-    switch (ret) {
-    case DMARC_PARSE_OKAY:
-      LOG(INFO) << "parse okay";
-      break;
-
-    case DMARC_PARSE_ERROR_NULL_CTX:
-      LOG(FATAL) << "null ctx";
-
-    case DMARC_PARSE_ERROR_EMPTY:
-      LOG(FATAL) << "error empty";
-
-    case DMARC_PARSE_ERROR_NO_DOMAIN:
-      LOG(FATAL) << "no domain";
-
-    case DMARC_DNS_ERROR_NXDOMAIN:
-      LOG(INFO) << "No such domain found in DNS.";
-      break;
-
-    case DMARC_DNS_ERROR_TMPERR:
-      LOG(INFO) << "DNS returned a temporary failure.";
-      break;
-
-    case DMARC_DNS_ERROR_NO_RECORD:
-      LOG(INFO) << "The domain exists but no DMARC record was found, either at"
-                   " that domain or a found organizational domain.";
-      break;
-
-    case DMARC_PARSE_ERROR_BAD_VERSION:
-      LOG(WARNING) << "If the DMARC record's v= was bad.";
-      break;
-
-    case DMARC_PARSE_ERROR_BAD_VALUE:
-      LOG(WARNING) << "If a value following an = was bad or illegal.";
-      break;
-
-    case DMARC_PARSE_ERROR_NO_REQUIRED_P:
-      LOG(WARNING) << "The required p= was absent.";
-      break;
-
-    default:
-      LOG(INFO) << "unknown return value from opendmarc_policy_query_dmarc()";
-      break;
+    auto status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
+    if (status != DMARC_PARSE_OKAY) {
+      LOG(ERROR) << "domain == " << domain;
+      LOG(ERROR) << opendmarc_policy_status_to_str(status);
     }
+  }
+
+  Advice get_policy()
+  {
+    auto status = opendmarc_get_policy_to_enforce(pctx_);
+
+    switch (status) {
+    case DMARC_PARSE_ERROR_NULL_CTX:
+      LOG(FATAL) << "NULL pctx value";
+
+    case DMARC_FROM_DOMAIN_ABSENT:
+      LOG(FATAL) << "No From: domain";
+
+    case DMARC_POLICY_ABSENT:
+      LOG(INFO) << "No DMARC record was found.";
+      return Advice::NONE;
+
+    case DMARC_POLICY_PASS:
+      LOG(INFO) << "Policy advises to accept the message.";
+      return Advice::ACCEPT;
+
+    case DMARC_POLICY_REJECT:
+      LOG(INFO) << "Policy advises to reject the message.";
+      return Advice::REJECT;
+
+    case DMARC_POLICY_QUARANTINE:
+      LOG(INFO) << "Policy advises to quarantine the message.";
+      return Advice::QUARANTINE;
+
+    case DMARC_POLICY_NONE:
+      LOG(INFO) << "Policy says to monitor and report";
+      return Advice::NONE;
+    }
+
+    LOG(FATAL) << "unknown status";
   }
 
 private:
