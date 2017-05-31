@@ -291,19 +291,21 @@ struct Rcpt_parameters : list<esmtp_param, SP> {
 struct String : sor<Quoted_string, Atom> {
 };
 
-struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO "), Domain, CRLF> {
+struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"), SP, Domain, CRLF> {
 };
 
-struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO "), Domain, CRLF> {
+struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"), SP, Domain, CRLF> {
 };
 
-struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL FROM:"),
+struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
+                       TAOCPP_PEGTL_ISTRING(" FROM:"),
                        Reverse_path,
                        opt<seq<SP, Mail_parameters>>,
                        CRLF> {
 };
 
-struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT TO:"),
+struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
+                     TAOCPP_PEGTL_ISTRING(" TO:"),
                      Forward_path,
                      opt<seq<SP, Rcpt_parameters>>,
                      CRLF> {
@@ -315,11 +317,11 @@ struct chunk_size : plus<DIGIT> {
 struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {
 };
 
-struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, CRLF> {
+struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {
 };
 
 struct bdat_last
-    : seq<TAOCPP_PEGTL_ISTRING("BDAT "), chunk_size, end_marker, CRLF> {
+    : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {
 };
 
 struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {
@@ -355,13 +357,11 @@ struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, String>>, CRLF> {
 struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, String>>, CRLF> {
 };
 
-struct starttls : seq<TAOCPP_PEGTL_ISTRING("STARTTLS"), CRLF> {
+struct starttls
+    : seq<TAOCPP_PEGTL_ISTRING("STAR"), TAOCPP_PEGTL_ISTRING("TTLS"), CRLF> {
 };
 
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
-};
-
-struct auth : seq<TAOCPP_PEGTL_ISTRING("AUTH LOGIN"), CRLF> {
 };
 
 // commands in size order
@@ -377,7 +377,6 @@ struct any_cmd : seq<sor<data,
                          bdat,
                          bdat_last,
                          starttls,
-                         auth,
                          rcpt_to,
                          mail_from>,
                      discard> {
@@ -724,11 +723,6 @@ struct action<help> {
 template <>
 struct action<starttls> {
   static void apply0(Ctx& ctx) { ctx.session.starttls(); }
-};
-
-template <>
-struct action<auth> {
-  static void apply0(Ctx& ctx) { ctx.session.error("AUTH not supported"); }
 };
 
 template <>
