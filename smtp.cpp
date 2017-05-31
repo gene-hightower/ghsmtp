@@ -11,6 +11,8 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 using namespace tao::pegtl::alphabet;
 
+using namespace std::string_literals;
+
 namespace Config {
 constexpr std::streamsize max_bfr_size = 64 * 1024;
 constexpr std::streamsize max_chunk_size = max_msg_size;
@@ -364,6 +366,9 @@ struct starttls
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
 };
 
+struct bogus_cmd : seq<plus<not_one<'\r', '\n'>>, CRLF> {
+};
+
 // commands in size order
 
 struct any_cmd : seq<sor<data,
@@ -378,7 +383,8 @@ struct any_cmd : seq<sor<data,
                          bdat_last,
                          starttls,
                          rcpt_to,
-                         mail_from>,
+                         mail_from,
+                         bogus_cmd>,
                      discard> {
 };
 
@@ -399,6 +405,15 @@ struct action<esmtp_keyword> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.param.first = in.string();
+  }
+};
+
+template <>
+struct action<bogus_cmd> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("bogus command: "s + in.string());
   }
 };
 
