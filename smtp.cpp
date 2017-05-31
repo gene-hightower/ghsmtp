@@ -366,12 +366,25 @@ struct starttls
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
 };
 
-struct bogus_cmd : seq<plus<not_one<'\r', '\n'>>, CRLF> {
+struct bogus_cmd_0 : CRLF {
+};
+struct bogus_cmd_1 : seq<not_one<'\r', '\n'>, CRLF> {
+};
+struct bogus_cmd_2 : seq<not_one<'\r', '\n'>, not_one<'\r', '\n'>, CRLF> {
+};
+struct bogus_cmd_3
+    : seq<not_one<'\r', '\n'>, not_one<'\r', '\n'>, not_one<'\r', '\n'>, CRLF> {
+};
+struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {
 };
 
 // commands in size order
 
-struct any_cmd : seq<sor<data,
+struct any_cmd : seq<sor<bogus_cmd_0,
+                         bogus_cmd_1,
+                         bogus_cmd_2,
+                         bogus_cmd_3,
+                         data,
                          quit,
                          rset,
                          noop,
@@ -405,6 +418,33 @@ struct action<esmtp_keyword> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.param.first = in.string();
+  }
+};
+
+template <>
+struct action<bogus_cmd_1> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("bogus command: "s + in.string());
+  }
+};
+
+template <>
+struct action<bogus_cmd_2> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("bogus command: "s + in.string());
+  }
+};
+
+template <>
+struct action<bogus_cmd_3> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("bogus command: "s + in.string());
   }
 };
 
