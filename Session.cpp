@@ -483,8 +483,8 @@ void Session::vrfy()
 
 void Session::help()
 {
-  out() << "214-see https://digilicious.com/smtp.html\r\n"
-           "214 and https://tools.ietf.org/html/rfc5321\r\n"
+  out() << "214 2.0.0 see https://digilicious.com/smtp.html and "
+           "https://tools.ietf.org/html/rfc5321\r\n"
         << std::flush;
   LOG(INFO) << "HELP";
 }
