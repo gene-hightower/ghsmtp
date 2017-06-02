@@ -1,4 +1,7 @@
+#include <string>
 #include <unordered_map>
+
+using namespace std::string_literals;
 
 #include <glog/logging.h>
 
@@ -27,7 +30,57 @@ using namespace tao::pegtl::alphabet;
 
 using std::experimental::string_view;
 
-namespace msg {
+namespace RFC5322 {
+
+// clang-format off
+constexpr char const* defined_fields[]{
+
+    // Trace Fields
+    "return-path",
+    "received",
+    "received-spf",   // RFC 7208 added trace field
+
+    // Sig
+    "dkim-signature", // RFC 7489
+
+    // Originator Fields
+    "date",
+    "from",
+    "sender",
+    "reply-to",
+
+    // Destination Address Fields
+    "to",
+    "cc",
+    "bcc",
+
+    // Identification Fields
+    "message-id",
+    "in-reply-to",
+    "references",
+
+    // Informational Fields
+    "subject",
+    "comments",
+    "keywords",
+
+    // Resent Fields
+    "resent-date",
+    "resent-from",
+    "resent-sender",
+    "resent-to",
+    "resent-cc",
+    "resent-bcc",
+    "resent-message-id",
+
+};
+// clang-format on
+
+bool is_defined_field(string_view field)
+{
+  return std::find(std::begin(defined_fields), std::end(defined_fields), field)
+         != std::end(defined_fields);
+}
 
 struct Ctx {
   OpenDKIM::Lib dkl;
@@ -39,9 +92,11 @@ struct Ctx {
   std::string mb_loc;
   std::string mb_dom;
 
-  std::vector<::Mailbox> mb_list;
+  std::vector<::Mailbox> mb_list; // temporary accumulator
 
-  std::vector<::Mailbox> RFC5322_From;
+  std::vector<::Mailbox> from_list;
+
+  ::Mailbox sender;
 
   std::string key;
   std::string value;
@@ -52,6 +107,11 @@ struct Ctx {
   std::string spf_result;
 
   std::string unstructured;
+
+  std::string opt_name;
+  std::string opt_value;
+
+  std::vector<std::string> msg_errors;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -394,8 +454,9 @@ struct key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
                  TAOCPP_PEGTL_ISTRING("helo")> {
 };
 
-// This value syntax not in accordance with RFC 7208 (or 4408) but is
-// what is effectivly used by libspf2 1.2.10 and before.
+// This value syntax (allowing mailbox) is not in accordance with RFC
+// 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
+// before.
 
 struct value : sor<mailbox, dot_atom, quoted_string> {
 };
@@ -437,8 +498,31 @@ struct optional_field : seq<field_name, one<':'>, field_value, eol> {
 
 // message header
 
-struct fields : star<sor<return_path,
+// clang-format off
+struct fields : star<sor<
+                         return_path,
                          received,
+                         received_spf,
+
+                         dkim_signature,
+
+                         orig_date,
+                         from,
+                         sender,
+                         reply_to,
+
+                         to,
+                         cc,
+                         bcc,
+
+                         message_id,
+                         in_reply_to,
+                         references,
+
+                         subject,
+                         comments,
+                         keywords,
+
                          resent_date,
                          resent_from,
                          resent_sender,
@@ -446,23 +530,11 @@ struct fields : star<sor<return_path,
                          resent_cc,
                          resent_bcc,
                          resent_msg_id,
-                         orig_date,
-                         from,
-                         sender,
-                         reply_to,
-                         to,
-                         cc,
-                         bcc,
-                         message_id,
-                         in_reply_to,
-                         references,
-                         subject,
-                         comments,
-                         keywords,
-                         received_spf,
-                         dkim_signature,
-                         optional_field>> {
+
+                         optional_field
+                       >> {
 };
+// clang-format on
 
 struct message : seq<fields, opt<seq<eol, body>>> {
 };
@@ -490,11 +562,36 @@ struct action<unstructured> {
 };
 
 template <>
+struct action<field_name> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.opt_name = in.string();
+    boost::to_lower(ctx.opt_name);
+  }
+};
+
+template <>
+struct action<field_value> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.opt_value = in.string();
+  }
+};
+
+template <>
 struct action<optional_field> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
     // LOG(INFO) << "optional_field";
+    if (is_defined_field(ctx.opt_name)) {
+      // So, this is a syntax error in a defined field.
+      auto err = "syntax error in: \""s + in.string() + "\""s;
+      ctx.msg_errors.push_back(err);
+      LOG(ERROR) << err;
+    }
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.unstructured.clear();
   }
@@ -546,21 +643,18 @@ struct action<from> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    // LOG(INFO) << "From:";
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
-    ctx.RFC5322_From = std::move(ctx.mb_list);
-    ctx.mb_list.clear();
-
-    if (ctx.RFC5322_From.size() != 1) {
-      LOG(WARNING) << "multiple RFC5322.From addressed";
-      for (auto const& add : ctx.RFC5322_From) {
-        LOG(WARNING) << add;
+    if (!ctx.from_list.empty()) {
+      auto msg = "multiple 'From:' address headers, previous list: \n"s;
+      for (auto const& add : ctx.from_list) {
+        msg += " "s + static_cast<std::string>(add) + "\n"s;
       }
+      msg += "new: " + in.string();
+      ctx.msg_errors.push_back(msg);
     }
 
-    LOG(INFO) << "From domain == " << ctx.RFC5322_From[0].domain();
-
-    ctx.dmp.store_from_domain(ctx.RFC5322_From[0].domain().c_str());
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.from_list = std::move(ctx.mb_list);
+    ctx.mb_list.clear();
   }
 };
 
@@ -569,7 +663,15 @@ struct action<sender> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
+    if (!ctx.sender.empty()) {
+      auto err = "multiple 'Sender:' headers, previous: "s
+                 + static_cast<std::string>(ctx.sender);
+      ctx.msg_errors.push_back(err);
+      err += ", this: "s + in.string();
+    }
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    CHECK_EQ(ctx.mb_list.size(), 1);
+    ctx.sender = std::move(ctx.mb_list[0]);
     ctx.mb_list.clear();
   }
 };
@@ -875,21 +977,21 @@ struct action<received_spf> {
     if (dom == "<>") {
       dom = ctx.spf_info["helo"];
       origin = DMARC_POLICY_SPF_ORIGIN_HELO;
-      LOG(INFO) << "DMARC_POLICY_SPF_ORIGIN_HELO";
+      LOG(INFO) << "SPF: HELO " << dom;
     }
     else {
-      LOG(INFO) << "DMARC_POLICY_SPF_ORIGIN_MAILFROM";
       auto pos = dom.find_first_of('@');
       if (pos != std::string::npos) {
         dom = dom.substr(pos + 1);
       }
+      LOG(INFO) << "SPF: MAIL FROM " << dom;
     }
 
-    LOG(INFO) << "ctx.spf_info[client-ip] == " << ctx.spf_info["client-ip"];
     ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
-
-    LOG(INFO) << "dom == " << dom;
     ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
+
+    LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
+              << ctx.spf_result;
 
     ctx.mb_list.clear();
   }
@@ -938,46 +1040,91 @@ struct action<message> {
 
     // ctx.dkv.check();
 
-    // LOG(INFO) << "foreach_sig";
+    std::string from_domain;
 
-    ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
-      // LOG(INFO) << "dkim check for " << domain
-      // << (passed ? " passed" : " failed");
-
-      int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
-                          : DMARC_POLICY_DKIM_OUTCOME_FAIL;
-      ctx.dmp.store_dkim(domain, result, "");
-    });
-
-    if (ctx.RFC5322_From.size() != 1) {
-      LOG(WARNING) << ctx.RFC5322_From.size() << " RFC5322.From addresses";
-      for (auto& f : ctx.RFC5322_From) {
-        LOG(WARNING) << f;
-      }
+    if (ctx.from_list.empty()) {
+      // RFC-5322 says message must have a 'From:' header.
+      LOG(ERROR) << "No 'From:' header";
       return;
     }
 
-    ctx.dmp.query_dmarc(nullptr);
+    if (ctx.from_list.size() > 1) {
 
-    LOG(INFO) << "Final DMARC advice: " << Advice_to_string(ctx.dmp.get_policy());
+      LOG(INFO) << ctx.from_list.size() << " RFC5322.From addresses";
+      for (auto& f : ctx.from_list) {
+        LOG(INFO) << f;
+      }
+
+      if (ctx.sender.empty()) {
+        // Must have 'Sender:' says RFC-5322 section 3.6.2.
+        LOG(ERROR) << "No 'Sender:' header with multiple From: mailboxes";
+        return;
+      }
+
+      // find sender in from list
+      auto s = find(begin(ctx.from_list), end(ctx.from_list), ctx.sender);
+      if (s == end(ctx.from_list)) {
+        // can't be found, not an error
+        LOG(INFO) << "No 'From:' match to 'Sender:'";
+      }
+
+      from_domain = ctx.sender;
+      LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain();
+    }
+    else {
+
+      from_domain = ctx.from_list[0].domain();
+
+      if (!ctx.sender.empty()) {
+        if (from_domain != ctx.sender.domain()) {
+          LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain()
+                    << " in place of 'From:' domain " << from_domain;
+          from_domain = ctx.sender.domain();
+        }
+      }
+    }
+
+    // if the domain is UTF-8, must convert to A-label here
+
+    ctx.dmp.store_from_domain(from_domain.c_str());
+
+    ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
+      LOG(INFO) << "DKIM check for " << domain
+                << (passed ? " passed" : " failed");
+
+      int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
+                          : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+      ctx.dmp.store_dkim(domain, result, nullptr);
+    });
+
+    ctx.dmp.query_dmarc(from_domain.c_str());
+
+    LOG(INFO) << "Final DMARC advice for domain " << from_domain << ": "
+              << Advice_to_string(ctx.dmp.get_policy());
+
+    if (ctx.msg_errors.size()) {
+      for (auto e : ctx.msg_errors) {
+        LOG(ERROR) << e;
+      }
+    }
   }
 };
 }
 
 int main(int argc, char const* argv[])
 {
+  CHECK(RFC5322::is_defined_field("subject"));
+  CHECK(!RFC5322::is_defined_field("X-subject"));
+
   for (auto i = 1; i < argc; ++i) {
     auto fn = argv[i];
     boost::filesystem::path name(fn);
     boost::iostreams::mapped_file_source f(name);
     memory_input<> in(f.data(), f.size(), fn);
     try {
-      msg::Ctx ctx;
-      if (parse<msg::message, msg::action>(in, ctx)) {
-        LOG(INFO) << "parse returned true";
-      }
-      else {
-        LOG(INFO) << "parse returned false";
+      RFC5322::Ctx ctx;
+      if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
+        LOG(ERROR) << "parse returned false";
       }
     }
     catch (parse_error const& e) {
