@@ -112,19 +112,16 @@ public:
     }
     CHECK_EQ(status_, DKIM_STAT_OK);
 
-    LOG(INFO) << "nsigs == " << nsigs;
     for (auto i = 0; i < nsigs; ++i) {
-      auto dom = dkim_sig_getdomain(sigs[i]);
-      CHECK_NOTNULL(dom);
-      LOG(INFO) << "dom == " << dom;
+      auto dom = CHECK_NOTNULL(dkim_sig_getdomain(sigs[i]));
       auto flg = dkim_sig_getflags(sigs[i]);
 
       if ((flg & DKIM_SIGFLAG_IGNORE) == DKIM_SIGFLAG_IGNORE) {
-        LOG(INFO) << "ignoring sig for " << dom;
+        LOG(INFO) << "ignoring signature for domain " << dom;
         continue;
       }
       if ((flg & DKIM_SIGFLAG_TESTKEY) == DKIM_SIGFLAG_TESTKEY) {
-        LOG(INFO) << "testkey";
+        LOG(INFO) << "testkey for domain " << dom;
       }
 
       CHECK((flg & DKIM_SIGFLAG_PROCESSED) == DKIM_SIGFLAG_PROCESSED)
