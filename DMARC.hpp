@@ -129,23 +129,18 @@ public:
       LOG(FATAL) << "No From: domain";
 
     case DMARC_POLICY_ABSENT:
-      LOG(INFO) << "No DMARC record was found.";
       return Advice::NONE;
 
     case DMARC_POLICY_PASS:
-      LOG(INFO) << "Policy advises to accept the message.";
       return Advice::ACCEPT;
 
     case DMARC_POLICY_REJECT:
-      LOG(INFO) << "Policy advises to reject the message.";
       return Advice::REJECT;
 
     case DMARC_POLICY_QUARANTINE:
-      LOG(INFO) << "Policy advises to quarantine the message.";
       return Advice::QUARANTINE;
 
     case DMARC_POLICY_NONE:
-      LOG(INFO) << "Policy says to monitor and report";
       return Advice::NONE;
     }
 
