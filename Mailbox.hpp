@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 
+#include <boost/algorithm/string.hpp>
+
 class Mailbox {
 public:
   Mailbox() = default;
@@ -12,18 +14,26 @@ public:
     : local_part_{std::move(local_part)}
     , domain_{std::move(domain)}
   {
+    boost::to_lower(domain_);
   }
   void clear()
   {
     local_part_.clear();
     domain_.clear();
   }
-  std::string const& domain() const { return domain_; }
   std::string const& local_part() const { return local_part_; }
+  std::string const& domain() const { return domain_; }
+
   bool empty() const { return local_part_.empty() && domain_.empty(); }
+
   operator std::string() const
   {
     return local_part() + (domain().empty() ? "" : ("@" + domain()));
+  }
+
+  bool operator==(Mailbox const& rhs) const
+  {
+    return ((local_part_ == rhs.local_part_) && (domain_ == rhs.domain_));
   }
 
 private:
