@@ -430,7 +430,11 @@ struct resent_msg_id
 struct return_path : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"), path, eol> {
 };
 
-struct received_token : sor<angle_addr, addr_spec, domain, word> {
+// qmail style received line:
+struct qmail_terd : seq<FWS, comment> {
+};
+
+struct received_token : sor<angle_addr, addr_spec, domain, word, qmail_terd> {
 };
 
 struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
