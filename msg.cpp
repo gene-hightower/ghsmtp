@@ -1,7 +1,6 @@
 #include <string>
 #include <unordered_map>
-
-using namespace std::string_literals;
+#include <vector>
 
 #include <glog/logging.h>
 
@@ -30,57 +29,72 @@ using namespace tao::pegtl::alphabet;
 
 using std::experimental::string_view;
 
+using namespace std::string_literals;
+
 namespace RFC5322 {
 
 // clang-format off
 constexpr char const* defined_fields[]{
 
     // Trace Fields
-    "return-path",
-    "received",
-    "received-spf",   // RFC 7208 added trace field
+    "Return-Path",
+    "Received",
+    "Received-SPF",   // RFC 7208 added trace field
 
     // Sig
-    "dkim-signature", // RFC 7489
+    "DKIM-Signature", // RFC 7489
 
     // Originator Fields
-    "date",
-    "from",
-    "sender",
-    "reply-to",
+    "Date",
+    "From",
+    "Sender",
+    "Reply-To",
 
     // Destination Address Fields
-    "to",
-    "cc",
-    "bcc",
+    "To",
+    "Cc",
+    "Bcc",
 
     // Identification Fields
-    "message-id",
-    "in-reply-to",
-    "references",
+    "Message-ID",
+    "In-Reply-To",
+    "References",
 
     // Informational Fields
-    "subject",
-    "comments",
-    "keywords",
+    "Subject",
+    "Comments",
+    "Keywords",
 
     // Resent Fields
-    "resent-date",
-    "resent-from",
-    "resent-sender",
-    "resent-to",
-    "resent-cc",
-    "resent-bcc",
-    "resent-message-id",
+    "Resent-Date",
+    "Resent-From",
+    "Resent-Sender",
+    "Resent-To",
+    "Resent-Cc",
+    "Resent-Bcc",
+    "Resent-Message-ID",
 
 };
 // clang-format on
 
-bool is_defined_field(string_view field)
+bool is_defined_field(string_view value)
 {
-  return std::find(std::begin(defined_fields), std::end(defined_fields), field)
-         != std::end(defined_fields);
+  auto first = std::begin(defined_fields);
+  auto last = std::end(defined_fields);
+  for (; first != last; ++first) {
+    if (0 == strcasecmp(*first, value.data())) { // US-ASCII
+      return true;
+    }
+  }
+  return false;
 }
+
+struct ci_less : public std::binary_function<std::string, std::string, bool> {
+  bool operator()(std::string const& lhs, std::string const& rhs) const
+  {
+    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
+  }
+};
 
 struct Ctx {
   OpenDKIM::Lib dkl;
@@ -103,7 +117,7 @@ struct Ctx {
 
   std::vector<std::pair<std::string, std::string>> kv_list;
 
-  std::unordered_map<std::string, std::string> spf_info;
+  std::map<std::string, std::string, ci_less> spf_info;
   std::string spf_result;
 
   std::string unstructured;
@@ -571,7 +585,6 @@ struct action<field_name> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.opt_name = in.string();
-    boost::to_lower(ctx.opt_name);
   }
 };
 
@@ -919,10 +932,7 @@ struct action<key_value_list> {
   static void apply0(Ctx& ctx)
   {
     for (auto kvp : ctx.kv_list) {
-      auto const& k = kvp.first;
-      std::string klc = k;
-      boost::to_lower(klc);
-      ctx.spf_info[klc] = kvp.second;
+      ctx.spf_info[kvp.first] = kvp.second;
     }
   }
 };
@@ -1117,8 +1127,8 @@ struct action<message> {
 
 int main(int argc, char const* argv[])
 {
-  CHECK(RFC5322::is_defined_field("subject"));
-  CHECK(!RFC5322::is_defined_field("X-subject"));
+  CHECK(RFC5322::is_defined_field("Subject"));
+  CHECK(!RFC5322::is_defined_field("X-Subject"));
 
   for (auto i = 1; i < argc; ++i) {
     auto fn = argv[i];
