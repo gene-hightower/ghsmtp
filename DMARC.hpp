@@ -74,16 +74,18 @@ public:
     pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip4), false));
   }
 
-  void store_from_domain(char const* from_domain)
+  bool store_from_domain(char const* from_domain)
   {
     auto status = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
     if (status != DMARC_PARSE_OKAY) {
       LOG(ERROR) << "from_domain == " << from_domain;
       LOG(ERROR) << opendmarc_policy_status_to_str(status);
+      return false;
     }
+    return true;
   }
 
-  void store_dkim(char const* d_equal_domain,
+  bool store_dkim(char const* d_equal_domain,
                   int dkim_result,
                   char const* human_result)
   {
@@ -92,10 +94,12 @@ public:
     if (status != DMARC_PARSE_OKAY) {
       LOG(ERROR) << "d_equal_domain == " << d_equal_domain;
       LOG(ERROR) << opendmarc_policy_status_to_str(status);
+      return false;
     }
+    return true;
   }
 
-  void store_spf(char const* domain,
+  bool store_spf(char const* domain,
                  int result,
                  int origin,
                  char const* human_readable)
@@ -105,16 +109,20 @@ public:
     if (status != DMARC_PARSE_OKAY) {
       LOG(ERROR) << "domain == " << domain;
       LOG(ERROR) << opendmarc_policy_status_to_str(status);
+      return false;
     }
+    return true;
   }
 
-  void query_dmarc(char const* domain)
+  bool query_dmarc(char const* domain)
   {
     auto status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
     if (status != DMARC_PARSE_OKAY) {
       LOG(ERROR) << "domain == " << domain;
       LOG(ERROR) << opendmarc_policy_status_to_str(status);
+      return false;
     }
+    return true;
   }
 
   Advice get_policy()
