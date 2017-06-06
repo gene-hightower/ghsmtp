@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "Session.hpp"
 
 #include <cstdlib>
@@ -19,7 +21,7 @@ constexpr std::streamsize max_chunk_size = max_msg_size;
 constexpr std::streamsize hdr_max = 16 * 1024;
 }
 
-namespace smtp {
+namespace RFC5321 {
 
 struct Ctx {
   Session session;
@@ -712,8 +714,7 @@ struct data_action<data_plain> {
     ctx.msg->write(in.begin(), len);
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::hdr_max) {
-        auto hlen = std::min(len, Config::hdr_max - ctx.hdr.size());
-        std::copy_n(in.begin(), hlen, std::back_inserter(ctx.hdr));
+        ctx.hdr.append(in.begin(), len);
       }
     }
   }
@@ -746,7 +747,8 @@ struct action<data> {
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 
-      parse_nested<smtp::data_grammar, smtp::data_action>(in, data_in, ctx);
+      parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, data_in,
+                                                                ctx);
     }
   }
 };
@@ -796,7 +798,7 @@ int main(int argc, char const* argv[])
   // Don't wait for STARTTLS to fail if no cert.
   CHECK(boost::filesystem::exists(TLS::cert_path)) << "can't find cert file";
 
-  smtp::Ctx ctx;
+  RFC5321::Ctx ctx;
 
   ctx.session.greeting();
 
@@ -805,7 +807,7 @@ int main(int argc, char const* argv[])
   istream_input<eol::crlf> in(ctx.session.in(), 4 * 1024, "session");
 
   try {
-    if (!parse<smtp::grammar, smtp::action>(in, ctx)) {
+    if (!parse<RFC5321::grammar, RFC5321::action>(in, ctx)) {
       if (ctx.session.timed_out()) {
         ctx.session.time_out();
       }
