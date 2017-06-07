@@ -131,30 +131,30 @@ using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
 
-struct U_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {
+struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {
 };
 
-struct U_ldh_str : plus<sor<ALPHA, DIGIT, UTF8_non_ascii, dash>> {
+struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8_non_ascii, dash>> {
   // verify last char is a U_Let_dig
 };
 
-struct U_label : seq<U_let_dig, opt<U_ldh_str>> {
+struct u_label : seq<u_let_dig, opt<u_ldh_str>> {
 };
 
-struct Let_dig : sor<ALPHA, DIGIT> {
+struct let_dig : sor<ALPHA, DIGIT> {
 };
 
-struct Ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
+struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
   // verify last char is a U_Let_dig
 };
 
-struct label : seq<Let_dig, opt<Ldh_str>> {
+struct label : seq<let_dig, opt<ldh_str>> {
 };
 
-struct sub_domain : sor<label, U_label> {
+struct sub_domain : sor<label, u_label> {
 };
 
-struct Domain : list<sub_domain, dot> {
+struct domain : list<sub_domain, dot> {
 };
 
 // clang-format off
@@ -196,7 +196,7 @@ struct IPv6_address_literal : seq<TAOCPP_PEGTL_STRING("IPv6:"), IPv6address> {
 struct dcontent : ranges<33, 90, 94, 126> {
 };
 
-struct standardized_tag : Ldh_str {
+struct standardized_tag : ldh_str {
 };
 
 struct General_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
@@ -210,10 +210,10 @@ struct address_literal : seq<one<'['>,
                              one<']'>> {
 };
 
-struct At_domain : seq<one<'@'>, Domain> {
+struct at_domain : seq<one<'@'>, domain> {
 };
 
-struct A_d_l : list<At_domain, one<','>> {
+struct a_d_l : list<at_domain, one<','>> {
 };
 
 struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {
@@ -225,10 +225,10 @@ struct graphic : range<32, 126> {
 struct quoted_pairSMTP : seq<one<'\\'>, graphic> {
 };
 
-struct QcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {
+struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {
 };
 
-struct Quoted_string : seq<one<'"'>, star<QcontentSMTP>, one<'"'>> {
+struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {
 };
 
 // clang-format off
@@ -247,34 +247,34 @@ struct atext : sor<ALPHA, DIGIT,
 };
 // clang-format on
 
-struct Atom : plus<atext> {
+struct atom : plus<atext> {
 };
 
-struct Dot_string : list<Atom, dot> {
+struct dot_string : list<atom, dot> {
 };
 
-struct Local_part : sor<Dot_string, Quoted_string> {
+struct local_part : sor<dot_string, quoted_string> {
 };
 
-struct Non_local_part : sor<Domain, address_literal> {
+struct non_local_part : sor<domain, address_literal> {
 };
 
-struct Mailbox : seq<Local_part, one<'@'>, Non_local_part> {
+struct mailbox : seq<local_part, one<'@'>, non_local_part> {
 };
 
-struct Path : seq<one<'<'>, seq<opt<seq<A_d_l, colon>>, Mailbox, one<'>'>>> {
+struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {
 };
 
 struct bounce_path : TAOCPP_PEGTL_STRING("<>") {
 };
 
-struct Reverse_path : sor<Path, bounce_path> {
+struct reverse_path : sor<path, bounce_path> {
 };
 
 struct magic_postmaster : TAOCPP_PEGTL_STRING("<Postmaster>") {
 };
 
-struct Forward_path : sor<Path, magic_postmaster> {
+struct forward_path : sor<path, magic_postmaster> {
 };
 
 struct esmtp_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {
@@ -286,32 +286,32 @@ struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {
 struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {
 };
 
-struct Mail_parameters : list<esmtp_param, SP> {
+struct mail_parameters : list<esmtp_param, SP> {
 };
 
-struct Rcpt_parameters : list<esmtp_param, SP> {
+struct rcpt_parameters : list<esmtp_param, SP> {
 };
 
-struct String : sor<Quoted_string, Atom> {
+struct string : sor<quoted_string, atom> {
 };
 
-struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"), SP, Domain, CRLF> {
+struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"), SP, domain, CRLF> {
 };
 
-struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"), SP, Domain, CRLF> {
+struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"), SP, domain, CRLF> {
 };
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
                        TAOCPP_PEGTL_ISTRING(" FROM:"),
-                       Reverse_path,
-                       opt<seq<SP, Mail_parameters>>,
+                       reverse_path,
+                       opt<seq<SP, mail_parameters>>,
                        CRLF> {
 };
 
 struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
                      TAOCPP_PEGTL_ISTRING(" TO:"),
-                     Forward_path,
-                     opt<seq<SP, Rcpt_parameters>>,
+                     forward_path,
+                     opt<seq<SP, rcpt_parameters>>,
                      CRLF> {
 };
 
@@ -352,13 +352,13 @@ struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
 struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
 };
 
-struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, String>>, CRLF> {
+struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, string>>, CRLF> {
 };
 
-struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, String>>, CRLF> {
+struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {
 };
 
-struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, String>>, CRLF> {
+struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {
 };
 
 struct starttls
@@ -480,7 +480,7 @@ struct action<esmtp_param> {
 };
 
 template <>
-struct action<Local_part> {
+struct action<local_part> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
@@ -489,7 +489,7 @@ struct action<Local_part> {
 };
 
 template <>
-struct action<Non_local_part> {
+struct action<non_local_part> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
