@@ -183,7 +183,8 @@ void Session::ehlo(std::string client_identity)
   out() << "250-PIPELINING\r\n";
 
   // RFC 3030
-  out() << "250-BINARYMIME\r\n250-CHUNKING\r\n";
+  // out() << "250-BINARYMIME\r\n";
+  out() << "250-CHUNKING\r\n";
 
   // RFC 6531
   out() << "250 SMTPUTF8\r\n" << std::flush;
