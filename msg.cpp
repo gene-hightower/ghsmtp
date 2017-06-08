@@ -601,9 +601,15 @@ struct action<optional_field> {
     // LOG(INFO) << "optional_field";
     if (is_defined_field(ctx.opt_name)) {
       // So, this is a syntax error in a defined field.
-      auto err = "syntax error in: \""s + in.string() + "\""s;
-      ctx.msg_errors.push_back(err);
-      LOG(ERROR) << err;
+      if (ctx.opt_name == "Received") {
+        // Go easy on Received lines, they tend to be wild and woolly.
+        LOG(INFO) << in.string();
+      }
+      else {
+        auto err = "syntax error in: \""s + in.string() + "\""s;
+        ctx.msg_errors.push_back(err);
+        LOG(ERROR) << err;
+      }
     }
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.unstructured.clear();
