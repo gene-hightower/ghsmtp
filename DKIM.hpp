@@ -133,9 +133,13 @@ public:
       }
 
       unsigned int bits;
-      CHECK_EQ(dkim_sig_getkeysize(sigs[i], &bits), DKIM_STAT_OK);
-      if (bits < 1024) {
-        LOG(WARNING) << "keysize " << bits << " too small for domain " << dom;
+      status_ = dkim_sig_getkeysize(sigs[i], &bits);
+      if (status_ == DKIM_STAT_OK) {
+        if (bits < 1024) {
+          LOG(WARNING) << "keysize " << bits << " too small for domain " << dom;
+        }
+      } else {
+        LOG(WARNING) << "getkeysize failed for domain " << dom << " with " << dkim_getresultstr(status_);
       }
 
       auto passed
