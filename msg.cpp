@@ -1038,8 +1038,6 @@ struct action<body> {
   {
     // LOG(INFO) << "body";
     ctx.dkv.eoh();
-    // constexpr char CRLF[]{'\r', '\n'};
-    // ctx.dkv.body(CRLF);
     ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
   }
 };
