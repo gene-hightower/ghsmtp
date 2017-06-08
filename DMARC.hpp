@@ -131,7 +131,8 @@ public:
 
     switch (status) {
     case DMARC_PARSE_ERROR_NULL_CTX:
-      LOG(FATAL) << "NULL pctx value";
+      LOG(ERROR) << "NULL pctx value";
+      return Advice::NONE;
 
     case DMARC_FROM_DOMAIN_ABSENT:
       LOG(FATAL) << "No From: domain";
