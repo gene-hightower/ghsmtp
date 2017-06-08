@@ -114,20 +114,32 @@ public:
 
     for (auto i = 0; i < nsigs; ++i) {
       auto dom = CHECK_NOTNULL(dkim_sig_getdomain(sigs[i]));
-      auto flg = dkim_sig_getflags(sigs[i]);
 
-      if ((flg & DKIM_SIGFLAG_IGNORE) == DKIM_SIGFLAG_IGNORE) {
+      auto flg = dkim_sig_getflags(sigs[i]);
+      if ((flg & DKIM_SIGFLAG_IGNORE) != 0) {
         LOG(INFO) << "ignoring signature for domain " << dom;
         continue;
       }
-      if ((flg & DKIM_SIGFLAG_TESTKEY) == DKIM_SIGFLAG_TESTKEY) {
+      if ((flg & DKIM_SIGFLAG_TESTKEY) != 0) {
         LOG(INFO) << "testkey for domain " << dom;
       }
 
-      CHECK((flg & DKIM_SIGFLAG_PROCESSED) == DKIM_SIGFLAG_PROCESSED)
-          << "sig for " << dom << " not processed";
+      CHECK((flg & DKIM_SIGFLAG_PROCESSED) != 0) << "sig for " << dom
+                                                 << " not processed";
 
-      auto passed = (flg & DKIM_SIGFLAG_PASSED) == DKIM_SIGFLAG_PASSED;
+      auto bh = dkim_sig_getbh(sigs[i]);
+      if (bh != DKIM_SIGBH_MATCH) {
+        LOG(INFO) << "Body hash mismatch for domain " << dom;
+      }
+
+      unsigned int bits;
+      CHECK_EQ(dkim_sig_getkeysize(sigs[i], &bits), DKIM_STAT_OK);
+      if (bits < 1024) {
+        LOG(WARNING) << "keysize " << bits << " too small for domain " << dom;
+      }
+
+      auto passed
+          = ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
 
       func(reinterpret_cast<char const*>(dom), passed);
     }
@@ -145,19 +157,19 @@ public:
     for (auto i = 0; i < nsigs; ++i) {
       LOG(INFO) << i << " domain == " << dkim_sig_getdomain(sigs[i]);
       auto flg = dkim_sig_getflags(sigs[i]);
-      if ((flg & DKIM_SIGFLAG_IGNORE) == DKIM_SIGFLAG_IGNORE) {
+      if ((flg & DKIM_SIGFLAG_IGNORE) != 0) {
         LOG(INFO) << "DKIM_SIGFLAG_IGNORE";
       }
-      if ((flg & DKIM_SIGFLAG_PROCESSED) == DKIM_SIGFLAG_PROCESSED) {
+      if ((flg & DKIM_SIGFLAG_PROCESSED) != 0) {
         LOG(INFO) << "DKIM_SIGFLAG_PROCESSED";
       }
-      if ((flg & DKIM_SIGFLAG_PASSED) == DKIM_SIGFLAG_PASSED) {
+      if ((flg & DKIM_SIGFLAG_PASSED) != 0) {
         LOG(INFO) << "DKIM_SIGFLAG_PASSED";
       }
-      if ((flg & DKIM_SIGFLAG_TESTKEY) == DKIM_SIGFLAG_TESTKEY) {
+      if ((flg & DKIM_SIGFLAG_TESTKEY) != 0) {
         LOG(INFO) << "DKIM_SIGFLAG_TESTKEY";
       }
-      if ((flg & DKIM_SIGFLAG_NOSUBDOMAIN) == DKIM_SIGFLAG_NOSUBDOMAIN) {
+      if ((flg & DKIM_SIGFLAG_NOSUBDOMAIN) != 0) {
         LOG(INFO) << "DKIM_SIGFLAG_NOSUBDOMAIN";
       }
     }
