@@ -207,14 +207,15 @@ struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {
 struct qcontent : sor<qtext, quoted_pair> {
 };
 
-struct quoted_string : seq<opt<CFWS>,
-                           DQUOTE,
-                           star<seq<opt<FWS>, qcontent>>,
-                           opt<FWS>,
-                           DQUOTE,
-                           opt<CFWS>> {
+// Corrected in errata ID: 3135
+struct quoted_string
+    : seq<opt<CFWS>,
+          DQUOTE,
+          sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
+          DQUOTE,
+          opt<CFWS>> {
 };
-
+// *([FWS] VCHAR) *WSP
 struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
 };
 
@@ -278,10 +279,26 @@ struct group
 struct address : sor<mailbox, group> {
 };
 
-struct mailbox_list : list<mailbox, one<','>> {
+// *([CFWS] ",") mailbox *("," [mailbox / CFWS])
+struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
+                           mailbox,
+                           star<one<','>, opt<sor<mailbox, CFWS>>>> {
 };
 
-struct address_list : list<address, one<','>> {
+struct mailbox_list : sor<list<mailbox, one<','>>, obs_mbox_list> {
+};
+
+// *([CFWS] ",") address *("," [address / CFWS])
+struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
+                           address,
+                           star<one<','>, opt<sor<address, CFWS>>>> {
+};
+
+struct address_list : sor<list<address, one<','>>, obs_addr_list> {
+};
+
+// 1*([CFWS] ",") [CFWS]
+struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
 };
 
 struct group_list : sor<mailbox_list, CFWS> {
@@ -319,22 +336,64 @@ struct day_name : sor<TAOCPP_PEGTL_ISTRING("Mon"),
                       TAOCPP_PEGTL_ISTRING("Sun")> {
 };
 
-struct day_of_week : seq<opt<FWS>, day_name> {
+struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
 };
 
-struct hour : rep<2, DIGIT> {
+struct obs_day : seq<opt<CFWS>, rep_min_max<1, 2, DIGIT>, opt<CFWS>> {
 };
 
-struct minute : rep<2, DIGIT> {
+struct obs_year : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
 };
 
-struct second : rep<2, DIGIT> {
+struct obs_hour : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
 };
 
-struct time_of_day : seq<hour, one<':'>, minute, opt<seq<one<':'>, second>>> {
+struct obs_minute : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
 };
 
-struct zone : seq<FWS, sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {
+struct obs_second : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+};
+
+struct day_of_week : sor<seq<opt<FWS>, day_name>, obs_day_of_week> {
+};
+
+struct hour : sor<rep<2, DIGIT>, obs_hour> {
+};
+
+struct minute : sor<rep<2, DIGIT>, obs_minute> {
+};
+
+struct second : sor<rep<2, DIGIT>, obs_second> {
+};
+
+struct millisecond : rep<3, DIGIT> {
+};
+
+// RFC-5322 extension is optional milliseconds
+struct time_of_day
+    : seq<hour,
+          one<':'>,
+          minute,
+          opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {
+};
+
+struct obs_zone : sor<range<65, 73>,
+                      range<75, 90>,
+                      range<97, 105>,
+                      range<107, 122>,
+                      TAOCPP_PEGTL_ISTRING("UT"),
+                      TAOCPP_PEGTL_ISTRING("GMT"),
+                      TAOCPP_PEGTL_ISTRING("EST"),
+                      TAOCPP_PEGTL_ISTRING("EDT"),
+                      TAOCPP_PEGTL_ISTRING("CST"),
+                      TAOCPP_PEGTL_ISTRING("CDT"),
+                      TAOCPP_PEGTL_ISTRING("MST"),
+                      TAOCPP_PEGTL_ISTRING("MDT"),
+                      TAOCPP_PEGTL_ISTRING("PST"),
+                      TAOCPP_PEGTL_ISTRING("PDT")> {
+};
+
+struct zone : sor<seq<FWS, sor<one<'+'>, one<'-'>>, rep<4, DIGIT>>, obs_zone> {
 };
 
 struct time : seq<time_of_day, zone> {
@@ -448,9 +507,10 @@ struct received_token : sor<angle_addr, addr_spec, domain, word> {
 };
 
 struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
-                      star<received_token>,
+                      opt<sor<plus<received_token>, CFWS>>,
                       one<';'>,
                       date_time,
+                      opt<seq<WSP, comment>>,
                       eol> {
 };
 
@@ -603,7 +663,7 @@ struct action<optional_field> {
       // So, this is a syntax error in a defined field.
       if (ctx.opt_name == "Received") {
         // Go easy on Received lines, they tend to be wild and woolly.
-        LOG(INFO) << in.string();
+        // LOG(INFO) << in.string();
       }
       else {
         auto err = "syntax error in: \""s + in.string() + "\""s;
@@ -613,6 +673,7 @@ struct action<optional_field> {
     }
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.unstructured.clear();
+    ctx.mb_list.clear();
   }
 };
 
@@ -1079,23 +1140,27 @@ struct action<message> {
       auto s = find(begin(ctx.from_list), end(ctx.from_list), ctx.sender);
       if (s == end(ctx.from_list)) {
         // can't be found, not an error
-        LOG(INFO) << "No 'From:' match to 'Sender:'";
-      }
+        LOG(ERROR) << "No 'From:' match to 'Sender:'";
 
-      from_domain = ctx.sender;
-      LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain();
+        // must check all From:s
+        LOG(FATAL) << "write code to check all From: addresses";
+      }
+      else {
+        from_domain = ctx.sender;
+        LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain();
+      }
     }
     else {
 
       from_domain = ctx.from_list[0].domain();
 
-      if (!ctx.sender.empty()) {
-        if (from_domain != ctx.sender.domain()) {
-          LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain()
-                    << " in place of 'From:' domain " << from_domain;
-          from_domain = ctx.sender.domain();
-        }
-      }
+      // if (!ctx.sender.empty()) {
+      //   if (from_domain != ctx.sender.domain()) {
+      //     LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain()
+      //               << " in place of 'From:' domain " << from_domain;
+      //     from_domain = ctx.sender.domain();
+      //   }
+      // }
     }
 
     // if the domain is UTF-8, must convert to A-label here
@@ -1125,10 +1190,40 @@ struct action<message> {
 };
 }
 
-int main(int argc, char const* argv[])
+void self_test()
 {
   CHECK(RFC5322::is_defined_field("Subject"));
   CHECK(!RFC5322::is_defined_field("X-Subject"));
+
+  const char* plist[]{
+      // github
+      "Received: from github-smtp2a-ext-cp1-prd.iad.github.net "
+      "(github-smtp2a-ext-cp1-prd.iad.github.net [192.30.253.16])\r\n"
+      " by ismtpd0004p1iad1.sendgrid.net (SG) with ESMTP id "
+      "OCAkwxSQQTiPcF-T3rLS3w\r\n"
+      "	for <gene-github@digilicious.com>; Tue, 23 May 2017 "
+      "23:01:49.124 +0000 (UTC)\r\n",
+
+      // sendgrid date is shit
+      // "Received: by filter0810p1mdw1.sendgrid.net with SMTP id "
+      // "filter0810p1mdw1-13879-5924BDA5-34\r\n"
+      // "        2017-05-23 22:54:29.679063164 +0000 UTC\r\n",
+
+  };
+
+  for (auto i : plist) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx ctx;
+    if (!parse<RFC5322::received, RFC5322::action /*, tao::pegtl::tracer*/>(
+            in, ctx)) {
+      LOG(ERROR) << "Error parsing \"" << i << "\"";
+    }
+  }
+}
+
+int main(int argc, char const* argv[])
+{
+  self_test();
 
   for (auto i = 1; i < argc; ++i) {
     auto fn = argv[i];
