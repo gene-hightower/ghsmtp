@@ -428,7 +428,7 @@ struct action<bogus_cmd_1> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: "s + in.string());
+    ctx.session.error("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -437,7 +437,7 @@ struct action<bogus_cmd_2> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: "s + in.string());
+    ctx.session.error("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -446,7 +446,7 @@ struct action<bogus_cmd_3> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: "s + in.string());
+    ctx.session.error("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -455,7 +455,7 @@ struct action<bogus_cmd> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: "s + in.string());
+    ctx.session.error("bogus command: \""s + in.string() + "\""s);
   }
 };
 
