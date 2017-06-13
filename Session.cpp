@@ -749,9 +749,11 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] uribl",
+             sock_.them_c_str());
       out() << "550 4.7.1 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
-      return false;
+      std::exit(EXIT_SUCCESS);
     }
   }
 
