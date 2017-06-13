@@ -124,8 +124,10 @@ public:
         LOG(INFO) << "testkey for domain " << dom;
       }
 
-      CHECK((flg & DKIM_SIGFLAG_PROCESSED) != 0) << "sig for " << dom
-                                                 << " not processed";
+      if ((flg & DKIM_SIGFLAG_PROCESSED) == 0) {
+        LOG(INFO) << "ignoring unprocessed sig for domain " << dom;
+        continue;
+      }
 
       auto bh = dkim_sig_getbh(sigs[i]);
       if (bh != DKIM_SIGBH_MATCH) {
