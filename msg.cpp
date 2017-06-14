@@ -156,10 +156,11 @@ struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
 struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
 };
 
+using dot = one<'.'>;
+using colon = one<':'>;
+
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
 };
-
-// struct obs_body {};
 
 struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
 };
@@ -189,6 +190,7 @@ struct atext : sor<ALPHA, DIGIT,
 };
 // clang-format on
 
+// ctext is ASCII not '(' or ')' or '\\'
 struct ctext : ranges<33, 39, 42, 91, 93, 126> {
 };
 
@@ -222,7 +224,7 @@ struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
 struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {
 };
 
-struct dot_atom_text : list<plus<atext>, one<'.'>> {
+struct dot_atom_text : list<plus<atext>, dot> {
 };
 
 struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {
@@ -232,6 +234,42 @@ struct word : sor<atom, quoted_string> {
 };
 
 struct phrase : plus<word> {
+};
+
+// clang-format off
+struct dec_octet : sor<one<'0'>,
+                       rep_min_max<1, 2, DIGIT>,
+                       seq<one<'1'>, DIGIT, DIGIT>,
+                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
+                       seq<string<'2','5'>, range<'0','5'>>> {};
+// clang-format on
+
+struct ipv4_address
+    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
+};
+
+struct h16 : rep_min_max<1, 4, HEXDIG> {
+};
+
+struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {
+};
+
+struct dcolon : two<':'> {
+};
+
+// clang-format off
+struct ipv6_address : sor<seq<                                          rep<6, h16, colon>, ls32>,
+                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
+                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
+                          seq<opt<h16,     opt<   colon, h16>>, dcolon, rep<3, h16, colon>, ls32>,
+                          seq<opt<h16, rep_opt<2, colon, h16>>, dcolon, rep<2, h16, colon>, ls32>,
+                          seq<opt<h16, rep_opt<3, colon, h16>>, dcolon,        h16, colon,  ls32>,
+                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
+                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
+                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
+// clang-format on
+
+struct ip : sor<ipv4_address, ipv6_address> {
 };
 
 struct local_part : sor<dot_atom, quoted_string> {
@@ -280,48 +318,53 @@ struct address : sor<mailbox, group> {
 };
 
 // *([CFWS] ",") mailbox *("," [mailbox / CFWS])
-struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
-                           mailbox,
-                           star<one<','>, opt<sor<mailbox, CFWS>>>> {
-};
+// struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
+//                            mailbox,
+//                            star<one<','>, opt<sor<mailbox, CFWS>>>> {
+// };
 
-struct mailbox_list : sor<list<mailbox, one<','>>, obs_mbox_list> {
+struct mailbox_list : list<mailbox, one<','>> {
 };
 
 // *([CFWS] ",") address *("," [address / CFWS])
-struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
-                           address,
-                           star<one<','>, opt<sor<address, CFWS>>>> {
-};
+// struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
+//                            address,
+//                            star<one<','>, opt<sor<address, CFWS>>>> {
+// };
 
-struct address_list : sor<list<address, one<','>>, obs_addr_list> {
+struct address_list : list<address, one<','>> {
 };
 
 // 1*([CFWS] ",") [CFWS]
-struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
-};
+// struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
+// };
 
 struct group_list : sor<mailbox_list, CFWS> {
 };
 
-struct day : seq<opt<FWS>, plus<rep_min_max<1, 2, DIGIT>>, FWS> {
+// 3.3. Date and Time Specification (mostly from RFC 2822)
+
+struct day : seq<opt<FWS>, rep_min_max<1, 2, DIGIT>> {
 };
 
-struct month : sor<TAOCPP_PEGTL_ISTRING("Jan"),
-                   TAOCPP_PEGTL_ISTRING("Feb"),
-                   TAOCPP_PEGTL_ISTRING("Mar"),
-                   TAOCPP_PEGTL_ISTRING("Apr"),
-                   TAOCPP_PEGTL_ISTRING("May"),
-                   TAOCPP_PEGTL_ISTRING("Jun"),
-                   TAOCPP_PEGTL_ISTRING("Jul"),
-                   TAOCPP_PEGTL_ISTRING("Aug"),
-                   TAOCPP_PEGTL_ISTRING("Sep"),
-                   TAOCPP_PEGTL_ISTRING("Oct"),
-                   TAOCPP_PEGTL_ISTRING("Nov"),
-                   TAOCPP_PEGTL_ISTRING("Dec")> {
+struct month_name : sor<TAOCPP_PEGTL_ISTRING("Jan"),
+                        TAOCPP_PEGTL_ISTRING("Feb"),
+                        TAOCPP_PEGTL_ISTRING("Mar"),
+                        TAOCPP_PEGTL_ISTRING("Apr"),
+                        TAOCPP_PEGTL_ISTRING("May"),
+                        TAOCPP_PEGTL_ISTRING("Jun"),
+                        TAOCPP_PEGTL_ISTRING("Jul"),
+                        TAOCPP_PEGTL_ISTRING("Aug"),
+                        TAOCPP_PEGTL_ISTRING("Sep"),
+                        TAOCPP_PEGTL_ISTRING("Oct"),
+                        TAOCPP_PEGTL_ISTRING("Nov"),
+                        TAOCPP_PEGTL_ISTRING("Dec")> {
 };
 
-struct year : seq<FWS, rep<4, DIGIT>, FWS> {
+struct month : seq<FWS, month_name, FWS> {
+};
+
+struct year : rep<4, DIGIT> {
 };
 
 struct date : seq<day, month, year> {
@@ -336,34 +379,37 @@ struct day_name : sor<TAOCPP_PEGTL_ISTRING("Mon"),
                       TAOCPP_PEGTL_ISTRING("Sun")> {
 };
 
-struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
+// struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
+// };
+
+// struct obs_day : seq<opt<CFWS>, rep_min_max<1, 2, DIGIT>, opt<CFWS>> {
+// };
+
+// struct obs_year : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// };
+
+// struct obs_hour : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// };
+
+// struct obs_minute : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// };
+
+// struct obs_second : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// };
+
+// struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
+// }
+
+struct day_of_week : seq<opt<FWS>, day_name> {
 };
 
-struct obs_day : seq<opt<CFWS>, rep_min_max<1, 2, DIGIT>, opt<CFWS>> {
+struct hour : rep<2, DIGIT> {
 };
 
-struct obs_year : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+struct minute : rep<2, DIGIT> {
 };
 
-struct obs_hour : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
-};
-
-struct obs_minute : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
-};
-
-struct obs_second : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
-};
-
-struct day_of_week : sor<seq<opt<FWS>, day_name>, obs_day_of_week> {
-};
-
-struct hour : sor<rep<2, DIGIT>, obs_hour> {
-};
-
-struct minute : sor<rep<2, DIGIT>, obs_minute> {
-};
-
-struct second : sor<rep<2, DIGIT>, obs_second> {
+struct second : rep<2, DIGIT> {
 };
 
 struct millisecond : rep<3, DIGIT> {
@@ -377,29 +423,30 @@ struct time_of_day
           opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {
 };
 
-struct obs_zone : sor<range<65, 73>,
-                      range<75, 90>,
-                      range<97, 105>,
-                      range<107, 122>,
-                      TAOCPP_PEGTL_ISTRING("UT"),
-                      TAOCPP_PEGTL_ISTRING("GMT"),
-                      TAOCPP_PEGTL_ISTRING("EST"),
-                      TAOCPP_PEGTL_ISTRING("EDT"),
-                      TAOCPP_PEGTL_ISTRING("CST"),
-                      TAOCPP_PEGTL_ISTRING("CDT"),
-                      TAOCPP_PEGTL_ISTRING("MST"),
-                      TAOCPP_PEGTL_ISTRING("MDT"),
-                      TAOCPP_PEGTL_ISTRING("PST"),
-                      TAOCPP_PEGTL_ISTRING("PDT")> {
+// struct obs_zone : sor<range<65, 73>,
+//                       range<75, 90>,
+//                       range<97, 105>,
+//                       range<107, 122>,
+//                       TAOCPP_PEGTL_ISTRING("UT"),
+//                       TAOCPP_PEGTL_ISTRING("GMT"),
+//                       TAOCPP_PEGTL_ISTRING("EST"),
+//                       TAOCPP_PEGTL_ISTRING("EDT"),
+//                       TAOCPP_PEGTL_ISTRING("CST"),
+//                       TAOCPP_PEGTL_ISTRING("CDT"),
+//                       TAOCPP_PEGTL_ISTRING("MST"),
+//                       TAOCPP_PEGTL_ISTRING("MDT"),
+//                       TAOCPP_PEGTL_ISTRING("PST"),
+//                       TAOCPP_PEGTL_ISTRING("PDT")> {
+// };
+
+struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {
 };
 
-struct zone : sor<seq<FWS, sor<one<'+'>, one<'-'>>, rep<4, DIGIT>>, obs_zone> {
+struct time : seq<time_of_day, FWS, zone> {
 };
 
-struct time : seq<time_of_day, zone> {
-};
-
-struct date_time : seq<opt<seq<day_of_week, one<','>>>, date, time, opt<CFWS>> {
+struct date_time
+    : seq<opt<seq<day_of_week, one<','>>>, date, FWS, time, opt<CFWS>> {
 };
 
 // The Origination Date Field
@@ -525,14 +572,18 @@ struct result : sor<TAOCPP_PEGTL_ISTRING("Pass"),
 
 struct key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
                  TAOCPP_PEGTL_ISTRING("envelope-from"),
-                 TAOCPP_PEGTL_ISTRING("helo")> {
+                 TAOCPP_PEGTL_ISTRING("helo"),
+                 TAOCPP_PEGTL_ISTRING("problem"),
+                 TAOCPP_PEGTL_ISTRING("receiver"),
+                 TAOCPP_PEGTL_ISTRING("identity"),
+                 TAOCPP_PEGTL_ISTRING("mechanism")> {
 };
 
 // This value syntax (allowing mailbox) is not in accordance with RFC
 // 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
 // before.
 
-struct value : sor<mailbox, dot_atom, quoted_string> {
+struct value : sor<ip, mailbox, dot_atom, quoted_string> {
 };
 
 struct key_value_pair : seq<key, opt<CFWS>, one<'='>, value> {
@@ -1195,7 +1246,21 @@ void self_test()
   CHECK(RFC5322::is_defined_field("Subject"));
   CHECK(!RFC5322::is_defined_field("X-Subject"));
 
-  const char* plist[]{
+  const char* ip_list[]{
+      "2607:f8b0:4001:c0b::22a",
+      "127.0.0.1",
+  };
+
+  for (auto i : ip_list) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx ctx;
+    if (!parse<RFC5322::ip, RFC5322::action /*, tao::pegtl::tracer*/>(
+            in, ctx)) {
+      LOG(ERROR) << "Error parsing as ip \"" << i << "\"";
+    }
+  }
+
+  const char* rec_list[]{
       // github
       "Received: from github-smtp2a-ext-cp1-prd.iad.github.net "
       "(github-smtp2a-ext-cp1-prd.iad.github.net [192.30.253.16])\r\n"
@@ -1211,25 +1276,64 @@ void self_test()
 
   };
 
-  for (auto i : plist) {
+  for (auto i : rec_list) {
     memory_input<> in(i, i);
     RFC5322::Ctx ctx;
     if (!parse<RFC5322::received, RFC5322::action /*, tao::pegtl::tracer*/>(
             in, ctx)) {
-      LOG(ERROR) << "Error parsing \"" << i << "\"";
+      LOG(ERROR) << "Error parsing as Received: \"" << i << "\"";
+    }
+  }
+
+  const char* date_list[]{
+      "Date: Tue, 30 May 2017 10:52:11 +0000 (UTC)\r\n",
+      "Date: Mon, 29 May 2017 16:47:58 -0700\r\n",
+
+      // this date is shit
+      // "Date: Mon, 29 May 2017 19:47:08 EDT\r\n",
+  };
+
+  for (auto i : date_list) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx ctx;
+    if (!parse<RFC5322::orig_date, RFC5322::action /*, tao::pegtl::tracer*/>(
+            in, ctx)) {
+      LOG(ERROR) << "Error parsing as Date: \"" << i << "\"";
+    }
+  }
+
+  const char* spf_list[]{
+      // works
+      "Received-SPF: pass (digilicious.com: domain of gmail.com designates "
+      "74.125.82.46 as permitted sender) client-ip=74.125.82.46; "
+      "envelope-from=sclark0322@gmail.com; helo=mail-wm0-f46.google.com;\r\n",
+
+      // also works
+      "Received-SPF: neutral (google.com: 2607:f8b0:4001:c0b::22a is neither "
+      "permitted nor denied by best guess record for domain of "
+      "rickoco@riscv.org) client-ip=2607:f8b0:4001:c0b::22a;\r\n",
+  };
+
+  for (auto i : spf_list) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx ctx;
+    if (!parse<RFC5322::received_spf, RFC5322::action /*, tao::pegtl::tracer*/>(
+            in, ctx)) {
+      LOG(ERROR) << "Error parsing as Received-SPF: \"" << i << "\"";
     }
   }
 }
 
 int main(int argc, char const* argv[])
 {
-  self_test();
+  // self_test();
 
   for (auto i = 1; i < argc; ++i) {
     auto fn = argv[i];
     boost::filesystem::path name(fn);
     boost::iostreams::mapped_file_source f(name);
     memory_input<> in(f.data(), f.size(), fn);
+    LOG(INFO) << "### " << fn;
     try {
       RFC5322::Ctx ctx;
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
