@@ -346,7 +346,7 @@ struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
 struct data_line : sor<data_blank, data_dot, data_plain> {
 };
 
-struct anything_else : seq<star<any>, eof> {
+struct anything_else : seq<plus<any>, eof> {
 };
 
 struct data_grammar
