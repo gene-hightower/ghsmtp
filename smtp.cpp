@@ -647,6 +647,7 @@ void bdat_act(Ctx& ctx)
           LOG(WARNING) << "may not have all headers in this chunk";
         }
         else {
+          ctx.hdr.append("\r\n");
           ctx.hdr_end = true;
         }
       }
@@ -721,6 +722,7 @@ struct data_action<data_blank> {
   {
     constexpr char CRLF[]{'\r', '\n'};
     ctx.msg->write(CRLF, sizeof(CRLF));
+    ctx.hdr.append(CRLF, sizeof(CRLF));
     ctx.hdr_end = true;
   }
 };
