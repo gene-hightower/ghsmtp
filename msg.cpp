@@ -1247,15 +1247,14 @@ void self_test()
   CHECK(!RFC5322::is_defined_field("X-Subject"));
 
   const char* ip_list[]{
-      "2607:f8b0:4001:c0b::22a",
-      "127.0.0.1",
+      "2607:f8b0:4001:c0b::22a", "127.0.0.1",
   };
 
   for (auto i : ip_list) {
     memory_input<> in(i, i);
     RFC5322::Ctx ctx;
-    if (!parse<RFC5322::ip, RFC5322::action /*, tao::pegtl::tracer*/>(
-            in, ctx)) {
+    if (!parse<RFC5322::ip, RFC5322::action /*, tao::pegtl::tracer*/>(in,
+                                                                      ctx)) {
       LOG(ERROR) << "Error parsing as ip \"" << i << "\"";
     }
   }
