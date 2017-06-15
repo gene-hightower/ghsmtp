@@ -379,6 +379,8 @@ struct bogus_cmd_3
 };
 struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {
 };
+struct anything_else : seq<star<any>, eof> {
+};
 
 // commands in size order
 
@@ -399,7 +401,8 @@ struct any_cmd : seq<sor<bogus_cmd_0,
                          starttls,
                          rcpt_to,
                          mail_from,
-                         bogus_cmd>,
+                         bogus_cmd,
+                         anything_else>,
                      discard> {
 };
 
@@ -456,6 +459,15 @@ struct action<bogus_cmd> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.session.error("bogus command: \""s + in.string() + "\""s);
+  }
+};
+
+template <>
+struct action<anything_else> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("garbage: \""s + in.string() + "\""s);
   }
 };
 
@@ -747,8 +759,21 @@ struct action<data> {
 
       istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
 
-      parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, data_in,
-                                                                ctx);
+      try {
+        if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
+                in, data_in, ctx)) {
+          LOG(ERROR) << "bad data syntax";
+          ctx.session.error("bad data syntax");
+        }
+        LOG(INFO) << "good data parse";
+        return;
+      }
+      catch (parse_error const& e) {
+        LOG(ERROR) << e.what();
+        ctx.session.error(e.what());
+      }
+      LOG(ERROR) << "unknown exception";
+      ctx.session.error("unknown data parser problem");
     }
   }
 };
