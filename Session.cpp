@@ -31,7 +31,7 @@ constexpr char const* const bad_recipients[] = {
 };
 
 constexpr char const* const bad_senders[] = {
-    "kris.antoine@gmail.com",
+    "",
 };
 
 constexpr char const* const rbls[] = {
