@@ -346,7 +346,11 @@ struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
 struct data_line : sor<data_blank, data_dot, data_plain> {
 };
 
-struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
+struct anything_else : seq<star<any>, eof> {
+};
+
+struct data_grammar
+    : sor<seq<star<seq<data_line, discard>>, data_end>, anything_else> {
 };
 
 struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
@@ -378,8 +382,6 @@ struct bogus_cmd_3
     : seq<not_one<'\r', '\n'>, not_one<'\r', '\n'>, not_one<'\r', '\n'>, CRLF> {
 };
 struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {
-};
-struct anything_else : seq<star<any>, eof> {
 };
 
 // commands in size order
@@ -467,7 +469,7 @@ struct action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("garbage: \""s + in.string() + "\""s);
+    ctx.session.error("garbage in cmd stream: \""s + in.string() + "\""s);
   }
 };
 
@@ -666,7 +668,8 @@ void bdat_act(Ctx& ctx)
   if (ctx.chunk_last) {
     if (!ctx.hdr_end) {
       LOG(WARNING) << "may not have all headers in this email";
-    } else {
+    }
+    else {
       LOG(INFO) << "header size " << ctx.hdr.size() << " octets";
     }
     ctx.session.data_msg_done(*ctx.msg);
@@ -702,7 +705,8 @@ struct data_action<data_end> {
     else {
       if (!ctx.hdr_end) {
         LOG(WARNING) << "may not have all headers in this email";
-      } else {
+      }
+      else {
         LOG(INFO) << "header size " << ctx.hdr.size() << " octets";
       }
       ctx.session.data_msg_done(*ctx.msg);
@@ -750,6 +754,15 @@ struct data_action<data_dot> {
         std::copy_n(in.begin() + 1, hlen, std::back_inserter(ctx.hdr));
       }
     }
+  }
+};
+
+template <>
+struct data_action<anything_else> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.error("garbage in data stream: \""s + in.string() + "\""s);
   }
 };
 
