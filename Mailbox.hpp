@@ -25,6 +25,7 @@ public:
   std::string const& domain() const { return domain_; }
 
   bool empty() const { return local_part_.empty() && domain_.empty(); }
+  auto length() const { return local_part_.length() + domain_.length(); }
 
   operator std::string() const
   {
