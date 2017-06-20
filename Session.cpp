@@ -358,23 +358,30 @@ std::string Session::added_headers_(Message const& msg)
     headers << " (" << client_ << ')';
   }
   headers << "\r\n        by " << our_fqdn_ << " with " << protocol_ << " id "
-          << msg.id() << "\r\n        for <" << forward_path_[0] << '>';
+          << msg.id();
+
+  // STD 3 section 5.2.8
+  if (forward_path_.size()) {
+    auto len = 0;
+    headers << "\r\n        for ";
+    for (size_t i = 0; i < forward_path_.size(); ++i) {
+      if (i) {
+        headers << ',';
+        if ((len + forward_path_[i].length()) > 80) {
+          headers << "\r\n        ";
+          len = 0;
+        }
+      }
+      headers << '<' << forward_path_[i] << '>';
+      len += forward_path_[i].length();
+    }
+  }
 
   std::string tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     headers << "\r\n        (" << tls_info << ')';
   }
   headers << ";\r\n        " << msg.when() << "\r\n";
-
-  // Only include X-Original-To header if it's more than just what's
-  // in the Received: line.
-  if (forward_path_.size() > 1) {
-    headers << "X-Original-To: <" << forward_path_[0] << '>';
-    for (size_t i = 1; i < forward_path_.size(); ++i) {
-      headers << ",\r\n        <" << forward_path_[i] << '>';
-    }
-    headers << "\r\n";
-  }
 
   return headers.str();
 }
