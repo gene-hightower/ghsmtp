@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := ldns openssl libcurl opendkim
+USES := ldns libcurl libidn opendkim openssl
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
@@ -30,9 +30,9 @@ LDLIBS += \
 
 PROGRAMS := smtp msg
 
-smtp_STEMS := smtp DNS Message POSIX SPF Session TLS-OpenSSL date/tz
+smtp_STEMS := smtp DNS Domain Message POSIX SPF Session TLS-OpenSSL date/tz
 
-msg_STEMS := msg
+msg_STEMS := msg Domain
 
 TESTS := \
 	CDB-test \
@@ -52,6 +52,7 @@ TESTS := \
 	TLS-OpenSSL-test
 
 DNS-test_STEMS := DNS
+Domain-test_STEMS := Domain
 Message-test_STEMS := date/tz Message
 Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
