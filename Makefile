@@ -76,6 +76,9 @@ all:: $(databases) public_suffix_list.dat
 TMPDIR ?= /tmp
 TEST_MAILDIR=$(TMPDIR)/Maildir
 
+$(TEST_MAILDIR):
+	mkdir -p $@
+
 #smtp.cpp: smtp.rl
 #	ragel -o smtp.cpp smtp.rl
 
