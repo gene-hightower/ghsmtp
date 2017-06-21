@@ -53,11 +53,12 @@ TESTS := \
 
 DNS-test_STEMS := DNS
 Domain-test_STEMS := Domain
-Message-test_STEMS := date/tz Message
+Mailbox-test_STEMS := Domain
+Message-test_STEMS := Domain date/tz Message
 Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
-Session-test_STEMS := DNS POSIX SPF Session TLS-OpenSSL
+Session-test_STEMS := DNS Domain POSIX SPF Session TLS-OpenSSL
 Sock-test_STEMS := POSIX TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
