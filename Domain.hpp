@@ -11,6 +11,7 @@ public:
   ~Domain();
 
   void set(char const* dom);
+  void clear();
 
   static bool match(std::experimental::string_view a,
                     std::experimental::string_view b)

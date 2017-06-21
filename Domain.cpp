@@ -13,10 +13,7 @@ Domain::Domain(char const* dom)
 
 void Domain::set(char const* dom)
 {
-  if (ascii_)
-    idn_free(ascii_);
-  if (utf8_)
-    idn_free(utf8_);
+  clear();
 
   // Normalize to avoid fuckery.
   auto norm = stringprep_utf8_nfkc_normalize(dom, -1);
@@ -33,10 +30,19 @@ void Domain::set(char const* dom)
   idn_free(norm);
 }
 
+void Domain::clear()
+{
+  if (ascii_) {
+    idn_free(ascii_);
+    ascii_ = nullptr;
+  }
+  if (utf8_) {
+    idn_free(utf8_);
+    utf8_ = nullptr;
+  }
+}
+
 Domain::~Domain()
 {
-  if (ascii_)
-    idn_free(ascii_);
-  if (utf8_)
-    idn_free(utf8_);
+  clear();
 }
