@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 
   Mailbox dg{"gene", "digilicious.com"};
 
-  CHECK_EQ(std::string("digilicious.com"), dg.domain());
+  CHECK_EQ(std::string("digilicious.com"), dg.domain().ascii());
 
   std::string dgstr = boost::lexical_cast<std::string>(dg);
 

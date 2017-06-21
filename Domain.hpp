@@ -8,10 +8,10 @@ class Domain {
 public:
   Domain() = default;
   Domain(char const* dom);
-  ~Domain();
 
   void set(char const* dom);
   void clear();
+  bool empty() const { return ascii_.empty() && utf8_.empty(); }
 
   static bool match(std::experimental::string_view a,
                     std::experimental::string_view b)
@@ -27,18 +27,44 @@ public:
     return boost::iequals(a, b);
   }
 
-  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
+  bool operator==(std::string const& rhs) const
+  {
+    return match(ascii_, rhs.c_str());
+  }
+  bool operator!=(std::string const& rhs) const { return !(*this == rhs); }
 
-  char const* ascii() const { return ascii_; }
-  char const* utf8() const { return utf8_; }
+  bool operator==(char const* rhs) const { return match(ascii_, rhs); }
+  bool operator!=(char const* rhs) const { return !(*this == rhs); }
+
+  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
+  bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
+
+  Domain& operator=(char const* p)
+  {
+    set(p);
+    return *this;
+  }
+  Domain& operator=(std::string const& s)
+  {
+    set(s.c_str());
+    return *this;
+  }
+
+  std::string const& ascii() const { return ascii_; }
+  std::string const& utf8() const { return utf8_; }
 
 private:
-  char* ascii_{nullptr};
-  char* utf8_{nullptr};
+  std::string ascii_;
+  std::string utf8_;
+
+  void set_(char const* dom);
 
   friend std::ostream& operator<<(std::ostream& os, Domain const& dom)
   {
-    return os << "{\"" << dom.ascii() << "\", \"" << dom.utf8() << "\"}";
+    if (dom.ascii() == dom.utf8()) {
+      return os << dom.ascii();
+    }
+    return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
   }
 };
 

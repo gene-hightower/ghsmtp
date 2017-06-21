@@ -8,6 +8,7 @@
 
 #include <experimental/string_view>
 
+#include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Sock.hpp"
@@ -66,20 +67,20 @@ private:
     reverse_path_verified_ = false;
   }
 
-  bool verify_client_(std::string const& client_identity);
+  bool verify_client_(Domain const& client_identity);
   bool verify_recipient_(Mailbox const& recipient);
   bool verify_sender_(Mailbox const& sender);
-  bool verify_sender_domain_(std::string const& sender);
+  bool verify_sender_domain_(Domain const& sender);
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
 
 private:
   Sock sock_;
 
-  std::string our_fqdn_;              // who we identify as
-  std::string fcrdns_;                // who they look-up as
+  Domain our_fqdn_;                   // who we identify as
+  Domain fcrdns_;                     // who they look-up as
   std::string client_;                // (fcrdns_ [sock_.them_c_str()])
-  std::string client_identity_;       // from ehlo/helo
+  Domain client_identity_;            // from ehlo/helo
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 

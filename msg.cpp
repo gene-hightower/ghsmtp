@@ -1166,7 +1166,7 @@ struct action<message> {
 
     // ctx.dkv.check();
 
-    std::string from_domain;
+    Domain from_domain;
 
     if (ctx.from_list.empty()) {
       // RFC-5322 says message must have a 'From:' header.
@@ -1214,9 +1214,7 @@ struct action<message> {
       // }
     }
 
-    // if the domain is UTF-8, must convert to A-label here
-
-    ctx.dmp.store_from_domain(from_domain.c_str());
+    ctx.dmp.store_from_domain(from_domain.ascii().c_str());
 
     ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
       LOG(INFO) << "DKIM check for " << domain
@@ -1227,7 +1225,7 @@ struct action<message> {
       ctx.dmp.store_dkim(domain, result, nullptr);
     });
 
-    ctx.dmp.query_dmarc(from_domain.c_str());
+    ctx.dmp.query_dmarc(from_domain.ascii().c_str());
 
     LOG(INFO) << "Final DMARC advice for domain " << from_domain << ": "
               << Advice_to_string(ctx.dmp.get_policy());

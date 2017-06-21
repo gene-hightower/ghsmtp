@@ -44,4 +44,11 @@ int main(int argc, char const* argv[])
   catch (std::exception const& ex) {
     // std::cout << ex.what() << '\n';
   }
+
+  try {
+    Domain junk{"[127.0.0.1]"};
+  }
+  catch (std::exception const& ex) {
+    LOG(FATAL) << "should not throw " << ex.what();
+  }
 }

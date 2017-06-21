@@ -49,23 +49,19 @@ using namespace std::string_literals;
 
 Session::Session(int fd_in, int fd_out, std::string our_fqdn)
   : sock_(fd_in, fd_out)
-  , our_fqdn_{std::move(our_fqdn)}
 {
-  if (our_fqdn_.empty()) {
+  if (our_fqdn.empty()) {
     utsname un;
     PCHECK(uname(&un) == 0);
-    our_fqdn_ = un.nodename;
+    our_fqdn = un.nodename;
 
-    if (our_fqdn_.find('.') == std::string::npos) {
+    if (our_fqdn.find('.') == std::string::npos) {
       if (sock_.us_c_str()[0]) {
-        our_fqdn_ = "["s + sock_.us_c_str() + "]"s;
+        our_fqdn = "["s + sock_.us_c_str() + "]"s;
       }
     }
-    else {
-      std::transform(our_fqdn_.begin(), our_fqdn_.end(), our_fqdn_.begin(),
-                     ::tolower);
-    }
   }
+  our_fqdn_.set(our_fqdn.c_str());
 }
 
 void Session::greeting()
@@ -108,7 +104,7 @@ void Session::greeting()
 
     if (ptr != ptrs.end()) {
       fcrdns_ = *ptr;
-      client_ = fcrdns_ + " [" + sock_.them_c_str() + "]";
+      client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
       // LOG(INFO) << "connect from " << fcrdns_;
     }
     else {
@@ -153,14 +149,14 @@ void Session::ehlo(std::string client_identity)
 {
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
 
-  if (!verify_client_(client_identity)) {
+  reset_();
+  client_identity_.set(client_identity.c_str());
+
+  if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
            sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
-
-  reset_();
-  client_identity_ = std::move(client_identity);
 
   out() << "250-" << our_fqdn_ << "\r\n";
 
@@ -194,14 +190,14 @@ void Session::helo(std::string client_identity)
 {
   protocol_ = "SMTP";
 
-  if (!verify_client_(client_identity)) {
+  reset_();
+  client_identity_.set(client_identity.c_str());
+
+  if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
            sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
-
-  reset_();
-  client_identity_ = std::move(client_identity);
 
   out() << "250 " << our_fqdn_ << "\r\n" << std::flush;
 }
@@ -398,11 +394,11 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
   CDB white("white");
 
   if (!fcrdns_.empty()) {
-    if (white.lookup(fcrdns_.c_str())) {
+    if (white.lookup(fcrdns_.utf8().c_str())) {
       status = Message::SpamStatus::ham;
     }
 
-    char const* tld = tld_db_.get_registered_domain(fcrdns_.c_str());
+    char const* tld = tld_db_.get_registered_domain(fcrdns_.utf8().c_str());
     if (tld && white.lookup(tld)) {
       status = Message::SpamStatus::ham;
     }
@@ -413,17 +409,17 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     }
   }
 
-  if (white.lookup(client_identity_.c_str())) {
+  if (white.lookup(client_identity_.utf8().c_str())) {
     status = Message::SpamStatus::ham;
   }
 
   char const* tld_client
-      = tld_db_.get_registered_domain(client_identity_.c_str());
+      = tld_db_.get_registered_domain(client_identity_.utf8().c_str());
   if (tld_client && white.lookup(tld_client)) {
     status = Message::SpamStatus::ham;
   }
 
-  msg.open(our_fqdn_, status);
+  msg.open(our_fqdn_.utf8(), status);
   auto hdrs = added_headers_(msg);
   msg.write(hdrs.data(), hdrs.size());
 }
@@ -536,23 +532,20 @@ void Session::starttls()
 // the client on failure, and return false.  The exception is the very
 // bad recipient list that exits right away.
 
-bool Session::verify_client_(std::string const& client_identity)
+bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (IP4::is_bracket_address(client_identity)) {
+  if (IP4::is_bracket_address(client_identity.ascii())) {
     LOG(ERROR) << "need domain name not " << client_identity;
     out() << "421 4.7.1 need domain name\r\n" << std::flush;
     return false;
   }
 
   // Bogus clients claim to be us or some local host.
-  if (Domain::match(client_identity, our_fqdn_)
-      || Domain::match(client_identity, "localhost")
-      || Domain::match(client_identity, "localhost.localdomain")
-      || Domain::match(client_identity, "[127.0.0.1]")) {
+  if ((client_identity == our_fqdn_) || (client_identity == "localhost")
+      || (client_identity == "localhost.localdomain")) {
 
-    if (!Domain::match(our_fqdn_, fcrdns_)
-        && strcmp(sock_.them_c_str(), "127.0.0.1")) {
+    if ((our_fqdn_ != fcrdns_) && strcmp(sock_.them_c_str(), "127.0.0.1")) {
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       out() << "550 5.7.1 liar\r\n" << std::flush;
@@ -561,7 +554,7 @@ bool Session::verify_client_(std::string const& client_identity)
   }
 
   std::vector<std::string> labels;
-  boost::algorithm::split(labels, client_identity,
+  boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
@@ -572,19 +565,28 @@ bool Session::verify_client_(std::string const& client_identity)
   }
 
   CDB black("black");
-  if (black.lookup(client_identity)) {
+  if (black.lookup(client_identity.ascii())) {
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
+               << client_ << " claiming " << client_identity.ascii();
     out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
+  }
+  else if (client_identity.ascii() != client_identity.utf8()) {
+    if (black.lookup(client_identity.utf8())) {
+      LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity.utf8();
+      out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
+      return false;
+    }
   }
   else {
     LOG(INFO) << "unblack client identity " << client_identity;
   }
 
-  char const* tld = tld_db_.get_registered_domain(client_identity.c_str());
+  char const* tld
+      = tld_db_.get_registered_domain(client_identity.ascii().c_str());
   if (!tld) {
-    tld = client_identity.c_str();
+    tld = client_identity.ascii().c_str();
   }
   else {
     if (black.lookup(tld)) {
@@ -598,12 +600,12 @@ bool Session::verify_client_(std::string const& client_identity)
     }
   }
 
-  // At this point, check whois for tld, if it's less than 48 hours
-  // old, we may want to take action.
+  // At this point, we might check whois for tld, if it's less than 48
+  // hours old, we may want to take action.
 
   // Log this client
   if (sock_.has_peername()) {
-    if (Domain::match(fcrdns_, client_identity)) {
+    if (fcrdns_ == client_identity) {
       LOG(INFO) << protocol_ << " connection from " << client_;
     }
     else {
@@ -627,14 +629,14 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   auto accepted_domain = false;
   for (const auto d : Config::accept_domains) {
-    if (Domain::match(recipient.domain(), d)) {
+    if (recipient.domain() == d) {
       accepted_domain = true;
       break;
     }
   }
 
   // Make sure the domain matches.
-  if (!accepted_domain && !Domain::match(recipient.domain(), our_fqdn_)
+  if (!accepted_domain && (recipient.domain() != our_fqdn_)
       && !(recipient.domain() == "["s + sock_.us_c_str() + "]"s)) {
     out() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for " << recipient;
@@ -657,7 +659,7 @@ bool Session::verify_sender_(Mailbox const& sender)
 {
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
-  if (!Domain::match(sender.domain(), fcrdns_)) {
+  if (sender.domain() != fcrdns_) {
     if (!verify_sender_domain_(sender.domain()))
       return false;
   }
@@ -670,7 +672,7 @@ bool Session::verify_sender_(Mailbox const& sender)
   return reverse_path_verified_ = true;
 }
 
-bool Session::verify_sender_domain_(std::string const& sender)
+bool Session::verify_sender_domain_(Domain const& sender)
 {
   if (sender.empty()) {
     // MAIL FROM:<>
@@ -678,7 +680,7 @@ bool Session::verify_sender_domain_(std::string const& sender)
     return true;
   }
 
-  std::string domain = sender;
+  std::string domain = sender.ascii();
   std::transform(domain.begin(), domain.end(), domain.begin(), ::tolower);
 
   // Break sender domain into labels:
@@ -768,11 +770,11 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  SPF::Server spf_srv(our_fqdn_.c_str());
+  SPF::Server spf_srv(our_fqdn_.ascii().c_str());
   SPF::Request spf_req(spf_srv);
 
   spf_req.set_ipv4_str(sock_.them_c_str());
-  spf_req.set_helo_dom(client_identity_.c_str());
+  spf_req.set_helo_dom(client_identity_.ascii().c_str());
 
   auto from = boost::lexical_cast<std::string>(sender);
 
