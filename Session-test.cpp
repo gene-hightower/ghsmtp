@@ -17,9 +17,9 @@ struct Session_test {
     Session sess(STDIN_FILENO, fd_null, "example.com");
 
     LOG(ERROR) << "Expect: 3 invalid sender domains:";
-    CHECK(!sess.verify_sender_domain_("com"));
-    CHECK(!sess.verify_sender_domain_("zzux.com"));
-    CHECK(!sess.verify_sender_domain_("blogspot.com.ar"));
+    CHECK(!sess.verify_sender_domain_(Domain("com")));
+    CHECK(!sess.verify_sender_domain_(Domain("zzux.com")));
+    CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar")));
   }
 };
 
