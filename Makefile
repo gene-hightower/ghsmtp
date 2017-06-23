@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := ldns libcurl libidn opendkim openssl
+USES := ldns libcurl libidn2 opendkim openssl
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
@@ -26,7 +26,8 @@ LDLIBS += \
 	-lglog \
 	-lopendmarc \
 	-lregdom \
-	-lspf2
+	-lspf2 \
+	-lunistring
 
 PROGRAMS := smtp msg
 

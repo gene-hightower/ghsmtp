@@ -33,20 +33,25 @@ int main(int argc, char const* argv[])
   Domain dom3{"xn--5rtw95l.xn--wgv71a"};
   CHECK_EQ(dom2, dom3);
 
+  Domain poop1{"💩.la"};
+  Domain poop2{"xn--ls8h.la"};
+  CHECK_EQ(poop1, poop2);
+
   Domain norm0{"hi⒌com"};
   Domain norm1{"hi5.com"};
   CHECK_EQ(norm0, norm1);
 
   try {
     Domain junk{"$?%^&*("};
-    LOG(FATAL) << "should have thrown";
+    // idn2 allows this
+    // LOG(FATAL) << "should have thrown";
   }
   catch (std::exception const& ex) {
     // std::cout << ex.what() << '\n';
   }
 
   try {
-    Domain junk{"[127.0.0.1]"};
+    Domain ip_addr{"[127.0.0.1]"};
   }
   catch (std::exception const& ex) {
     LOG(FATAL) << "should not throw " << ex.what();

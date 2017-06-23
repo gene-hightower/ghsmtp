@@ -2,14 +2,15 @@
 #define DOMAIN_DOT_HPP
 
 #include <boost/algorithm/string/predicate.hpp>
+
 #include <experimental/string_view>
 
 class Domain {
 public:
   Domain() = default;
-  Domain(char const* dom);
+  Domain(std::experimental::string_view dom);
 
-  void set(char const* dom);
+  void set(std::experimental::string_view dom);
   void clear();
   bool empty() const { return ascii_.empty() && utf8_.empty(); }
 
