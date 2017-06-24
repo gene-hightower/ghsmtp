@@ -26,8 +26,8 @@ public:
                    std::string fqdn = "");
 
   void greeting();
-  void ehlo(std::string client_identity);
-  void helo(std::string client_identity);
+  void ehlo(std::experimental::string_view client_identity);
+  void helo(std::experimental::string_view client_identity);
   void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 

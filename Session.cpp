@@ -145,12 +145,12 @@ void Session::greeting()
   LOG(INFO) << "connect from " << client_;
 }
 
-void Session::ehlo(std::string client_identity)
+void Session::ehlo(std::experimental::string_view client_identity)
 {
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
 
   reset_();
-  client_identity_.set(client_identity.c_str());
+  client_identity_.set(client_identity);
 
   if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
@@ -186,12 +186,12 @@ void Session::ehlo(std::string client_identity)
   out() << "250 SMTPUTF8\r\n" << std::flush;
 }
 
-void Session::helo(std::string client_identity)
+void Session::helo(std::experimental::string_view client_identity)
 {
   protocol_ = "SMTP";
 
   reset_();
-  client_identity_.set(client_identity.c_str());
+  client_identity_.set(client_identity);
 
   if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",

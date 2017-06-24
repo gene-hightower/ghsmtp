@@ -15,6 +15,8 @@ using namespace tao::pegtl::alphabet;
 
 using namespace std::string_literals;
 
+using std::experimental::string_view;
+
 namespace Config {
 constexpr std::streamsize max_bfr_size = 64 * 1024;
 constexpr std::streamsize max_chunk_size = max_msg_size;
@@ -525,9 +527,9 @@ struct action<helo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    // +5 for the length of "HELO ", -2 for the CRLF
-    auto dom = std::string(in.begin() + 5, in.end() - 2);
-    ctx.session.helo(dom);
+    auto beg = in.begin() + 5; // +5 for the length of "HELO "
+    auto end = in.end() - 2;   // -2 for the CRLF
+    ctx.session.helo(string_view(beg, end - beg));
     ctx.bdat_rset();
   }
 };
@@ -537,9 +539,9 @@ struct action<ehlo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    // +5 for the length of "EHLO ", -2 for the CRLF
-    auto dom = std::string(in.begin() + 5, in.end() - 2);
-    ctx.session.ehlo(dom);
+    auto beg = in.begin() + 5; // +5 for the length of "EHLO "
+    auto end = in.end() - 2;   // -2 for the CRLF
+    ctx.session.ehlo(string_view(beg, end - beg));
     ctx.bdat_rset();
   }
 };
