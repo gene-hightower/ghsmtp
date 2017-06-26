@@ -830,7 +830,7 @@ struct action<starttls> {
 
 template <>
 struct action<quit> {
-  static void apply0(Ctx& ctx) { ctx.session.quit(); }
+  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.quit(); }
 };
 }
 
