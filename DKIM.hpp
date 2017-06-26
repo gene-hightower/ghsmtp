@@ -1,10 +1,9 @@
 #ifndef DKIM_DOT_HPP
 #define DKIM_DOT_HPP
 
-#include <cstdbool>
-
 #include <experimental/string_view>
 
+#define _Bool bool
 #include <dkim.h>
 
 #include <glog/logging.h>
