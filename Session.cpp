@@ -522,6 +522,7 @@ void Session::starttls()
   else {
     out() << "220 2.0.0 go for TLS\r\n" << std::flush;
     sock_.starttls();
+    reset_();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
 }
@@ -590,8 +591,7 @@ bool Session::verify_client_(Domain const& client_identity)
   }
   else {
     if (black.lookup(tld)) {
-      LOG(ERROR) << "blacklisted TLD" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
+      LOG(ERROR) << "blacklisted TLD " << tld;
       out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
       return false;
     }
