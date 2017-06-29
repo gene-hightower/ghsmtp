@@ -536,11 +536,12 @@ void Session::starttls()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (IP4::is_address_literal(client_identity.ascii())) {
-    LOG(ERROR) << "need domain name not " << client_identity;
-    out() << "421 4.7.1 need domain name\r\n" << std::flush;
-    return false;
-  }
+  // This is not so sketchy, maybe…
+  // if (IP4::is_address_literal(client_identity.ascii())) {
+  //   LOG(ERROR) << "need domain name not " << client_identity;
+  //   out() << "421 4.7.1 need domain name\r\n" << std::flush;
+  //   return false;
+  // }
 
   // Bogus clients claim to be us or some local host.
   if ((client_identity == our_fqdn_) || (client_identity == "localhost")
