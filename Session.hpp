@@ -45,7 +45,9 @@ public:
   void vrfy();
   void help();
   void quit() __attribute__((noreturn));
-  void error(std::experimental::string_view msg);
+  void error(std::experimental::string_view loc_msg,
+             std::experimental::string_view rem_msg = "");
+
   void time_out() __attribute__((noreturn));
   void starttls();
 

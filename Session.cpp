@@ -500,10 +500,15 @@ void Session::quit()
   std::exit(EXIT_SUCCESS);
 }
 
-void Session::error(std::experimental::string_view m)
+void Session::error(std::experimental::string_view loc_msg,
+                    std::experimental::string_view rem_msg)
 {
-  out() << "502 5.5.1 command unrecognized\r\n" << std::flush;
-  LOG(ERROR) << "Session::error: " << m;
+  std::experimental::string_view rem = rem_msg;
+  if (rem.empty()) {
+    rem = "502 5.5.1 command unrecognized";
+  }
+  out() << rem << "\r\n" << std::flush;
+  LOG(ERROR) << "Session::error: " << loc_msg;
 }
 
 void Session::time_out()
