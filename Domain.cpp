@@ -1,5 +1,6 @@
 #include "Domain.hpp"
 #include "IP4.hpp"
+#include "IP6.hpp"
 
 #include <idn2.h>
 #include <uninorm.h>
@@ -22,7 +23,7 @@ std::string nfkc(std::experimental::string_view str)
 
 void Domain::set(std::experimental::string_view dom)
 {
-  if (IP4::is_address_literal(dom)) {
+  if (IP4::is_address_literal(dom) || IP6::is_address_literal(dom)) {
     ascii_ = std::string(dom.data(), dom.length());
     utf8_ = std::string(dom.data(), dom.length());
     return;
