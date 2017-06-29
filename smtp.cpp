@@ -766,8 +766,9 @@ struct data_action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("garbage in data stream: \""s + in.string() + "\""s,
-                      "554 5.6.11 malformed data/bare LF, see <https://cr.yp.to/docs/smtplf.html>"s);
+    ctx.session.error(
+        "garbage in data stream: \""s + in.string() + "\""s,
+        "554 5.6.11 malformed data/bare LF, see <https://cr.yp.to/docs/smtplf.html>"s);
   }
 };
 
