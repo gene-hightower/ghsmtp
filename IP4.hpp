@@ -31,7 +31,7 @@ inline bool is_address(std::experimental::string_view addr)
   return regex_match(addr.begin(), addr.end(), matches, re);
 }
 
-inline bool is_bracket_address(std::experimental::string_view addr)
+inline bool is_address_literal(std::experimental::string_view addr)
 {
   using namespace boost::xpressive;
 
