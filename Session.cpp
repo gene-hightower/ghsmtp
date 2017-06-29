@@ -555,6 +555,9 @@ bool Session::verify_client_(Domain const& client_identity)
     }
   }
 
+  std::string cid_lc = client_identity.ascii();
+  std::transform(cid_lc.begin(), cid_lc.end(), cid_lc.begin(), ::tolower);
+
   std::vector<std::string> labels;
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
@@ -567,9 +570,9 @@ bool Session::verify_client_(Domain const& client_identity)
   }
 
   CDB black("black");
-  if (black.lookup(client_identity.ascii())) {
+  if (black.lookup(cid_lc)) {
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity.ascii();
+               << client_ << " claiming " << cid_lc;
     out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -587,10 +590,7 @@ bool Session::verify_client_(Domain const& client_identity)
 
   char const* tld
       = tld_db_.get_registered_domain(client_identity.ascii().c_str());
-  if (!tld) {
-    tld = client_identity.ascii().c_str();
-  }
-  else {
+  if (tld) {
     if (black.lookup(tld)) {
       LOG(ERROR) << "blacklisted TLD " << tld;
       out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
@@ -600,9 +600,6 @@ bool Session::verify_client_(Domain const& client_identity)
       LOG(INFO) << "unblack TLD " << tld;
     }
   }
-
-  // At this point, we might check whois for tld, if it's less than 48
-  // hours old, we may want to take action.
 
   // Log this client
   if (sock_.has_peername()) {
@@ -681,34 +678,39 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return true;
   }
 
-  std::string domain = sender.ascii();
-  std::transform(domain.begin(), domain.end(), domain.begin(), ::tolower);
+  std::string sndr_lc = sender.ascii();
+  std::transform(sndr_lc.begin(), sndr_lc.end(), sndr_lc.begin(), ::tolower);
 
   // Break sender domain into labels:
 
   std::vector<std::string> labels;
-  boost::algorithm::split(labels, domain, boost::algorithm::is_any_of("."));
+  boost::algorithm::split(labels, sndr_lc, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    out() << "550 5.7.1 invalid sender domain " << domain << "\r\n"
+    out() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
           << std::flush;
-    LOG(ERROR) << "sender \"" << domain << "\" invalid syntax";
+    LOG(ERROR) << "sender \"" << sndr_lc << "\" invalid syntax";
     return false;
   }
 
   CDB white("white");
-  if (white.lookup(domain)) {
-    LOG(INFO) << "sender \"" << domain << "\" whitelisted";
+  if (white.lookup(sndr_lc)) {
+    LOG(INFO) << "sender \"" << sndr_lc << "\" whitelisted";
     return true;
+  }
+  else if (sender.ascii() != sender.utf8()) {
+    if (white.lookup(sender.utf8())) {
+      LOG(INFO) << "sender \"" << sender.utf8() << "\" whitelisted";
+      return true;
+    }
   }
 
-  auto tld = tld_db_.get_registered_domain(domain.c_str());
-  if (!tld) {
-    tld = domain.c_str();
-  }
-  if (white.lookup(tld)) {
-    LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";
-    return true;
+  auto tld = tld_db_.get_registered_domain(sndr_lc.c_str());
+  if (tld) {
+    if (white.lookup(tld)) {
+      LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";
+      return true;
+    }
   }
 
   // Based on <http://www.surbl.org/guidelines>
