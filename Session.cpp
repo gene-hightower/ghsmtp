@@ -11,6 +11,7 @@
 #include "DNS.hpp"
 #include "Domain.hpp"
 #include "IP4.hpp"
+#include "IP6.hpp"
 #include "Message.hpp"
 #include "SPF.hpp"
 #include "Session.hpp"
@@ -83,50 +84,81 @@ void Session::greeting()
 
     using namespace DNS;
     Resolver res;
+    std::string reversed;
 
-    // "0.1.2.3" => "3.2.1.0."
-    std::string reversed{IP4::reverse(sock_.them_c_str())};
+    if (IP4::is_address(sock_.them_c_str())) {
+      // "0.1.2.3" => "3.2.1.0."
+      reversed = IP4::reverse(sock_.them_c_str());
 
-    // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
+      // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
-    // The reverse part, check PTR records.
-    std::vector<std::string> ptrs
-        = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
+      // The reverse part, check PTR records.
+      std::vector<std::string> ptrs
+          = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
-    char const* them = sock_.them_c_str();
+      char const* them = sock_.them_c_str();
 
-    auto ptr = std::find_if(
-        ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
-          // The forward part, check each PTR for matching A record.
-          std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
-          return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
-        });
+      auto ptr = std::find_if(
+          ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
+            // The forward part, check each PTR for matching A record.
+            std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
+            return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
+          });
 
-    if (ptr != ptrs.end()) {
-      fcrdns_ = *ptr;
-      client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
-      // LOG(INFO) << "connect from " << fcrdns_;
-    }
-    else {
-      client_ = std::string("unknown [") + sock_.them_c_str() + "]";
-    }
-
-    CDB white("ip-white");
-    if (white.lookup(sock_.them_c_str())) {
-      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
-      ip_whitelisted_ = true;
-    }
-    else {
-      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-      for (const auto& rbl : Config::rbls) {
-        if (has_record<RR_type::A>(res, reversed + rbl)) {
-          syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
-                 sock_.them_c_str(), rbl);
-          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
-          std::exit(EXIT_SUCCESS);
-        }
+      if (ptr != ptrs.end()) {
+        fcrdns_ = *ptr;
+        client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
+        // LOG(INFO) << "connect from " << fcrdns_;
       }
-      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
+      else {
+        client_ = std::string("unknown [") + sock_.them_c_str() + "]";
+      }
+    }
+    else if (IP6::is_address(sock_.them_c_str())) {
+      reversed = IP6::reverse(sock_.them_c_str());
+
+      // The reverse part, check PTR records.
+      std::vector<std::string> ptrs
+          = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
+
+      char const* them = sock_.them_c_str();
+
+      auto ptr = std::find_if(
+          ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
+            // The forward part, check each PTR for matching AAAA record.
+            std::vector<std::string> addrs = get_records<RR_type::AAAA>(res, s);
+            return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
+          });
+
+      if (ptr != ptrs.end()) {
+        fcrdns_ = *ptr;
+        client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
+        // LOG(INFO) << "connect from " << fcrdns_;
+      }
+      else {
+        client_ = std::string("unknown [") + sock_.them_c_str() + "]";
+      }
+    }
+
+    if (!reversed.empty()) {
+      CDB white("ip-white");
+      if (white.lookup(sock_.them_c_str())) {
+        LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+        ip_whitelisted_ = true;
+      }
+      else if (IP4::is_address(sock_.them_c_str())) {
+        // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+        for (const auto& rbl : Config::rbls) {
+          if (has_record<RR_type::A>(res, reversed + rbl)) {
+            syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
+                   sock_.them_c_str(), rbl);
+            out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
+            std::exit(EXIT_SUCCESS);
+          }
+        }
+        // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
+        // blacklisted";
+      }
     }
 
     // Wait a bit of time for pre-greeting traffic.
@@ -566,12 +598,10 @@ void Session::starttls()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  // This is not so sketchy, maybe…
-  // if (IP4::is_address_literal(client_identity.ascii())) {
-  //   LOG(ERROR) << "need domain name not " << client_identity;
-  //   out() << "421 4.7.1 need domain name\r\n" << std::flush;
-  //   return false;
-  // }
+  if (IP4::is_address_literal(client_identity.ascii())
+      || IP6::is_address_literal(client_identity.ascii())) {
+    return true;
+  }
 
   // Bogus clients claim to be us or some local host.
   if ((client_identity == our_fqdn_) || (client_identity == "localhost")
