@@ -147,10 +147,10 @@ void Session::greeting()
 
 void Session::ehlo(std::experimental::string_view client_identity)
 {
-  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
-  extensions_ = true;
-
   reset_();
+
+  extensions_ = true;
+  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_.set(client_identity);
 
   if (!verify_client_(client_identity_)) {
@@ -189,10 +189,10 @@ void Session::ehlo(std::experimental::string_view client_identity)
 
 void Session::helo(std::experimental::string_view client_identity)
 {
-  protocol_ = sock_.tls() ? "ESMTPS" : "SMTP";
-  extensions_ = false;
-
   reset_();
+
+  extensions_ = false;
+  protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
   client_identity_.set(client_identity);
 
   if (!verify_client_(client_identity_)) {
