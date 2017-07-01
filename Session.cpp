@@ -621,13 +621,15 @@ bool Session::verify_client_(Domain const& client_identity)
   char const* tld
       = tld_db_.get_registered_domain(client_identity.ascii().c_str());
   if (tld) {
-    if (black.lookup(tld)) {
-      LOG(ERROR) << "blacklisted TLD " << tld;
-      out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
-      return false;
-    }
-    else {
-      LOG(INFO) << "unblack TLD " << tld;
+    if (!Domain::match(cid_lc, tld)) {
+      if (black.lookup(tld)) {
+        LOG(ERROR) << "blacklisted TLD " << tld;
+        out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
+        return false;
+      }
+      else {
+        LOG(INFO) << "unblack TLD " << tld;
+      }
     }
   }
 
