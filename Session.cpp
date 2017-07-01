@@ -148,6 +148,7 @@ void Session::greeting()
 void Session::ehlo(std::experimental::string_view client_identity)
 {
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
+  extensions_ = true;
 
   reset_();
   client_identity_.set(client_identity);
@@ -188,7 +189,15 @@ void Session::ehlo(std::experimental::string_view client_identity)
 
 void Session::helo(std::experimental::string_view client_identity)
 {
+  if (sock_.tls()) {
+    out() << "503 5.5.1 can't use 'HELO' after 'EHLO'\r\n" << std::flush;
+    LOG(WARNING) << "use of 'HELO' after 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  }
+
   protocol_ = "SMTP";
+  extensions_ = false;
 
   reset_();
   client_identity_.set(client_identity);
@@ -210,6 +219,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
+
+  bool smtputf8 = false;
 
   // Take a look at the optional parameters:
   for (auto const& p : parameters) {
@@ -237,6 +248,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       if (!val.empty()) {
         LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
       }
+      smtputf8 = true;
     }
     else if (name == "SIZE") {
       if (val.empty()) {
@@ -268,6 +280,17 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   reset_();
+  if (smtputf8) {
+    protocol_ = sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
+  }
+  else {
+    if (extensions_) {
+      protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
+    }
+    else {
+      protocol_ = "SMTP";
+    }
+  }
 
   auto sender = static_cast<std::string>(reverse_path);
 
@@ -525,10 +548,16 @@ void Session::starttls()
     LOG(ERROR) << "STARTTLS issued with TLS already active";
   }
   else {
-    out() << "220 2.0.0 go for TLS\r\n" << std::flush;
-    sock_.starttls();
-    reset_();
-    LOG(INFO) << "STARTTLS " << sock_.tls_info();
+    if (extensions_) {
+      out() << "220 2.0.0 go for TLS\r\n" << std::flush;
+      sock_.starttls();
+      reset_();
+      LOG(INFO) << "STARTTLS " << sock_.tls_info();
+    }
+    else {
+      out() << "554 5.5.1 TLS not supported\r\n" << std::flush;
+      LOG(ERROR) << "STARTTLS issued with no EHLO";
+    }
   }
 }
 

@@ -65,7 +65,9 @@ private:
   {
     reverse_path_.clear();
     forward_path_.clear();
+    protocol_ = "";
     binarymime_ = false;
+    extensions_ = false;
     reverse_path_verified_ = false;
   }
 
@@ -95,6 +97,7 @@ private:
   TLD tld_db_;
 
   bool binarymime_{false};
+  bool extensions_{false};
   bool ip_whitelisted_{false};
   bool reverse_path_verified_{false};
 };
