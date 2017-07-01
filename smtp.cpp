@@ -18,9 +18,10 @@ using namespace std::string_literals;
 using std::experimental::string_view;
 
 namespace Config {
-constexpr std::streamsize max_bfr_size = 64 * 1024;
+constexpr std::streamsize bfr_size = 4 * 1024;
+constexpr std::streamsize max_xfer_size = 64 * 1024;
 constexpr std::streamsize max_chunk_size = max_msg_size;
-constexpr std::streamsize hdr_max = 16 * 1024;
+constexpr std::streamsize max_hdr_size = 16 * 1024;
 }
 
 namespace RFC5321 {
@@ -73,7 +74,7 @@ struct Ctx {
       LOG(ERROR) << "may not have whole header";
       return false;
     }
-    if (hdr.size() > Config::hdr_max) {
+    if (hdr.size() > Config::max_hdr_size) {
       LOG(ERROR) << "header size too large";
       return false;
     }
@@ -348,7 +349,7 @@ struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
 struct data_line : sor<data_blank, data_dot, data_plain> {
 };
 
-struct anything_else : seq<rep_min_max<1, 4 * 1024, any>, eof> {
+struct anything_else : seq<rep_min_max<1, Config::bfr_size, any>, eof> {
 };
 
 struct data_grammar
@@ -642,7 +643,7 @@ void bdat_act(Ctx& ctx)
   std::streamsize to_xfer = ctx.chunk_size;
 
   while (to_xfer) {
-    auto xfer_sz = std::min(to_xfer, Config::max_bfr_size);
+    auto xfer_sz = std::min(to_xfer, Config::max_xfer_size);
     bfr.resize(xfer_sz);
 
     ctx.session.in().read(&bfr[0], xfer_sz);
@@ -650,7 +651,7 @@ void bdat_act(Ctx& ctx)
 
     if (!ctx.hdr_end) {
       auto e = bfr.find("\r\n\r\n");
-      if (ctx.hdr.size() < Config::hdr_max) {
+      if (ctx.hdr.size() < Config::max_hdr_size) {
         ctx.hdr += bfr.substr(0, e);
         if (e == std::string::npos) {
           LOG(WARNING) << "may not have all headers in this chunk";
@@ -745,7 +746,7 @@ struct data_action<data_plain> {
     size_t len = in.end() - in.begin();
     ctx.msg->write(in.begin(), len);
     if (!ctx.hdr_end) {
-      if (ctx.hdr.size() < Config::hdr_max) {
+      if (ctx.hdr.size() < Config::max_hdr_size) {
         ctx.hdr.append(in.begin(), len);
       }
     }
@@ -761,8 +762,8 @@ struct data_action<data_dot> {
     ctx.msg->write(in.begin() + 1, len);
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
-      if (ctx.hdr.size() < Config::hdr_max) {
-        auto hlen = std::min(len, Config::hdr_max - ctx.hdr.size());
+      if (ctx.hdr.size() < Config::max_hdr_size) {
+        auto hlen = std::min(len, Config::max_hdr_size - ctx.hdr.size());
         std::copy_n(in.begin() + 1, hlen, std::back_inserter(ctx.hdr));
       }
     }
@@ -786,7 +787,8 @@ struct action<data> {
     if (ctx.session.data_start()) {
       ctx.new_msg();
 
-      istream_input<eol::crlf> data_in(ctx.session.in(), 4 * 1024, "data");
+      istream_input<eol::crlf> data_in(ctx.session.in(), Config::bfr_size,
+                                       "data");
 
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
@@ -854,7 +856,7 @@ int main(int argc, char const* argv[])
 
   ctx.session.in().unsetf(std::ios::skipws);
 
-  istream_input<eol::crlf> in(ctx.session.in(), 4 * 1024, "session");
+  istream_input<eol::crlf> in(ctx.session.in(), Config::bfr_size, "session");
 
   try {
     if (!parse<RFC5321::grammar, RFC5321::action>(in, ctx)) {
