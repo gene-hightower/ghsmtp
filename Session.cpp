@@ -132,11 +132,11 @@ void Session::greeting()
 
       if (ptr != ptrs.end()) {
         fcrdns_ = *ptr;
-        client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
+        client_ = fcrdns_.utf8() + " [IPv6:" + sock_.them_c_str() + "]";
         // LOG(INFO) << "connect from " << fcrdns_;
       }
       else {
-        client_ = std::string("unknown [") + sock_.them_c_str() + "]";
+        client_ = std::string("unknown [IPv6:") + sock_.them_c_str() + "]";
       }
     }
 
@@ -598,8 +598,7 @@ void Session::starttls()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (IP4::is_address_literal(client_identity.ascii())
-      || IP6::is_address_literal(client_identity.ascii())) {
+  if (client_identity.is_address_literal()) {
     return true;
   }
 

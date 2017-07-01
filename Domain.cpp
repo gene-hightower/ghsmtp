@@ -23,10 +23,16 @@ std::string nfkc(std::experimental::string_view str)
 
 void Domain::set(std::experimental::string_view dom)
 {
-  if (IP4::is_address_literal(dom) || IP6::is_address_literal(dom)) {
-    ascii_ = std::string(dom.data(), dom.length());
-    utf8_ = std::string(dom.data(), dom.length());
-    return;
+  if ((dom.front() == '[') && (dom.back() == ']')) {
+    auto lit = dom;
+    lit.remove_prefix(1);
+    lit.remove_suffix(1);
+    if (IP4::is_address_literal(lit) || IP6::is_address_literal(lit)) {
+      ascii_ = std::string(dom.data(), dom.length());
+      utf8_ = std::string(dom.data(), dom.length());
+      is_address_literal_ = true;
+      return;
+    }
   }
 
   auto norm = nfkc(dom);
@@ -52,4 +58,5 @@ void Domain::clear()
 {
   ascii_.clear();
   utf8_.clear();
+  is_address_literal_ = false;
 }

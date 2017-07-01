@@ -51,12 +51,16 @@ public:
     return *this;
   }
 
+  bool is_address_literal() const { return is_address_literal_; }
+
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
 private:
   std::string ascii_;
   std::string utf8_;
+
+  bool is_address_literal_{false};
 
   void set_(char const* dom);
 
