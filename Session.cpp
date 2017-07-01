@@ -557,16 +557,10 @@ void Session::starttls()
     LOG(ERROR) << "STARTTLS issued with TLS already active";
   }
   else {
-    if (extensions_) {
-      out() << "220 2.0.0 go for TLS\r\n" << std::flush;
-      sock_.starttls();
-      reset_();
-      LOG(INFO) << "STARTTLS " << sock_.tls_info();
-    }
-    else {
-      out() << "554 5.5.1 TLS not supported\r\n" << std::flush;
-      LOG(ERROR) << "STARTTLS issued with no EHLO";
-    }
+    out() << "220 2.0.0 go for TLS\r\n" << std::flush;
+    sock_.starttls();
+    reset_();
+    LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
 }
 
