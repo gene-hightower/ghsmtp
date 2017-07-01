@@ -309,6 +309,7 @@ struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
                        TAOCPP_PEGTL_ISTRING(" FROM:"),
+                       opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                        reverse_path,
                        opt<seq<SP, mail_parameters>>,
                        CRLF> {
@@ -316,6 +317,7 @@ struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
 
 struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
                      TAOCPP_PEGTL_ISTRING(" TO:"),
+                     opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                      forward_path,
                      opt<seq<SP, rcpt_parameters>>,
                      CRLF> {
