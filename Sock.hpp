@@ -36,8 +36,6 @@ public:
             != nullptr);
         break;
       case sizeof(sockaddr_in6):
-        LOG(WARNING)
-            << "getsockname returned us_addr_len == sizeof(sockaddr_in6)";
         PCHECK(
             inet_ntop(
                 AF_INET6,
@@ -70,8 +68,6 @@ public:
             != nullptr);
         break;
       case sizeof(sockaddr_in6):
-        LOG(WARNING)
-            << "getpeername returned them_addr_len == sizeof(sockaddr_in6)";
         PCHECK(inet_ntop(AF_INET6,
                          &(reinterpret_cast<struct sockaddr_in6*>(&them_addr_)
                                ->sin6_addr),
