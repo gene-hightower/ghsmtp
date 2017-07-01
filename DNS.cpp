@@ -123,6 +123,32 @@ std::vector<std::string> Rrlist<RR_type::A>::get() const
   return ret;
 }
 
+template <>
+std::vector<std::string> Rrlist<RR_type::AAAA>::get() const
+{
+  std::vector<std::string> ret;
+  if (rrlst_) {
+    for (unsigned i = 0; i < rrlst_->_rr_count; ++i) {
+      ldns_rr const* rr = rrlst_->_rrs[i];
+      if (rr) {
+        for (unsigned j = 0; j < rr->_rd_count; ++j) {
+          ldns_rdf const* rdf = rr->_rdata_fields[j];
+          if (rdf->_type == LDNS_RDF_TYPE_AAAA) {
+            char str[INET6_ADDRSTRLEN];
+            PCHECK(inet_ntop(AF_INET6, rdf->_data, str, sizeof str));
+            ret.push_back(str);
+          }
+          else {
+            LOG(WARNING) << "expecting AAAA got:"
+                         << static_cast<unsigned>(rdf->_type);
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
+
 template <RR_type T>
 inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 {

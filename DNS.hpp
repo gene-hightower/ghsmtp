@@ -16,9 +16,11 @@ namespace DNS {
 
 enum class RR_type {
   A = LDNS_RR_TYPE_A,
+  AAAA = LDNS_RR_TYPE_AAAA,
   CNAME = LDNS_RR_TYPE_CNAME,
   PTR = LDNS_RR_TYPE_PTR,
   MX = LDNS_RR_TYPE_MX,
+  TLSA = LDNS_RR_TYPE_TLSA,
   TXT = LDNS_RR_TYPE_TXT,
 };
 
@@ -59,6 +61,7 @@ private:
   ldns_resolver* res_;
 
   friend class Query<RR_type::A>;
+  friend class Query<RR_type::AAAA>;
   friend class Query<RR_type::PTR>;
   friend class Query<RR_type::TXT>;
 };
@@ -80,6 +83,7 @@ private:
   ldns_rdf* drdfp_;
 
   friend class Query<RR_type::A>;
+  friend class Query<RR_type::AAAA>;
   friend class Query<RR_type::PTR>;
   friend class Query<RR_type::TXT>;
 };
