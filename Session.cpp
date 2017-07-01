@@ -189,14 +189,7 @@ void Session::ehlo(std::experimental::string_view client_identity)
 
 void Session::helo(std::experimental::string_view client_identity)
 {
-  if (sock_.tls()) {
-    out() << "503 5.5.1 can't use 'HELO' after 'EHLO'\r\n" << std::flush;
-    LOG(WARNING) << "use of 'HELO' after 'EHLO'"
-                 << (sock_.has_peername() ? " from " : "") << client_;
-    return;
-  }
-
-  protocol_ = "SMTP";
+  protocol_ = sock_.tls() ? "ESMTPS" : "SMTP";
   extensions_ = false;
 
   reset_();
@@ -288,7 +281,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
     }
     else {
-      protocol_ = "SMTP";
+      protocol_ = sock_.tls() ? "SMTPS" : "SMTP";
     }
   }
 
