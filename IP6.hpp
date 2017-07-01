@@ -7,21 +7,9 @@
 
 namespace IP6 {
 
-inline bool is_address(std::experimental::string_view addr)
-{
-  return false;
-}
-
-inline bool is_address_literal(std::experimental::string_view addr)
-{
-  return false;
-}
-
-inline std::string reverse(std::experimental::string_view addr)
-{
-  LOG(FATAL) << "can't reverse IPv6 address yet";
-  return "";
-}
+bool is_address(std::experimental::string_view addr);
+bool is_address_literal(std::experimental::string_view addr);
+std::string reverse(std::experimental::string_view addr);
 }
 
 #endif // IP4_DOT_HPP
