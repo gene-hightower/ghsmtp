@@ -32,7 +32,6 @@ constexpr char const* const bad_recipients[] = {
 };
 
 constexpr char const* const bad_senders[] = {
-    "",
 };
 
 constexpr char const* const rbls[] = {
