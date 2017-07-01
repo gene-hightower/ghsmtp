@@ -301,7 +301,10 @@ struct string : sor<quoted_string, atom> {
 struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"), SP, domain, CRLF> {
 };
 
-struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"), SP, domain, CRLF> {
+struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
+                  SP,
+                  sor<domain, address_literal>,
+                  CRLF> {
 };
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
