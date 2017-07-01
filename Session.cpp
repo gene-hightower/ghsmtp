@@ -462,22 +462,15 @@ void Session::data_size_error(Message& msg)
   LOG(WARNING) << "DATA size error";
 }
 
-void Session::data_error(Message& msg)
-{
-  msg.trash();
-  out() << "550 5.3.5 system error\r\n" << std::flush;
-  LOG(WARNING) << "DATA error";
-}
-
 bool Session::bdat_start()
 {
   if (!reverse_path_verified_) {
-    out() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
+    out() << "503 5.5.1 need 'MAIL FROM' before 'BDAT'\r\n" << std::flush;
     LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    out() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
+    out() << "503 5.5.1 need 'RCPT TO' before 'BDAT'\r\n" << std::flush;
     LOG(ERROR) << "no valid recipients";
     return false;
   }
@@ -487,6 +480,13 @@ bool Session::bdat_start()
 void Session::bdat_msg(Message& msg, size_t n)
 {
   out() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
+}
+
+void Session::bdat_error(Message& msg)
+{
+  msg.trash();
+  out() << "550 5.3.5 system error\r\n" << std::flush;
+  LOG(WARNING) << "DATA error";
 }
 
 void Session::rset()
@@ -523,15 +523,24 @@ void Session::quit()
   std::exit(EXIT_SUCCESS);
 }
 
-void Session::error(std::experimental::string_view loc_msg,
-                    std::experimental::string_view rem_msg)
+void Session::error(std::experimental::string_view log_msg)
 {
-  std::experimental::string_view rem = rem_msg;
-  if (rem.empty()) {
-    rem = "502 5.5.1 command unrecognized";
-  }
-  out() << rem << "\r\n" << std::flush;
-  LOG(ERROR) << "Session::error: " << loc_msg;
+  out() << "550 5.3.5 system error\r\n" << std::flush;
+  LOG(ERROR) << log_msg;
+}
+
+void Session::cmd_unrecognized(std::experimental::string_view log_msg)
+{
+  out() << "502 5.5.1 command unrecognized\r\n" << std::flush;
+  LOG(ERROR) << log_msg;
+}
+
+void Session::bare_lf(std::experimental::string_view log_msg)
+{
+  out() << "554 5.6.11 malformed data/bare LF, see "
+           "<https://cr.yp.to/docs/smtplf.html>\r\n"
+        << std::flush;
+  LOG(ERROR) << "Session::bare_lf: " << log_msg;
 }
 
 void Session::time_out()

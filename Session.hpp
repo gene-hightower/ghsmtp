@@ -35,18 +35,19 @@ public:
   void data_msg(Message& msg);
   void data_msg_done(Message& msg);
   void data_size_error(Message& msg);
-  void data_error(Message& msg);
 
   bool bdat_start();
   void bdat_msg(Message& msg, size_t n);
+  void bdat_error(Message& msg);
 
   void rset();
   void noop();
   void vrfy();
   void help();
   void quit() __attribute__((noreturn));
-  void error(std::experimental::string_view loc_msg,
-             std::experimental::string_view rem_msg = "");
+  void error(std::experimental::string_view log_msg);
+  void cmd_unrecognized(std::experimental::string_view log_msg);
+  void bare_lf(std::experimental::string_view log_msg);
 
   void time_out() __attribute__((noreturn));
   void starttls();

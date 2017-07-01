@@ -435,7 +435,7 @@ struct action<bogus_cmd_1> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -444,7 +444,7 @@ struct action<bogus_cmd_2> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -453,7 +453,7 @@ struct action<bogus_cmd_3> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -462,7 +462,7 @@ struct action<bogus_cmd> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
   }
 };
 
@@ -471,7 +471,8 @@ struct action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error("garbage in cmd stream: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("garbage in cmd stream: \""s + in.string()
+                                 + "\""s);
   }
 };
 
@@ -589,23 +590,29 @@ void bdat_act(Ctx& ctx)
   LOG(INFO) << "BDAT " << ctx.chunk_size << (ctx.chunk_last ? " LAST" : "");
 
   if (ctx.chunk_first) {
+    ctx.chunk_first = false;
+
     if (!ctx.session.bdat_start()) {
-      ctx.bdat_error = true;
       // no need to ctx.msg.reset() when bdat_start fails
-      LOG(WARNING) << "bdat_start() returned error!";
+      ctx.bdat_error = true;
+      LOG(ERROR) << "bdat_start() returned error!";
+
+      // seek over BDAT data
+      auto pos = ctx.session.in().tellg();
+      pos += ctx.chunk_size;
+      ctx.session.in().seekg(pos, ctx.session.in().beg);
+
       return;
     }
 
     ctx.new_msg();
-
-    ctx.chunk_first = false;
   }
 
   if (ctx.bdat_error) { // If we've already failed...
     LOG(ERROR) << "BDAT continuing data error, skiping " << ctx.chunk_size
                << " octets";
 
-    ctx.session.data_error(*ctx.msg);
+    ctx.session.bdat_error(*ctx.msg);
 
     // seek over BDAT data
     auto pos = ctx.session.in().tellg();
@@ -677,6 +684,7 @@ void bdat_act(Ctx& ctx)
     }
     ctx.session.data_msg_done(*ctx.msg);
     ctx.msg.reset();
+    ctx.chunk_first = true;
   }
   else {
     ctx.session.bdat_msg(*ctx.msg, ctx.chunk_size);
@@ -766,9 +774,7 @@ struct data_action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.error(
-        "garbage in data stream: \""s + in.string() + "\""s,
-        "554 5.6.11 malformed data/bare LF, see <https://cr.yp.to/docs/smtplf.html>"s);
+    ctx.session.bare_lf("garbage in data stream: \""s + in.string() + "\""s);
   }
 };
 
@@ -785,17 +791,13 @@ struct action<data> {
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
                 in, data_in, ctx)) {
-          LOG(ERROR) << "bad data syntax";
           ctx.session.error("bad data syntax");
         }
-        LOG(INFO) << "good data parse";
         return;
       }
       catch (parse_error const& e) {
-        LOG(ERROR) << e.what();
         ctx.session.error(e.what());
       }
-      LOG(ERROR) << "unknown exception";
       ctx.session.error("unknown data parser problem");
     }
   }
