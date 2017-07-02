@@ -801,10 +801,10 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Server spf_srv(our_fqdn_.ascii().c_str());
   SPF::Request spf_req(spf_srv);
 
-  if (IP4::is_address_literal(sock_.them_address_literal())) {
+  if (IP4::is_address(sock_.them_c_str())) {
     spf_req.set_ipv4_str(sock_.them_c_str());
   }
-  else if (IP6::is_address_literal(sock_.them_address_literal())) {
+  else if (IP6::is_address(sock_.them_c_str())) {
     spf_req.set_ipv6_str(sock_.them_c_str());
   }
   else {
