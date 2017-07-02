@@ -101,11 +101,6 @@ void Session::greeting()
 
       if (ptr != ptrs.end()) {
         fcrdns_ = *ptr;
-        client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
-        // LOG(INFO) << "connect from " << fcrdns_;
-      }
-      else {
-        client_ = "unknown "s + sock_.them_address_literal();
       }
     }
     else if (IP6::is_address(sock_.them_c_str())) {
@@ -126,12 +121,14 @@ void Session::greeting()
 
       if (ptr != ptrs.end()) {
         fcrdns_ = *ptr;
-        client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
-        // LOG(INFO) << "connect from " << fcrdns_;
       }
-      else {
-        client_ = "unknown "s + sock_.them_address_literal();
-      }
+    }
+
+    if (!fcrdns_.empty()) {
+      client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
+    }
+    else {
+      client_ = "unknown "s + sock_.them_address_literal();
     }
 
     CDB white("ip-white");
