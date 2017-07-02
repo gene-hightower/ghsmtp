@@ -125,7 +125,7 @@ void Session::greeting()
     }
 
     if (!fcrdns_.empty()) {
-      client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
+      client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
     }
     else {
       client_ = "unknown "s + sock_.them_address_literal();
