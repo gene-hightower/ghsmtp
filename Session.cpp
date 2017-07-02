@@ -75,11 +75,6 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    // LOG(INFO) << "connect from " << sock_.them_c_str();
-
-    // This is just a teaser, the first line of a multi-line response.
-    out() << "220-" << our_fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
-
     using namespace DNS;
     Resolver res;
     std::string reversed;
