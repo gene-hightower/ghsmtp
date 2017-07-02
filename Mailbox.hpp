@@ -17,16 +17,7 @@ public:
     , domain_str_{std::move(domain)}
   {
     boost::to_lower(domain_str_);
-    // if not an address literal
-    if ((domain_str_.front() != '[') && (domain_str_.back() != ']')) {
-      try {
-        domain_.set(domain_str_.c_str());
-        domain_str_ = domain_.utf8();
-      }
-      catch (std::exception const& ex) {
-        // ignore...
-      }
-    }
+    domain_.set(domain_str_.c_str());
   }
   void clear()
   {
