@@ -59,6 +59,10 @@ public:
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv4_str(req_, ipv4));
   }
+  void set_ipv6_str(char const* ipv6)
+  {
+    CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv6_str(req_, ipv6));
+  }
   void set_helo_dom(char const* dom)
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_helo_dom(req_, dom));
