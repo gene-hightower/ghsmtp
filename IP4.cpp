@@ -75,7 +75,7 @@ std::string fcrdns(char const* addr)
 
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
-  auto reversed = IP4::reverse(addr);
+  auto reversed = reverse(addr);
 
   // The reverse part, check PTR records.
   auto ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
