@@ -47,7 +47,8 @@ struct ipv6_address : sor<seq<                                          rep<6, h
                           seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 // clang-format on
 
-struct ipv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address> {
+struct ipv6_address_literal
+    : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
 };
 
 bool is_address(std::experimental::string_view addr)
