@@ -172,7 +172,6 @@ void Session::greeting()
 void Session::ehlo(std::experimental::string_view client_identity)
 {
   reset_();
-
   extensions_ = true;
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_.set(client_identity);
@@ -184,37 +183,38 @@ void Session::ehlo(std::experimental::string_view client_identity)
   }
 
   out() << "250-" << our_fqdn_ << "\r\n";
-
   // RFC 1870
   out() << "250-SIZE " << Config::max_msg_size << "\r\n";
-
   // RFC 6152
   out() << "250-8BITMIME\r\n";
-
-  // If we're not already TLS, offer TLS
-  if (!sock_.tls()) {
+  if (!sock_.tls()) { // If we're not already TLS, offer TLS
     // RFC 3207
     out() << "250-STARTTLS\r\n";
   }
-
   // RFC 2034
   out() << "250-ENHANCEDSTATUSCODES\r\n";
-
   // RFC 2920
   out() << "250-PIPELINING\r\n";
-
   // RFC 3030
   // out() << "250-BINARYMIME\r\n";
   out() << "250-CHUNKING\r\n";
-
   // RFC 6531
   out() << "250 SMTPUTF8\r\n" << std::flush;
+
+  // Log this client
+  if (sock_.has_peername()) {
+    LOG(INFO) << "EHLO " << client_identity
+              << ((fcrdns_ == client_identity) ? "" : " **unmatched** ")
+              << "from " << client_;
+  }
+  else {
+    LOG(INFO) << "EHLO " << client_identity;
+  }
 }
 
 void Session::helo(std::experimental::string_view client_identity)
 {
   reset_();
-
   extensions_ = false;
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
   client_identity_.set(client_identity);
@@ -226,6 +226,16 @@ void Session::helo(std::experimental::string_view client_identity)
   }
 
   out() << "250 " << our_fqdn_ << "\r\n" << std::flush;
+
+  // Log this client
+  if (sock_.has_peername()) {
+    LOG(INFO) << "HELO " << client_identity
+              << ((fcrdns_ == client_identity) ? "" : " **unmatched** ")
+              << "from " << client_;
+  }
+  else {
+    LOG(INFO) << "HELO " << client_identity;
+  }
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
@@ -660,20 +670,6 @@ bool Session::verify_client_(Domain const& client_identity)
         LOG(INFO) << "unblack TLD " << tld;
       }
     }
-  }
-
-  // Log this client
-  if (sock_.has_peername()) {
-    if (fcrdns_ == client_identity) {
-      LOG(INFO) << protocol_ << " connection from " << client_;
-    }
-    else {
-      LOG(INFO) << protocol_ << " connection from " << client_ << " claiming "
-                << client_identity;
-    }
-  }
-  else {
-    LOG(INFO) << protocol_ << " connection claiming " << client_identity;
   }
 
   return true;
