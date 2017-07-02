@@ -10,6 +10,8 @@
 
 #include "SockBuffer.hpp"
 
+using namespace std::string_literals;
+
 class Sock {
 public:
   Sock(const Sock&) = delete;
@@ -34,6 +36,7 @@ public:
                 &(reinterpret_cast<struct sockaddr_in*>(&us_addr_)->sin_addr),
                 us_addr_str_, sizeof us_addr_str_)
             != nullptr);
+        us_address_literal_ = "["s + us_addr_str_ + "]"s;
         break;
       case sizeof(sockaddr_in6):
         PCHECK(
@@ -42,6 +45,7 @@ public:
                 &(reinterpret_cast<struct sockaddr_in6*>(&us_addr_)->sin6_addr),
                 us_addr_str_, sizeof us_addr_str_)
             != nullptr);
+        us_address_literal_ = "[IPv6:"s + us_addr_str_ + "]"s;
         break;
       default:
         LOG(FATAL) << "bogus address length (" << us_addr_len_
@@ -66,6 +70,7 @@ public:
                 &(reinterpret_cast<struct sockaddr_in*>(&them_addr_)->sin_addr),
                 them_addr_str_, sizeof them_addr_str_)
             != nullptr);
+        them_address_literal_ = "["s + them_addr_str_ + "]"s;
         break;
       case sizeof(sockaddr_in6):
         PCHECK(inet_ntop(AF_INET6,
@@ -73,6 +78,7 @@ public:
                                ->sin6_addr),
                          them_addr_str_, sizeof them_addr_str_)
                != nullptr);
+        them_address_literal_ = "[IPv6:"s + them_addr_str_ + "]"s;
         break;
       default:
         LOG(FATAL) << "bogus address length (" << them_addr_len_
@@ -83,6 +89,11 @@ public:
 
   char const* us_c_str() const { return us_addr_str_; }
   char const* them_c_str() const { return them_addr_str_; }
+  std::string const& us_address_literal() const { return us_address_literal_; }
+  std::string const& them_address_literal() const
+  {
+    return them_address_literal_;
+  }
   bool has_peername() const { return them_addr_str_[0] != '\0'; }
   bool input_ready(std::chrono::milliseconds wait)
   {
@@ -108,6 +119,9 @@ private:
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
+
+  std::string us_address_literal_;
+  std::string them_address_literal_;
 };
 
 #endif // SOCK_DOT_HPP
