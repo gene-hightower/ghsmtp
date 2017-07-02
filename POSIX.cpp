@@ -63,6 +63,11 @@ std::streamsize POSIX::io_fd_(char const* fnm,
     if (errno == EINTR)
       continue; // try fnc again
 
+    if (errno == ECONNRESET) {
+      LOG(WARNING) << fnm << " raised ECONNRESET, interpreting as EOF";
+      return static_cast<std::streamsize>(-1);
+    }
+
     PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
         << "Error from POSIX " << fnm << " system call";
 
