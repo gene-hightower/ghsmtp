@@ -133,25 +133,23 @@ void Session::greeting()
       }
     }
 
-    if (!reversed.empty()) {
-      CDB white("ip-white");
-      if (white.lookup(sock_.them_c_str())) {
-        LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
-        ip_whitelisted_ = true;
-      }
-      else if (IP4::is_address(sock_.them_c_str())) {
-        // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-        for (const auto& rbl : Config::rbls) {
-          if (has_record<RR_type::A>(res, reversed + rbl)) {
-            syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
-                   sock_.them_c_str(), rbl);
-            out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
-            std::exit(EXIT_SUCCESS);
-          }
+    CDB white("ip-white");
+    if (white.lookup(sock_.them_c_str())) {
+      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+      ip_whitelisted_ = true;
+    }
+    else if (IP4::is_address(sock_.them_c_str())) {
+      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+      for (const auto& rbl : Config::rbls) {
+        if (has_record<RR_type::A>(res, reversed + rbl)) {
+          syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
+                 sock_.them_c_str(), rbl);
+          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
+          std::exit(EXIT_SUCCESS);
         }
-        // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
-        // blacklisted";
       }
+      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
+      // blacklisted";
     }
 
     // Wait a bit of time for pre-greeting traffic.
