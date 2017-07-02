@@ -604,7 +604,9 @@ bool Session::verify_client_(Domain const& client_identity)
   if ((client_identity == our_fqdn_) || (client_identity == "localhost")
       || (client_identity == "localhost.localdomain")) {
 
-    if ((our_fqdn_ != fcrdns_) && strcmp(sock_.them_c_str(), "127.0.0.1")) {
+    if ((our_fqdn_ != fcrdns_)
+        && (sock_.them_address_literal() != "[127.0.0.1]")
+        && (sock_.them_address_literal() != "[IPv6:::1]")) {
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       out() << "550 5.7.1 liar\r\n" << std::flush;
@@ -719,16 +721,24 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
 bool Session::verify_sender_(Mailbox const& sender)
 {
-  // If the reverse path domain matches the Forward-confirmed reverse
-  // DNS of the sending IP address, we skip the uribl check.
-  if (sender.domain() != fcrdns_) {
-    if (!verify_sender_domain_(sender.domain()))
-      return false;
+  if (sender.domain().is_address_literal()) {
+    if (sender.domain() != sock_.them_address_literal()) {
+      LOG(WARNING) << "sender domain " << sender.domain() << " does not match "
+                   << sock_.them_address_literal();
+    }
   }
+  else {
+    // If the reverse path domain matches the Forward-confirmed reverse
+    // DNS of the sending IP address, we skip the uribl check.
+    if (sender.domain() != fcrdns_) {
+      if (!verify_sender_domain_(sender.domain()))
+        return false;
+    }
 
-  if (sock_.has_peername() && !ip_whitelisted_) {
-    if (!verify_sender_spf_(sender))
-      return false;
+    if (sock_.has_peername() && !ip_whitelisted_) {
+      if (!verify_sender_spf_(sender))
+        return false;
+    }
   }
 
   return reverse_path_verified_ = true;
@@ -840,7 +850,17 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Server spf_srv(our_fqdn_.ascii().c_str());
   SPF::Request spf_req(spf_srv);
 
-  spf_req.set_ipv4_str(sock_.them_c_str());
+  if (IP4::is_address_literal(sock_.them_address_literal())) {
+    spf_req.set_ipv4_str(sock_.them_c_str());
+  }
+  else if (IP6::is_address_literal(sock_.them_address_literal())) {
+    spf_req.set_ipv6_str(sock_.them_c_str());
+  }
+  else {
+    LOG(FATAL) << "bogus address " << sock_.them_address_literal() << ", "
+               << sock_.them_c_str();
+  }
+
   spf_req.set_helo_dom(client_identity_.ascii().c_str());
 
   auto from = boost::lexical_cast<std::string>(sender);

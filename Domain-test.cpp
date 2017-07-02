@@ -52,6 +52,15 @@ int main(int argc, char const* argv[])
 
   try {
     Domain ip_addr{"[127.0.0.1]"};
+    CHECK(ip_addr.is_address_literal());
+  }
+  catch (std::exception const& ex) {
+    LOG(FATAL) << "should not throw " << ex.what();
+  }
+
+  try {
+    Domain ip_addr{"127.0.0.1"};
+    CHECK(ip_addr.is_address_literal());
   }
   catch (std::exception const& ex) {
     LOG(FATAL) << "should not throw " << ex.what();
