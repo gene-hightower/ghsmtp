@@ -29,11 +29,10 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := smtp msg
-
-smtp_STEMS := smtp DNS Domain IP4 IP6 Message POSIX SPF Session TLS-OpenSSL date/tz
+PROGRAMS := msg smtp
 
 msg_STEMS := msg Domain IP4 IP6
+smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX SPF Session TLS-OpenSSL date/tz
 
 TESTS := \
 	CDB-test \
@@ -62,7 +61,7 @@ Message-test_STEMS := Domain IP4 IP6 Message date/tz
 Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
 SPF-test_STEMS := SPF
-Session-test_STEMS := DNS Domain IP4 IP6 POSIX SPF Session TLS-OpenSSL
+Session-test_STEMS := DNS Domain IP IP4 IP6 POSIX SPF Session TLS-OpenSSL
 Sock-test_STEMS := POSIX TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL

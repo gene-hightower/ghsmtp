@@ -10,6 +10,7 @@
 #include "CDB.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
+#include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "Message.hpp"
@@ -67,7 +68,6 @@ Session::Session(int fd_in, int fd_out, std::string our_fqdn)
 void Session::greeting()
 {
   if (sock_.has_peername()) {
-
     CDB black("ip-black");
     if (black.lookup(sock_.them_c_str())) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
@@ -76,53 +76,7 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    using namespace DNS;
-    Resolver res;
-    std::string reversed;
-
-    if (IP4::is_address(sock_.them_c_str())) {
-      // "0.1.2.3" => "3.2.1.0."
-      reversed = IP4::reverse(sock_.them_c_str());
-
-      // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
-
-      // The reverse part, check PTR records.
-      std::vector<std::string> ptrs
-          = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
-
-      char const* them = sock_.them_c_str();
-
-      auto ptr = std::find_if(
-          ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
-            // The forward part, check each PTR for matching A record.
-            std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
-            return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
-          });
-
-      if (ptr != ptrs.end()) {
-        fcrdns_ = *ptr;
-      }
-    }
-    else if (IP6::is_address(sock_.them_c_str())) {
-      reversed = IP6::reverse(sock_.them_c_str());
-
-      // The reverse part, check PTR records.
-      std::vector<std::string> ptrs
-          = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
-
-      char const* them = sock_.them_c_str();
-
-      auto ptr = std::find_if(
-          ptrs.begin(), ptrs.end(), [&res, them](std::string const& s) {
-            // The forward part, check each PTR for matching AAAA record.
-            std::vector<std::string> addrs = get_records<RR_type::AAAA>(res, s);
-            return std::find(addrs.begin(), addrs.end(), them) != addrs.end();
-          });
-
-      if (ptr != ptrs.end()) {
-        fcrdns_ = *ptr;
-      }
-    }
+    fcrdns_ = IP::fcrdns(sock_.them_c_str());
 
     if (!fcrdns_.empty()) {
       client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
@@ -137,7 +91,11 @@ void Session::greeting()
       ip_whitelisted_ = true;
     }
     else if (IP4::is_address(sock_.them_c_str())) {
+      using namespace DNS;
+      Resolver res;
+
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+      auto reversed = IP4::reverse(sock_.them_c_str());
       for (const auto& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",

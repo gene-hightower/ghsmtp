@@ -1,5 +1,7 @@
 #include "IP6.hpp"
 
+#include "DNS.hpp"
+
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 
@@ -8,6 +10,8 @@
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
+
+using namespace std::string_literals;
 
 namespace IP6 {
 
@@ -69,6 +73,11 @@ bool is_address_literal(std::experimental::string_view addr)
   return false;
 }
 
+std::string to_address_literal(std::experimental::string_view addr)
+{
+  return "[IPv6:"s + std::string(addr.data(), addr.size()) + "]"s;
+}
+
 std::string reverse(std::experimental::string_view addr_str)
 {
   in6_addr addr;
@@ -93,5 +102,30 @@ std::string reverse(std::experimental::string_view addr_str)
   }
 
   return q;
+}
+
+std::string fcrdns(char const* addr)
+{
+  using namespace DNS;
+  Resolver res;
+
+  // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
+
+  auto reversed = IP6::reverse(addr);
+
+  // The reverse part, check PTR records.
+  auto ptrs = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
+
+  auto ptr = std::find_if(
+      ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
+        // The forward part, check each PTR for matching AAAA record.
+        std::vector<std::string> addrs = get_records<RR_type::AAAA>(res, s);
+        return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
+      });
+
+  if (ptr != ptrs.end()) {
+    return *ptr;
+  }
+  return "";
 }
 }

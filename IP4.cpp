@@ -1,8 +1,12 @@
 #include "IP4.hpp"
 
+#include "DNS.hpp"
+
 #include <boost/xpressive/xpressive.hpp>
 
 #include <glog/logging.h>
+
+using namespace std::string_literals;
 
 namespace IP4 {
 
@@ -26,6 +30,11 @@ bool is_address(std::experimental::string_view addr)
   cregex re = octet >> '.' >> octet >> '.' >> octet >> '.' >> octet;
   cmatch matches;
   return regex_match(addr.begin(), addr.end(), matches, re);
+}
+
+std::string to_address_literal(std::experimental::string_view addr)
+{
+  return "["s + std::string(addr.data(), addr.size()) + "]"s;
 }
 
 bool is_address_literal(std::experimental::string_view addr)
@@ -57,5 +66,30 @@ std::string reverse(std::experimental::string_view addr)
     reverse << octet << '.'; // and leave a trailing '.'
   }
   return reverse.str();
+}
+
+std::string fcrdns(char const* addr)
+{
+  using namespace DNS;
+  Resolver res;
+
+  // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
+
+  auto reversed = IP4::reverse(addr);
+
+  // The reverse part, check PTR records.
+  auto ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
+
+  auto ptr = std::find_if(
+      ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
+        // The forward part, check each PTR for matching A record.
+        std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
+        return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
+      });
+
+  if (ptr != ptrs.end()) {
+    return *ptr;
+  }
+  return "";
 }
 }
