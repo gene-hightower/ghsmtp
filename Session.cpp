@@ -42,6 +42,7 @@ constexpr char const* const uribls[] = {
 };
 
 constexpr auto greeting_wait_ms = 3'000;
+constexpr auto max_recipients_per_message = 1'000;
 }
 
 using namespace std::string_literals;
@@ -321,7 +322,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
     out() << "250 2.1.0 mail ok\r\n" << std::flush;
-    LOG(INFO) << "MAIL FROM " << reverse_path_;
+    LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
   }
   else {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
@@ -346,9 +347,15 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   if (verify_recipient_(forward_path)) {
-    forward_path_.push_back(std::move(forward_path));
-    out() << "250 2.1.5 OK\r\n" << std::flush;
-    LOG(INFO) << "RCPT TO " << forward_path_.back();
+    if (forward_path_.size() >= Config::max_recipients_per_message) {
+      out() << "452 4.5.3 Too many recipients\r\n" << std::flush;
+      LOG(WARNING) << "too many recipients <" << forward_path << ">";
+    }
+    else {
+      forward_path_.push_back(std::move(forward_path));
+      out() << "250 2.1.5 OK\r\n" << std::flush;
+      LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
+    }
   }
   // We're lenient on most bad recipients, no else/exit here.
 }
