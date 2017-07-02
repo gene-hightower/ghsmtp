@@ -31,8 +31,7 @@ constexpr char const* const bad_recipients[] = {
     "mixmaster", "nobody", "oq6_2nbq", "truthfinder",
 };
 
-constexpr char const* const bad_senders[] = {
-};
+constexpr char const* const bad_senders[] = {};
 
 constexpr char const* const rbls[] = {
     "zen.spamhaus.org", "b.barracudacentral.org",
@@ -693,9 +692,14 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
   }
 
+  if (recipient.domain().is_address_literal()) {
+    if (recipient.domain() == sock_.us_address_literal()) {
+      accepted_domain = true;
+    }
+  }
+
   // Make sure the domain matches.
-  if (!accepted_domain && (recipient.domain() != our_fqdn_)
-      && !(recipient.domain() == "["s + sock_.us_c_str() + "]"s)) {
+  if (!accepted_domain && (recipient.domain() != our_fqdn_)) {
     out() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
