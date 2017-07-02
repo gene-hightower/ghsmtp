@@ -7,6 +7,8 @@
 
 #include <glog/logging.h>
 
+#include <stdexcept>
+
 using namespace std::string_literals;
 
 Domain::Domain(std::experimental::string_view dom) { set(dom); }
