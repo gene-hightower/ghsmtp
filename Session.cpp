@@ -101,11 +101,11 @@ void Session::greeting()
 
       if (ptr != ptrs.end()) {
         fcrdns_ = *ptr;
-        client_ = fcrdns_.utf8() + " [" + sock_.them_c_str() + "]";
+        client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
         // LOG(INFO) << "connect from " << fcrdns_;
       }
       else {
-        client_ = std::string("unknown [") + sock_.them_c_str() + "]";
+        client_ = "unknown "s + sock_.them_address_literal();
       }
     }
     else if (IP6::is_address(sock_.them_c_str())) {
@@ -126,11 +126,11 @@ void Session::greeting()
 
       if (ptr != ptrs.end()) {
         fcrdns_ = *ptr;
-        client_ = fcrdns_.utf8() + " [IPv6:" + sock_.them_c_str() + "]";
+        client_ = fcrdns_.utf8() + " "s + sock_.them_address_literal();
         // LOG(INFO) << "connect from " << fcrdns_;
       }
       else {
-        client_ = std::string("unknown [IPv6:") + sock_.them_c_str() + "]";
+        client_ = "unknown "s + sock_.them_address_literal();
       }
     }
 
@@ -296,7 +296,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
-  reset_();
   if (smtputf8) {
     protocol_ = sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
   }
@@ -321,6 +320,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
+    forward_path_.clear();
     out() << "250 2.1.0 mail ok\r\n" << std::flush;
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
   }
