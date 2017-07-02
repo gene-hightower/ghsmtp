@@ -46,13 +46,15 @@ bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
   return 0 != puts;
 }
 
-std::streamsize POSIX::io_fd_(char const* fnm,
-                              std::function<ssize_t(int, void*, size_t)> fnc,
-                              int fd,
-                              char* s,
-                              std::streamsize n,
-                              std::chrono::milliseconds timeout,
-                              bool& t_o)
+std::streamsize
+POSIX::io_fd_(char const* fnm,
+              std::function<ssize_t(int, void*, size_t)> fnc,
+              std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
+              int fd,
+              char* s,
+              std::streamsize n,
+              std::chrono::milliseconds timeout,
+              bool& t_o)
 {
   using namespace std::chrono;
   time_point<system_clock> start = system_clock::now();
@@ -75,7 +77,7 @@ std::streamsize POSIX::io_fd_(char const* fnm,
     if (now < (start + timeout)) {
       milliseconds time_left
           = duration_cast<milliseconds>((start + timeout) - now);
-      if (input_ready(fd, time_left))
+      if (rdy_fnc(fd, time_left))
         continue; // try fnc again
     }
     t_o = true;
