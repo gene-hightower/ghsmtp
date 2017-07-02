@@ -7,6 +7,8 @@
 
 #include <glog/logging.h>
 
+using namespace std::string_literals;
+
 Domain::Domain(std::experimental::string_view dom) { set(dom); }
 
 namespace {
@@ -23,13 +25,27 @@ std::string nfkc(std::experimental::string_view str)
 
 void Domain::set(std::experimental::string_view dom)
 {
+  // Handle "bare" IP address literals, without the brackets.
+  if (IP4::is_address_literal(dom)) {
+    ascii_ = "["s + std::string(dom.data(), dom.length()) + "]"s;
+    utf8_ = ascii_;
+    is_address_literal_ = true;
+    return;
+  }
+  if (IP6::is_address_literal(dom)) {
+    ascii_ = "[IPv6:"s + std::string(dom.data(), dom.length()) + "]"s;
+    utf8_ = ascii_;
+    is_address_literal_ = true;
+    return;
+  }
+
   if ((dom.front() == '[') && (dom.back() == ']')) {
     auto lit = dom;
     lit.remove_prefix(1);
     lit.remove_suffix(1);
     if (IP4::is_address_literal(lit) || IP6::is_address_literal(lit)) {
       ascii_ = std::string(dom.data(), dom.length());
-      utf8_ = std::string(dom.data(), dom.length());
+      utf8_ = ascii_;
       is_address_literal_ = true;
       return;
     }
