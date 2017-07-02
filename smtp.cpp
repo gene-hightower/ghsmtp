@@ -193,7 +193,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 // clang-format on
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_STRING("IPv6:"), IPv6address> {
+struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {
 };
 
 struct dcontent : ranges<33, 90, 94, 126> {
@@ -268,13 +268,13 @@ struct mailbox : seq<local_part, one<'@'>, non_local_part> {
 struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {
 };
 
-struct bounce_path : TAOCPP_PEGTL_STRING("<>") {
+struct bounce_path : TAOCPP_PEGTL_ISTRING("<>") {
 };
 
 struct reverse_path : sor<path, bounce_path> {
 };
 
-struct magic_postmaster : TAOCPP_PEGTL_STRING("<Postmaster>") {
+struct magic_postmaster : TAOCPP_PEGTL_ISTRING("<Postmaster>") {
 };
 
 struct forward_path : sor<path, magic_postmaster> {
