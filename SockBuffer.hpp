@@ -67,9 +67,14 @@ public:
                ? tls_.write(s, n, write_timeout_, timed_out_)
                : POSIX::write(fd_out_, s, n, write_timeout_, timed_out_);
   }
-  void starttls()
+  void starttls_server()
   {
-    tls_.starttls(fd_in_, fd_out_, starttls_timeout_);
+    tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
+    tls_active_ = true;
+  }
+  void starttls_client()
+  {
+    tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
     tls_active_ = true;
   }
   std::string tls_info()

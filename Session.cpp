@@ -563,7 +563,7 @@ void Session::starttls()
   }
   else {
     out_() << "220 2.0.0 go for TLS\r\n" << std::flush;
-    sock_.starttls();
+    sock_.starttls_server();
     reset_();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }

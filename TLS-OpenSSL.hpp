@@ -18,7 +18,8 @@ public:
   TLS();
   ~TLS();
 
-  void starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout);
+  void starttls_client(int fd_in, int fd_out, std::chrono::milliseconds timeout);
+  void starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);
 
   std::streamsize
   read(char* s, std::streamsize n, std::chrono::milliseconds wait, bool& t_o)

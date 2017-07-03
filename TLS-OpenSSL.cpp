@@ -27,21 +27,29 @@ TLS::~TLS()
   }
 }
 
-void TLS::starttls(int fd_in, int fd_out, std::chrono::milliseconds timeout)
+void TLS::starttls_client(int fd_in, int fd_out, std::chrono::milliseconds timeout)
 {
-  SSL_load_error_strings();
+  LOG(FATAL) << "no starttls_client yet";
+}
 
+void TLS::starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout)
+{
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
   SSL_library_init();
 #else
   OPENSSL_init_ssl(0, nullptr);
 #endif
 
+  SSL_load_error_strings();
+
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
   OpenSSL_add_all_algorithms();
 
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
+
+  constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+  SSL_CTX_set_options(ctx_, flags);
 
   CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load certificate file \"" << cert_path << "\"";

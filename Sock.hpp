@@ -45,7 +45,8 @@ public:
   std::istream& in() { return iostream_; }
   std::ostream& out() { return iostream_; }
 
-  void starttls() { iostream_->starttls(); }
+  void starttls_server() { iostream_->starttls_server(); }
+  void starttls_client() { iostream_->starttls_client(); }
   bool tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }
 
