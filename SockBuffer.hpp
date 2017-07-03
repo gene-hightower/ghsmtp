@@ -12,16 +12,11 @@
 
 #include <glog/logging.h>
 
+// We must define this to account for args to Sockbuffer
+#define BOOST_IOSTREAMS_MAX_FORWARDING_ARITY 5
+
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>
-
-namespace Config {
-// Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
-// section 4.5.3.2.7.
-constexpr auto read_timeout = std::chrono::minutes(5);
-constexpr auto write_timeout = std::chrono::seconds(10);
-constexpr auto starttls_timeout = std::chrono::seconds(10);
-}
 
 class SockBuffer
     : public boost::iostreams::device<boost::iostreams::bidirectional> {
@@ -30,14 +25,24 @@ public:
   SockBuffer(SockBuffer const& that)
     : fd_in_(that.fd_in_)
     , fd_out_(that.fd_out_)
+    , read_timeout_(that.read_timeout_)
+    , write_timeout_(that.write_timeout_)
+    , starttls_timeout_(that.starttls_timeout_)
   {
     CHECK(!that.timed_out_);
     CHECK(!that.tls_active_);
   }
 
-  SockBuffer(int fd_in, int fd_out)
+  SockBuffer(int fd_in,
+             int fd_out,
+             std::chrono::milliseconds read_timeout,
+             std::chrono::milliseconds write_timeout,
+             std::chrono::milliseconds starttls_timeout)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
+    , read_timeout_(read_timeout)
+    , write_timeout_(write_timeout)
+    , starttls_timeout_(starttls_timeout)
   {
     POSIX::set_nonblocking(fd_in_);
     POSIX::set_nonblocking(fd_out_);
@@ -53,19 +58,18 @@ public:
   bool timed_out() const { return timed_out_; }
   std::streamsize read(char* s, std::streamsize n)
   {
-    return tls_active_
-               ? tls_.read(s, n, Config::read_timeout, timed_out_)
-               : POSIX::read(fd_in_, s, n, Config::read_timeout, timed_out_);
+    return tls_active_ ? tls_.read(s, n, read_timeout_, timed_out_)
+                       : POSIX::read(fd_in_, s, n, read_timeout_, timed_out_);
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
     return tls_active_
-               ? tls_.write(s, n, Config::write_timeout, timed_out_)
-               : POSIX::write(fd_out_, s, n, Config::write_timeout, timed_out_);
+               ? tls_.write(s, n, write_timeout_, timed_out_)
+               : POSIX::write(fd_out_, s, n, write_timeout_, timed_out_);
   }
   void starttls()
   {
-    tls_.starttls(fd_in_, fd_out_, Config::starttls_timeout);
+    tls_.starttls(fd_in_, fd_out_, starttls_timeout_);
     tls_active_ = true;
   }
   std::string tls_info()
@@ -81,9 +85,13 @@ private:
   int fd_in_;
   int fd_out_;
 
-  bool timed_out_{false};
+  std::chrono::milliseconds read_timeout_;
+  std::chrono::milliseconds write_timeout_;
+  std::chrono::milliseconds starttls_timeout_;
 
+  bool timed_out_{false};
   bool tls_active_{false};
+
   TLS tls_;
 };
 

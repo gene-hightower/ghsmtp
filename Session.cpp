@@ -46,12 +46,17 @@ constexpr char const* const uribls[] = {
 
 constexpr auto greeting_wait_ms = 3'000;
 constexpr auto max_recipients_per_message = 1'000;
+
+// Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
+// section 4.5.3.2.7.
+constexpr auto read_timeout = std::chrono::minutes(5);
+constexpr auto write_timeout = std::chrono::seconds(30);
 }
 
 using namespace std::string_literals;
 
 Session::Session(int fd_in, int fd_out, std::string our_fqdn)
-  : sock_(fd_in, fd_out)
+  : sock_(fd_in, fd_out, Config::read_timeout, Config::write_timeout)
 {
   if (our_fqdn.empty()) {
     utsname un;

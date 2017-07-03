@@ -21,7 +21,9 @@ int main(int argc, char* argv[])
   int fd_out;
   PCHECK((fd_out = mkstemp(outfile)) != -1);
 
-  boost::iostreams::stream<SockBuffer> iostream{SockBuffer(fd_in, fd_out)};
+  boost::iostreams::stream<SockBuffer> iostream{
+      fd_in, fd_out, std::chrono::seconds(1), std::chrono::seconds(1),
+      std::chrono::seconds(1)};
 
   std::string line;
   while (std::getline(iostream, line)) {

@@ -10,12 +10,23 @@
 
 using namespace std::string_literals;
 
+namespace Config {
+constexpr auto read_timeout_default = std::chrono::seconds(30);
+constexpr auto write_timeout_default = std::chrono::seconds(30);
+constexpr auto starttls_timeout_default = std::chrono::seconds(30);
+}
+
 class Sock {
 public:
   Sock(const Sock&) = delete;
   Sock& operator=(const Sock&) = delete;
 
-  Sock(int fd_in, int fd_out);
+  Sock(int fd_in,
+       int fd_out,
+       std::chrono::milliseconds read_timeout = Config::read_timeout_default,
+       std::chrono::milliseconds write_timeout = Config::write_timeout_default,
+       std::chrono::milliseconds starttls_timeout
+       = Config::starttls_timeout_default);
 
   char const* us_c_str() const { return us_addr_str_; }
   char const* them_c_str() const { return them_addr_str_; }
