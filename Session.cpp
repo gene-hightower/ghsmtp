@@ -618,9 +618,6 @@ bool Session::verify_client_(Domain const& client_identity)
       return false;
     }
   }
-  else {
-    LOG(INFO) << "unblack client identity " << client_identity;
-  }
 
   char const* tld
       = tld_db_.get_registered_domain(client_identity.ascii().c_str());
@@ -630,9 +627,6 @@ bool Session::verify_client_(Domain const& client_identity)
         LOG(ERROR) << "blacklisted TLD " << tld;
         out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
         return false;
-      }
-      else {
-        LOG(INFO) << "unblack TLD " << tld;
       }
     }
   }
