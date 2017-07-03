@@ -468,6 +468,16 @@ bool Session::bdat_start()
 void Session::bdat_msg(Message& msg, size_t n)
 {
   out() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
+  LOG(INFO) << "BDAT " << n;
+}
+
+void Session::bdat_msg_last(Message& msg, size_t n)
+{
+  msg.save();
+  out() << "250 2.6.0 Message OK\r\n" << std::flush;
+  LOG(INFO) << "BDAT " << n << " LAST";
+  LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
+            << msg.id();
 }
 
 void Session::bdat_error(Message& msg)

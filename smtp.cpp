@@ -593,8 +593,6 @@ struct action<end_marker> {
 
 void bdat_act(Ctx& ctx)
 {
-  LOG(INFO) << "BDAT " << ctx.chunk_size << (ctx.chunk_last ? " LAST" : "");
-
   if (ctx.chunk_first) {
     ctx.chunk_first = false;
 
@@ -688,7 +686,7 @@ void bdat_act(Ctx& ctx)
     else {
       LOG(INFO) << "header size " << ctx.hdr.size() << " octets";
     }
-    ctx.session.data_msg_done(*ctx.msg);
+    ctx.session.bdat_msg_last(*ctx.msg, ctx.chunk_size);
     ctx.msg.reset();
     ctx.chunk_first = true;
   }

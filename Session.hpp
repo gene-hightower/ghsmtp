@@ -38,6 +38,7 @@ public:
 
   bool bdat_start();
   void bdat_msg(Message& msg, size_t n);
+  void bdat_msg_last(Message& msg, size_t n);
   void bdat_error(Message& msg);
 
   void rset();
