@@ -2,6 +2,10 @@
 
 #include <iostream>
 
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
 #include <experimental/string_view>
 
 #include <tao/pegtl.hpp>
@@ -18,9 +22,21 @@ using std::experimental::string_view;
 
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
+
+constexpr auto read_timeout = std::chrono::seconds(30);
+constexpr auto write_timeout = std::chrono::minutes(3);
 }
 
 namespace RFC5321 {
+
+struct Connection {
+  Sock sock;
+
+  Connection(int fd)
+    : sock(fd, fd, Config::read_timeout, Config::write_timeout)
+  {
+  }
+};
 
 struct UTF8_tail : range<0x80, 0xBF> {
 };
@@ -138,6 +154,9 @@ struct address_literal : seq<one<'['>,
 struct textstring : plus<sor<one<9>, range<32, 126>>> {
 };
 
+struct server_id : sor<domain, address_literal> {
+};
+
 // Greeting       = ( "220 " (Domain / address-literal) [ SP textstring ] CRLF )
 //                  /
 //                  ( "220-" (Domain / address-literal) [ SP textstring ] CRLF
@@ -146,11 +165,11 @@ struct textstring : plus<sor<one<9>, range<32, 126>>> {
 
 struct greeting
     : sor<seq<TAOCPP_PEGTL_ISTRING("220 "),
-              sor<domain, address_literal>,
+              server_id,
               opt<seq<SP, textstring>>,
               CRLF>,
           seq<TAOCPP_PEGTL_ISTRING("220-"),
-              sor<domain, address_literal>,
+              server_id,
               opt<seq<SP, textstring>>,
               CRLF,
               star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
@@ -203,42 +222,156 @@ struct ehlo_line : seq<ehlo_keyword, star<seq<SP, ehlo_param>>> {
 //                    "250 " ehlo-line CRLF )
 
 struct ehlo_ok_rsp
-    : sor<seq<TAOCPP_PEGTL_ISTRING("220 "),
+    : sor<seq<TAOCPP_PEGTL_ISTRING("250 "),
               domain,
               opt<seq<SP, ehlo_greet>>,
               CRLF>,
-          seq<seq<TAOCPP_PEGTL_ISTRING("220-"),
+          seq<seq<TAOCPP_PEGTL_ISTRING("250-"),
                   domain,
                   opt<seq<SP, ehlo_greet>>,
                   CRLF,
-                  star<seq<TAOCPP_PEGTL_ISTRING("220-"), ehlo_line, CRLF>>,
-                  seq<TAOCPP_PEGTL_ISTRING("220 "), ehlo_line, CRLF>>>> {
+                  star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
+                  seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>>> {
 };
 
 template <typename Rule>
 struct action : nothing<Rule> {
 };
+
+template <>
+struct action<greeting> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    LOG(INFO) << "greeting: " << in.string();
+  }
+};
+
+template <>
+struct action<ehlo_ok_rsp> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    LOG(INFO) << "ehlo_ok_rsp: " << in.string();
+  }
+};
+
+template <>
+struct action<reply_lines> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    LOG(INFO) << "reply_lines: " << in.string();
+  }
+};
+}
+
+void greeting() {}
+
+int conn(char const* node, char const* service)
+{
+  addrinfo* res = nullptr;
+  auto gaierr = getaddrinfo(node, service, nullptr, &res);
+  CHECK(gaierr == 0) << "getaddrinfo failed: " << gai_strerror(gaierr);
+
+  for (auto r = res; r; r = r->ai_next) {
+    auto addr = r->ai_addr;
+    switch (addr->sa_family) {
+    case AF_INET: {
+      auto in4 = reinterpret_cast<sockaddr_in*>(addr);
+
+      int fd = socket(AF_INET, SOCK_STREAM, 0);
+      PCHECK(fd >= 0) << "socket failed";
+      if (connect(fd, addr, sizeof(*in4)) == 0) {
+        freeaddrinfo(res);
+        return fd;
+      }
+      PLOG(WARNING) << "connect failed for node==" << node
+                    << ", service ==" << service;
+
+      char str[INET_ADDRSTRLEN]{0};
+      PCHECK(inet_ntop(AF_INET, &(in4->sin_addr), str, sizeof str));
+      LOG(WARNING) << "connect failed for IP4==" << str
+                   << ", port==" << ntohs(in4->sin_port);
+
+      close(fd);
+      break;
+    }
+
+    case AF_INET6: {
+      auto in6 = reinterpret_cast<sockaddr_in6*>(addr);
+
+      int fd = socket(AF_INET6, SOCK_STREAM, 0);
+      PCHECK(fd >= 0) << "socket failed";
+      if (connect(fd, addr, sizeof(*in6)) == 0) {
+        freeaddrinfo(res);
+        return fd;
+      }
+      PLOG(WARNING) << "connect failed for node==" << node
+                    << ", service ==" << service;
+
+      char str[INET6_ADDRSTRLEN]{0};
+      PCHECK(inet_ntop(AF_INET6, &(in6->sin6_addr), str, sizeof str));
+      LOG(WARNING) << "connect failed for IP6==" << str
+                   << ", port==" << ntohs(in6->sin6_port);
+
+      close(fd);
+      break;
+    }
+
+    default:
+      LOG(FATAL) << "unknown address type: " << addr->sa_family;
+      break;
+    }
+  }
+
+  freeaddrinfo(res);
+  return -1;
 }
 
 int main(int argc, char const* argv[])
 {
-  // open fds
-  int fd;
+  static RFC5321::Connection cnn(conn("localhost", "smtp-test"));
 
-  Sock sock(fd, fd);
-
-  istream_input<eol::crlf> in(sock.in(), Config::bfr_size, "session");
+  istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
   try {
-    if (!parse<RFC5321::greeting, RFC5321::action>(in)) {
-      if (sock.timed_out()) {
-        std::cerr << "timed out\n";
+    if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
+      if (cnn.sock.timed_out()) {
+        std::cerr << "timed out waiting for greeting\n";
       }
       else {
         std::cerr << "syntax error from parser\n";
       }
       return 1;
     }
+    LOG(INFO) << "greeting parse success";
+
+    cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
+
+    if (!parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)) {
+      if (cnn.sock.timed_out()) {
+        std::cerr << "timed out waiting for ehlo_ok_rsp\n";
+      }
+      else {
+        std::cerr << "syntax error from parser\n";
+      }
+      return 1;
+    }
+    LOG(INFO) << "ehlo_ok_rsp parse success";
+
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+
+    if (!parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)) {
+      if (cnn.sock.timed_out()) {
+        std::cerr << "timed out waiting for quit reply\n";
+      }
+      else {
+        std::cerr << "syntax error from parser\n";
+      }
+      return 1;
+    }
+    LOG(INFO) << "reply_lines parse success";
   }
   catch (parse_error const& e) {
     std::cerr << e.what();
