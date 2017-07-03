@@ -158,9 +158,13 @@ void Session::ehlo(std::experimental::string_view client_identity)
 
   // Log this client
   if (sock_.has_peername()) {
-    LOG(INFO) << "EHLO " << client_identity
-              << ((fcrdns_ == client_identity_) ? "" : " **unmatched**")
-              << " from " << client_;
+    if (fcrdns_ == client_identity_) {
+      LOG(INFO) << "EHLO " << client_identity
+                << " from " << sock_.them_address_literal();
+    } else {
+      LOG(INFO) << "EHLO " << client_identity
+                << " from " << client_;
+    }
   }
   else {
     LOG(INFO) << "EHLO " << client_identity;
@@ -184,9 +188,13 @@ void Session::helo(std::experimental::string_view client_identity)
 
   // Log this client
   if (sock_.has_peername()) {
-    LOG(INFO) << "HELO " << client_identity
-              << ((fcrdns_ == client_identity_) ? "" : " **unmatched**")
-              << " from " << client_;
+    if (fcrdns_ == client_identity_) {
+      LOG(INFO) << "HELO " << client_identity
+                << " from " << sock_.them_address_literal();
+    } else {
+      LOG(INFO) << "HELO " << client_identity
+                << " from " << client_;
+    }
   }
   else {
     LOG(INFO) << "HELO " << client_identity;
