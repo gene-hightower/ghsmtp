@@ -873,11 +873,9 @@ int main(int argc, char const* argv[])
   // Don't wait for STARTTLS to fail if no cert.
   CHECK(boost::filesystem::exists(TLS::cert_path)) << "can't find cert file";
 
-  RFC5321::Ctx ctx;
+  static RFC5321::Ctx ctx;
 
   ctx.session.greeting();
-
-  ctx.session.in().unsetf(std::ios::skipws);
 
   istream_input<eol::crlf> in(ctx.session.in(), Config::bfr_size, "session");
 
