@@ -24,6 +24,8 @@
 
 #include <syslog.h>
 
+using std::experimental::string_view;
+
 namespace Config {
 constexpr char const* const accept_domains[] = {};
 
@@ -124,8 +126,7 @@ void Session::greeting()
   LOG(INFO) << "connect from " << client_;
 }
 
-void Session::log_lo_(char const* verb,
-                      std::experimental::string_view client_identity) const
+void Session::log_lo_(char const* verb, string_view client_identity) const
 {
   if (sock_.has_peername()) {
     if (fcrdns_ == client_identity_) {
@@ -141,7 +142,7 @@ void Session::log_lo_(char const* verb,
   }
 }
 
-void Session::ehlo(std::experimental::string_view client_identity)
+void Session::ehlo(string_view client_identity)
 {
   reset_();
   extensions_ = true;
@@ -176,7 +177,7 @@ void Session::ehlo(std::experimental::string_view client_identity)
   log_lo_("EHLO", client_identity);
 }
 
-void Session::helo(std::experimental::string_view client_identity)
+void Session::helo(string_view client_identity)
 {
   reset_();
   extensions_ = false;
@@ -495,24 +496,24 @@ void Session::rset()
   LOG(INFO) << "RSET";
 }
 
-void Session::noop()
+void Session::noop(string_view str)
 {
   out_() << "250 2.0.0 OK\r\n" << std::flush;
-  LOG(INFO) << "NOOP";
+  LOG(INFO) << "NOOP" << (str.length() ? " " : "") << str;
 }
 
-void Session::vrfy()
+void Session::vrfy(string_view str)
 {
   out_() << "252 2.0.0 try it\r\n" << std::flush;
-  LOG(INFO) << "VRFY";
+  LOG(INFO) << "VRFY" << (str.length() ? " " : "") << str;
 }
 
-void Session::help()
+void Session::help(string_view str)
 {
   out_() << "214 2.0.0 see https://digilicious.com/smtp.html and "
             "https://tools.ietf.org/html/rfc5321\r\n"
          << std::flush;
-  LOG(INFO) << "HELP";
+  LOG(INFO) << "HELP" << (str.length() ? " " : "") << str;
 }
 
 void Session::quit()
@@ -522,19 +523,19 @@ void Session::quit()
   std::exit(EXIT_SUCCESS);
 }
 
-void Session::error(std::experimental::string_view log_msg)
+void Session::error(string_view log_msg)
 {
   out_() << "550 5.3.5 system error\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
-void Session::cmd_unrecognized(std::experimental::string_view log_msg)
+void Session::cmd_unrecognized(string_view log_msg)
 {
   out_() << "502 5.5.1 command unrecognized\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
-void Session::bare_lf(std::experimental::string_view log_msg)
+void Session::bare_lf(string_view log_msg)
 {
   out_() << "554 5.6.11 malformed data/bare LF or CR, see "
             "<https://cr.yp.to/docs/smtplf.html>\r\n"

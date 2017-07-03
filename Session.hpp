@@ -42,9 +42,9 @@ public:
   void bdat_error(Message& msg);
 
   void rset();
-  void noop();
-  void vrfy();
-  void help();
+  void noop(std::experimental::string_view str);
+  void vrfy(std::experimental::string_view str);
+  void help(std::experimental::string_view str);
   void quit() __attribute__((noreturn));
   void error(std::experimental::string_view log_msg);
   void cmd_unrecognized(std::experimental::string_view log_msg);

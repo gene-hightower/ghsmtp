@@ -811,19 +811,45 @@ struct action<rset> {
   }
 };
 
+template <typename Input>
+string_view get_string(Input const& in)
+{
+  auto beg = in.begin() + 4;
+  auto len = in.end() - beg;
+  auto str = string_view(beg, len);
+  if (str.front() == ' ')
+    str.remove_prefix(1);
+  return str;
+}
+
 template <>
 struct action<noop> {
-  static void apply0(Ctx& ctx) { ctx.session.noop(); }
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    auto str = get_string(in);
+    ctx.session.noop(str);
+  }
 };
 
 template <>
 struct action<vrfy> {
-  static void apply0(Ctx& ctx) { ctx.session.vrfy(); }
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    auto str = get_string(in);
+    ctx.session.vrfy(str);
+  }
 };
 
 template <>
 struct action<help> {
-  static void apply0(Ctx& ctx) { ctx.session.help(); }
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    auto str = get_string(in);
+    ctx.session.help(str);
+  }
 };
 
 template <>
