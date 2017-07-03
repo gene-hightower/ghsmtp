@@ -61,7 +61,7 @@ private:
 
   std::string added_headers_(Message const& msg);
 
-  std::ostream& out() { return sock_.out(); }
+  std::ostream& out_() { return sock_.out(); }
 
   void reset_()
   {

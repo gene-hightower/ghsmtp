@@ -72,7 +72,7 @@ void Session::greeting()
     if (black.lookup(sock_.them_c_str())) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
-      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
+      out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       std::exit(EXIT_SUCCESS);
     }
 
@@ -100,7 +100,7 @@ void Session::greeting()
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                  sock_.them_c_str(), rbl);
-          out() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
+          out_() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
           std::exit(EXIT_SUCCESS);
         }
       }
@@ -114,12 +114,12 @@ void Session::greeting()
     if (sock_.input_ready(wait)) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
              sock_.them_c_str());
-      out() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
+      out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
       std::exit(EXIT_SUCCESS);
     }
   } // if (sock_.has_peername())
 
-  out() << "220 " << our_fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
+  out_() << "220 " << our_fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
 
   LOG(INFO) << "connect from " << client_;
 }
@@ -137,24 +137,24 @@ void Session::ehlo(std::experimental::string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out() << "250-" << our_fqdn_ << "\r\n";
+  out_() << "250-" << our_fqdn_ << "\r\n";
   // RFC 1870
-  out() << "250-SIZE " << Config::max_msg_size << "\r\n";
+  out_() << "250-SIZE " << Config::max_msg_size << "\r\n";
   // RFC 6152
-  out() << "250-8BITMIME\r\n";
+  out_() << "250-8BITMIME\r\n";
   if (!sock_.tls()) { // If we're not already TLS, offer TLS
     // RFC 3207
-    out() << "250-STARTTLS\r\n";
+    out_() << "250-STARTTLS\r\n";
   }
   // RFC 2034
-  out() << "250-ENHANCEDSTATUSCODES\r\n";
+  out_() << "250-ENHANCEDSTATUSCODES\r\n";
   // RFC 2920
-  out() << "250-PIPELINING\r\n";
+  out_() << "250-PIPELINING\r\n";
   // RFC 3030
-  // out() << "250-BINARYMIME\r\n";
-  out() << "250-CHUNKING\r\n";
+  // out_() << "250-BINARYMIME\r\n";
+  out_() << "250-CHUNKING\r\n";
   // RFC 6531
-  out() << "250 SMTPUTF8\r\n" << std::flush;
+  out_() << "250 SMTPUTF8\r\n" << std::flush;
 
   // Log this client
   if (sock_.has_peername()) {
@@ -184,7 +184,7 @@ void Session::helo(std::experimental::string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out() << "250 " << our_fqdn_ << "\r\n" << std::flush;
+  out_() << "250 " << our_fqdn_ << "\r\n" << std::flush;
 
   // Log this client
   if (sock_.has_peername()) {
@@ -204,7 +204,7 @@ void Session::helo(std::experimental::string_view client_identity)
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   if (client_identity_.empty()) {
-    out() << "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
+    out_() << "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
     LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -248,9 +248,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         try {
           size_t sz = stoull(val);
           if (sz > Config::max_msg_size) {
-            out() << "552 5.3.4 message size exceeds fixed maximium message "
-                     "size\r\n"
-                  << std::flush;
+            out_() << "552 5.3.4 message size exceeds fixed maximium message "
+                      "size\r\n"
+                   << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return;
           }
@@ -285,7 +285,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   for (const auto bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
-      out() << "550 5.7.26 bad sender\r\n" << std::flush;
+      out_() << "550 5.7.26 bad sender\r\n" << std::flush;
       LOG(WARNING) << "bad sender " << sender;
       return;
     }
@@ -294,7 +294,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
     forward_path_.clear();
-    out() << "250 2.1.0 mail ok\r\n" << std::flush;
+    out_() << "250 2.1.0 mail ok\r\n" << std::flush;
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
   }
   else {
@@ -307,7 +307,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   if (!reverse_path_verified_) {
-    out() << "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
+    out_() << "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -321,12 +321,12 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   if (verify_recipient_(forward_path)) {
     if (forward_path_.size() >= Config::max_recipients_per_message) {
-      out() << "452 4.5.3 Too many recipients\r\n" << std::flush;
+      out_() << "452 4.5.3 Too many recipients\r\n" << std::flush;
       LOG(WARNING) << "too many recipients <" << forward_path << ">";
     }
     else {
       forward_path_.push_back(std::move(forward_path));
-      out() << "250 2.1.5 OK\r\n" << std::flush;
+      out_() << "250 2.1.5 OK\r\n" << std::flush;
       LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
     }
   }
@@ -336,21 +336,21 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 bool Session::data_start()
 {
   if (binarymime_) {
-    out() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
+    out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
     LOG(ERROR) << "DATA does not support BINARYMIME";
     return false;
   }
   if (!reverse_path_verified_) {
-    out() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
+    out_() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
     LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    out() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
+    out_() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
     LOG(ERROR) << "no valid recipients";
     return false;
   }
-  out() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
+  out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
   LOG(INFO) << "DATA";
   return true;
 }
@@ -446,7 +446,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 void Session::data_msg_done(Message& msg)
 {
   msg.save();
-  out() << "250 2.6.0 Message OK\r\n" << std::flush;
+  out_() << "250 2.6.0 Message OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
             << msg.id();
 }
@@ -454,19 +454,19 @@ void Session::data_msg_done(Message& msg)
 void Session::data_size_error(Message& msg)
 {
   msg.trash();
-  out() << "552 5.3.4 Channel size limit exceeded\r\n" << std::flush;
+  out_() << "552 5.3.4 Channel size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "DATA size error";
 }
 
 bool Session::bdat_start()
 {
   if (!reverse_path_verified_) {
-    out() << "503 5.5.1 need 'MAIL FROM' before 'BDAT'\r\n" << std::flush;
+    out_() << "503 5.5.1 need 'MAIL FROM' before 'BDAT'\r\n" << std::flush;
     LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
-    out() << "503 5.5.1 need 'RCPT TO' before 'BDAT'\r\n" << std::flush;
+    out_() << "503 5.5.1 need 'RCPT TO' before 'BDAT'\r\n" << std::flush;
     LOG(ERROR) << "no valid recipients";
     return false;
   }
@@ -475,14 +475,14 @@ bool Session::bdat_start()
 
 void Session::bdat_msg(Message& msg, size_t n)
 {
-  out() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
+  out_() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
 }
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
   msg.save();
-  out() << "250 2.6.0 Message OK\r\n" << std::flush;
+  out_() << "250 2.6.0 Message OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
             << msg.id();
@@ -491,67 +491,67 @@ void Session::bdat_msg_last(Message& msg, size_t n)
 void Session::bdat_error(Message& msg)
 {
   msg.trash();
-  out() << "550 5.3.5 system error\r\n" << std::flush;
+  out_() << "550 5.3.5 system error\r\n" << std::flush;
   LOG(WARNING) << "DATA error";
 }
 
 void Session::rset()
 {
   reset_();
-  out() << "250 2.0.0 OK\r\n" << std::flush;
+  out_() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "RSET";
 }
 
 void Session::noop()
 {
-  out() << "250 2.0.0 OK\r\n" << std::flush;
+  out_() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "NOOP";
 }
 
 void Session::vrfy()
 {
-  out() << "252 2.0.0 try it\r\n" << std::flush;
+  out_() << "252 2.0.0 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY";
 }
 
 void Session::help()
 {
-  out() << "214 2.0.0 see https://digilicious.com/smtp.html and "
-           "https://tools.ietf.org/html/rfc5321\r\n"
-        << std::flush;
+  out_() << "214 2.0.0 see https://digilicious.com/smtp.html and "
+            "https://tools.ietf.org/html/rfc5321\r\n"
+         << std::flush;
   LOG(INFO) << "HELP";
 }
 
 void Session::quit()
 {
-  out() << "221 2.0.0 bye\r\n" << std::flush;
+  out_() << "221 2.0.0 bye\r\n" << std::flush;
   LOG(INFO) << "QUIT";
   std::exit(EXIT_SUCCESS);
 }
 
 void Session::error(std::experimental::string_view log_msg)
 {
-  out() << "550 5.3.5 system error\r\n" << std::flush;
+  out_() << "550 5.3.5 system error\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
 void Session::cmd_unrecognized(std::experimental::string_view log_msg)
 {
-  out() << "502 5.5.1 command unrecognized\r\n" << std::flush;
+  out_() << "502 5.5.1 command unrecognized\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
 void Session::bare_lf(std::experimental::string_view log_msg)
 {
-  out() << "554 5.6.11 malformed data/bare LF or CR, see "
-           "<https://cr.yp.to/docs/smtplf.html>\r\n"
-        << std::flush;
+  out_() << "554 5.6.11 malformed data/bare LF or CR, see "
+            "<https://cr.yp.to/docs/smtplf.html>\r\n"
+         << std::flush;
   LOG(ERROR) << "Session::bare_lf: " << log_msg;
 }
 
 void Session::time_out()
 {
-  out() << "421 4.4.2 time-out\r\n" << std::flush;
+  out_() << "421 4.4.2 time-out\r\n" << std::flush;
   LOG(ERROR) << "time-out" << (sock_.has_peername() ? " from " : "") << client_;
   std::exit(EXIT_SUCCESS);
 }
@@ -559,11 +559,11 @@ void Session::time_out()
 void Session::starttls()
 {
   if (sock_.tls()) {
-    out() << "554 5.5.1 TLS already active\r\n" << std::flush;
+    out_() << "554 5.5.1 TLS already active\r\n" << std::flush;
     LOG(ERROR) << "STARTTLS issued with TLS already active";
   }
   else {
-    out() << "220 2.0.0 go for TLS\r\n" << std::flush;
+    out_() << "220 2.0.0 go for TLS\r\n" << std::flush;
     sock_.starttls();
     reset_();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
@@ -592,7 +592,7 @@ bool Session::verify_client_(Domain const& client_identity)
         && (sock_.them_address_literal() != "[IPv6:::1]")) {
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
-      out() << "550 5.7.1 liar\r\n" << std::flush;
+      out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
     }
   }
@@ -607,7 +607,7 @@ bool Session::verify_client_(Domain const& client_identity)
   if (labels.size() < 2) {
     LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << client_identity;
-    out() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
+    out_() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
     return false;
   }
 
@@ -615,14 +615,14 @@ bool Session::verify_client_(Domain const& client_identity)
   if (black.lookup(cid_lc)) {
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                << client_ << " claiming " << cid_lc;
-    out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
+    out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
   else if (client_identity.ascii() != client_identity.utf8()) {
     if (black.lookup(client_identity.utf8())) {
       LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity.utf8();
-      out() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
+      out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
       return false;
     }
   }
@@ -633,7 +633,7 @@ bool Session::verify_client_(Domain const& client_identity)
     if (!Domain::match(cid_lc, tld)) {
       if (black.lookup(tld)) {
         LOG(ERROR) << "blacklisted TLD " << tld;
-        out() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
+        out_() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
         return false;
       }
     }
@@ -665,7 +665,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // Make sure the domain matches.
   if (!accepted_domain && (recipient.domain() != our_fqdn_)) {
-    out() << "554 5.7.1 relay access denied\r\n" << std::flush;
+    out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for " << recipient;
     return false;
   }
@@ -673,7 +673,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   for (const auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
-      out() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
+      out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
       return false;
     }
@@ -724,8 +724,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
   boost::algorithm::split(labels, sndr_lc, boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    out() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
-          << std::flush;
+    out_() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
+           << std::flush;
     LOG(ERROR) << "sender \"" << sndr_lc << "\" invalid syntax";
     return false;
   }
@@ -764,7 +764,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
                                            + three_level);
       }
       else {
-        out() << "550 4.7.1 bad sender domain\r\n" << std::flush;
+        out_() << "550 4.7.1 bad sender domain\r\n" << std::flush;
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
         return false;
@@ -779,7 +779,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
                                          + two_level);
     }
     else {
-      out() << "550 4.7.1 bad sender domain\r\n" << std::flush;
+      out_() << "550 4.7.1 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
       return false;
@@ -798,7 +798,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out() << "550 4.7.1 blocked by " << uribl << "\r\n" << std::flush;
+      out_() << "550 4.7.1 blocked by " << uribl << "\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }
@@ -833,7 +833,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    out() << "550 4.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
+    out_() << "550 4.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
     LOG(ERROR) << spf_res.header_comment();
     return false;
   }
