@@ -119,7 +119,7 @@ void Session::greeting()
     }
   } // if (sock_.has_peername())
 
-  out() << "220 " << our_fqdn_ << " ESMTP ghsmtp\r\n" << std::flush;
+  out() << "220 " << our_fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
 
   LOG(INFO) << "connect from " << client_;
 }
