@@ -62,6 +62,8 @@ private:
   std::string added_headers_(Message const& msg);
 
   std::ostream& out_() { return sock_.out(); }
+  void log_lo_(char const* verb,
+               std::experimental::string_view client_identity) const;
 
   void reset_()
   {

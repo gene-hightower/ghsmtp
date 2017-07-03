@@ -124,6 +124,23 @@ void Session::greeting()
   LOG(INFO) << "connect from " << client_;
 }
 
+void Session::log_lo_(char const* verb,
+                      std::experimental::string_view client_identity) const
+{
+  if (sock_.has_peername()) {
+    if (fcrdns_ == client_identity_) {
+      LOG(INFO) << verb << " " << client_identity << " from "
+                << sock_.them_address_literal();
+    }
+    else {
+      LOG(INFO) << verb << " " << client_identity << " from " << client_;
+    }
+  }
+  else {
+    LOG(INFO) << verb << " " << client_identity;
+  }
+}
+
 void Session::ehlo(std::experimental::string_view client_identity)
 {
   reset_();
@@ -156,19 +173,7 @@ void Session::ehlo(std::experimental::string_view client_identity)
   // RFC 6531
   out_() << "250 SMTPUTF8\r\n" << std::flush;
 
-  // Log this client
-  if (sock_.has_peername()) {
-    if (fcrdns_ == client_identity_) {
-      LOG(INFO) << "EHLO " << client_identity << " from "
-                << sock_.them_address_literal();
-    }
-    else {
-      LOG(INFO) << "EHLO " << client_identity << " from " << client_;
-    }
-  }
-  else {
-    LOG(INFO) << "EHLO " << client_identity;
-  }
+  log_lo_("EHLO", client_identity);
 }
 
 void Session::helo(std::experimental::string_view client_identity)
@@ -186,19 +191,7 @@ void Session::helo(std::experimental::string_view client_identity)
 
   out_() << "250 " << our_fqdn_ << "\r\n" << std::flush;
 
-  // Log this client
-  if (sock_.has_peername()) {
-    if (fcrdns_ == client_identity_) {
-      LOG(INFO) << "HELO " << client_identity << " from "
-                << sock_.them_address_literal();
-    }
-    else {
-      LOG(INFO) << "HELO " << client_identity << " from " << client_;
-    }
-  }
-  else {
-    LOG(INFO) << "HELO " << client_identity;
-  }
+  log_lo_("HELO", client_identity);
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
