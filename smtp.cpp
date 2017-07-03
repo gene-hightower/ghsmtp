@@ -202,14 +202,14 @@ struct dcontent : ranges<33, 90, 94, 126> {
 struct standardized_tag : ldh_str {
 };
 
-struct General_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
+struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
 };
 
 // See rfc 5321 Section 4.1.3
 struct address_literal : seq<one<'['>,
                              sor<IPv4_address_literal,
                                  IPv6_address_literal,
-                                 General_address_literal>,
+                                 general_address_literal>,
                              one<']'>> {
 };
 
