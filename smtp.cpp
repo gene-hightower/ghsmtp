@@ -683,9 +683,6 @@ void bdat_act(Ctx& ctx)
     if (!ctx.hdr_end) {
       LOG(WARNING) << "may not have all headers in this email";
     }
-    else {
-      LOG(INFO) << "header size " << ctx.hdr.size() << " octets";
-    }
     ctx.session.bdat_msg_last(*ctx.msg, ctx.chunk_size);
     ctx.msg.reset();
     ctx.chunk_first = true;
@@ -720,9 +717,6 @@ struct data_action<data_end> {
     else {
       if (!ctx.hdr_end) {
         LOG(WARNING) << "may not have all headers in this email";
-      }
-      else {
-        LOG(INFO) << "header size " << ctx.hdr.size() << " octets";
       }
       ctx.session.data_msg_done(*ctx.msg);
       ctx.msg.reset();
