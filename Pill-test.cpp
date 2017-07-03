@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string.h>
 
+#include <glog/logging.h>
+
 int main(int arcv, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);

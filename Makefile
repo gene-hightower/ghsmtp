@@ -32,7 +32,7 @@ LDLIBS += \
 PROGRAMS := msg smtp snd
 
 msg_STEMS := msg Domain IP4 IP6
-smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX SPF Session Sock TLS-OpenSSL date/tz
+smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz
 snd_STEMS := snd DNS Domain POSIX Session Sock TLS-OpenSSL date/tz
 
 TESTS := \
@@ -58,11 +58,12 @@ Domain-test_STEMS := Domain IP4 IP6
 IP4-test_STEMS := IP4
 IP6-test_STEMS := IP6
 Mailbox-test_STEMS := Domain IP4 IP6
-Message-test_STEMS := Domain IP4 IP6 Message date/tz
+Message-test_STEMS := Domain IP4 IP6 Message Pill date/tz
 Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
+Pill-test_STEMS := Pill
 SPF-test_STEMS := SPF
-Session-test_STEMS := DNS Domain IP IP4 IP6 POSIX SPF Session Sock TLS-OpenSSL
+Session-test_STEMS := DNS Domain IP IP4 IP6 POSIX Pill SPF Session Sock TLS-OpenSSL
 Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
