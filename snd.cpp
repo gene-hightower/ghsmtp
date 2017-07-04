@@ -1,12 +1,15 @@
 #include "Sock.hpp"
 
 #include <iostream>
+#include <unordered_map>
 
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
 #include <experimental/string_view>
+
+#include <boost/algorithm/string/case_conv.hpp>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -31,6 +34,14 @@ namespace RFC5321 {
 
 struct Connection {
   Sock sock;
+
+  std::string server_id;
+
+  std::string ehlo_keyword;
+  std::string ehlo_param;
+  std::unordered_map<std::string, std::string> ehlo_params;
+
+  std::string reply_code;
 
   Connection(int fd)
     : sock(fd, fd, Config::read_timeout, Config::write_timeout)
@@ -186,7 +197,7 @@ struct reply_code
 //                   Reply-code [ SP textstring ] CRLF
 
 struct reply_lines : seq<star<seq<reply_code, one<'-'>, opt<textstring>, CRLF>>,
-                         seq<reply_code, SP, opt<textstring>, CRLF>> {
+                         seq<reply_code, opt<seq<SP, textstring>>, CRLF>> {
 };
 
 // ehlo-greet     = 1*(%d0-9 / %d11-12 / %d14-127)
@@ -239,11 +250,20 @@ struct action : nothing<Rule> {
 };
 
 template <>
+struct action<server_id> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    cnn.server_id = in.string();
+  }
+};
+
+template <>
 struct action<greeting> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "greeting: " << in.string();
+    // LOG(INFO) << "greeting: " << in.string();
   }
 };
 
@@ -252,7 +272,35 @@ struct action<ehlo_ok_rsp> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "ehlo_ok_rsp: " << in.string();
+    // LOG(INFO) << "ehlo_ok_rsp: " << in.string();
+  }
+};
+
+template <>
+struct action<ehlo_keyword> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    cnn.ehlo_keyword = in.string();
+  }
+};
+
+template <>
+struct action<ehlo_param> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    cnn.ehlo_param = in.string();
+  }
+};
+
+template <>
+struct action<ehlo_line> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    boost::to_upper(cnn.ehlo_keyword);
+    cnn.ehlo_params[cnn.ehlo_keyword] = cnn.ehlo_param;
   }
 };
 
@@ -262,6 +310,15 @@ struct action<reply_lines> {
   static void apply(Input const& in, Connection& cnn)
   {
     LOG(INFO) << "reply_lines: " << in.string();
+  }
+};
+
+template <>
+struct action<reply_code> {
+  template <typename Input>
+  static void apply(Input const& in, Connection& cnn)
+  {
+    cnn.reply_code = in.string();
   }
 };
 }
@@ -359,6 +416,49 @@ int main(int argc, char const* argv[])
       return 1;
     }
     LOG(INFO) << "ehlo_ok_rsp parse success";
+
+    if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
+      cnn.sock.out() << "STARTTLS\r\n" << std::flush;
+
+      if (!parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)) {
+        if (cnn.sock.timed_out()) {
+          std::cerr << "timed out waiting for STARTTLS reply\n";
+        }
+        else {
+          std::cerr << "syntax error from parser\n";
+        }
+        return 1;
+      }
+
+      cnn.sock.starttls_client();
+
+      cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
+
+      if (!parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)) {
+        if (cnn.sock.timed_out()) {
+          std::cerr << "timed out waiting for ehlo_ok_rsp\n";
+        }
+        else {
+          std::cerr << "syntax error from parser\n";
+        }
+        return 1;
+      }
+      LOG(INFO) << "2nd ehlo_ok_rsp parse success";
+    }
+
+    LOG(INFO) << "server identifies as " << cnn.server_id;
+    if (cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()) {
+      LOG(INFO) << "SIZE " << cnn.ehlo_params["SIZE"];
+    }
+    if (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end()) {
+      LOG(INFO) << "8BITMIME";
+    }
+    if (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()) {
+      LOG(INFO) << "CHUNKING";
+    }
+    if (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end()) {
+      LOG(INFO) << "SMTPUTF8";
+    }
 
     cnn.sock.out() << "QUIT\r\n" << std::flush;
 
