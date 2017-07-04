@@ -1,6 +1,8 @@
 #ifndef DMARC_DOT_HPP
 #define DMARC_DOT_HPP
 
+#include "IP6.hpp"
+
 #include <opendmarc/dmarc.h>
 
 #include <glog/logging.h>
@@ -69,9 +71,10 @@ public:
     }
   }
 
-  void init(char const* ip4)
+  void init(char const* ip)
   {
-    pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip4), false));
+    auto is_ipv6 = IP6::is_address(ip);
+    pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip), is_ipv6));
   }
 
   bool store_from_domain(char const* from_domain)
