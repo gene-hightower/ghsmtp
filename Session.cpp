@@ -744,7 +744,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
   auto tld = tld_db_.get_registered_domain(sndr_lc.c_str());
   if (tld) {
     if (white.lookup(tld)) {
-      LOG(INFO) << "sender tld \"" << tld << "\" whitelisted";
+      LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
       return true;
     }
   }
@@ -786,7 +786,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
   }
 
   if (two_level.compare(tld)) {
-    LOG(INFO) << "two level " << two_level << " != tld " << tld;
+    LOG(INFO) << "two level '" << two_level << "' != TLD '" << tld << "'";
   }
 
   return verify_sender_domain_uribl_(tld);
