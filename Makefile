@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := gflags ldns libglog libcurl libidn2 opendkim openssl
+USES := ldns libglog libcurl libidn2 opendkim openssl
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
@@ -23,6 +23,7 @@ LDLIBS += \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
+	-lgflags \
 	-lopendmarc \
 	-lregdom \
 	-lspf2 \
@@ -123,3 +124,5 @@ regression: $(programs) $(TEST_MAILDIR)
 test-mail:
 	./mkm > test.eml
 	curl --ssl-reqd --mail-from 基因@digilicious.com --mail-rcpt 基因@digilicious.com --url smtp://localhost:225 --upload-file test.eml -v --insecure
+	./mkm > test.eml
+	./snd
