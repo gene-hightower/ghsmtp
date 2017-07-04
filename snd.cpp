@@ -363,6 +363,7 @@ int conn(char const* node, char const* service)
     }
 
     case AF_INET6: {
+      break;
       auto in6 = reinterpret_cast<sockaddr_in6*>(addr);
 
       int fd = socket(AF_INET6, SOCK_STREAM, 0);
