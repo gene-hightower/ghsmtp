@@ -398,8 +398,8 @@ int main(int argc, char* argv[])
 {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  static RFC5321::Connection cnn(conn("gmail-smtp-in.l.google.com", "smtp"));
-  // static RFC5321::Connection cnn(conn("localhost", "smtp-test"));
+  // static RFC5321::Connection cnn(conn("gmail-smtp-in.l.google.com", "smtp"));
+  static RFC5321::Connection cnn(conn("localhost", "smtp-test"));
 
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
@@ -437,8 +437,8 @@ int main(int argc, char* argv[])
 
     LOG(INFO) << "RCPT TO";
 
-    cnn.sock.out() << "RCPT TO:<gene.hightower@gmail.com>\r\n" << std::flush;
-    // cnn.sock.out() << "RCPT TO:<基因@digilicious.com>\r\n" << std::flush;
+    // cnn.sock.out() << "RCPT TO:<gene.hightower@gmail.com>\r\n" << std::flush;
+    cnn.sock.out() << "RCPT TO:<基因@digilicious.com>\r\n" << std::flush;
 
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
