@@ -4,8 +4,10 @@
 *.o
 *~
 cdb-gen
+mkm
 msg
 p0f
+public_suffix_list.dat
 smtp
 smtp.pem
 snd
@@ -16,4 +18,3 @@ two-level-black.cdb
 two-level-tlds
 two-level-tlds.cdb
 two-level-white.cdb
-public_suffix_list.dat
