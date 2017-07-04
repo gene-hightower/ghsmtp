@@ -22,13 +22,14 @@ int main(int argc, char* argv[])
   PCHECK((fd_out = mkstemp(outfile)) != -1);
 
   boost::iostreams::stream<SockBuffer> iostream{
-      fd_in, fd_out, std::chrono::seconds(1), std::chrono::seconds(1),
+      fd_in, fd_out, std::chrono::seconds(10), std::chrono::seconds(10),
       std::chrono::seconds(1)};
 
   std::string line;
   while (std::getline(iostream, line)) {
     iostream << line << '\n';
   }
+  iostream << std::flush;
 
   std::string diff_cmd = "diff ";
   diff_cmd += infile;
@@ -38,5 +39,6 @@ int main(int argc, char* argv[])
 
   PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;
 
-  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n';
+  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n'
+            << std::flush;
 }
