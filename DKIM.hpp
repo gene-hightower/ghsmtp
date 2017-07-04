@@ -15,29 +15,15 @@ u_char* uc(char const* cp)
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
 }
 
-constexpr unsigned char id[]{"OpenDKIM::Verify"};
-
-class Verify;
+constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
+constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
 
 class Lib {
 public:
-  Lib()
-    : lib_(CHECK_NOTNULL(dkim_init(nullptr, nullptr)))
+  virtual ~Lib()
   {
-  }
-  ~Lib() { dkim_close(lib_); }
-
-private:
-  DKIM_LIB* lib_{nullptr};
-
-  friend class Verify;
-};
-
-class Verify {
-public:
-  Verify(Lib& lib)
-    : dkim_(CHECK_NOTNULL(dkim_verify(lib.lib_, id, nullptr, &status_)))
-  {
+    dkim_free(dkim_);
+    dkim_close(lib_);
   }
 
   void header(std::experimental::string_view header)
@@ -139,8 +125,10 @@ public:
         if (bits < 1024) {
           LOG(WARNING) << "keysize " << bits << " too small for domain " << dom;
         }
-      } else {
-        LOG(WARNING) << "getkeysize failed for domain " << dom << " with " << dkim_getresultstr(status_);
+      }
+      else {
+        LOG(WARNING) << "getkeysize failed for domain " << dom << " with "
+                     << dkim_getresultstr(status_);
       }
 
       auto passed
@@ -148,6 +136,24 @@ public:
 
       func(reinterpret_cast<char const*>(dom), passed);
     }
+  }
+
+protected:
+  Lib()
+    : lib_(CHECK_NOTNULL(dkim_init(nullptr, nullptr)))
+  {
+  }
+
+  DKIM_LIB* lib_{nullptr};
+  DKIM* dkim_{nullptr};
+  DKIM_STAT status_{DKIM_STAT_OK};
+};
+
+class Verify : public Lib {
+public:
+  Verify()
+  {
+    dkim_ = CHECK_NOTNULL(dkim_verify(lib_, id_v, nullptr, &status_));
   }
 
   bool check()
@@ -227,10 +233,17 @@ public:
   {
     return dkim_sig_syntax(dkim_, uc(str.data()), str.length()) == DKIM_STAT_OK;
   }
+};
 
-private:
-  DKIM* dkim_{nullptr};
-  DKIM_STAT status_{DKIM_STAT_OK};
+class Sign : public Lib {
+public:
+  Sign(char const* secretkey, char const* selector, char const* domain)
+  {
+    dkim_ = CHECK_NOTNULL(dkim_sign(lib_, id_s, nullptr, uc(secretkey),
+                                    uc(selector), uc(domain),
+                                    DKIM_CANON_RELAXED, DKIM_CANON_RELAXED,
+                                    DKIM_SIGN_RSASHA256, -1, &status_));
+  }
 };
 }
 

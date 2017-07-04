@@ -97,8 +97,7 @@ struct ci_less : public std::binary_function<std::string, std::string, bool> {
 };
 
 struct Ctx {
-  OpenDKIM::Lib dkl;
-  OpenDKIM::Verify dkv{dkl};
+  OpenDKIM::Verify dkv;
 
   OpenDMARC::Lib dml;
   OpenDMARC::Policy dmp;
