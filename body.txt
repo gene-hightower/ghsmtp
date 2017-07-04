@@ -1,12 +1,6 @@
-Just dropping you a note using SMTPUTF8, since you asked.
-
-As far as I know, Google is /still/ the only major domestic email
-service that supports SMTPUTF8.  There are a few in China (中国) that
-seem to also.
-
-Can you imagine?  We have been forcing the whole world to use US-ASCII
-to the left of the '@' for like 35 years!
-
-And what about BINARYMIME?  Is that /ever/ going to happen?
-
-BTW: I am /not/ using Google.
+பேஸ்பால் என்பது துடுப்பு மற்றும் பந்தைப் பயன்படுத்தி விளையாடப்படும் குழு
+விளையாட்டு. விளையாடும் ஒவ்வொரு அணியிலும் 09 வீரர்கள் இருப்பர். வட அமெரிக்காவில்
+பத்தொன்பதாம் நூற்றாண்டின் மத்தியில் அடிப்பந்தாட்டம்(Baseball) அல்லது பேஸ்போல்
+விளையாட்டு உருவானது. ஐக்கிய அமெரிக்காவின் (USA) தேசிய விளையாட்டான இது
+ஹாலிவுட் படங்களினாலும், தொலைக்காட்சியினாலும் மற்றவர்களுக்கு சற்றேனும்
+அறிமுகமானதாக இருக்கிறது.
