@@ -32,8 +32,7 @@ void Message::open(std::string const& fqdn, SpamStatus spam)
 
   // Unique name, see: <http://cr.yp.to/proto/maildir.html>
   std::ostringstream uniq;
-  uniq << then_.sec() << "."
-       << "R" << s_ << "." << fqdn;
+  uniq << then_.sec() << '.' << 'R' << s_ << '.' << fqdn;
 
   tmpfn_ = maildir;
   newfn_ = maildir;
