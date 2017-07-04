@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 
   std::string line;
   while (std::getline(iostream, line)) {
-    iostream << line << std::endl;
+    iostream << line << '\n';
   }
 
   std::string diff_cmd = "diff ";
@@ -38,5 +38,5 @@ int main(int argc, char* argv[])
 
   PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;
 
-  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << std::endl;
+  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n';
 }
