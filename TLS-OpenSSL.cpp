@@ -27,23 +27,63 @@ TLS::~TLS()
   }
 }
 
-void TLS::starttls_client(int fd_in, int fd_out, std::chrono::milliseconds timeout)
+void TLS::starttls_client(int fd_in,
+                          int fd_out,
+                          std::chrono::milliseconds timeout)
 {
-  LOG(FATAL) << "no starttls_client yet";
-}
-
-void TLS::starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout)
-{
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-  SSL_library_init();
-#else
-  OPENSSL_init_ssl(0, nullptr);
-#endif
-
   SSL_load_error_strings();
+  SSL_library_init();
 
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
-  OpenSSL_add_all_algorithms();
+
+  const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
+  ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
+
+  constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+  SSL_CTX_set_options(ctx_, flags);
+
+  ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
+  SSL_set_rfd(ssl_, fd_in);
+  SSL_set_wfd(ssl_, fd_out);
+
+  using namespace std::chrono;
+  time_point<system_clock> start = system_clock::now();
+
+  int rc;
+  while ((rc = SSL_connect(ssl_)) < 0) {
+
+    time_point<system_clock> now = system_clock::now();
+
+    CHECK(now < (start + timeout)) << "starttls timed out";
+
+    milliseconds time_left
+        = duration_cast<milliseconds>((start + timeout) - now);
+
+    switch (SSL_get_error(ssl_, rc)) {
+    case SSL_ERROR_WANT_READ:
+      CHECK(POSIX::input_ready(fd_in, time_left))
+          << "starttls timed out on input_ready";
+      continue; // try SSL_accept again
+
+    case SSL_ERROR_WANT_WRITE:
+      CHECK(POSIX::output_ready(fd_out, time_left))
+          << "starttls timed out on output_ready";
+      continue; // try SSL_accept again
+
+    default:
+      ssl_error();
+    }
+  }
+}
+
+void TLS::starttls_server(int fd_in,
+                          int fd_out,
+                          std::chrono::milliseconds timeout)
+{
+  SSL_load_error_strings();
+  SSL_library_init();
+
+  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));

@@ -7,11 +7,9 @@
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
-#include <tao/pegtl/contrib/alphabet.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
-using namespace tao::pegtl::alphabet;
 
 using namespace std::string_literals;
 
@@ -699,8 +697,11 @@ struct action<bdat> {
 
 template <>
 struct action<bdat_last> {
-  static void apply0(Ctx& ctx)
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
   {
+    // FIXME
+    LOG(INFO) << in.string();
     bdat_act(ctx);
     ctx.bdat_error = true; // to make next BDAT fail.
   }

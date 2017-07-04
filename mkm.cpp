@@ -1,7 +1,6 @@
 #include "Now.hpp"
 #include "Pill.hpp"
-
-#include <sys/utsname.h>
+#include "hostname.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -31,17 +30,18 @@ int main(int argc, char* argv[])
 
   eml.hdrs.push_back(
       std::make_pair("From"s, "Gene Hightower <基因@digilicious.com>"s));
-  eml.hdrs.push_back(
-      std::make_pair("To"s, "Gene Hightower <基因@digilicious.com>"s));
-  eml.hdrs.push_back(std::make_pair("Subject"s, "This is a test email…"s));
+
+  eml.hdrs.push_back(std::make_pair("To"s, "Gene Hightower <gene.hightower@gmail.com>"s));
+  // eml.hdrs.push_back(std::make_pair("To"s, "Gene Hightower <基因@digilicious.com>"s));
+
+  eml.hdrs.push_back(std::make_pair("Subject"s, "Sending a note…"s));
   eml.hdrs.push_back(std::make_pair("Keywords"s, "everyone loves π, 🔑, 🌀"s));
 
-  utsname un;
-  PCHECK(uname(&un) == 0);
+  auto nodename = get_hostname();
   Pill red, blue;
   std::stringstream mid_str;
-  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
-          << un.nodename << '>';
+  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@' << nodename
+          << '>';
   eml.hdrs.push_back(std::make_pair("Message-ID"s, mid_str.str()));
 
   for (auto const& h : eml.hdrs) {

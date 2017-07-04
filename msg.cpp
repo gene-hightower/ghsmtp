@@ -19,13 +19,11 @@
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
-#include <tao/pegtl/contrib/alphabet.hpp>
 
 #include <tao/pegtl/contrib/tracer.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
-using namespace tao::pegtl::alphabet;
 
 using std::experimental::string_view;
 

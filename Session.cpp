@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include <sys/utsname.h>
-
 #include "CDB.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
@@ -16,6 +14,7 @@
 #include "Message.hpp"
 #include "SPF.hpp"
 #include "Session.hpp"
+#include "hostname.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -59,10 +58,7 @@ Session::Session(int fd_in, int fd_out, std::string our_fqdn)
   : sock_(fd_in, fd_out, Config::read_timeout, Config::write_timeout)
 {
   if (our_fqdn.empty()) {
-    utsname un;
-    PCHECK(uname(&un) == 0);
-    our_fqdn = un.nodename;
-
+    our_fqdn = get_hostname();
     if (our_fqdn.find('.') == std::string::npos) {
       if (sock_.us_c_str()[0]) {
         our_fqdn = "["s + sock_.us_c_str() + "]"s;

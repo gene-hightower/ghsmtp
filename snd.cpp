@@ -9,15 +9,22 @@
 
 #include <experimental/string_view>
 
+#include <gflags/gflags.h>
+
+DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
+
 #include <boost/algorithm/string/case_conv.hpp>
+
+#define BOOST_FILESYSTEM_NO_DEPRECATED
+#include <boost/filesystem.hpp>
+
+#include <boost/iostreams/device/mapped_file.hpp>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
-#include <tao/pegtl/contrib/alphabet.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
-using namespace tao::pegtl::alphabet;
 
 using namespace std::string_literals;
 
@@ -263,7 +270,7 @@ struct action<greeting> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    // LOG(INFO) << "greeting: " << in.string();
+    LOG(INFO) << "greeting: " << in.string();
   }
 };
 
@@ -272,7 +279,7 @@ struct action<ehlo_ok_rsp> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    // LOG(INFO) << "ehlo_ok_rsp: " << in.string();
+    LOG(INFO) << "ehlo_ok_rsp: " << in.string();
   }
 };
 
@@ -386,92 +393,90 @@ int conn(char const* node, char const* service)
   return -1;
 }
 
-int main(int argc, char const* argv[])
+int main(int argc, char* argv[])
 {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+
+  // static RFC5321::Connection cnn(conn("gmail-smtp-in.l.google.com", "smtp"));
   static RFC5321::Connection cnn(conn("localhost", "smtp-test"));
 
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
   try {
-    if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
-      if (cnn.sock.timed_out()) {
-        std::cerr << "timed out waiting for greeting\n";
-      }
-      else {
-        std::cerr << "syntax error from parser\n";
-      }
-      return 1;
-    }
-    LOG(INFO) << "greeting parse success";
+    CHECK((parse<RFC5321::greeting, RFC5321::action>(in, cnn)));
 
     cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
-
-    if (!parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)) {
-      if (cnn.sock.timed_out()) {
-        std::cerr << "timed out waiting for ehlo_ok_rsp\n";
-      }
-      else {
-        std::cerr << "syntax error from parser\n";
-      }
-      return 1;
-    }
-    LOG(INFO) << "ehlo_ok_rsp parse success";
+    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
     if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
       cnn.sock.out() << "STARTTLS\r\n" << std::flush;
-
-      if (!parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)) {
-        if (cnn.sock.timed_out()) {
-          std::cerr << "timed out waiting for STARTTLS reply\n";
-        }
-        else {
-          std::cerr << "syntax error from parser\n";
-        }
-        return 1;
-      }
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
       cnn.sock.starttls_client();
-
       cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
-
-      if (!parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)) {
-        if (cnn.sock.timed_out()) {
-          std::cerr << "timed out waiting for ehlo_ok_rsp\n";
-        }
-        else {
-          std::cerr << "syntax error from parser\n";
-        }
-        return 1;
-      }
-      LOG(INFO) << "2nd ehlo_ok_rsp parse success";
+      CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
     }
 
     LOG(INFO) << "server identifies as " << cnn.server_id;
-    if (cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()) {
-      LOG(INFO) << "SIZE " << cnn.ehlo_params["SIZE"];
+
+    if ((cnn.ehlo_params.find("8BITMIME") == cnn.ehlo_params.end())
+        || (cnn.ehlo_params.find("SMTPUTF8") == cnn.ehlo_params.end())) {
+
+      LOG(INFO) << "We don't have all the extensions we need.";
+      cnn.sock.out() << "QUIT\r\n" << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      return 1;
     }
-    if (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end()) {
-      LOG(INFO) << "8BITMIME";
+
+    LOG(INFO) << "MAIL FROM";
+    cnn.sock.out()
+        << "MAIL FROM:<基因@digilicious.com> SMTPUTF8 BODY=8BITMIME\r\n"
+        << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    LOG(INFO) << "RCPT TO";
+
+    // cnn.sock.out() << "RCPT TO:<gene.hightower@gmail.com>\r\n" << std::flush;
+    cnn.sock.out() << "RCPT TO:<基因@digilicious.com>\r\n" << std::flush;
+
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    if (FLAGS_use_chunking
+        && (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end())) {
+      boost::filesystem::path test_mail_path("test.eml");
+      boost::iostreams::mapped_file_source test_mail(test_mail_path);
+
+      std::stringstream bdat_str;
+      bdat_str << "BDAT " << test_mail.size() << " LAST";
+      LOG(INFO) << bdat_str.str();
+      cnn.sock.out() << bdat_str.str() << "\r\n" << std::flush;
+
+      cnn.sock.out().write(test_mail.data(), test_mail.size()) << std::flush;
+      CHECK(cnn.sock.out().good());
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
-    if (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()) {
-      LOG(INFO) << "CHUNKING";
-    }
-    if (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end()) {
-      LOG(INFO) << "SMTPUTF8";
+    else {
+      LOG(INFO) << "DATA";
+      cnn.sock.out() << "DATA\r\n" << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+      std::ifstream test_mail("test.eml");
+      std::string line;
+      while (std::getline(test_mail, line)) {
+        if (line.length() && (line.at(0) == '.')) {
+          cnn.sock.out() << '.';
+        }
+        cnn.sock.out() << line;
+        if (line.back() != '\r')
+          cnn.sock.out() << '\r';
+        cnn.sock.out() << '\n';
+      }
+      cnn.sock.out() << ".\r\n" << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
 
     cnn.sock.out() << "QUIT\r\n" << std::flush;
-
-    if (!parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)) {
-      if (cnn.sock.timed_out()) {
-        std::cerr << "timed out waiting for quit reply\n";
-      }
-      else {
-        std::cerr << "syntax error from parser\n";
-      }
-      return 1;
-    }
-    LOG(INFO) << "reply_lines parse success";
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   catch (parse_error const& e) {
     std::cerr << e.what();

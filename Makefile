@@ -13,7 +13,7 @@
 #   You should have received a copy of the GNU Affero General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-USES := ldns libcurl libidn2 opendkim openssl
+USES := gflags ldns libglog libcurl libidn2 opendkim openssl
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
@@ -23,7 +23,6 @@ LDLIBS += \
 	-lboost_system \
 	-lcdb \
 	-lcrypto \
-	-lglog \
 	-lopendmarc \
 	-lregdom \
 	-lspf2 \
@@ -31,10 +30,10 @@ LDLIBS += \
 
 PROGRAMS := mkm msg smtp snd
 
-mkm_STEMS := mkm Pill date/tz
+mkm_STEMS := mkm Pill date/tz hostname
 msg_STEMS := msg Domain IP4 IP6
-smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz
-snd_STEMS := snd DNS Domain POSIX Session Sock TLS-OpenSSL date/tz
+smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz hostname
+snd_STEMS := snd DNS Domain POSIX Session Sock TLS-OpenSSL date/tz hostname
 
 TESTS := \
 	CDB-test \
@@ -64,7 +63,7 @@ Now-test_STEMS := date/tz
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := SPF
-Session-test_STEMS := DNS Domain IP IP4 IP6 POSIX Pill SPF Session Sock TLS-OpenSSL
+Session-test_STEMS := DNS Domain IP IP4 IP6 POSIX Pill SPF Session Sock TLS-OpenSSL hostname
 Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL

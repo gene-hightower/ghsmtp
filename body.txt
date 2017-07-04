@@ -1,9 +1,12 @@
-共同通信杯の後、大久保はクラシック第一戦の皐月賞に向けスプリングステー
-クスを経由して出走することを決定。この出走は前述のように気性面の問題に
-対処するためのものであった。レースでは第3コーナーで最後方からまくりを
-かけ優勝した。
+Just dropping you a note using SMTPUTF8, since you asked.
 
-同レースでは直線の長い東京競馬場でありながら、まくりをかけながらも出走
-馬の中で最も速い上がりを繰り出して優勝。
+As far as I know, Google is /still/ the only major domestic email
+service that supports SMTPUTF8.  There are a few in China (中国) that
+seem to also.
 
-クラシック二冠を達成した。
+Can you imagine?  We have been forcing the whole world to use US-ASCII
+to the left of the '@' for like 35 years!
+
+And what about BINARYMIME?  Is that /ever/ going to happen?
+
+BTW: I am /not/ using Google.

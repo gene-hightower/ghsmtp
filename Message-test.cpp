@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include <cstdlib>
-#include <sys/utsname.h>
 
 using namespace std::string_literals;
 
