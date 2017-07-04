@@ -34,6 +34,8 @@ public:
         .count();
   }
 
+  std::string const& string() const { return str_; }
+
   bool operator==(Now const& that) const { return v_ == that.v_; }
   bool operator!=(Now const& that) const { return !(*this == that); }
 
