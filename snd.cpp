@@ -22,11 +22,11 @@ DEFINE_string(receiver, "localhost", "FQDN of receiving node");
 
 DEFINE_string(service, "smtp-test", "service name");
 
-DEFINE_string(from, "基因@digilicious.com", "rfc5321 MAIL FROM address");
-DEFINE_string(to, "基因@digilicious.com", "rfc5321 RCPT TO address");
+DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
+DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
 
-DEFINE_string(from_name, "基因 Gene Hightower", "rfc5322 From name");
-DEFINE_string(to_name, "基因 Gene Hightower", "rfc5322 To name");
+DEFINE_string(from_name, "Gene Hightower", "rfc5322 From name");
+DEFINE_string(to_name, "Gene Hightower", "rfc5322 To name");
 
 DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
 DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
@@ -34,12 +34,21 @@ DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
 DEFINE_bool(ip_4, false, "use only IP version 4");
 DEFINE_bool(ip_6, false, "use only IP version 6");
 
+DEFINE_string(username, "", "AUTH username");
+DEFINE_string(password, "", "AUTH password");
+
 #include <boost/algorithm/string/case_conv.hpp>
 
 #define BOOST_FILESYSTEM_NO_DEPRECATED
 #include <boost/filesystem.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
+
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/binary_from_base64.hpp>
+#include <boost/archive/iterators/insert_linebreaks.hpp>
+#include <boost/archive/iterators/remove_whitespace.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -250,8 +259,9 @@ struct ehlo_param : plus<range<33, 126>> {
 };
 
 // ehlo-line      = ehlo-keyword *( SP ehlo-param )
+// with extra support for AUTH=
 
-struct ehlo_line : seq<ehlo_keyword, star<seq<SP, ehlo_param>>> {
+struct ehlo_line : seq<ehlo_keyword, star<seq<sor<SP, one<'='>>, ehlo_param>>> {
 };
 
 // ehlo-ok-rsp    = ( "250 " Domain [ SP ehlo-greet ] CRLF )
@@ -271,6 +281,14 @@ struct ehlo_ok_rsp
                   CRLF,
                   star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
                   seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>>> {
+};
+
+struct auth_login_username
+    : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {
+};
+
+struct auth_login_password
+    : seq<TAOCPP_PEGTL_STRING("334 UGFzc3dvcmQ6"), CRLF> {
 };
 
 template <typename Rule>
@@ -437,6 +455,22 @@ private:
   }
 };
 
+std::string base64(string_view s)
+{
+  using namespace boost::archive::iterators;
+
+  typedef insert_linebreaks<base64_from_binary<transform_width<std::string::
+                                                                   const_iterator,
+                                                               6, 8>>,
+                            72>
+      it_base64_t;
+
+  unsigned int writePaddChars = (3 - s.length() % 3) % 3;
+  std::string b64(it_base64_t(s.begin()), it_base64_t(s.end()));
+  b64.append(writePaddChars, '=');
+  return b64;
+}
+
 namespace gflags {
 // in case we didn't have one
 }
@@ -445,7 +479,7 @@ int main(int argc, char* argv[])
 {
   const auto hostname = get_hostname();
   FLAGS_sender = hostname.c_str();
-  const auto from = "基因@"s + hostname;
+  const auto from = "♥@"s + hostname;
   FLAGS_from = from.c_str();
 
   { // Need to work with either namespace.
@@ -476,6 +510,10 @@ int main(int argc, char* argv[])
   eml.add_hdr("Subject"s, FLAGS_subject);
   eml.add_hdr("Keywords"s, FLAGS_keywords);
 
+  eml.add_hdr("MIME-Version"s, "1.0"s);
+  eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
+  eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
+
   Pill red, blue;
   std::stringstream mid_str;
   mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
@@ -494,7 +532,6 @@ int main(int argc, char* argv[])
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
     if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
-
       LOG(INFO) << "> STARTTLS";
       cnn.sock.out() << "STARTTLS\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -516,6 +553,21 @@ int main(int argc, char* argv[])
       cnn.sock.out() << "QUIT\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       return 1;
+    }
+
+    if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
+      if (cnn.ehlo_params.find("AUTH") != cnn.ehlo_params.end()) {
+        LOG(INFO) << "> AUTH";
+        cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
+        CHECK((parse<RFC5321::auth_login_username>(in)));
+        cnn.sock.out() << base64(FLAGS_username) << "\r\n" << std::flush;
+        CHECK((parse<RFC5321::auth_login_password>(in)));
+        cnn.sock.out() << base64(FLAGS_password) << "\r\n" << std::flush;
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      }
+      else {
+        LOG(WARNING) << "server doesn't support AUTH";
+      }
     }
 
     std::string param;
