@@ -91,6 +91,37 @@ void TLS::starttls_server(int fd_in,
   constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
   SSL_CTX_set_options(ctx_, flags);
 
+  // <https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37376.pdf>
+
+  // Shooting for ECDHE-RSA-AES128-GCM-SHA256, since OpenSSL will pick
+  // the larger AES given the option, we remove them.
+
+  // clang-format off
+  char const* cipher_list
+      = "ECDHE-RSA-AES128-GCM-SHA256:"
+        "ECDHE-ECDSA-AES128-GCM-SHA256:"
+        // "ECDHE-RSA-AES256-GCM-SHA384:"
+        // "ECDHE-ECDSA-AES256-GCM-SHA384:"
+        "DHE-RSA-AES128-GCM-SHA256:"
+        "kEDH+AESGCM:"
+        "ECDHE-RSA-AES128-SHA256:"
+        "ECDHE-ECDSA-AES128-SHA256:"
+        "ECDHE-RSA-AES128-SHA:"
+        "ECDHE-ECDSA-AES128-SHA:"
+        // "ECDHE-RSA-AES256-SHA384:"
+        // "ECDHE-ECDSA-AES256-SHA384:"
+        // "ECDHE-RSA-AES256-SHA:"
+        // "ECDHE-ECDSA-AES256-SHA:"
+        "DHE-RSA-AES128-SHA256:"
+        "DHE-RSA-AES128-SHA:"
+        // "DHE-RSA-AES256-SHA256:"
+        // "DHE-RSA-AES256-SHA:"
+        "!aNULL:!eNULL:!EXPORT:!DSS:!DES:!RC4:!3DES:!MD5:!PSK";
+  // clang-format on
+
+  CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
+      << "Can't set cipher list to " << cipher_list;
+
   CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load certificate file \"" << cert_path << "\"";
   CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
@@ -99,34 +130,40 @@ void TLS::starttls_server(int fd_in,
   CHECK(SSL_CTX_check_private_key(ctx_))
       << "Private key does not match the public certificate";
 
-  // RFC 3526
-  constexpr char g_dh4096_sz[]
-      = "-----BEGIN DH PARAMETERS-----\n"
-        "MIICCAKCAgEA///////////JD9qiIWjCNMTGYouA3BzRKQJOCIpnzHQCC76mOxOb\n"
-        "IlFKCHmONATd75UZs806QxswKwpt8l8UN0/hNW1tUcJF5IW1dmJefsb0TELppjft\n"
-        "awv/XLb0Brft7jhr+1qJn6WunyQRfEsf5kkoZlHs5Fs9wgB8uKFjvwWY2kg2HFXT\n"
-        "mmkWP6j9JM9fg2VdI9yjrZYcYvNWIIVSu57VKQdwlpZtZww1Tkq8mATxdGwIyhgh\n"
-        "fDKQXkYuNs474553LBgOhgObJ4Oi7Aeij7XFXfBvTFLJ3ivL9pVYFxg5lUl86pVq\n"
-        "5RXSJhiY+gUQFXKOWoqqxC2tMxcNBFB6M6hVIavfHLpk7PuFBFjb7wqK6nFXXQYM\n"
-        "fbOXD4Wm4eTHq/WujNsJM9cejJTgSiVhnc7j0iYa0u5r8S/6BtmKCGTYdgJzPshq\n"
-        "ZFIfKxgXeyAMu+EXV3phXWx3CYjAutlG4gjiT6B05asxQ9tb/OD9EI5LgtEgqSEI\n"
-        "ARpyPBKnh+bXiHGaEL26WyaZwycYavTiPBqUaDS2FQvaJYPpyirUTOjbu8LbBN6O\n"
-        "+S6O/BQfvsqmKHxZR05rwF2ZspZPoJDDoiM7oYZRW+ftH2EpcM7i16+4G912IXBI\n"
-        "HNAGkSfVsFqpk7TqmI2P3cGG/7fckKbAj030Nck0BjGZ//////////8CAQI=\n"
-        "-----END DH PARAMETERS-----";
+  // <https://wiki.mozilla.org/Security/Server_Side_TLS#DHE_handshake_and_dhparam>
+  constexpr char ffdhe4096[] = R"(
+-----BEGIN DH PARAMETERS-----
+MIICCAKCAgEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
++8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a
+87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7
+YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi
+7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD
+ssbzSibBsu/6iGtCOGEfz9zeNVs7ZRkDW7w09N75nAI4YbRvydbmyQd62R0mkff3
+7lmMsPrBhtkcrv4TCYUTknC0EwyTvEN5RPT9RFLi103TZPLiHnH1S/9croKrnJ32
+nuhtK8UiNjoNq8Uhl5sN6todv5pC1cRITgq80Gv6U93vPBsg7j/VnXwl5B0rZp4e
+8W5vUsMWTfT7eTDp5OWIV7asfV9C1p9tGHdjzx1VA0AEh/VbpX4xzHpxNciG77Qx
+iu1qHgEtnmgyqQdgCpGBMMRtx3j5ca0AOAkpmaMzy4t6Gh25PXFAADwqTs6p+Y0K
+zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
+-----END DH PARAMETERS-----
+)";
 
-  BIO* bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(g_dh4096_sz), -1));
+  BIO* bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
   DH* dh = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
+
+  auto ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 
   SSL_CTX_set_tmp_dh(ctx_, dh);
+  SSL_CTX_set_tmp_ecdh(ctx_, ecdh);
 
 #pragma GCC diagnostic pop
 
   DH_free(dh);
   BIO_free(bio);
+
+  EC_KEY_free(ecdh);
 
   // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
 
