@@ -25,8 +25,8 @@ DEFINE_string(service, "smtp-test", "service name");
 DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
 DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
 
-DEFINE_string(from_name, "Gene Hightower", "rfc5322 From name");
-DEFINE_string(to_name, "Gene Hightower", "rfc5322 To name");
+DEFINE_string(from_name, "基因", "rfc5322 From name");
+DEFINE_string(to_name, "基因", "rfc5322 To name");
 
 DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
 DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
