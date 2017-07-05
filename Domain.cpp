@@ -11,8 +11,6 @@
 
 using namespace std::string_literals;
 
-Domain::Domain(std::experimental::string_view dom) { set(dom); }
-
 namespace {
 std::string nfkc(std::experimental::string_view str)
 {

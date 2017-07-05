@@ -1,3 +1,4 @@
+#include "Domain.hpp"
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
@@ -436,6 +437,10 @@ private:
   }
 };
 
+namespace gflags {
+// in case we didn't have one
+}
+
 int main(int argc, char* argv[])
 {
   const auto hostname = get_hostname();
@@ -448,6 +453,9 @@ int main(int argc, char* argv[])
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
   }
+
+  Domain sender(FLAGS_sender);
+  Domain receiver(FLAGS_receiver);
 
   if (FLAGS_ip_4 && FLAGS_ip_6) {
     std::cout << "Must use /some/ IP version.";
@@ -470,19 +478,19 @@ int main(int argc, char* argv[])
 
   Pill red, blue;
   std::stringstream mid_str;
-  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
-          << FLAGS_sender << '>';
+  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@' << sender
+          << '>';
   eml.add_hdr("Message-ID"s, mid_str.str());
 
-  static RFC5321::Connection cnn(conn(FLAGS_receiver, FLAGS_service));
+  static RFC5321::Connection cnn(conn(receiver.ascii(), FLAGS_service));
 
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
   try {
     CHECK((parse<RFC5321::greeting, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "> EHLO " << FLAGS_sender;
-    cnn.sock.out() << "EHLO " << FLAGS_sender << "\r\n" << std::flush;
+    LOG(INFO) << "> EHLO " << sender;
+    cnn.sock.out() << "EHLO " << sender << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
     if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
@@ -493,12 +501,12 @@ int main(int argc, char* argv[])
 
       cnn.sock.starttls_client();
 
-      LOG(INFO) << "> EHLO " << FLAGS_sender;
-      cnn.sock.out() << "EHLO " << FLAGS_sender << "\r\n" << std::flush;
+      LOG(INFO) << "> EHLO " << sender;
+      cnn.sock.out() << "EHLO " << sender << "\r\n" << std::flush;
       CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
     }
 
-    if (cnn.server_id != FLAGS_receiver) {
+    if (cnn.server_id != receiver.ascii()) {
       LOG(INFO) << "server identifies as " << cnn.server_id;
     }
 

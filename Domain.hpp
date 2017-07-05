@@ -8,7 +8,8 @@
 class Domain {
 public:
   Domain() = default;
-  Domain(std::experimental::string_view dom);
+
+  Domain(std::experimental::string_view dom) { set(dom); }
 
   void set(std::experimental::string_view dom);
   void clear();
@@ -20,11 +21,9 @@ public:
     if ((0 != a.length()) && ('.' == a.back())) {
       a.remove_suffix(1);
     }
-
     if ((0 != b.length()) && ('.' == b.back())) {
       b.remove_suffix(1);
     }
-
     return boost::iequals(a, b);
   }
 
@@ -61,8 +60,6 @@ private:
   std::string utf8_;
 
   bool is_address_literal_{false};
-
-  void set_(char const* dom);
 
   friend std::ostream& operator<<(std::ostream& os, Domain const& dom)
   {
