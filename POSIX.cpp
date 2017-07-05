@@ -48,7 +48,7 @@ bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
 
 std::streamsize
 POSIX::io_fd_(char const* fnm,
-              std::function<ssize_t(int, void*, size_t)> fnc,
+              std::function<ssize_t(int, void*, size_t)> io_fnc,
               std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
               int fd,
               char* s,
@@ -60,10 +60,11 @@ POSIX::io_fd_(char const* fnm,
   time_point<system_clock> start = system_clock::now();
 
   ssize_t n_ret;
-  while ((n_ret = fnc(fd, static_cast<void*>(s), static_cast<size_t>(n))) < 0) {
+  while ((n_ret = io_fnc(fd, static_cast<void*>(s), static_cast<size_t>(n)))
+         < 0) {
 
     if (errno == EINTR)
-      continue; // try fnc again
+      continue; // try io_fnc again
 
     if (errno == ECONNRESET) {
       LOG(WARNING) << fnm << " raised ECONNRESET, interpreting as EOF";
@@ -78,7 +79,7 @@ POSIX::io_fd_(char const* fnm,
       milliseconds time_left
           = duration_cast<milliseconds>((start + timeout) - now);
       if (rdy_fnc(fd, time_left))
-        continue; // try fnc again
+        continue; // try io_fnc again
     }
     t_o = true;
     LOG(WARNING) << fnm << " timed out";

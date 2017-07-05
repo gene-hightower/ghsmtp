@@ -38,7 +38,7 @@ public:
 private:
   static std::streamsize
   io_fd_(char const* fnm,
-         std::function<ssize_t(int, void*, size_t)> fnc,
+         std::function<ssize_t(int, void*, size_t)> io_fnc,
          std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
          int fd,
          char* s,

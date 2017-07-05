@@ -181,7 +181,7 @@ std::string TLS::info()
 }
 
 std::streamsize TLS::io_tls_(char const* fnm,
-                             std::function<int(SSL*, void*, int)> fnc,
+                             std::function<int(SSL*, void*, int)> io_fnc,
                              char* s,
                              std::streamsize n,
                              std::chrono::milliseconds wait,
@@ -191,7 +191,8 @@ std::streamsize TLS::io_tls_(char const* fnm,
   time_point<system_clock> start = system_clock::now();
 
   int n_ret;
-  while ((n_ret = fnc(ssl_, static_cast<void*>(s), static_cast<int>(n))) < 0) {
+  while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
+         < 0) {
     time_point<system_clock> now = system_clock::now();
     if (now > (start + wait)) {
       LOG(WARNING) << fnm << " timed out";
@@ -206,7 +207,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
       if (POSIX::input_ready(fd, time_left))
-        continue; // try fnc again
+        continue; // try io_fnc again
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
@@ -216,7 +217,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
       int fd = SSL_get_wfd(ssl_);
       CHECK_NE(-1, fd);
       if (POSIX::output_ready(fd, time_left))
-        continue; // try fnc again
+        continue; // try io_fnc again
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
