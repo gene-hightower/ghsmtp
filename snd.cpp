@@ -499,6 +499,13 @@ int main(int argc, char* argv[])
   Eml eml;
 
   Now date;
+
+  Pill red, blue;
+  std::stringstream mid_str;
+  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
+          << sender.utf8() << '>';
+  eml.add_hdr("Message-ID"s, mid_str.str());
+
   eml.add_hdr("Date"s, date.string());
 
   std::string rfc5322_from = FLAGS_from_name + " <" + FLAGS_from + ">";
@@ -513,12 +520,6 @@ int main(int argc, char* argv[])
   eml.add_hdr("MIME-Version"s, "1.0"s);
   eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
   eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
-
-  Pill red, blue;
-  std::stringstream mid_str;
-  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
-          << sender.utf8() << '>';
-  eml.add_hdr("Message-ID"s, mid_str.str());
 
   static RFC5321::Connection cnn(conn(receiver.ascii(), FLAGS_service));
 
