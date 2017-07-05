@@ -32,7 +32,7 @@ LDLIBS += \
 PROGRAMS := mkm msg smtp snd
 
 mkm_STEMS := mkm Pill date/tz hostname
-msg_STEMS := msg Domain IP4 IP6
+msg_STEMS := msg DKIM Domain IP4 IP6
 smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz hostname
 snd_STEMS := snd DNS Domain IP4 IP6 POSIX Pill Session Sock TLS-OpenSSL date/tz hostname
 
