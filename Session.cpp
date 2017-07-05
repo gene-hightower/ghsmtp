@@ -363,7 +363,7 @@ std::string Session::added_headers_(Message const& msg)
     headers << received_spf_ << "\r\n";
   }
 
-  headers << "Received: from " << client_identity_;
+  headers << "Received: from " << client_identity_.utf8();
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
   }
@@ -424,6 +424,9 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
   }
 
   if (white.lookup(client_identity_.utf8().c_str())) {
+    status = Message::SpamStatus::ham;
+  }
+  if (white.lookup(client_identity_.ascii().c_str())) {
     status = Message::SpamStatus::ham;
   }
 
