@@ -122,7 +122,7 @@ void Session::greeting()
     }
   } // if (sock_.has_peername())
 
-  out_() << "220 " << our_fqdn_ << " ESMTP - ghsmtp\r\n" << std::flush;
+  out_() << "220 " << our_fqdn_.ascii() << " ESMTP - ghsmtp\r\n" << std::flush;
 
   LOG(INFO) << "connect from " << client_;
 }
@@ -156,7 +156,7 @@ void Session::ehlo(string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out_() << "250-" << our_fqdn_ << "\r\n";
+  out_() << "250-" << our_fqdn_.ascii() << "\r\n";
   // RFC 1870
   out_() << "250-SIZE " << Config::max_msg_size << "\r\n";
   // RFC 6152
@@ -191,7 +191,7 @@ void Session::helo(string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out_() << "250 " << our_fqdn_ << "\r\n" << std::flush;
+  out_() << "250 " << our_fqdn_.ascii() << "\r\n" << std::flush;
 
   log_lo_("HELO", client_identity);
 }
@@ -367,8 +367,8 @@ std::string Session::added_headers_(Message const& msg)
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
   }
-  headers << "\r\n        by " << our_fqdn_ << " with " << protocol_ << " id "
-          << msg.id();
+  headers << "\r\n        by " << our_fqdn_.utf8() << " with " << protocol_
+          << " id " << msg.id();
 
   // STD 3 section 5.2.8
   if (forward_path_.size()) {
