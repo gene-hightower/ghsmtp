@@ -595,20 +595,20 @@ int main(int argc, char* argv[])
       hdr_stream << eml;
       auto hdr_str = hdr_stream.str();
 
-      std::stringstream bdat_stream;
-      bdat_stream << "BDAT " << hdr_str.size();
-      LOG(INFO) << "> " << bdat_stream.str();
-      cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
-      cnn.sock.out().write(hdr_str.data(), hdr_str.size()) << std::flush;
-      CHECK(cnn.sock.out().good());
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      auto total_size = hdr_str.size() + body.size();
 
-      bdat_stream.str(std::string());
-      bdat_stream << "BDAT " << body.size() << " LAST";
-      LOG(INFO) << "> " << bdat_stream.str();
+      std::stringstream bdat_stream;
+      bdat_stream << "BDAT " << total_size << " LAST";
+      LOG(INFO) << "> " << total_size << " LAST";
+
       cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
-      cnn.sock.out().write(body.data(), body.size()) << std::flush;
+      cnn.sock.out().write(hdr_str.data(), hdr_str.size());
       CHECK(cnn.sock.out().good());
+      cnn.sock.out().write(body.data(), body.size());
+      CHECK(cnn.sock.out().good());
+      cnn.sock.out() << std::flush;
+      CHECK(cnn.sock.out().good());
+
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
     else {
