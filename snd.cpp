@@ -478,8 +478,8 @@ int main(int argc, char* argv[])
 
   Pill red, blue;
   std::stringstream mid_str;
-  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@' << sender
-          << '>';
+  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
+          << sender.utf8() << '>';
   eml.add_hdr("Message-ID"s, mid_str.str());
 
   static RFC5321::Connection cnn(conn(receiver.ascii(), FLAGS_service));
@@ -489,8 +489,8 @@ int main(int argc, char* argv[])
   try {
     CHECK((parse<RFC5321::greeting, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "> EHLO " << sender;
-    cnn.sock.out() << "EHLO " << sender << "\r\n" << std::flush;
+    LOG(INFO) << "> EHLO " << sender.utf8();
+    cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
     if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
@@ -501,8 +501,8 @@ int main(int argc, char* argv[])
 
       cnn.sock.starttls_client();
 
-      LOG(INFO) << "> EHLO " << sender;
-      cnn.sock.out() << "EHLO " << sender << "\r\n" << std::flush;
+      LOG(INFO) << "> EHLO " << sender.utf8();
+      cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
       CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
     }
 
