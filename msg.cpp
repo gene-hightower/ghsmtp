@@ -188,7 +188,7 @@ struct atext : sor<ALPHA, DIGIT,
 // clang-format on
 
 // ctext is ASCII not '(' or ')' or '\\'
-struct ctext : ranges<33, 39, 42, 91, 93, 126> {
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8_non_ascii> {
 };
 
 struct comment;
@@ -1096,27 +1096,31 @@ struct action<received_spf> {
       pol_spf = DMARC_POLICY_SPF_OUTCOME_FAIL;
     }
 
-    auto dom = ctx.spf_info["envelope-from"];
-    auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+    // Google sometimes doesn't put in anything but client-ip
+    if (ctx.spf_info.find("envelope-from") != ctx.spf_info.end()) {
+      auto dom = ctx.spf_info["envelope-from"];
+      auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
-    if (dom == "<>") {
-      dom = ctx.spf_info["helo"];
-      origin = DMARC_POLICY_SPF_ORIGIN_HELO;
-      LOG(INFO) << "SPF: HELO " << dom;
-    }
-    else {
-      auto pos = dom.find_first_of('@');
-      if (pos != std::string::npos) {
-        dom = dom.substr(pos + 1);
+      if (dom == "<>") {
+        dom = ctx.spf_info["helo"];
+        origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+        LOG(INFO) << "SPF: HELO " << dom;
       }
-      LOG(INFO) << "SPF: MAIL FROM " << dom;
+      else {
+        auto pos = dom.find_first_of('@');
+        if (pos != std::string::npos) {
+          dom = dom.substr(pos + 1);
+        }
+        LOG(INFO) << "SPF: MAIL FROM " << dom;
+      }
+      ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
     }
 
-    ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
-    ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
-
-    LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
-              << ctx.spf_result;
+    if (ctx.spf_info.find("client-ip") != ctx.spf_info.end()) {
+      ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
+      LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
+                << ctx.spf_result;
+    }
 
     ctx.mb_list.clear();
   }
