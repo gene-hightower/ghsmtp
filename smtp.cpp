@@ -700,8 +700,6 @@ struct action<bdat_last> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    // FIXME
-    LOG(INFO) << in.string();
     bdat_act(ctx);
     ctx.bdat_error = true; // to make next BDAT fail.
   }
