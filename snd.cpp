@@ -1,4 +1,7 @@
+#include "Now.hpp"
+#include "Pill.hpp"
 #include "Sock.hpp"
+#include "hostname.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -12,6 +15,23 @@
 #include <gflags/gflags.h>
 
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
+
+DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
+DEFINE_string(receiver, "localhost", "FQDN of receiving node");
+
+DEFINE_string(service, "smtp-test", "service name");
+
+DEFINE_string(from, "基因@digilicious.com", "rfc5321 MAIL FROM address");
+DEFINE_string(to, "基因@digilicious.com", "rfc5321 RCPT TO address");
+
+DEFINE_string(from_name, "基因 Gene Hightower", "rfc5322 From name");
+DEFINE_string(to_name, "基因 Gene Hightower", "rfc5322 To name");
+
+DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
+DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
+
+DEFINE_bool(ip_4, false, "use only IP version 4");
+DEFINE_bool(ip_6, false, "use only IP version 6");
 
 #include <boost/algorithm/string/case_conv.hpp>
 
@@ -270,7 +290,7 @@ struct action<greeting> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "greeting: " << in.string();
+    LOG(INFO) << "< " << in.string();
   }
 };
 
@@ -279,7 +299,7 @@ struct action<ehlo_ok_rsp> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "ehlo_ok_rsp: " << in.string();
+    LOG(INFO) << "< " << in.string();
   }
 };
 
@@ -316,7 +336,7 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "reply_lines: " << in.string();
+    LOG(INFO) << "< " << in.string();
   }
 };
 
@@ -330,18 +350,19 @@ struct action<reply_code> {
 };
 }
 
-void greeting() {}
-
-int conn(char const* node, char const* service)
+int conn(std::string const& node, std::string const& service)
 {
   addrinfo* res = nullptr;
-  auto gaierr = getaddrinfo(node, service, nullptr, &res);
+  auto gaierr = getaddrinfo(node.c_str(), service.c_str(), nullptr, &res);
   CHECK(gaierr == 0) << "getaddrinfo failed: " << gai_strerror(gaierr);
 
   for (auto r = res; r; r = r->ai_next) {
     auto addr = r->ai_addr;
     switch (addr->sa_family) {
     case AF_INET: {
+      if (FLAGS_ip_6)
+        break;
+
       auto in4 = reinterpret_cast<sockaddr_in*>(addr);
 
       int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -363,7 +384,9 @@ int conn(char const* node, char const* service)
     }
 
     case AF_INET6: {
-      break;
+      if (FLAGS_ip_4)
+        break;
+
       auto in6 = reinterpret_cast<sockaddr_in6*>(addr);
 
       int fd = socket(AF_INET6, SOCK_STREAM, 0);
@@ -394,76 +417,149 @@ int conn(char const* node, char const* service)
   return -1;
 }
 
+class Eml {
+public:
+  void add_hdr(std::string name, std::string value)
+  {
+    hdrs_.push_back(std::make_pair(name, value));
+  }
+
+private:
+  std::vector<std::pair<std::string, std::string>> hdrs_;
+
+  friend std::ostream& operator<<(std::ostream& os, Eml const& eml)
+  {
+    for (auto const& h : eml.hdrs_) {
+      os << h.first << ": " << h.second << "\r\n";
+    }
+    return os << "\r\n"; // end of headers
+  }
+};
+
 int main(int argc, char* argv[])
 {
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  const auto hostname = get_hostname();
+  FLAGS_sender = hostname.c_str();
+  const auto from = "基因@"s + hostname;
+  FLAGS_from = from.c_str();
 
-  // static RFC5321::Connection cnn(conn("gmail-smtp-in.l.google.com", "smtp"));
-  static RFC5321::Connection cnn(conn("localhost", "smtp-test"));
+  { // Need to work with either namespace.
+    using namespace gflags;
+    using namespace google;
+    ParseCommandLineFlags(&argc, &argv, true);
+  }
+
+  if (FLAGS_ip_4 && FLAGS_ip_6) {
+    std::cout << "Must use /some/ IP version.";
+    return 1;
+  }
+
+  Eml eml;
+
+  Now date;
+  eml.add_hdr("Date"s, date.string());
+
+  std::string rfc5322_from = FLAGS_from_name + " <" + FLAGS_from + ">";
+  eml.add_hdr("From"s, rfc5322_from);
+
+  std::string rfc5322_to = FLAGS_to_name + " <" + FLAGS_to + ">";
+  eml.add_hdr("To"s, rfc5322_to);
+
+  eml.add_hdr("Subject"s, FLAGS_subject);
+  eml.add_hdr("Keywords"s, FLAGS_keywords);
+
+  Pill red, blue;
+  std::stringstream mid_str;
+  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
+          << FLAGS_sender << '>';
+  eml.add_hdr("Message-ID"s, mid_str.str());
+
+  static RFC5321::Connection cnn(conn(FLAGS_receiver, FLAGS_service));
 
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
   try {
     CHECK((parse<RFC5321::greeting, RFC5321::action>(in, cnn)));
 
-    cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
+    LOG(INFO) << "> EHLO " << FLAGS_sender;
+    cnn.sock.out() << "EHLO " << FLAGS_sender << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
     if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
+
+      LOG(INFO) << "> STARTTLS";
       cnn.sock.out() << "STARTTLS\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
       cnn.sock.starttls_client();
-      cnn.sock.out() << "EHLO digilicious.com\r\n" << std::flush;
+
+      LOG(INFO) << "> EHLO " << FLAGS_sender;
+      cnn.sock.out() << "EHLO " << FLAGS_sender << "\r\n" << std::flush;
       CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
     }
 
-    LOG(INFO) << "server identifies as " << cnn.server_id;
+    if (cnn.server_id != FLAGS_receiver) {
+      LOG(INFO) << "server identifies as " << cnn.server_id;
+    }
 
     if ((cnn.ehlo_params.find("8BITMIME") == cnn.ehlo_params.end())
         || (cnn.ehlo_params.find("SMTPUTF8") == cnn.ehlo_params.end())) {
-
       LOG(INFO) << "We don't have all the extensions we need.";
       cnn.sock.out() << "QUIT\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       return 1;
     }
 
-    LOG(INFO) << "MAIL FROM";
-    cnn.sock.out()
-        << "MAIL FROM:<基因@digilicious.com> SMTPUTF8 BODY=8BITMIME\r\n"
-        << std::flush;
+    std::string param;
+    if (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())
+      param += " BODY=8BITMIME";
+    if (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())
+      param += " SMTPUTF8";
+
+    LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param;
+    cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param << "\r\n"
+                   << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "RCPT TO";
-
-    // cnn.sock.out() << "RCPT TO:<gene.hightower@gmail.com>\r\n" << std::flush;
-    cnn.sock.out() << "RCPT TO:<基因@digilicious.com>\r\n" << std::flush;
-
+    LOG(INFO) << "> RCPT TO:<" << FLAGS_to;
+    cnn.sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     if (FLAGS_use_chunking
         && (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end())) {
-      boost::filesystem::path test_mail_path("test.eml");
-      boost::iostreams::mapped_file_source test_mail(test_mail_path);
+      boost::filesystem::path body_path("body.txt");
+      boost::iostreams::mapped_file_source body(body_path);
 
-      std::stringstream bdat_str;
-      bdat_str << "BDAT " << test_mail.size() << " LAST";
-      LOG(INFO) << bdat_str.str();
-      cnn.sock.out() << bdat_str.str() << "\r\n" << std::flush;
+      std::stringstream hdr_stream;
+      hdr_stream << eml;
+      auto hdr_str = hdr_stream.str();
 
-      cnn.sock.out().write(test_mail.data(), test_mail.size()) << std::flush;
+      std::stringstream bdat_stream;
+      bdat_stream << "BDAT " << hdr_str.size();
+      LOG(INFO) << "> " << bdat_stream.str();
+      cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
+      cnn.sock.out().write(hdr_str.data(), hdr_str.size()) << std::flush;
+      CHECK(cnn.sock.out().good());
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+      bdat_stream.str(std::string());
+      bdat_stream << "BDAT " << body.size() << " LAST";
+      LOG(INFO) << "> " << bdat_stream.str();
+      cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
+      cnn.sock.out().write(body.data(), body.size()) << std::flush;
       CHECK(cnn.sock.out().good());
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
     else {
-      LOG(INFO) << "DATA";
+      LOG(INFO) << "> DATA";
       cnn.sock.out() << "DATA\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-      std::ifstream test_mail("test.eml");
+      cnn.sock.out() << eml;
+
+      std::ifstream body("body.txt");
       std::string line;
-      while (std::getline(test_mail, line)) {
+      while (std::getline(body, line)) {
         if (line.length() && (line.at(0) == '.')) {
           cnn.sock.out() << '.';
         }
@@ -472,6 +568,8 @@ int main(int argc, char* argv[])
           cnn.sock.out() << '\r';
         cnn.sock.out() << '\n';
       }
+
+      // Done!
       cnn.sock.out() << ".\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
@@ -480,6 +578,10 @@ int main(int argc, char* argv[])
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   catch (parse_error const& e) {
+    std::cerr << "parse_error == " << e.what();
+    return 1;
+  }
+  catch (std::exception const& e) {
     std::cerr << e.what();
     return 1;
   }
