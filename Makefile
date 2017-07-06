@@ -29,9 +29,8 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := mkm msg smtp snd
+PROGRAMS := msg smtp snd
 
-mkm_STEMS := mkm Pill date/tz hostname
 msg_STEMS := msg DKIM Domain IP4 IP6
 smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz hostname
 snd_STEMS := snd DNS Domain IP4 IP6 POSIX Pill Session Sock TLS-OpenSSL date/tz hostname
@@ -120,9 +119,3 @@ regression: $(programs) $(TEST_MAILDIR)
 	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
 	ls -l smtp
 	size smtp
-
-test-mail:
-	./mkm > test.eml
-	curl --ssl-reqd --mail-from 基因@digilicious.com --mail-rcpt 基因@digilicious.com --url smtp://localhost:225 --upload-file test.eml -v --insecure
-	./mkm > test.eml
-	./snd
