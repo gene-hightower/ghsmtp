@@ -662,9 +662,10 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Make sure the domain matches.
-  if (!accepted_domain && (recipient.domain() != our_fqdn_)) {
+  if ((!accepted_domain) && (recipient.domain() != our_fqdn_)) {
     out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
-    LOG(WARNING) << "relay access denied for " << recipient;
+    LOG(WARNING) << "relay access denied for domain " << recipient.domain()
+                 << " as it doesn't match " << our_fqdn_;
     return false;
   }
 
