@@ -577,7 +577,7 @@ void Session::starttls()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (client_identity.is_address_literal()) {
+  if (ip_whitelisted_ || client_identity.is_address_literal()) {
     return true;
   }
 
