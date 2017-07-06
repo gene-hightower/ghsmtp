@@ -1,5 +1,9 @@
 #include "Message.hpp"
 
+#include <sys/types.h>
+
+#include <sys/stat.h>
+
 void Message::open(std::string const& fqdn, SpamStatus spam)
 {
   if (fqdn.empty())
@@ -39,6 +43,8 @@ void Message::open(std::string const& fqdn, SpamStatus spam)
 
   tmpfn_ /= "tmp";
   newfn_ /= "new";
+
+  umask(077);
 
   // mkdirs for tmpfn_ and newfn_
   boost::system::error_code ec;
