@@ -479,8 +479,12 @@ int main(int argc, char* argv[])
 {
   const auto hostname = get_hostname();
   FLAGS_sender = hostname.c_str();
+
   const auto from = "♥@"s + hostname;
   FLAGS_from = from.c_str();
+
+  const auto to = "♥@"s + hostname;
+  FLAGS_to = to.c_str();
 
   { // Need to work with either namespace.
     using namespace gflags;
