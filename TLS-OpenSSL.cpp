@@ -96,31 +96,31 @@ void TLS::starttls_server(int fd_in,
   // Shooting for ECDHE-RSA-AES128-GCM-SHA256, since OpenSSL will pick
   // the larger AES given the option, we remove them.
 
-  // clang-format off
-  char const* cipher_list
-      = "ECDHE-RSA-AES128-GCM-SHA256:"
-        "ECDHE-ECDSA-AES128-GCM-SHA256:"
-        // "ECDHE-RSA-AES256-GCM-SHA384:"
-        // "ECDHE-ECDSA-AES256-GCM-SHA384:"
-        "DHE-RSA-AES128-GCM-SHA256:"
-        "kEDH+AESGCM:"
-        "ECDHE-RSA-AES128-SHA256:"
-        "ECDHE-ECDSA-AES128-SHA256:"
-        "ECDHE-RSA-AES128-SHA:"
-        "ECDHE-ECDSA-AES128-SHA:"
-        // "ECDHE-RSA-AES256-SHA384:"
-        // "ECDHE-ECDSA-AES256-SHA384:"
-        // "ECDHE-RSA-AES256-SHA:"
-        // "ECDHE-ECDSA-AES256-SHA:"
-        "DHE-RSA-AES128-SHA256:"
-        "DHE-RSA-AES128-SHA:"
-        // "DHE-RSA-AES256-SHA256:"
-        // "DHE-RSA-AES256-SHA:"
-        "!aNULL:!eNULL:!EXPORT:!DSS:!DES:!RC4:!3DES:!MD5:!PSK";
-  // clang-format on
+  // // clang-format off
+  // char const* cipher_list
+  //     = "ECDHE-RSA-AES128-GCM-SHA256:"
+  //       "ECDHE-ECDSA-AES128-GCM-SHA256:"
+  //       // "ECDHE-RSA-AES256-GCM-SHA384:"
+  //       // "ECDHE-ECDSA-AES256-GCM-SHA384:"
+  //       "DHE-RSA-AES128-GCM-SHA256:"
+  //       "kEDH+AESGCM:"
+  //       "ECDHE-RSA-AES128-SHA256:"
+  //       "ECDHE-ECDSA-AES128-SHA256:"
+  //       "ECDHE-RSA-AES128-SHA:"
+  //       "ECDHE-ECDSA-AES128-SHA:"
+  //       // "ECDHE-RSA-AES256-SHA384:"
+  //       // "ECDHE-ECDSA-AES256-SHA384:"
+  //       // "ECDHE-RSA-AES256-SHA:"
+  //       // "ECDHE-ECDSA-AES256-SHA:"
+  //       "DHE-RSA-AES128-SHA256:"
+  //       "DHE-RSA-AES128-SHA:"
+  //       // "DHE-RSA-AES256-SHA256:"
+  //       // "DHE-RSA-AES256-SHA:"
+  //       "!aNULL:!eNULL:!EXPORT:!DSS:!DES:!RC4:!3DES:!MD5:!PSK";
+  // // clang-format on
 
-  CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
-      << "Can't set cipher list to " << cipher_list;
+  // CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
+  //     << "Can't set cipher list to " << cipher_list;
 
   CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load certificate file \"" << cert_path << "\"";
