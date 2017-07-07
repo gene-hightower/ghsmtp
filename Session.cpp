@@ -291,6 +291,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     forward_path_.clear();
     out_() << "250 2.1.0 mail ok\r\n" << std::flush;
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
+    for (auto p : parameters) {
+      LOG(INFO) << "  " << p.first << (p.second.empty() ? "" : "=") << p.second;
+    }
   }
   else {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
@@ -357,7 +360,6 @@ std::string Session::added_headers_(Message const& msg)
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
-
   // Received-SPF:
   if (!received_spf_.empty()) {
     headers << received_spf_ << "\r\n";
