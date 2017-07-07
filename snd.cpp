@@ -1,10 +1,15 @@
+#include "DKIM.hpp"
 #include "Domain.hpp"
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
 #include "hostname.hpp"
+#include "imemstream.hpp"
 
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <string>
 #include <unordered_map>
 
 #include <netdb.h>
@@ -36,6 +41,8 @@ DEFINE_bool(ip_6, false, "use only IP version 6");
 
 DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
+
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
 
 #include <boost/algorithm/string/case_conv.hpp>
 
@@ -443,6 +450,14 @@ public:
     hdrs_.push_back(std::make_pair(name, value));
   }
 
+  void foreach_hdr(std::function<void(std::string const& name,
+                                      std::string const& value)> func)
+  {
+    for (auto const& h : hdrs_) {
+      func(h.first, h.second);
+    }
+  }
+
 private:
   std::vector<std::pair<std::string, std::string>> hdrs_;
 
@@ -475,6 +490,29 @@ namespace gflags {
 // in case we didn't have one
 }
 
+// // clang-format off
+// char const* const signhdrs[] = {
+//     "From",
+
+//     "Message-ID",
+
+//     "Cc",
+//     "Date",
+//     "In-Reply-To",
+//     "References",
+//     "Reply-To",
+//     "Sender",
+//     "Subject",
+//     "To",
+
+//     "MIME-Version",
+//     "Content-Type",
+//     "Content-Transfer-Encoding",
+
+//     nullptr
+// };
+// clang-format on
+
 int main(int argc, char* argv[])
 {
   const auto hostname = get_hostname();
@@ -496,7 +534,7 @@ int main(int argc, char* argv[])
   Domain receiver(FLAGS_receiver);
 
   if (FLAGS_ip_4 && FLAGS_ip_6) {
-    std::cout << "Must use /some/ IP version.";
+    std::cerr << "Must use /some/ IP version.";
     return 1;
   }
 
@@ -525,7 +563,33 @@ int main(int argc, char* argv[])
   eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
   eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
 
-  static RFC5321::Connection cnn(conn(receiver.ascii(), FLAGS_service));
+  boost::filesystem::path body_path("body.txt");
+  auto body_sz = boost::filesystem::file_size(body_path);
+  if (body_sz == 0) {
+    std::cerr << "body.txt is empty\n";
+    return 2;
+  }
+
+  boost::iostreams::mapped_file_source body(body_path);
+
+  std::ifstream keyfs("private.key");
+  std::string key(std::istreambuf_iterator<char>{keyfs}, {});
+
+  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str());
+
+  eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
+    auto header = name + ": "s + value;
+    dks.header(header.c_str());
+  });
+  dks.eoh();
+  dks.body(string_view(body.data(), body.size()));
+  dks.eom();
+
+  eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
+
+  auto fd = conn(receiver.ascii(), FLAGS_service);
+  CHECK_NE(fd, -1);
+  static RFC5321::Connection cnn(fd);
 
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
 
@@ -592,9 +656,6 @@ int main(int argc, char* argv[])
 
     if (FLAGS_use_chunking
         && (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end())) {
-      boost::filesystem::path body_path("body.txt");
-      boost::iostreams::mapped_file_source body(body_path);
-
       std::stringstream hdr_stream;
       hdr_stream << eml;
       auto hdr_str = hdr_stream.str();
@@ -603,7 +664,7 @@ int main(int argc, char* argv[])
 
       std::stringstream bdat_stream;
       bdat_stream << "BDAT " << total_size << " LAST";
-      LOG(INFO) << "> " << total_size << " LAST";
+      LOG(INFO) << "> " << bdat_stream.str();
 
       cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
       cnn.sock.out().write(hdr_str.data(), hdr_str.size());
@@ -622,9 +683,9 @@ int main(int argc, char* argv[])
 
       cnn.sock.out() << eml;
 
-      std::ifstream body("body.txt");
+      imemstream isbody(body.data(), body.size());
       std::string line;
-      while (std::getline(body, line)) {
+      while (std::getline(isbody, line)) {
         if (line.length() && (line.at(0) == '.')) {
           cnn.sock.out() << '.';
         }
@@ -639,6 +700,7 @@ int main(int argc, char* argv[])
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
 
+    LOG(INFO) << "> QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
