@@ -5,7 +5,7 @@ DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
 DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
 DEFINE_string(receiver, "", "FQDN of receiving node");
 
-DEFINE_string(service, "smtp-test", "service name");
+DEFINE_string(service, "smtp", "service name");
 
 DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
 DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
