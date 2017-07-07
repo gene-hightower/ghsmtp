@@ -25,8 +25,6 @@ public:
   void chunk(std::experimental::string_view chunk);
   void eom();
 
-  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
-
 protected:
   Lib();
 
@@ -41,11 +39,13 @@ public:
 
   bool check();
   bool check_signature(std::experimental::string_view str);
+  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
 };
 
 class Sign : public Lib {
 public:
   Sign(char const* secretkey, char const* selector, char const* domain);
+  std::string getsighdr();
 };
 }
 

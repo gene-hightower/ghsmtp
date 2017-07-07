@@ -9,8 +9,10 @@
 namespace {
 u_char* uc(char const* cp)
 {
-  return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
+  return reinterpret_cast<u_char*>(const_cast<char*>(cp));
 }
+
+char const* c(unsigned char* cp) { return reinterpret_cast<char const*>(cp); }
 
 constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
 constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
@@ -89,7 +91,8 @@ void Lib::eom()
   }
 }
 
-void Lib::foreach_sig(std::function<void(char const* domain, bool passed)> func)
+void Verify::foreach_sig(
+    std::function<void(char const* domain, bool passed)> func)
 {
   int nsigs = 0;
   DKIM_SIGINFO** sigs;
@@ -229,5 +232,14 @@ Sign::Sign(char const* secretkey, char const* selector, char const* domain)
                                   uc(selector), uc(domain), DKIM_CANON_RELAXED,
                                   DKIM_CANON_RELAXED, DKIM_SIGN_RSASHA256, -1,
                                   &status_));
+}
+
+std::string Sign::getsighdr()
+{
+  auto initial = strlen(DKIM_SIGNHEADER) + 2;
+  unsigned char* buf{nullptr};
+  size_t len{0};
+  status_ = dkim_getsighdr_d(dkim_, initial, &buf, &len);
+  return std::string(c(buf), len);
 }
 }
