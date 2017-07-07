@@ -1,5 +1,34 @@
+#include <gflags/gflags.h>
+
+DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
+
+DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
+DEFINE_string(receiver, "", "FQDN of receiving node");
+
+DEFINE_string(service, "smtp-test", "service name");
+
+DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
+DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
+
+DEFINE_string(from_name, "基因", "rfc5322 From name");
+DEFINE_string(to_name, "基因", "rfc5322 To name");
+
+DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
+// DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
+DEFINE_string(keywords, "keyword", "rfc5322 Keywords");
+
+DEFINE_bool(ip_4, false, "use only IP version 4");
+DEFINE_bool(ip_6, false, "use only IP version 6");
+
+DEFINE_string(username, "", "AUTH username");
+DEFINE_string(password, "", "AUTH password");
+
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
+
 #include "DKIM.hpp"
+#include "DNS.hpp"
 #include "Domain.hpp"
+#include "Mailbox.hpp"
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
@@ -18,31 +47,9 @@
 
 #include <experimental/string_view>
 
-#include <gflags/gflags.h>
-
-DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
-
-DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
-DEFINE_string(receiver, "localhost", "FQDN of receiving node");
-
-DEFINE_string(service, "smtp-test", "service name");
-
-DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
-DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
-
-DEFINE_string(from_name, "基因", "rfc5322 From name");
-DEFINE_string(to_name, "基因", "rfc5322 To name");
-
-DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
-DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
-
-DEFINE_bool(ip_4, false, "use only IP version 4");
-DEFINE_bool(ip_6, false, "use only IP version 6");
-
-DEFINE_string(username, "", "AUTH username");
-DEFINE_string(password, "", "AUTH password");
-
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
+namespace Config {
+constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
+}
 
 #include <boost/algorithm/string/case_conv.hpp>
 
@@ -74,6 +81,197 @@ constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 }
 
+namespace UTF8 {
+struct tail : range<0x80, 0xBF> {
+};
+
+struct ch_1 : range<0x00, 0x7F> {
+};
+
+struct ch_2 : seq<range<0xC2, 0xDF>, tail> {
+};
+
+struct ch_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, tail>,
+                  seq<range<0xE1, 0xEC>, rep<2, tail>>,
+                  seq<one<0xED>, range<0x80, 0x9F>, tail>,
+                  seq<range<0xEE, 0xEF>, rep<2, tail>>> {
+};
+
+struct ch_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, tail>>,
+                  seq<range<0xF1, 0xF3>, rep<3, tail>>,
+                  seq<one<0xF4>, range<0x80, 0x8F>, rep<2, tail>>> {
+};
+
+// char = ch_1 | ch_2 | ch_3 | ch_4;
+
+struct non_ascii : sor<ch_2, ch_3, ch_4> {
+};
+}
+
+namespace RFC5322 {
+
+struct VUCHAR : sor<VCHAR, UTF8::non_ascii> {
+};
+
+using dot = one<'.'>;
+using colon = one<':'>;
+
+struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8::non_ascii> {
+};
+
+struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
+};
+
+struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
+};
+
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8::non_ascii> {
+};
+
+struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {
+};
+
+// clang-format off
+struct atext : sor<ALPHA, DIGIT,
+                   one<'!'>, one<'#'>,
+                   one<'$'>, one<'%'>,
+                   one<'&'>, one<'\''>,
+                   one<'*'>, one<'+'>,
+                   one<'-'>, one<'/'>,
+                   one<'='>, one<'?'>,
+                   one<'^'>, one<'_'>,
+                   one<'`'>, one<'{'>,
+                   one<'|'>, one<'}'>,
+                   one<'~'>,
+                   UTF8::non_ascii> {
+};
+// clang-format on
+
+// ctext is ASCII not '(' or ')' or '\\'
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8::non_ascii> {
+};
+
+struct comment;
+
+struct ccontent : sor<ctext, quoted_pair, comment> {
+};
+
+struct comment
+    : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {
+};
+
+struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {
+};
+
+struct qcontent : sor<qtext, quoted_pair> {
+};
+
+// Corrected in errata ID: 3135
+struct quoted_string
+    : seq<opt<CFWS>,
+          DQUOTE,
+          sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
+          DQUOTE,
+          opt<CFWS>> {
+};
+// *([FWS] VCHAR) *WSP
+struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
+};
+
+struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {
+};
+
+struct dot_atom_text : list<plus<atext>, dot> {
+};
+
+struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {
+};
+
+struct word : sor<atom, quoted_string> {
+};
+
+struct phrase : plus<word> {
+};
+
+// clang-format off
+struct dec_octet : sor<one<'0'>,
+                       rep_min_max<1, 2, DIGIT>,
+                       seq<one<'1'>, DIGIT, DIGIT>,
+                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
+                       seq<string<'2','5'>, range<'0','5'>>> {};
+// clang-format on
+
+struct ipv4_address
+    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
+};
+
+struct h16 : rep_min_max<1, 4, HEXDIG> {
+};
+
+struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {
+};
+
+struct dcolon : two<':'> {
+};
+
+// clang-format off
+struct ipv6_address : sor<seq<                                          rep<6, h16, colon>, ls32>,
+                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
+                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
+                          seq<opt<h16,     opt<   colon, h16>>, dcolon, rep<3, h16, colon>, ls32>,
+                          seq<opt<h16, rep_opt<2, colon, h16>>, dcolon, rep<2, h16, colon>, ls32>,
+                          seq<opt<h16, rep_opt<3, colon, h16>>, dcolon,        h16, colon,  ls32>,
+                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
+                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
+                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
+// clang-format on
+
+struct ip : sor<ipv4_address, ipv6_address> {
+};
+
+struct local_part : sor<dot_atom, quoted_string> {
+};
+
+struct dtext : ranges<33, 90, 94, 126> {
+};
+
+struct domain_literal : seq<opt<CFWS>,
+                            one<'['>,
+                            star<seq<opt<FWS>, dtext>>,
+                            opt<FWS>,
+                            one<']'>,
+                            opt<CFWS>> {
+};
+
+struct domain : sor<dot_atom, domain_literal> {
+};
+
+struct addr_spec : seq<local_part, one<'@'>, domain> {
+};
+
+template <typename Rule>
+struct action : nothing<Rule> {
+};
+
+template <>
+struct action<local_part> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox& mbx)
+  {
+    mbx.set_local(in.string());
+  }
+};
+
+template <>
+struct action<domain> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox& mbx)
+  {
+    mbx.set_domain(in.string());
+  }
+};
+}
+
 namespace RFC5321 {
 
 struct Connection {
@@ -93,31 +291,6 @@ struct Connection {
   }
 };
 
-struct UTF8_tail : range<0x80, 0xBF> {
-};
-
-struct UTF8_1 : range<0x00, 0x7F> {
-};
-
-struct UTF8_2 : seq<range<0xC2, 0xDF>, UTF8_tail> {
-};
-
-struct UTF8_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, UTF8_tail>,
-                    seq<range<0xE1, 0xEC>, rep<2, UTF8_tail>>,
-                    seq<one<0xED>, range<0x80, 0x9F>, UTF8_tail>,
-                    seq<range<0xEE, 0xEF>, rep<2, UTF8_tail>>> {
-};
-
-struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
-                    seq<range<0xF1, 0xF3>, rep<3, UTF8_tail>>,
-                    seq<one<0xF4>, range<0x80, 0x8F>, rep<2, UTF8_tail>>> {
-};
-
-// UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
-
-struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
-};
-
 struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
 };
 
@@ -125,10 +298,10 @@ using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {
+struct u_let_dig : sor<ALPHA, DIGIT, UTF8::non_ascii> {
 };
 
-struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8_non_ascii, dash>> {
+struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8::non_ascii, dash>> {
   // verify last char is a U_Let_dig
 };
 
@@ -513,8 +686,35 @@ namespace gflags {
 // };
 // clang-format on
 
+void self_test()
+{
+  static RFC5321::Connection cnn(0);
+
+  const char* greet_list[]{
+      "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
+      "220-AOL and its affiliated companies do not\r\n"
+      "220-authorize the use of its proprietary computers and computer\r\n"
+      "220-networks to accept, transmit, or distribute unsolicited bulk\r\n"
+      "220-e-mail sent from the internet.\r\n"
+      "220-Effective immediately:\r\n"
+      "220-AOL may no longer accept connections from IP addresses\r\n"
+      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"
+
+  };
+
+  for (auto i : greet_list) {
+    memory_input<> in(i, i);
+    if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
+            in, cnn)) {
+      LOG(ERROR) << "Error parsing greeting \"" << i << "\"";
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
+  // self_test();
+
   const auto hostname = get_hostname();
   FLAGS_sender = hostname.c_str();
 
@@ -531,7 +731,33 @@ int main(int argc, char* argv[])
   }
 
   Domain sender(FLAGS_sender);
-  Domain receiver(FLAGS_receiver);
+
+  Domain receiver;
+  if (!FLAGS_receiver.empty()) {
+    receiver.set(FLAGS_receiver);
+  }
+  else {
+    // parse FLAGS_to as addr_spec
+    Mailbox mbx;
+    memory_input<> in(FLAGS_to, "to");
+    if (!parse<RFC5322::addr_spec, RFC5322::action>(in, mbx)) {
+      LOG(ERROR) << "Error parsing address \"" << FLAGS_receiver << "\"";
+    }
+
+    LOG(INFO) << "mbx == " << mbx;
+
+    // look up MX records for mbx.domain()
+    using namespace DNS;
+    Resolver res;
+
+    // returns list of servers sorted by priority, low to high
+    auto mxs = get_records<RR_type::MX>(res, mbx.domain().ascii());
+
+    if (!mxs.empty())
+      receiver.set(mxs[0]);
+    else
+      receiver = mbx.domain();
+  }
 
   if (FLAGS_ip_4 && FLAGS_ip_6) {
     std::cerr << "Must use /some/ IP version.";
@@ -616,12 +842,18 @@ int main(int argc, char* argv[])
       LOG(INFO) << "server identifies as " << cnn.server_id;
     }
 
-    if ((cnn.ehlo_params.find("8BITMIME") == cnn.ehlo_params.end())
-        || (cnn.ehlo_params.find("SMTPUTF8") == cnn.ehlo_params.end())) {
-      LOG(INFO) << "We don't have all the extensions we need.";
-      cnn.sock.out() << "QUIT\r\n" << std::flush;
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-      return 1;
+    bool ext_smtputf8
+        = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
+    bool ext_8bitmime
+        = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
+
+    auto max_msg_size = 0u;
+    bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
+    if (ext_size) {
+      max_msg_size = strtoul(cnn.ehlo_params["SIZE"].c_str(), nullptr, 0);
+    }
+    if (!max_msg_size) {
+      max_msg_size = Config::max_msg_size;
     }
 
     if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
@@ -640,10 +872,19 @@ int main(int argc, char* argv[])
     }
 
     std::string param;
-    if (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())
+    if (ext_8bitmime) {
       param += " BODY=8BITMIME";
-    if (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())
+    }
+    else {
+      // check and perhaps convert body
+    }
+
+    if (ext_smtputf8) {
       param += " SMTPUTF8";
+    }
+    else {
+      // check and perhaps convert headers
+    }
 
     LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param;
     cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param << "\r\n"
@@ -661,6 +902,13 @@ int main(int argc, char* argv[])
       auto hdr_str = hdr_stream.str();
 
       auto total_size = hdr_str.size() + body.size();
+      if (total_size > max_msg_size) {
+        std::cerr << "message size " << total_size << " exceeds size limit of "
+                  << max_msg_size;
+        LOG(INFO) << "> QUIT";
+        cnn.sock.out() << "QUIT\r\n" << std::flush;
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      }
 
       std::stringstream bdat_stream;
       bdat_stream << "BDAT " << total_size << " LAST";

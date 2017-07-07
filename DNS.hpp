@@ -62,6 +62,7 @@ private:
 
   friend class Query<RR_type::A>;
   friend class Query<RR_type::AAAA>;
+  friend class Query<RR_type::MX>;
   friend class Query<RR_type::PTR>;
   friend class Query<RR_type::TXT>;
 };
@@ -84,6 +85,7 @@ private:
 
   friend class Query<RR_type::A>;
   friend class Query<RR_type::AAAA>;
+  friend class Query<RR_type::MX>;
   friend class Query<RR_type::PTR>;
   friend class Query<RR_type::TXT>;
 };

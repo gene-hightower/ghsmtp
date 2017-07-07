@@ -13,9 +13,17 @@ class Mailbox {
 public:
   Mailbox() = default;
   Mailbox(std::string local_part, std::string domain)
-    : local_part_{std::move(local_part)}
-    , domain_str_{std::move(domain)}
   {
+    set_local(local_part);
+    set_domain(domain);
+  }
+  void set_local(std::string local_part)
+  {
+    local_part_ = std::move(local_part);
+  }
+  void set_domain(std::string domain)
+  {
+    domain_str_ = std::move(domain);
     boost::to_lower(domain_str_);
     domain_.set(domain_str_.c_str());
   }
