@@ -32,6 +32,7 @@ public:
     return out;
   }
 
+private:
   static bool Encode(std::experimental::string_view in, std::string& out)
   {
     int i = 0, j = 0;
