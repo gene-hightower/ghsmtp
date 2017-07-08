@@ -205,42 +205,6 @@ struct word : sor<atom, quoted_string> {
 struct phrase : plus<word> {
 };
 
-// clang-format off
-struct dec_octet : sor<one<'0'>,
-                       rep_min_max<1, 2, DIGIT>,
-                       seq<one<'1'>, DIGIT, DIGIT>,
-                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
-                       seq<string<'2','5'>, range<'0','5'>>> {};
-// clang-format on
-
-struct ipv4_address
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
-};
-
-struct h16 : rep_min_max<1, 4, HEXDIG> {
-};
-
-struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {
-};
-
-struct dcolon : two<':'> {
-};
-
-// clang-format off
-struct ipv6_address : sor<seq<                                          rep<6, h16, colon>, ls32>,
-                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
-                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
-                          seq<opt<h16,     opt<   colon, h16>>, dcolon, rep<3, h16, colon>, ls32>,
-                          seq<opt<h16, rep_opt<2, colon, h16>>, dcolon, rep<2, h16, colon>, ls32>,
-                          seq<opt<h16, rep_opt<3, colon, h16>>, dcolon,        h16, colon,  ls32>,
-                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
-                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
-                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
-// clang-format on
-
-struct ip : sor<ipv4_address, ipv6_address> {
-};
-
 struct local_part : sor<dot_atom, quoted_string> {
 };
 
