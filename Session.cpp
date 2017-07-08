@@ -28,10 +28,20 @@ using std::experimental::string_view;
 namespace Config {
 constexpr char const* const accept_domains[] = {};
 
+// clang-format off
 constexpr char const* const bad_recipients[] = {
-    "a",         "ene",    "h.gene",   "jay",         "lizard",
-    "mixmaster", "nobody", "oq6_2nbq", "truthfinder",
+    "a",
+    "ene",
+    "h.gene",
+    "jay",
+    "lizard",
+    "mixmaster",
+    "nobody",
+    "oq6_2nbq",
+    "truthfinder",
+    "zk4k7g",
 };
+// clang-format on
 
 constexpr char const* const bad_senders[] = {};
 
