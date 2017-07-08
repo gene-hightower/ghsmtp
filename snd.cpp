@@ -18,6 +18,8 @@ DEFINE_string(to_name, "基因", "rfc5322 To name");
 DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
 DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
 
+DEFINE_string(content_language, "en", "RFC 3282 Content-Language header");
+
 DEFINE_bool(ip_4, false, "use only IP version 4");
 DEFINE_bool(ip_6, false, "use only IP version 6");
 
@@ -33,6 +35,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
+#include "base64.hpp"
 #include "hostname.hpp"
 #include "imemstream.hpp"
 
@@ -58,12 +61,6 @@ constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
 #include <boost/filesystem.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
-
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/binary_from_base64.hpp>
-#include <boost/archive/iterators/insert_linebreaks.hpp>
-#include <boost/archive/iterators/remove_whitespace.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -658,22 +655,6 @@ private:
   }
 };
 
-std::string base64(string_view s)
-{
-  using namespace boost::archive::iterators;
-
-  typedef insert_linebreaks<base64_from_binary<transform_width<std::string::
-                                                                   const_iterator,
-                                                               6, 8>>,
-                            72>
-      it_base64_t;
-
-  unsigned int writePaddChars = (3 - s.length() % 3) % 3;
-  std::string b64(it_base64_t(s.begin()), it_base64_t(s.end()));
-  b64.append(writePaddChars, '=');
-  return b64;
-}
-
 namespace gflags {
 // in case we didn't have one
 }
@@ -725,6 +706,20 @@ void self_test()
     }
   }
 }
+
+enum class content_transfer_encoding {
+  seven_bit,
+  quoted_printable,
+  base64,
+  eight_bit,
+  binary,
+};
+
+enum class body_type {
+  ascii,  // 7bit, quoted-printable and base64
+  utf8,   // 8bit
+  binary, // binary
+};
 
 int main(int argc, char* argv[])
 {
@@ -781,6 +776,12 @@ int main(int argc, char* argv[])
     }
   }
 
+  boost::filesystem::path body_path("body.txt");
+  auto body_sz = boost::filesystem::file_size(body_path);
+  CHECK(body_sz) << "body.txt must not be empty";
+
+  boost::iostreams::mapped_file_source body(body_path);
+
   Eml eml;
 
   Now date;
@@ -798,13 +799,10 @@ int main(int argc, char* argv[])
   eml.add_hdr("Keywords"s, FLAGS_keywords);
   eml.add_hdr("MIME-Version"s, "1.0"s);
   eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
+
   eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
 
-  boost::filesystem::path body_path("body.txt");
-  auto body_sz = boost::filesystem::file_size(body_path);
-  CHECK(body_sz) << "body.txt must not be empty";
-
-  boost::iostreams::mapped_file_source body(body_path);
+  eml.add_hdr("Content-Language", FLAGS_content_language);
 
   std::ifstream keyfs("private.key");
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
@@ -876,9 +874,9 @@ try_host:
       LOG(INFO) << "> AUTH";
       cnn->sock.out() << "AUTH LOGIN\r\n" << std::flush;
       CHECK((parse<RFC5321::auth_login_username>(in)));
-      cnn->sock.out() << base64(FLAGS_username) << "\r\n" << std::flush;
+      cnn->sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
       CHECK((parse<RFC5321::auth_login_password>(in)));
-      cnn->sock.out() << base64(FLAGS_password) << "\r\n" << std::flush;
+      cnn->sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
     }
     else {

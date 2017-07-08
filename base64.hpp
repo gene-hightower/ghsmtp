@@ -3,25 +3,46 @@
 #ifndef BASE64_H
 #define BASE64_H
 
+#include <stdexcept>
 #include <string>
 
-const char kBase64Alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                               "abcdefghijklmnopqrstuvwxyz"
-                               "0123456789+/";
+#include <experimental/string_view>
+
+constexpr char kBase64Alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                   "abcdefghijklmnopqrstuvwxyz"
+                                   "0123456789+/";
 
 class Base64 {
 public:
-  static bool Encode(const std::string& in, std::string* out)
+  static std::string enc(std::experimental::string_view const& in)
+  {
+    std::string out;
+    if (!Encode(in, out)) {
+      throw std::length_error("encode length mismatch");
+    }
+    return out;
+  }
+
+  static std::string dec(std::experimental::string_view const& in)
+  {
+    std::string out;
+    if (!Decode(in, out)) {
+      throw std::invalid_argument("decode length mismatch");
+    }
+    return out;
+  }
+
+  static bool Encode(std::experimental::string_view in, std::string& out)
   {
     int i = 0, j = 0;
     size_t enc_len = 0;
     unsigned char a3[3];
     unsigned char a4[4];
 
-    out->resize(EncodedLength(in));
+    out.resize(EncodedLength(in));
 
     int input_len = in.size();
-    std::string::const_iterator input = in.begin();
+    auto input = in.begin();
 
     while (input_len--) {
       a3[i++] = *(input++);
@@ -29,7 +50,7 @@ public:
         a3_to_a4(a4, a3);
 
         for (i = 0; i < 4; i++) {
-          (*out)[enc_len++] = kBase64Alphabet[a4[i]];
+          out[enc_len++] = kBase64Alphabet[a4[i]];
         }
 
         i = 0;
@@ -44,19 +65,19 @@ public:
       a3_to_a4(a4, a3);
 
       for (j = 0; j < i + 1; j++) {
-        (*out)[enc_len++] = kBase64Alphabet[a4[j]];
+        out[enc_len++] = kBase64Alphabet[a4[j]];
       }
 
       while ((i++ < 3)) {
-        (*out)[enc_len++] = '=';
+        out[enc_len++] = '=';
       }
     }
 
-    return (enc_len == out->size());
+    return enc_len == out.size();
   }
 
   static bool
-  Encode(const char* input, size_t input_length, char* out, size_t out_length)
+  Encode(char const* input, size_t input_length, char* out, size_t out_length)
   {
     int i = 0, j = 0;
     char* out_begin = out;
@@ -100,7 +121,7 @@ public:
     return (out == (out_begin + encoded_length));
   }
 
-  static bool Decode(const std::string& in, std::string* out)
+  static bool Decode(std::experimental::string_view in, std::string& out)
   {
     int i = 0, j = 0;
     size_t dec_len = 0;
@@ -108,9 +129,9 @@ public:
     unsigned char a4[4];
 
     int input_len = in.size();
-    std::string::const_iterator input = in.begin();
+    auto input = in.begin();
 
-    out->resize(DecodedLength(in));
+    out.resize(DecodedLength(in));
 
     while (input_len--) {
       if (*input == '=') {
@@ -126,7 +147,7 @@ public:
         a4_to_a3(a3, a4);
 
         for (i = 0; i < 3; i++) {
-          (*out)[dec_len++] = a3[i];
+          out[dec_len++] = a3[i];
         }
 
         i = 0;
@@ -145,11 +166,11 @@ public:
       a4_to_a3(a3, a4);
 
       for (j = 0; j < i - 1; j++) {
-        (*out)[dec_len++] = a3[j];
+        out[dec_len++] = a3[j];
       }
     }
 
-    return (dec_len == out->size());
+    return (dec_len == out.size());
   }
 
   static bool
@@ -209,20 +230,19 @@ public:
   {
     int numEq = 0;
 
-    const char* in_end = in + in_length;
+    auto in_end = in + in_length;
     while (*--in_end == '=')
       ++numEq;
 
     return ((6 * in_length) / 8) - numEq;
   }
 
-  static int DecodedLength(const std::string& in)
+  static int DecodedLength(std::experimental::string_view in)
   {
     int numEq = 0;
     int n = in.size();
 
-    for (std::string::const_reverse_iterator it = in.rbegin(); *it == '=';
-         ++it) {
+    for (auto it = in.rbegin(); *it == '='; ++it) {
       ++numEq;
     }
 
@@ -234,19 +254,19 @@ public:
     return (length + 2 - ((length + 2) % 3)) / 3 * 4;
   }
 
-  inline static int EncodedLength(const std::string& in)
+  inline static int EncodedLength(std::experimental::string_view in)
   {
     return EncodedLength(in.length());
   }
 
-  inline static void StripPadding(std::string* in)
+  inline static void StripPadding(std::string& in)
   {
-    while (!in->empty() && *(in->rbegin()) == '=')
-      in->resize(in->size() - 1);
+    while (!in.empty() && *(in.rbegin()) == '=')
+      in.resize(in.size() - 1);
   }
 
 private:
-  static inline void a3_to_a4(unsigned char* a4, unsigned char* a3)
+  static inline void a3_to_a4(unsigned char* a4, unsigned char const* a3)
   {
     a4[0] = (a3[0] & 0xfc) >> 2;
     a4[1] = ((a3[0] & 0x03) << 4) + ((a3[1] & 0xf0) >> 4);
@@ -254,7 +274,7 @@ private:
     a4[3] = (a3[2] & 0x3f);
   }
 
-  static inline void a4_to_a3(unsigned char* a3, unsigned char* a4)
+  static inline void a4_to_a3(unsigned char* a3, unsigned char const* a4)
   {
     a3[0] = (a4[0] << 2) + ((a4[1] & 0x30) >> 4);
     a3[1] = ((a4[1] & 0xf) << 4) + ((a4[2] & 0x3c) >> 2);
