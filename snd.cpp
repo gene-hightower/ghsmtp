@@ -16,7 +16,7 @@ DEFINE_string(from_name, "基因", "rfc5322 From name");
 DEFINE_string(to_name, "基因", "rfc5322 To name");
 
 DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
-DEFINE_string(keywords, "🔑", "rfc5322 Keywords");
+DEFINE_string(keywords, "ghsmtp", "rfc5322 Keywords");
 
 DEFINE_string(content_language, "en", "RFC 3282 Content-Language header");
 
@@ -740,11 +740,82 @@ int main(int argc, char* argv[])
     }
   }
 
-  boost::filesystem::path body_path("body.txt");
+  // boost::filesystem::path body_path("body.txt");
+  boost::filesystem::path body_path("/z/home/gene/Desktop/IMG_20140925_161657.jpg");
+  // boost::filesystem::path body_path("/z/home/gene/src/jnk/binary.dat");
   auto body_sz = boost::filesystem::file_size(body_path);
   CHECK(body_sz) << "body.txt must not be empty";
 
   boost::iostreams::mapped_file_source body(body_path);
+
+try_host:
+  CHECK(!receivers.empty()) << "no more hosts to try";
+  LOG(INFO) << "trying " << receivers[0].utf8();
+  auto fd = conn(receivers[0].ascii(), FLAGS_service);
+  CHECK_NE(fd, -1);
+  RFC5321::Connection cnn(fd);
+  istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
+  if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
+    close(fd);
+    receivers.erase(receivers.begin());
+    goto try_host;
+  }
+
+  LOG(INFO) << "> EHLO " << sender.utf8();
+  cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
+  CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+
+  if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
+    LOG(INFO) << "> STARTTLS";
+    cnn.sock.out() << "STARTTLS\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    cnn.sock.starttls_client();
+
+    LOG(INFO) << "> EHLO " << sender.utf8();
+    cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+  }
+
+  if (cnn.server_id != receivers[0].ascii()) {
+    LOG(INFO) << "server identifies as " << cnn.server_id;
+  }
+
+  bool ext_smtputf8
+      = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
+  bool ext_8bitmime
+      = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
+  bool ext_binarymime
+      = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
+
+  if (ext_binarymime) {
+    CHECK((cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()));
+  }
+
+  auto max_msg_size = 0u;
+  bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
+  if (ext_size) {
+    if (!cnn.ehlo_params["SIZE"].empty())
+      max_msg_size = strtoul(cnn.ehlo_params["SIZE"].c_str(), nullptr, 10);
+  }
+  if (!max_msg_size) {
+    max_msg_size = Config::max_msg_size;
+  }
+
+  if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
+    if (cnn.ehlo_params.find("AUTH") != cnn.ehlo_params.end()) {
+      LOG(INFO) << "> AUTH";
+      cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
+      CHECK((parse<RFC5321::auth_login_username>(in)));
+      cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
+      CHECK((parse<RFC5321::auth_login_password>(in)));
+      cnn.sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    }
+    else {
+      LOG(WARNING) << "server doesn't support AUTH";
+    }
+  }
 
   Eml eml;
 
@@ -760,13 +831,58 @@ int main(int argc, char* argv[])
   std::string rfc5322_to = FLAGS_to_name + " <" + FLAGS_to + ">";
   eml.add_hdr("To"s, rfc5322_to);
   eml.add_hdr("Subject"s, FLAGS_subject);
-  eml.add_hdr("Keywords"s, FLAGS_keywords);
+  if (!FLAGS_keywords.empty())
+    eml.add_hdr("Keywords"s, FLAGS_keywords);
   eml.add_hdr("MIME-Version"s, "1.0"s);
-  eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
 
-  eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
+  // eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
 
-  eml.add_hdr("Content-Language", FLAGS_content_language);
+#if 0
+
+  if (ext_binarymime) {
+    eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
+    eml.add_hdr("Content-Transfer-Encoding", "binary"s);
+  }
+  else if (ext_8bitmime) {
+    eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
+    eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
+  }
+  else if (ext_smtputf8) {
+    LOG(ERROR)
+        << "SMTPUTF8 must advertise 8BITMIME, see RFC-6531 section 3.1 item 8.";
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
+  }
+  else {
+    eml.add_hdr("Content-Type"s, "text/plain; charset=\"US-ASCII\""s);
+    eml.add_hdr("Content-Transfer-Encoding", "7bit"s);
+  }
+
+  if (!FLAGS_content_language.empty())
+    eml.add_hdr("Content-Language", FLAGS_content_language);
+
+#else
+
+  // eml.add_hdr("Content-Type", "application/octet-stream; name=\"binary.dat\"");
+  // eml.add_hdr("Content-Description", "binary.dat");
+  // eml.add_hdr("Content-Disposition", "attachment; filename=\"binary.dat\";"
+  //             "\r\n\tsize=256; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
+  //             "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
+  // eml.add_hdr("Content-Transfer-Encoding", "binary");
+
+  eml.add_hdr("Content-Type", "image/jpg; name=\"IMG_20140925_161657.jpg\"");
+  eml.add_hdr("Content-Description", "IMG_20140925_161657.jpg");
+  eml.add_hdr("Content-Disposition", "attachment; filename=\"IMG_20140925_161657.jpg\";"
+              "\r\n\tsize=2830200; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
+              "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
+  eml.add_hdr("Content-Transfer-Encoding", "binary");
+
+#endif
+
+#if 0
+  // Maybe strict/strict ?
 
   std::ifstream keyfs("private.key");
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
@@ -779,196 +895,137 @@ int main(int argc, char* argv[])
   dks.body(string_view(body.data(), body.size()));
   dks.eom();
   eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
-
-try_host:
-  CHECK(!receivers.empty()) << "no more hosts to try";
-  LOG(INFO) << "trying " << receivers[0].utf8();
-  auto fd = conn(receivers[0].ascii(), FLAGS_service);
-  CHECK_NE(fd, -1);
-  auto cnn = std::make_unique<RFC5321::Connection>(fd);
-  istream_input<eol::crlf> in(cnn->sock.in(), Config::bfr_size, "session");
-  if (!parse<RFC5321::greeting, RFC5321::action>(in, *cnn)) {
-    receivers.erase(receivers.begin());
-    goto try_host;
-  }
-
-  LOG(INFO) << "> EHLO " << sender.utf8();
-  cnn->sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
-  CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, *cnn)));
-
-  if (cnn->ehlo_params.find("STARTTLS") != cnn->ehlo_params.end()) {
-    LOG(INFO) << "> STARTTLS";
-    cnn->sock.out() << "STARTTLS\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
-
-    cnn->sock.starttls_client();
-
-    LOG(INFO) << "> EHLO " << sender.utf8();
-    cnn->sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
-    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, *cnn)));
-  }
-
-  if (cnn->server_id != receivers[0].ascii()) {
-    LOG(INFO) << "server identifies as " << cnn->server_id;
-  }
-
-  bool ext_smtputf8
-      = cnn->ehlo_params.find("SMTPUTF8") != cnn->ehlo_params.end();
-  bool ext_8bitmime
-      = cnn->ehlo_params.find("8BITMIME") != cnn->ehlo_params.end();
-  bool ext_binarymime
-      = cnn->ehlo_params.find("BINARYMIME") != cnn->ehlo_params.end();
-
-  if (ext_binarymime) {
-    CHECK((cnn->ehlo_params.find("CHUNKING") != cnn->ehlo_params.end()));
-  }
-
-  auto max_msg_size = 0u;
-  bool ext_size = cnn->ehlo_params.find("SIZE") != cnn->ehlo_params.end();
-  if (ext_size) {
-    if (!cnn->ehlo_params["SIZE"].empty())
-      max_msg_size = strtoul(cnn->ehlo_params["SIZE"].c_str(), nullptr, 10);
-  }
-  if (!max_msg_size) {
-    max_msg_size = Config::max_msg_size;
-  }
-
-  if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
-    if (cnn->ehlo_params.find("AUTH") != cnn->ehlo_params.end()) {
-      LOG(INFO) << "> AUTH";
-      cnn->sock.out() << "AUTH LOGIN\r\n" << std::flush;
-      CHECK((parse<RFC5321::auth_login_username>(in)));
-      cnn->sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
-      CHECK((parse<RFC5321::auth_login_password>(in)));
-      cnn->sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
-    }
-    else {
-      LOG(WARNING) << "server doesn't support AUTH";
-    }
-  }
-
-  std::string hdr_str;
-  std::string param_str;
+#endif
 
   std::stringstream hdr_stream;
   hdr_stream << eml;
-  hdr_str = hdr_stream.str();
+  auto hdr_str = hdr_stream.str();
 
   auto total_size = hdr_str.size() + body.size();
   if (total_size > max_msg_size) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
-    goto quit;
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
   }
 
-  {
-    std::stringstream param_stream;
-    if (ext_size) {
-      param_stream << " SIZE=" << total_size;
-    }
-    if (ext_binarymime) {
-      param_stream << " BODY=BINARYMIME";
-      // no body check
-    }
-    else if (ext_8bitmime) {
-      param_stream << " BODY=8BITMIME";
-      // check body, must be UTF8 with reasonable line lengths
-      memory_input<> in(body.data(), body.size(), "body");
-      if (!parse<RFC5322::body>(in)) {
-        LOG(FATAL) << "must convert body";
-      }
-    }
-    else {
-      // check ASCII body
-      memory_input<> in(body.data(), body.size(), "body");
-      if (!parse<RFC5322::body_ascii>(in)) {
-        LOG(FATAL) << "must convert body";
-      }
-    }
-
-    if (ext_smtputf8) {
-      param_stream << " SMTPUTF8";
-    }
-    else {
-      LOG(INFO) << "checking headers";
-      eml.foreach_hdr([](std::string const& name, std::string const& value) {
-        memory_input<> in(value, "header");
-        if (!parse<UTF8::ascii>(in)) {
-          LOG(FATAL) << "non-ascii header " << name;
-        }
-        LOG(INFO) << value << " parsed as ascii";
-      });
-    }
-
-    param_str = param_stream.str();
+  std::stringstream param_stream;
+  if (ext_size) {
+    param_stream << " SIZE=" << total_size;
   }
+  if (ext_binarymime) {
+    param_stream << " BODY=BINARYMIME";
+    // no body check
+  }
+  else if (ext_8bitmime) {
+    param_stream << " BODY=8BITMIME";
+    // check body, must be UTF8 with reasonable line lengths
+    memory_input<> in(body.data(), body.size(), "body");
+    if (!parse<RFC5322::body>(in)) {
+      LOG(FATAL) << "must convert body";
+    }
+  }
+  else {
+    // check ASCII body
+    memory_input<> in(body.data(), body.size(), "body");
+    if (!parse<RFC5322::body_ascii>(in)) {
+      LOG(FATAL) << "must convert body";
+    }
+  }
+
+  if (ext_smtputf8) {
+    param_stream << " SMTPUTF8";
+  }
+  else {
+    LOG(INFO) << "checking headers";
+    eml.foreach_hdr([](std::string const& name, std::string const& value) {
+      memory_input<> in(value, "header");
+      if (!parse<UTF8::ascii>(in)) {
+        LOG(FATAL) << "non-ascii header " << name;
+      }
+      LOG(INFO) << value << " parsed as ascii";
+    });
+  }
+
+  auto param_str = param_stream.str();
 
   LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param_str;
-  cnn->sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n"
+  cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n"
                   << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
-  if (cnn->reply_code.at(0) != '2') {
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  if (cnn.reply_code.at(0) != '2') {
     // If sender was not accepted for any transient reason, maybe goto try_host
-    LOG(ERROR) << "MAIL FROM returned " << cnn->reply_code;
-    goto quit;
+    LOG(ERROR) << "MAIL FROM returned " << cnn.reply_code;
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
   }
 
-  LOG(INFO) << "> RCPT TO:<" << FLAGS_to;
-  cnn->sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
-  if (cnn->reply_code.at(0) != '2') {
+  LOG(INFO) << "> RCPT TO:<" << FLAGS_to << ">";
+  cnn.sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  if (cnn.reply_code.at(0) != '2') {
     // If mailbox was not accepted for any transient reason, maybe goto try_host
-    LOG(ERROR) << "RCPT TO returned " << cnn->reply_code;
-    goto quit;
+    LOG(ERROR) << "RCPT TO returned " << cnn.reply_code;
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
   }
 
   if (FLAGS_use_chunking
-      && (cnn->ehlo_params.find("CHUNKING") != cnn->ehlo_params.end())) {
+      && (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end())) {
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "> " << bdat_stream.str();
 
-    cnn->sock.out() << bdat_stream.str() << "\r\n" << std::flush;
-    cnn->sock.out().write(hdr_str.data(), hdr_str.size());
-    CHECK(cnn->sock.out().good());
-    cnn->sock.out().write(body.data(), body.size());
-    CHECK(cnn->sock.out().good());
-    cnn->sock.out() << std::flush;
-    CHECK(cnn->sock.out().good());
+    cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
+    cnn.sock.out().write(hdr_str.data(), hdr_str.size());
+    CHECK(cnn.sock.out().good());
+    cnn.sock.out().write(body.data(), body.size());
+    CHECK(cnn.sock.out().good());
+    cnn.sock.out() << std::flush;
+    CHECK(cnn.sock.out().good());
 
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     // If mail was not accepted for any transient, maybe goto try_host
   }
   else {
     LOG(INFO) << "> DATA";
-    cnn->sock.out() << "DATA\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
+    cnn.sock.out() << "DATA\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    cnn->sock.out() << eml;
+    cnn.sock.out() << eml;
+
+    // This loop adds a CRLF and the end of the transmission if the
+    // file doesn't already end with one.  This is an artifact of the
+    // SMTP DATA protocol.
 
     imemstream isbody(body.data(), body.size());
     std::string line;
     while (std::getline(isbody, line)) {
       if (line.length() && (line.at(0) == '.')) {
-        cnn->sock.out() << '.';
+        cnn.sock.out() << '.';
       }
-      cnn->sock.out() << line;
+      cnn.sock.out() << line;
       if (line.back() != '\r')
-        cnn->sock.out() << '\r';
-      cnn->sock.out() << '\n';
+        cnn.sock.out() << '\r';
+      cnn.sock.out() << '\n';
     }
 
     // Done!
-    cnn->sock.out() << ".\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
+    cnn.sock.out() << ".\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     // If mail was not accepted for any transient, maybe goto try_host
   }
 
-quit:
   LOG(INFO) << "> QUIT";
-  cnn->sock.out() << "QUIT\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *cnn)));
+  cnn.sock.out() << "QUIT\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  exit(EXIT_SUCCESS);
 }
