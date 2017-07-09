@@ -346,7 +346,13 @@ struct data_blank : CRLF {
 struct data_dot : seq<one<'.'>, plus<not_one<'\r', '\n'>>, CRLF> {
 };
 
-struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
+// Rule for strict RFC adherence:
+
+// struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
+// };
+
+// But let's accept crud for a while...
+struct data_plain : seq<not_one<'.'>, star<not_one<'\n'>>, LF> {
 };
 
 struct data_line : sor<data_blank, data_dot, data_plain> {
