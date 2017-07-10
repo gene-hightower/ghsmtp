@@ -20,8 +20,8 @@ DEFINE_string(keywords, "ghsmtp", "rfc5322 Keywords");
 
 DEFINE_string(content_language, "en", "RFC 3282 Content-Language header");
 
-DEFINE_bool(ip_4, false, "use only IP version 4");
-DEFINE_bool(ip_6, false, "use only IP version 6");
+DEFINE_bool(ip4, false, "use only IP version 4");
+DEFINE_bool(ip6, false, "use only IP version 6");
 
 DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
@@ -79,7 +79,7 @@ constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 }
 
-namespace UTF8 {
+namespace chars {
 struct tail : range<0x80, 0xBF> {
 };
 
@@ -115,29 +115,35 @@ struct utf8 : seq<star<u8char>, eof> {
 
 namespace RFC5322 {
 
-struct VUCHAR : sor<VCHAR, UTF8::non_ascii> {
+struct VUCHAR : sor<VCHAR, chars::non_ascii> {
 };
 
 using dot = one<'.'>;
 using colon = one<':'>;
 
-struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8::non_ascii> {
+// All 7-bit ASCII except LF (10) and CR (13).
+struct text_ascii : ranges<0, 9, 11, 12, 14, 127> {
 };
 
-struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
+// Short lines of ASCII text.  LF or CRLF line separators.
+struct body_ascii : seq<star<seq<rep_max<998, text_ascii>, eol>>,
+                        opt<rep_max<998, text_ascii>>,
+                        eof> {
 };
 
-struct text_ascii : ranges<1, 9, 11, 12, 14, 127> {
+struct text_utf8 : sor<text_ascii, chars::non_ascii> {
 };
 
-struct body_ascii
-    : seq<star<seq<rep_max<998, text_ascii>, eol>>, rep_max<998, text_ascii>> {
+// Short lines of UTF-8 text.  LF or CRLF line separators.
+struct body_utf8 : seq<star<seq<rep_max<998, text_utf8>, eol>>,
+                       opt<rep_max<998, text_utf8>>,
+                       eof> {
 };
 
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
 };
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8::non_ascii> {
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, chars::non_ascii> {
 };
 
 struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {
@@ -155,12 +161,12 @@ struct atext : sor<ALPHA, DIGIT,
                    one<'`'>, one<'{'>,
                    one<'|'>, one<'}'>,
                    one<'~'>,
-                   UTF8::non_ascii> {
+                   chars::non_ascii> {
 };
 // clang-format on
 
 // ctext is ASCII not '(' or ')' or '\\'
-struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8::non_ascii> {
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, chars::non_ascii> {
 };
 
 struct comment;
@@ -274,10 +280,10 @@ using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, UTF8::non_ascii> {
+struct u_let_dig : sor<ALPHA, DIGIT, chars::non_ascii> {
 };
 
-struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8::non_ascii, dash>> {
+struct u_ldh_str : plus<sor<ALPHA, DIGIT, chars::non_ascii, dash>> {
   // verify last char is a U_Let_dig
 };
 
@@ -527,57 +533,62 @@ struct action<reply_code> {
 
 int conn(std::string const& node, std::string const& service)
 {
+  addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+
+  hints.ai_family = AF_UNSPEC;
+  if (FLAGS_ip6)
+    hints.ai_family = AF_INET6;
+  if (FLAGS_ip4)
+    hints.ai_family = AF_INET;
+
+  hints.ai_socktype = SOCK_STREAM;
+
   addrinfo* res = nullptr;
-  auto gaierr = getaddrinfo(node.c_str(), service.c_str(), nullptr, &res);
+  auto gaierr = getaddrinfo(node.c_str(), service.c_str(), &hints, &res);
   CHECK(gaierr == 0) << "getaddrinfo failed: " << gai_strerror(gaierr);
 
   for (auto r = res; r; r = r->ai_next) {
     auto addr = r->ai_addr;
     switch (addr->sa_family) {
     case AF_INET: {
-      if (FLAGS_ip_6)
-        break;
+      CHECK(!FLAGS_ip6);
 
       auto in4 = reinterpret_cast<sockaddr_in*>(addr);
 
       int fd = socket(AF_INET, SOCK_STREAM, 0);
       PCHECK(fd >= 0) << "socket failed";
-      if (connect(fd, addr, sizeof(*in4)) == 0) {
-        freeaddrinfo(res);
-        return fd;
-      }
-      PLOG(WARNING) << "connect failed for node==" << node
-                    << ", service ==" << service;
 
       char str[INET_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET, &(in4->sin_addr), str, sizeof str));
-      LOG(WARNING) << "connect failed for IP4==" << str
-                   << ", port==" << ntohs(in4->sin_port);
 
+      if (connect(fd, addr, sizeof(*in4)) == 0) {
+        freeaddrinfo(res);
+        LOG(INFO) << "connect " << str << ":" << ntohs(in4->sin_port);
+        return fd;
+      }
+      PLOG(WARNING) << "connect failed " << str << ":" << ntohs(in4->sin_port);
       close(fd);
       break;
     }
 
     case AF_INET6: {
-      if (FLAGS_ip_4)
-        break;
+      CHECK(!FLAGS_ip4);
 
       auto in6 = reinterpret_cast<sockaddr_in6*>(addr);
 
       int fd = socket(AF_INET6, SOCK_STREAM, 0);
       PCHECK(fd >= 0) << "socket failed";
-      if (connect(fd, addr, sizeof(*in6)) == 0) {
-        freeaddrinfo(res);
-        return fd;
-      }
-      PLOG(WARNING) << "connect failed for node==" << node
-                    << ", service ==" << service;
 
       char str[INET6_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET6, &(in6->sin6_addr), str, sizeof str));
-      LOG(WARNING) << "connect failed for IP6==" << str
-                   << ", port==" << ntohs(in6->sin6_port);
 
+      if (connect(fd, addr, sizeof(*in6)) == 0) {
+        freeaddrinfo(res);
+        LOG(INFO) << "connect [" << str << "]:" << ntohs(in6->sin6_port);
+        return fd;
+      }
+      PLOG(WARNING) << "connect failed [" << str << "]:" << ntohs(in6->sin6_port);
       close(fd);
       break;
     }
@@ -671,7 +682,7 @@ void self_test()
   }
 }
 
-enum class content_transfer_encoding {
+enum class transfer_encoding {
   seven_bit,
   quoted_printable,
   base64,
@@ -679,10 +690,85 @@ enum class content_transfer_encoding {
   binary,
 };
 
-enum class body_type {
+enum class data_type {
   ascii,  // 7bit, quoted-printable and base64
   utf8,   // 8bit
   binary, // binary
+};
+
+data_type type(string_view d)
+{
+  memory_input<> in(d.data(), d.size(), "data");
+  if (parse<RFC5322::body_ascii>(in)) {
+    return data_type::ascii;
+  }
+  if (parse<RFC5322::body_utf8>(in)) {
+    return data_type::utf8;
+  }
+  // anything else is
+  return data_type::binary;
+}
+
+class body {
+public:
+  body(char const* path, data_type constraint)
+    : path_(path)
+  {
+    auto body_sz = boost::filesystem::file_size(path_);
+    if (body_sz) {
+      file_.open(path_);
+      data_ = file_.data();
+      size_ = file_.size();
+    }
+
+    switch (type_ = type(*this)) {
+    case data_type::ascii:
+      coding_ = transfer_encoding::seven_bit;
+      LOG(INFO) << path << " is ascii";
+      return;
+
+    case data_type::utf8:
+      if ((constraint == data_type::utf8)
+          || (constraint == data_type::binary)) {
+        coding_ = transfer_encoding::eight_bit;
+        LOG(INFO) << path << " is utf8";
+        return;
+      }
+      break;
+
+    case data_type::binary:
+      if (constraint == data_type::binary) {
+        coding_ = transfer_encoding::binary;
+        LOG(INFO) << path << " is binary";
+        return;
+      }
+      break;
+    }
+
+    // we need some type of transfer encoding
+    coding_ = transfer_encoding::base64;
+    xfer_buffer_ = Base64::enc(*this, true);
+    data_ = xfer_buffer_.data();
+    size_ = xfer_buffer_.size();
+  }
+
+  operator string_view() const { return string_view(data_, size_); }
+
+  char const* data() const { return data_; }
+  size_t size() const { return size_; }
+
+  transfer_encoding coding() const { return coding_; }
+
+private:
+  char const* data_{nullptr};
+  size_t size_{0};
+
+  data_type type_;
+  transfer_encoding coding_;
+  std::string xfer_buffer_;
+
+  boost::filesystem::path path_;
+  boost::iostreams::mapped_file_source file_;
 };
 
 int main(int argc, char* argv[])
@@ -704,34 +790,47 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  if (FLAGS_ip_4 && FLAGS_ip_6) {
+  if (FLAGS_ip4 && FLAGS_ip6) {
     LOG(FATAL) << "Must use /some/ IP version.";
   }
 
   Domain sender(FLAGS_sender);
+
+  // parse FLAGS_from and FLAGS_to as addr_spec
+
+  Mailbox from_mbx;
+  memory_input<> from_in(FLAGS_from, "from");
+  if (!parse<RFC5322::addr_spec, RFC5322::action>(from_in, from_mbx)) {
+    LOG(FATAL) << "Bad From: address syntax \"" << FLAGS_from << "\"";
+  }
+  LOG(INFO) << "from_mbx == " << from_mbx;
+
+  memory_input<> local_from(from_mbx.local_part(), "from.local");
+  bool must_have_smtputf8 = !parse<chars::ascii>(local_from);
+
+  Mailbox to_mbx;
+  memory_input<> to_in(FLAGS_to, "to");
+  if (!parse<RFC5322::addr_spec, RFC5322::action>(to_in, to_mbx)) {
+    LOG(FATAL) << "Bad address syntax \"" << FLAGS_to << "\"";
+  }
+  LOG(INFO) << "to_mbx == " << to_mbx;
+
+  memory_input<> local_in(to_mbx.local_part(), "to.local");
+  must_have_smtputf8 = must_have_smtputf8 || !parse<chars::ascii>(local_in);
 
   std::vector<Domain> receivers;
   if (!FLAGS_receiver.empty()) {
     receivers.push_back(Domain(FLAGS_receiver));
   }
   else {
-    // parse FLAGS_to as addr_spec
-    Mailbox mbx;
-    memory_input<> in(FLAGS_to, "to");
-    if (!parse<RFC5322::addr_spec, RFC5322::action>(in, mbx)) {
-      LOG(FATAL) << "Error parsing address \"" << FLAGS_receiver << "\"";
-    }
-
-    LOG(INFO) << "mbx == " << mbx;
-
-    // look up MX records for mbx.domain()
+    // look up MX records for to_mbx.domain()
     DNS::Resolver res;
 
     // returns list of servers sorted by priority, low to high
-    auto mxs = DNS::get_records<DNS::RR_type::MX>(res, mbx.domain().ascii());
+    auto mxs = DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii());
 
     if (mxs.empty()) {
-      receivers.push_back(mbx.domain());
+      receivers.push_back(to_mbx.domain());
     }
     else {
       for (auto mx : mxs) {
@@ -740,20 +839,13 @@ int main(int argc, char* argv[])
     }
   }
 
-  // boost::filesystem::path body_path("body.txt");
-  boost::filesystem::path body_path("/z/home/gene/Desktop/IMG_20140925_161657.jpg");
-  // boost::filesystem::path body_path("/z/home/gene/src/jnk/binary.dat");
-  auto body_sz = boost::filesystem::file_size(body_path);
-  CHECK(body_sz) << "body.txt must not be empty";
-
-  boost::iostreams::mapped_file_source body(body_path);
-
 try_host:
   CHECK(!receivers.empty()) << "no more hosts to try";
-  LOG(INFO) << "trying " << receivers[0].utf8();
+  LOG(INFO) << "trying " << receivers[0].utf8() << ":" << FLAGS_service;
   auto fd = conn(receivers[0].ascii(), FLAGS_service);
   CHECK_NE(fd, -1);
   RFC5321::Connection cnn(fd);
+  // CRLF /only/
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
     close(fd);
@@ -781,15 +873,55 @@ try_host:
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 
-  bool ext_smtputf8
-      = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
-  bool ext_8bitmime
-      = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
+  bool ext_smtputf8 = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
+
+  if (must_have_smtputf8 && !ext_smtputf8) {
+    close(fd);
+    receivers.erase(receivers.begin());
+    goto try_host;
+  }
+
+  bool ext_8bitmime = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
   bool ext_binarymime
       = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
+  bool ext_chunking = cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end();
 
-  if (ext_binarymime) {
-    CHECK((cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()));
+  if (ext_binarymime && !ext_chunking) {
+    LOG(ERROR)
+        << "BINARYMIME requires CHUNKING, see RFC-3030 section 3 item 3.";
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
+  }
+
+  if (ext_smtputf8 && !ext_8bitmime) {
+    LOG(ERROR)
+        << "SMTPUTF8 requires 8BITMIME, see RFC-6531 section 3.1 item 8.";
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
+  }
+
+  // set server constraints
+  data_type constraint = data_type::binary;
+  if (!ext_binarymime) {
+    if (ext_8bitmime) {
+      constraint = data_type::utf8;
+    }
+    else {
+      constraint = data_type::ascii;
+    }
+  }
+
+  std::vector<body> bodies;
+
+  if (argc == 1) {
+    bodies.emplace_back("body.txt", constraint);
+  }
+  for (int a = 1; a < argc; ++a) {
+    bodies.emplace_back(argv[a], constraint);
   }
 
   auto max_msg_size = 0u;
@@ -835,10 +967,6 @@ try_host:
     eml.add_hdr("Keywords"s, FLAGS_keywords);
   eml.add_hdr("MIME-Version"s, "1.0"s);
 
-  // eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
-
-#if 0
-
   if (ext_binarymime) {
     eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
     eml.add_hdr("Content-Transfer-Encoding", "binary"s);
@@ -863,45 +991,50 @@ try_host:
   if (!FLAGS_content_language.empty())
     eml.add_hdr("Content-Language", FLAGS_content_language);
 
-#else
+#if 0
 
-  // eml.add_hdr("Content-Type", "application/octet-stream; name=\"binary.dat\"");
+  // eml.add_hdr("Content-Type", "application/octet-stream;
+  // name=\"binary.dat\"");
   // eml.add_hdr("Content-Description", "binary.dat");
   // eml.add_hdr("Content-Disposition", "attachment; filename=\"binary.dat\";"
-  //             "\r\n\tsize=256; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
+  //             "\r\n\tsize=256; creation-date=\"Sat, 08 Jul 2017 18:25:46
+  //             GMT\""
   //             "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
   // eml.add_hdr("Content-Transfer-Encoding", "binary");
 
   eml.add_hdr("Content-Type", "image/jpg; name=\"IMG_20140925_161657.jpg\"");
   eml.add_hdr("Content-Description", "IMG_20140925_161657.jpg");
-  eml.add_hdr("Content-Disposition", "attachment; filename=\"IMG_20140925_161657.jpg\";"
-              "\r\n\tsize=2830200; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
-              "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
+  eml.add_hdr(
+      "Content-Disposition",
+      "attachment; filename=\"IMG_20140925_161657.jpg\";"
+      "\r\n\tsize=2830200; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
+      "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
   eml.add_hdr("Content-Transfer-Encoding", "binary");
 
 #endif
 
-#if 0
-  // Maybe strict/strict ?
-
   std::ifstream keyfs("private.key");
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
-  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str());
+  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
+                     OpenDKIM::Sign::body_type::binary);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
     auto header = name + ": "s + value;
     dks.header(header.c_str());
   });
   dks.eoh();
-  dks.body(string_view(body.data(), body.size()));
+  for (auto const& body : bodies)
+    dks.body(body);
   dks.eom();
   eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
-#endif
 
   std::stringstream hdr_stream;
   hdr_stream << eml;
   auto hdr_str = hdr_stream.str();
 
-  auto total_size = hdr_str.size() + body.size();
+  auto total_size = hdr_str.size();
+  for (auto const& body : bodies)
+    total_size += body.size();
+
   if (total_size > max_msg_size) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
@@ -915,45 +1048,37 @@ try_host:
   if (ext_size) {
     param_stream << " SIZE=" << total_size;
   }
-  if (ext_binarymime) {
-    param_stream << " BODY=BINARYMIME";
-    // no body check
-  }
-  else if (ext_8bitmime) {
-    param_stream << " BODY=8BITMIME";
-    // check body, must be UTF8 with reasonable line lengths
-    memory_input<> in(body.data(), body.size(), "body");
-    if (!parse<RFC5322::body>(in)) {
-      LOG(FATAL) << "must convert body";
+
+  bool body_type_set = false;
+  for (auto const& body : bodies) {
+    if (body.coding() == transfer_encoding::binary) {
+      CHECK(ext_binarymime);
+      param_stream << " BODY=BINARYMIME";
+      body_type_set = true;
+      break;
     }
   }
-  else {
-    // check ASCII body
-    memory_input<> in(body.data(), body.size(), "body");
-    if (!parse<RFC5322::body_ascii>(in)) {
-      LOG(FATAL) << "must convert body";
+  if (!body_type_set) {
+    for (auto const& body : bodies) {
+      if (body.coding() == transfer_encoding::eight_bit) {
+        CHECK(ext_8bitmime);
+        param_stream << " BODY=8BITMIME";
+        body_type_set = true;
+        break;
+      }
     }
   }
 
-  if (ext_smtputf8) {
+  if (must_have_smtputf8) {
+    CHECK(ext_smtputf8);
     param_stream << " SMTPUTF8";
-  }
-  else {
-    LOG(INFO) << "checking headers";
-    eml.foreach_hdr([](std::string const& name, std::string const& value) {
-      memory_input<> in(value, "header");
-      if (!parse<UTF8::ascii>(in)) {
-        LOG(FATAL) << "non-ascii header " << name;
-      }
-      LOG(INFO) << value << " parsed as ascii";
-    });
   }
 
   auto param_str = param_stream.str();
 
   LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param_str;
   cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n"
-                  << std::flush;
+                 << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   if (cnn.reply_code.at(0) != '2') {
     // If sender was not accepted for any transient reason, maybe goto try_host
@@ -976,8 +1101,7 @@ try_host:
     exit(EXIT_FAILURE);
   }
 
-  if (FLAGS_use_chunking
-      && (cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end())) {
+  if (FLAGS_use_chunking && ext_chunking) {
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "> " << bdat_stream.str();
@@ -985,8 +1109,10 @@ try_host:
     cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
     cnn.sock.out().write(hdr_str.data(), hdr_str.size());
     CHECK(cnn.sock.out().good());
-    cnn.sock.out().write(body.data(), body.size());
+
+    cnn.sock.out().write(bodies[0].data(), bodies[0].size());
     CHECK(cnn.sock.out().good());
+
     cnn.sock.out() << std::flush;
     CHECK(cnn.sock.out().good());
 
@@ -1001,11 +1127,15 @@ try_host:
 
     cnn.sock.out() << eml;
 
+    // This loop converts single LF line endings into CRLF.
+
     // This loop adds a CRLF and the end of the transmission if the
     // file doesn't already end with one.  This is an artifact of the
     // SMTP DATA protocol.
 
-    imemstream isbody(body.data(), body.size());
+    // This loop does nothing to fix single CR characters.
+
+    imemstream isbody(bodies[0].data(), bodies[0].size());
     std::string line;
     while (std::getline(isbody, line)) {
       if (line.length() && (line.at(0) == '.')) {
