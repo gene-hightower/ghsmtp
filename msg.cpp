@@ -127,6 +127,15 @@ struct Ctx {
   std::string opt_value;
 
   std::vector<std::string> msg_errors;
+
+  std::string type;
+  std::string subtype;
+
+  bool mime_version{false};
+  bool discrete_type{false};
+  bool composite_type{false};
+
+  std::vector<std::pair<std::string, std::string>> ct_parameters;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -722,11 +731,29 @@ struct parameter : seq<attribute, one<'='>, value> {
 struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
                      opt<CFWS>,
                      seq<type, one<'/'>, subtype>,
-                     star<seq<one<';'>, opt<CFWS>, parameter>>> {
+                     star<seq<one<';'>, opt<CFWS>, parameter>>,
+                     eol> {
+};
+
+// mechanism := "7bit" / "8bit" / "binary" /
+//              "quoted-printable" / "base64" /
+//              ietf-token / x-token
+
+struct mechanism : seq<sor<TAOCPP_PEGTL_ISTRING("7bit"),
+                           TAOCPP_PEGTL_ISTRING("8bit"),
+                           TAOCPP_PEGTL_ISTRING("binary"),
+                           TAOCPP_PEGTL_ISTRING("quoted-printable"),
+                           TAOCPP_PEGTL_ISTRING("base64"),
+                           ietf_token,
+                           x_token>,
+                       eol> {
 };
 
 struct content_transfer_encoding
-    : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"), seq<atom>> {
+    : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"),
+          opt<CFWS>,
+          mechanism,
+          eol> {
 };
 
 // Optional Fields
@@ -1164,6 +1191,8 @@ struct action<spf_key_value_pair> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.kv_list.emplace_back(ctx.key, ctx.value);
+    ctx.key.clear();
+    ctx.value.clear();
   }
 };
 
@@ -1288,6 +1317,7 @@ struct action<mime_version> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mime_version = true;
     // ctx.unstructured.clear();
   }
 };
@@ -1303,6 +1333,35 @@ struct action<content> {
 };
 
 template <>
+struct action<discrete_type> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.discrete_type = true;
+    ctx.type = in.string();
+  }
+};
+
+template <>
+struct action<composite_type> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.composite_type = true;
+    ctx.type = in.string();
+  }
+};
+
+template <>
+struct action<subtype> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.subtype = in.string();
+  }
+};
+
+template <>
 struct action<content_transfer_encoding> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
@@ -1313,13 +1372,58 @@ struct action<content_transfer_encoding> {
 };
 
 template <>
+struct action<attribute> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.key = in.string();
+  }
+};
+
+template <>
+struct action<parameter> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.ct_parameters.emplace_back(ctx.key, ctx.value);
+    ctx.key.clear();
+    ctx.value.clear();
+  }
+};
+
+template <>
+struct action<value> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.value = in.string();
+  }
+};
+
+template <>
 struct action<body> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    // LOG(INFO) << "body";
+    LOG(INFO) << "body";
+    // auto body = string_view(in.begin(), in.end() - in.begin());
+
     ctx.dkv.eoh();
     ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
+
+    // ctx.dkv.body(body);
+
+    if (ctx.mime_version) {
+      LOG(INFO) << "type == " << ctx.type;
+      LOG(INFO) << "subtype == " << ctx.subtype;
+      for (auto const& p : ctx.ct_parameters) {
+        LOG(INFO) << "  " << p.first << "=" << p.second;
+      }
+      // memory_input<> body_in(body, "body");
+      // if (!parse_nested<RFC5322::, RFC5322::action>(in, body_in, ctx)) {
+      //   LOG(ERROR) << "bad mime body";
+      // }
+    }
   }
 };
 
