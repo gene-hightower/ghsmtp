@@ -359,13 +359,12 @@ struct ehlo_line
 //                    "250 " ehlo-line CRLF )
 
 struct ehlo_ok_rsp
-: sor<
-      seq<TAOCPP_PEGTL_ISTRING("250 "), domain, opt<seq<SP, ehlo_greet>>, CRLF>,
-  seq<seq<TAOCPP_PEGTL_ISTRING("250-"), domain, opt<seq<SP, ehlo_greet>>, CRLF,
- star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
+: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), domain, opt<seq<SP, ehlo_greet>>, CRLF>,
 
-      seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>>
-     > {};
+      seq<TAOCPP_PEGTL_ISTRING("250-"), domain, opt<seq<SP, ehlo_greet>>, CRLF,
+ star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
+      seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>
+      > {};
 
 struct auth_login_username
     : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
