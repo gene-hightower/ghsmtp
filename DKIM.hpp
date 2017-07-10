@@ -44,7 +44,15 @@ public:
 
 class Sign : public Lib {
 public:
-  Sign(char const* secretkey, char const* selector, char const* domain);
+  enum class body_type : bool {
+    binary,
+    text,
+  };
+
+  Sign(char const* secretkey,
+       char const* selector,
+       char const* domain,
+       body_type typ = body_type::text);
   std::string getsighdr();
 };
 }

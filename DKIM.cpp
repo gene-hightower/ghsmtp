@@ -226,12 +226,16 @@ bool Verify::check_signature(std::experimental::string_view str)
   return dkim_sig_syntax(dkim_, uc(str.data()), str.length()) == DKIM_STAT_OK;
 }
 
-Sign::Sign(char const* secretkey, char const* selector, char const* domain)
+Sign::Sign(char const* secretkey,
+           char const* selector,
+           char const* domain,
+           body_type typ)
 {
-  dkim_ = CHECK_NOTNULL(dkim_sign(lib_, id_s, nullptr, uc(secretkey),
-                                  uc(selector), uc(domain), DKIM_CANON_RELAXED,
-                                  DKIM_CANON_RELAXED, DKIM_SIGN_RSASHA256, -1,
-                                  &status_));
+  dkim_ = CHECK_NOTNULL(dkim_sign(
+      lib_, id_s, nullptr, uc(secretkey), uc(selector), uc(domain),
+      DKIM_CANON_RELAXED,
+      (typ == body_type::binary) ? DKIM_CANON_SIMPLE : DKIM_CANON_RELAXED,
+      DKIM_SIGN_RSASHA256, -1, &status_));
 }
 
 std::string Sign::getsighdr()
