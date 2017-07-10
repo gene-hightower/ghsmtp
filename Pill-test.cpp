@@ -5,7 +5,7 @@
 
 #include <glog/logging.h>
 
-int main(int arcv, char* argv[])
+int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
