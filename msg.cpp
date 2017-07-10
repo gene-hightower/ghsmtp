@@ -72,6 +72,10 @@ constexpr char const* defined_fields[]{
     "Resent-Bcc",
     "Resent-Message-ID",
 
+    // MIME Fields
+    "MIME-Version",
+    "Content-Type",
+    "Content-Transfer-Encoding",
 };
 // clang-format on
 
@@ -156,6 +160,7 @@ struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
 using dot = one<'.'>;
 using colon = one<':'>;
 
+// UTF-8 except NUL (0), LF (10) and CR (13).
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
 };
 
@@ -567,28 +572,29 @@ struct result : sor<TAOCPP_PEGTL_ISTRING("Pass"),
                     TAOCPP_PEGTL_ISTRING("PermError")> {
 };
 
-struct key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
-                 TAOCPP_PEGTL_ISTRING("envelope-from"),
-                 TAOCPP_PEGTL_ISTRING("helo"),
-                 TAOCPP_PEGTL_ISTRING("problem"),
-                 TAOCPP_PEGTL_ISTRING("receiver"),
-                 TAOCPP_PEGTL_ISTRING("identity"),
-                 TAOCPP_PEGTL_ISTRING("mechanism")> {
+struct spf_key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
+                     TAOCPP_PEGTL_ISTRING("envelope-from"),
+                     TAOCPP_PEGTL_ISTRING("helo"),
+                     TAOCPP_PEGTL_ISTRING("problem"),
+                     TAOCPP_PEGTL_ISTRING("receiver"),
+                     TAOCPP_PEGTL_ISTRING("identity"),
+                     TAOCPP_PEGTL_ISTRING("mechanism")> {
 };
 
 // This value syntax (allowing mailbox) is not in accordance with RFC
 // 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
 // before.
 
-struct value : sor<ip, mailbox, dot_atom, quoted_string> {
+struct spf_value : sor<ip, addr_spec, dot_atom, quoted_string> {
 };
 
-struct key_value_pair : seq<key, opt<CFWS>, one<'='>, value> {
+struct spf_key_value_pair : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {
 };
 
-struct key_value_list : seq<key_value_pair,
-                            star<seq<one<';'>, opt<CFWS>, key_value_pair>>,
-                            opt<one<';'>>> {
+struct spf_key_value_list
+    : seq<spf_key_value_pair,
+          star<seq<one<';'>, opt<CFWS>, spf_key_value_pair>>,
+          opt<one<';'>>> {
 };
 
 struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
@@ -596,12 +602,131 @@ struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
                           result,
                           FWS,
                           opt<seq<comment, FWS>>,
-                          opt<key_value_list>,
+                          opt<spf_key_value_list>,
                           eol> {
 };
 
 struct dkim_signature
     : seq<TAOCPP_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
+};
+
+struct mime_version : seq<TAOCPP_PEGTL_ISTRING("MIME-Version:"),
+                          opt<CFWS>,
+                          one<'1'>,
+                          opt<CFWS>,
+                          one<'.'>,
+                          opt<CFWS>,
+                          one<'0'>,
+                          opt<CFWS>,
+                          eol> {
+};
+
+// CTL :=  <any ASCII control           ; (  0- 37,  0.- 31.)
+//          character and DEL>          ; (    177,     127.)
+
+// SPACE := 32
+
+// tspecials :=  "(" / ")" / "<" / ">" / "@" /
+//               "," / ";" / ":" / "\" / <">
+//               "/" / "[" / "]" / "?" / "="
+
+// ! 33
+
+// 33-33
+
+// "  34
+
+// 35-39
+
+// (  40
+// )  41
+
+// 42-43
+
+// ,  44
+
+// 45-46
+
+// /  47
+
+// 48-57
+
+// :  58
+// ;  59
+// <  60
+// =  61
+// >  62
+// ?  63
+// @  64
+
+// 65-90
+
+// [  91
+// \  92
+// ]  93
+
+// 94-126
+
+// token := 1*<any (US-ASCII) CHAR except CTLs, SPACE,
+//            or tspecials>
+
+struct tchar : ranges<33, 33, 35, 39, 42, 43, 45, 46, 48, 57, 65, 90, 94, 126> {
+};
+
+struct token : plus<tchar> {
+};
+
+struct ietf_token : token {
+};
+
+struct x_token : seq<TAOCPP_PEGTL_ISTRING("X-"), token> {
+};
+
+struct extension_token : sor<x_token, ietf_token> {
+};
+
+struct discrete_type : sor<TAOCPP_PEGTL_ISTRING("text"),
+                           TAOCPP_PEGTL_ISTRING("image"),
+                           TAOCPP_PEGTL_ISTRING("audio"),
+                           TAOCPP_PEGTL_ISTRING("video"),
+                           TAOCPP_PEGTL_ISTRING("application"),
+                           extension_token> {
+};
+
+struct composite_type : sor<TAOCPP_PEGTL_ISTRING("message"),
+                            TAOCPP_PEGTL_ISTRING("multipart"),
+                            extension_token> {
+};
+
+struct type : sor<discrete_type, composite_type> {
+};
+
+struct subtype : token {
+};
+
+// value     := token / quoted-string
+
+// attribute := token
+
+// parameter := attribute "=" value
+
+struct value : sor<token, quoted_string> {
+};
+
+struct attribute : token {
+};
+
+struct parameter : seq<attribute, one<'='>, value> {
+};
+
+struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
+                     opt<CFWS>,
+                     seq<type, one<'/'>, subtype>,
+                     star<seq<one<';'>, opt<CFWS>, parameter>>> {
+};
+
+struct content_transfer_encoding
+    : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"), seq<atom>> {
 };
 
 // Optional Fields
@@ -652,6 +777,10 @@ struct fields : star<sor<
                          resent_cc,
                          resent_bcc,
                          resent_msg_id,
+
+                         mime_version,
+                         content,
+                         content_transfer_encoding,
 
                          optional_field
                        >> {
@@ -1011,7 +1140,7 @@ struct action<result> {
 };
 
 template <>
-struct action<key> {
+struct action<spf_key> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
@@ -1020,7 +1149,7 @@ struct action<key> {
 };
 
 template <>
-struct action<value> {
+struct action<spf_value> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
@@ -1030,7 +1159,7 @@ struct action<value> {
 };
 
 template <>
-struct action<key_value_pair> {
+struct action<spf_key_value_pair> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
@@ -1039,7 +1168,7 @@ struct action<key_value_pair> {
 };
 
 template <>
-struct action<key_value_list> {
+struct action<spf_key_value_list> {
   static void apply0(Ctx& ctx)
   {
     for (auto kvp : ctx.kv_list) {
@@ -1096,6 +1225,12 @@ struct action<received_spf> {
       pol_spf = DMARC_POLICY_SPF_OUTCOME_FAIL;
     }
 
+    if (ctx.spf_info.find("client-ip") != ctx.spf_info.end()) {
+      ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
+      LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
+                << ctx.spf_result;
+    }
+
     // Google sometimes doesn't put in anything but client-ip
     if (ctx.spf_info.find("envelope-from") != ctx.spf_info.end()) {
       auto dom = ctx.spf_info["envelope-from"];
@@ -1107,19 +1242,20 @@ struct action<received_spf> {
         LOG(INFO) << "SPF: HELO " << dom;
       }
       else {
-        auto pos = dom.find_first_of('@');
-        if (pos != std::string::npos) {
-          dom = dom.substr(pos + 1);
+        memory_input<> addr_in(dom, "dom");
+        if (parse_nested<RFC5322::addr_spec, RFC5322::action>(in, addr_in,
+                                                              ctx)) {
+          dom = ctx.mb_dom;
+          ctx.mb_loc.clear();
+          ctx.mb_dom.clear();
         }
+        else {
+          LOG(FATAL) << "Failed to parse domain: " << dom;
+        }
+
         LOG(INFO) << "SPF: MAIL FROM " << dom;
       }
       ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
-    }
-
-    if (ctx.spf_info.find("client-ip") != ctx.spf_info.end()) {
-      ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
-      LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
-                << ctx.spf_result;
     }
 
     ctx.mb_list.clear();
@@ -1143,6 +1279,36 @@ struct action<received_token> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
+  }
+};
+
+template <>
+struct action<mime_version> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    // ctx.unstructured.clear();
+  }
+};
+
+template <>
+struct action<content> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    // ctx.unstructured.clear();
+  }
+};
+
+template <>
+struct action<content_transfer_encoding> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    // ctx.unstructured.clear();
   }
 };
 
