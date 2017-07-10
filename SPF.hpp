@@ -5,8 +5,10 @@
 #include <unordered_map>
 
 #include <arpa/inet.h> // in_addr required by spf2/spf.h
+#include <arpa/nameser.h>
 
 extern "C" {
+#define HAVE_NS_TYPE
 #include <spf2/spf.h>
 }
 
@@ -55,6 +57,8 @@ public:
   {
   }
   ~Request() { SPF_request_free(req_); }
+  void set_ip_str(char const* ip);
+
   void set_ipv4_str(char const* ipv4)
   {
     CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv4_str(req_, ipv4));

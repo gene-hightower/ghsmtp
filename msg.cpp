@@ -1,3 +1,5 @@
+// Toy RFC-5322 message parser and validator.
+
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +18,8 @@
 #include "DKIM.hpp"
 #include "DMARC.hpp"
 #include "Mailbox.hpp"
+#include "SPF.hpp"
+#include "hostname.hpp"
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -1215,18 +1219,22 @@ struct action<received_spf> {
 
     // *** Do the check now?
 
-    // utsname un;
-    // PCHECK(uname(&un) == 0);
-    // SPF::Server spf_srv(un.nodename);
-    // SPF::Request spf_req(spf_srv);
+    auto node = get_hostname();
 
-    // spf_req.set_ipv4_str(ctx.spf_info["client-ip"].c_str());
-    // spf_req.set_helo_dom(ctx.spf_info["helo"].c_str());
-    // spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
+    SPF::Server spf_srv(node.c_str());
+    SPF::Request spf_req(spf_srv);
 
-    // SPF::Response spf_res(spf_req);
-    // auto res = spf_res.result();
-    // CHECK_NE(res, SPF::Result::INVALID);
+    spf_req.set_ip_str(ctx.spf_info["client-ip"].c_str());
+
+    spf_req.set_helo_dom(ctx.spf_info["helo"].c_str());
+    spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
+
+    SPF::Response spf_res(spf_req);
+    auto res = spf_res.result();
+    CHECK_NE(res, SPF::Result::INVALID);
+
+    LOG(INFO) << "new SPF result: " << res;
+    LOG(INFO) << "old SPF result: " << ctx.spf_result;
 
     // *** Get result from header:
 
