@@ -24,6 +24,7 @@ LDLIBS += \
 	-lcdb \
 	-lcrypto \
 	-lgflags \
+	-lmagic \
 	-lopendmarc \
 	-lregdom \
 	-lspf2 \
@@ -33,7 +34,7 @@ PROGRAMS := msg smtp snd
 
 msg_STEMS := msg DKIM Domain IP4 IP6
 smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz hostname
-snd_STEMS := snd DKIM DNS Domain IP4 IP6 POSIX Pill Session Sock TLS-OpenSSL base64 date/tz hostname
+snd_STEMS := snd DKIM DNS Domain IP4 IP6 Magic POSIX Pill Session Sock TLS-OpenSSL base64 date/tz hostname
 
 TESTS := \
 	CDB-test \
@@ -41,6 +42,7 @@ TESTS := \
 	Domain-test \
 	IP4-test \
 	IP6-test \
+	Magic-test \
 	Mailbox-test \
 	Message-test \
 	Now-test \
@@ -57,6 +59,7 @@ DNS-test_STEMS := DNS
 Domain-test_STEMS := Domain IP4 IP6
 IP4-test_STEMS := IP4
 IP6-test_STEMS := IP6
+Magic-test_STEMS := Magic
 Mailbox-test_STEMS := Domain IP4 IP6
 Message-test_STEMS := Domain IP4 IP6 Message Pill date/tz
 Now-test_STEMS := date/tz

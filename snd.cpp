@@ -5,9 +5,9 @@
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
 
 DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
-DEFINE_string(receiver, "", "FQDN of receiving node");
 
-DEFINE_string(service, "smtp", "service name");
+DEFINE_string(receiver, "localhost", "FQDN of receiving node");
+DEFINE_string(service, "smtp-test", "service name");
 
 DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
 DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
@@ -17,8 +17,6 @@ DEFINE_string(to_name, "基因", "rfc5322 To name");
 
 DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
 DEFINE_string(keywords, "ghsmtp", "rfc5322 Keywords");
-
-DEFINE_string(content_language, "en", "RFC 3282 Content-Language header");
 
 DEFINE_bool(ip4, false, "use only IP version 4");
 DEFINE_bool(ip6, false, "use only IP version 6");
@@ -31,6 +29,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "DKIM.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
+#include "Magic.hpp"
 #include "Mailbox.hpp"
 #include "Now.hpp"
 #include "Pill.hpp"
@@ -121,8 +120,8 @@ struct VUCHAR : sor<VCHAR, chars::non_ascii> {
 using dot = one<'.'>;
 using colon = one<':'>;
 
-// All 7-bit ASCII except LF (10) and CR (13).
-struct text_ascii : ranges<0, 9, 11, 12, 14, 127> {
+// All 7-bit ASCII except NUL (0), LF (10) and CR (13).
+struct text_ascii : ranges<1, 9, 11, 12, 14, 127> {
 };
 
 // Short lines of ASCII text.  LF or CRLF line separators.
@@ -588,7 +587,8 @@ int conn(std::string const& node, std::string const& service)
         LOG(INFO) << "connect [" << str << "]:" << ntohs(in6->sin6_port);
         return fd;
       }
-      PLOG(WARNING) << "connect failed [" << str << "]:" << ntohs(in6->sin6_port);
+      PLOG(WARNING) << "connect failed [" << str
+                    << "]:" << ntohs(in6->sin6_port);
       close(fd);
       break;
     }
@@ -709,9 +709,9 @@ data_type type(string_view d)
   return data_type::binary;
 }
 
-class body {
+class content {
 public:
-  body(char const* path, data_type constraint)
+  content(char const* path)
     : path_(path)
   {
     auto body_sz = boost::filesystem::file_size(path_);
@@ -721,51 +721,21 @@ public:
       size_ = file_.size();
     }
 
-    switch (type_ = type(*this)) {
-    case data_type::ascii:
-      coding_ = transfer_encoding::seven_bit;
-      LOG(INFO) << path << " is ascii";
-      return;
-
-    case data_type::utf8:
-      if ((constraint == data_type::utf8)
-          || (constraint == data_type::binary)) {
-        coding_ = transfer_encoding::eight_bit;
-        LOG(INFO) << path << " is utf8";
-        return;
-      }
-      break;
-
-    case data_type::binary:
-      if (constraint == data_type::binary) {
-        coding_ = transfer_encoding::binary;
-        LOG(INFO) << path << " is binary";
-        return;
-      }
-      break;
-    }
-
-    // we need some type of transfer encoding
-    coding_ = transfer_encoding::base64;
-    xfer_buffer_ = Base64::enc(*this, true);
-    data_ = xfer_buffer_.data();
-    size_ = xfer_buffer_.size();
+    type_ = ::type(*this);
   }
-
-  operator string_view() const { return string_view(data_, size_); }
 
   char const* data() const { return data_; }
   size_t size() const { return size_; }
+  data_type type() const { return type_; }
 
-  transfer_encoding coding() const { return coding_; }
+  bool empty() const { return size() == 0; }
+  operator string_view() const { return string_view(data(), size()); }
 
 private:
   char const* data_{nullptr};
   size_t size_{0};
 
   data_type type_;
-  transfer_encoding coding_;
-  std::string xfer_buffer_;
 
   boost::filesystem::path path_;
   boost::iostreams::mapped_file_source file_;
@@ -904,25 +874,16 @@ try_host:
     exit(EXIT_FAILURE);
   }
 
-  // set server constraints
-  data_type constraint = data_type::binary;
-  if (!ext_binarymime) {
-    if (ext_8bitmime) {
-      constraint = data_type::utf8;
-    }
-    else {
-      constraint = data_type::ascii;
-    }
-  }
-
-  std::vector<body> bodies;
+  std::vector<content> bodies;
 
   if (argc == 1) {
-    bodies.emplace_back("body.txt", constraint);
+    bodies.emplace_back("body.txt");
   }
   for (int a = 1; a < argc; ++a) {
-    bodies.emplace_back(argv[a], constraint);
+    bodies.emplace_back(argv[a]);
   }
+
+  CHECK_EQ(bodies.size(), 1) << "only one body part for now";
 
   auto max_msg_size = 0u;
   bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
@@ -956,74 +917,37 @@ try_host:
   std::stringstream mid_str;
   mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
           << sender.utf8() << '>';
-  eml.add_hdr("Message-ID"s, mid_str.str());
-  eml.add_hdr("Date"s, date.string());
+  eml.add_hdr("Message-ID", mid_str.str());
+  eml.add_hdr("Date", date.string());
   std::string rfc5322_from = FLAGS_from_name + " <" + FLAGS_from + ">";
-  eml.add_hdr("From"s, rfc5322_from);
+  eml.add_hdr("From", rfc5322_from);
   std::string rfc5322_to = FLAGS_to_name + " <" + FLAGS_to + ">";
   eml.add_hdr("To"s, rfc5322_to);
-  eml.add_hdr("Subject"s, FLAGS_subject);
+  eml.add_hdr("Subject", FLAGS_subject);
   if (!FLAGS_keywords.empty())
-    eml.add_hdr("Keywords"s, FLAGS_keywords);
-  eml.add_hdr("MIME-Version"s, "1.0"s);
+    eml.add_hdr("Keywords", FLAGS_keywords);
+  eml.add_hdr("MIME-Version", "1.0");
 
-  if (ext_binarymime) {
-    eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
-    eml.add_hdr("Content-Transfer-Encoding", "binary"s);
-  }
-  else if (ext_8bitmime) {
-    eml.add_hdr("Content-Type"s, "text/plain; charset=\"UTF-8\""s);
-    eml.add_hdr("Content-Transfer-Encoding", "8bit"s);
-  }
-  else if (ext_smtputf8) {
-    LOG(ERROR)
-        << "SMTPUTF8 must advertise 8BITMIME, see RFC-6531 section 3.1 item 8.";
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_FAILURE);
-  }
-  else {
-    eml.add_hdr("Content-Type"s, "text/plain; charset=\"US-ASCII\""s);
-    eml.add_hdr("Content-Transfer-Encoding", "7bit"s);
-  }
+  Magic magic; // to ID buffer contents
 
-  if (!FLAGS_content_language.empty())
-    eml.add_hdr("Content-Language", FLAGS_content_language);
+  eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
 
-#if 0
-
-  // eml.add_hdr("Content-Type", "application/octet-stream;
-  // name=\"binary.dat\"");
-  // eml.add_hdr("Content-Description", "binary.dat");
-  // eml.add_hdr("Content-Disposition", "attachment; filename=\"binary.dat\";"
-  //             "\r\n\tsize=256; creation-date=\"Sat, 08 Jul 2017 18:25:46
-  //             GMT\""
-  //             "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
-  // eml.add_hdr("Content-Transfer-Encoding", "binary");
-
-  eml.add_hdr("Content-Type", "image/jpg; name=\"IMG_20140925_161657.jpg\"");
-  eml.add_hdr("Content-Description", "IMG_20140925_161657.jpg");
-  eml.add_hdr(
-      "Content-Disposition",
-      "attachment; filename=\"IMG_20140925_161657.jpg\";"
-      "\r\n\tsize=2830200; creation-date=\"Sat, 08 Jul 2017 18:25:46 GMT\""
-      "\r\n\tmodification-date=\"Sat, 08 Jul 2017 18:25:46 GMT\"");
-  eml.add_hdr("Content-Transfer-Encoding", "binary");
-
-#endif
+  auto body_type = (bodies[0].type() == data_type::binary)
+                       ? OpenDKIM::Sign::body_type::binary
+                       : OpenDKIM::Sign::body_type::text;
 
   std::ifstream keyfs("private.key");
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
   OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
-                     OpenDKIM::Sign::body_type::binary);
+                     body_type);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
     auto header = name + ": "s + value;
     dks.header(header.c_str());
   });
   dks.eoh();
-  for (auto const& body : bodies)
+  for (auto const& body : bodies) {
     dks.body(body);
+  }
   dks.eom();
   eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
 
@@ -1049,24 +973,11 @@ try_host:
     param_stream << " SIZE=" << total_size;
   }
 
-  bool body_type_set = false;
-  for (auto const& body : bodies) {
-    if (body.coding() == transfer_encoding::binary) {
-      CHECK(ext_binarymime);
-      param_stream << " BODY=BINARYMIME";
-      body_type_set = true;
-      break;
-    }
+  if (ext_binarymime) {
+    param_stream << " BODY=BINARYMIME";
   }
-  if (!body_type_set) {
-    for (auto const& body : bodies) {
-      if (body.coding() == transfer_encoding::eight_bit) {
-        CHECK(ext_8bitmime);
-        param_stream << " BODY=8BITMIME";
-        body_type_set = true;
-        break;
-      }
-    }
+  else if (ext_8bitmime) {
+    param_stream << " BODY=8BITMIME";
   }
 
   if (must_have_smtputf8) {
@@ -1110,7 +1021,9 @@ try_host:
     cnn.sock.out().write(hdr_str.data(), hdr_str.size());
     CHECK(cnn.sock.out().good());
 
-    cnn.sock.out().write(bodies[0].data(), bodies[0].size());
+    for (auto const& body : bodies) {
+      cnn.sock.out().write(body.data(), body.size());
+    }
     CHECK(cnn.sock.out().good());
 
     cnn.sock.out() << std::flush;
@@ -1135,16 +1048,18 @@ try_host:
 
     // This loop does nothing to fix single CR characters.
 
-    imemstream isbody(bodies[0].data(), bodies[0].size());
-    std::string line;
-    while (std::getline(isbody, line)) {
-      if (line.length() && (line.at(0) == '.')) {
-        cnn.sock.out() << '.';
+    for (auto const& body : bodies) {
+      std::string line;
+      imemstream isbody(body.data(), body.size());
+      while (std::getline(isbody, line)) {
+        if (line.length() && (line.at(0) == '.')) {
+          cnn.sock.out() << '.';
+        }
+        cnn.sock.out() << line;
+        if (line.back() != '\r')
+          cnn.sock.out() << '\r';
+        cnn.sock.out() << '\n';
       }
-      cnn.sock.out() << line;
-      if (line.back() != '\r')
-        cnn.sock.out() << '\r';
-      cnn.sock.out() << '\n';
     }
 
     // Done!
