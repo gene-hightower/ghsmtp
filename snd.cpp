@@ -78,77 +78,59 @@ constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 }
 
+// clang-format off
+
 namespace chars {
-struct tail : range<0x80, 0xBF> {
-};
+struct tail : range<0x80, 0xBF> {};
 
-struct ch_1 : range<0x00, 0x7F> {
-};
+struct ch_1 : range<0x00, 0x7F> {};
 
-struct ch_2 : seq<range<0xC2, 0xDF>, tail> {
-};
+struct ch_2 : seq<range<0xC2, 0xDF>, tail> {};
 
 struct ch_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, tail>,
                   seq<range<0xE1, 0xEC>, rep<2, tail>>,
                   seq<one<0xED>, range<0x80, 0x9F>, tail>,
-                  seq<range<0xEE, 0xEF>, rep<2, tail>>> {
-};
+                  seq<range<0xEE, 0xEF>, rep<2, tail>>> {};
 
 struct ch_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, tail>>,
                   seq<range<0xF1, 0xF3>, rep<3, tail>>,
-                  seq<one<0xF4>, range<0x80, 0x8F>, rep<2, tail>>> {
-};
+                  seq<one<0xF4>, range<0x80, 0x8F>, rep<2, tail>>> {};
 
-struct u8char : sor<ch_1, ch_2, ch_3, ch_4> {
-};
+struct u8char : sor<ch_1, ch_2, ch_3, ch_4> {};
 
-struct non_ascii : sor<ch_2, ch_3, ch_4> {
-};
+struct non_ascii : sor<ch_2, ch_3, ch_4> {};
 
-struct ascii : seq<star<ch_1>, eof> {
-};
+struct ascii : seq<star<ch_1>, eof> {};
 
-struct utf8 : seq<star<u8char>, eof> {
-};
+struct utf8 : seq<star<u8char>, eof> {};
 }
 
 namespace RFC5322 {
 
-struct VUCHAR : sor<VCHAR, chars::non_ascii> {
-};
+struct VUCHAR : sor<VCHAR, chars::non_ascii> {};
 
 using dot = one<'.'>;
 using colon = one<':'>;
 
 // All 7-bit ASCII except NUL (0), LF (10) and CR (13).
-struct text_ascii : ranges<1, 9, 11, 12, 14, 127> {
-};
+struct text_ascii : ranges<1, 9, 11, 12, 14, 127> {};
 
 // Short lines of ASCII text.  LF or CRLF line separators.
 struct body_ascii : seq<star<seq<rep_max<998, text_ascii>, eol>>,
-                        opt<rep_max<998, text_ascii>>,
-                        eof> {
-};
+                             opt<rep_max<998, text_ascii>>, eof> {};
 
-struct text_utf8 : sor<text_ascii, chars::non_ascii> {
-};
+struct text_utf8 : sor<text_ascii, chars::non_ascii> {};
 
 // Short lines of UTF-8 text.  LF or CRLF line separators.
 struct body_utf8 : seq<star<seq<rep_max<998, text_utf8>, eol>>,
-                       opt<rep_max<998, text_utf8>>,
-                       eof> {
-};
+                            opt<rep_max<998, text_utf8>>, eof> {};
 
-struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
-};
+struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, chars::non_ascii> {
-};
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, chars::non_ascii> {};
 
-struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {
-};
+struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
 
-// clang-format off
 struct atext : sor<ALPHA, DIGIT,
                    one<'!'>, one<'#'>,
                    one<'$'>, one<'%'>,
@@ -160,28 +142,21 @@ struct atext : sor<ALPHA, DIGIT,
                    one<'`'>, one<'{'>,
                    one<'|'>, one<'}'>,
                    one<'~'>,
-                   chars::non_ascii> {
-};
-// clang-format on
+                   chars::non_ascii> {};
 
 // ctext is ASCII not '(' or ')' or '\\'
-struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, chars::non_ascii> {
-};
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, chars::non_ascii> {};
 
 struct comment;
 
-struct ccontent : sor<ctext, quoted_pair, comment> {
-};
+struct ccontent : sor<ctext, quoted_pair, comment> {};
 
 struct comment
-    : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {
-};
+    : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {};
 
-struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {
-};
+struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {};
 
-struct qcontent : sor<qtext, quoted_pair> {
-};
+struct qcontent : sor<qtext, quoted_pair> {};
 
 // Corrected in errata ID: 3135
 struct quoted_string
@@ -189,50 +164,38 @@ struct quoted_string
           DQUOTE,
           sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
           DQUOTE,
-          opt<CFWS>> {
-};
+          opt<CFWS>> {};
+
 // *([FWS] VCHAR) *WSP
-struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
-};
+struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
 
-struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {
-};
+struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {};
 
-struct dot_atom_text : list<plus<atext>, dot> {
-};
+struct dot_atom_text : list<plus<atext>, dot> {};
 
-struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {
-};
+struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {};
 
-struct word : sor<atom, quoted_string> {
-};
+struct word : sor<atom, quoted_string> {};
 
-struct phrase : plus<word> {
-};
+struct phrase : plus<word> {};
 
-struct local_part : sor<dot_atom, quoted_string> {
-};
+struct local_part : sor<dot_atom, quoted_string> {};
 
-struct dtext : ranges<33, 90, 94, 126> {
-};
+struct dtext : ranges<33, 90, 94, 126> {};
 
 struct domain_literal : seq<opt<CFWS>,
                             one<'['>,
                             star<seq<opt<FWS>, dtext>>,
                             opt<FWS>,
                             one<']'>,
-                            opt<CFWS>> {
-};
+                            opt<CFWS>> {};
 
-struct domain : sor<dot_atom, domain_literal> {
-};
+struct domain : sor<dot_atom, domain_literal> {};
 
-struct addr_spec : seq<local_part, one<'@'>, domain> {
-};
+struct addr_spec : seq<local_part, one<'@'>, domain> {};
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<local_part> {
@@ -268,65 +231,48 @@ struct Connection {
 
   Connection(int fd)
     : sock(fd, fd, Config::read_timeout, Config::write_timeout)
-  {
-  }
+  {}
 };
 
-struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
-};
+struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
 
 using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, chars::non_ascii> {
-};
+struct u_let_dig : sor<ALPHA, DIGIT, chars::non_ascii> {};
 
-struct u_ldh_str : plus<sor<ALPHA, DIGIT, chars::non_ascii, dash>> {
-  // verify last char is a U_Let_dig
-};
+// should verify last char is a U_Let_dig
+struct u_ldh_str : plus<sor<ALPHA, DIGIT, chars::non_ascii, dash>> {};
 
-struct u_label : seq<u_let_dig, opt<u_ldh_str>> {
-};
+struct u_label : seq<u_let_dig, opt<u_ldh_str>> {};
 
-struct let_dig : sor<ALPHA, DIGIT> {
-};
+struct let_dig : sor<ALPHA, DIGIT> {};
 
-struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
-  // verify last char is a U_Let_dig
-};
+// should verify last char is a U_Let_dig
+struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {};
 
-struct label : seq<let_dig, opt<ldh_str>> {
-};
+struct label : seq<let_dig, opt<ldh_str>> {};
 
-struct sub_domain : sor<label, u_label> {
-};
+struct sub_domain : sor<label, u_label> {};
 
-struct domain : list<sub_domain, dot> {
-};
+struct domain : list<sub_domain, dot> {};
 
-// clang-format off
 struct dec_octet : sor<one<'0'>,
                        rep_min_max<1, 2, DIGIT>,
                        seq<one<'1'>, DIGIT, DIGIT>,
                        seq<one<'2'>, range<'0', '4'>, DIGIT>,
                        seq<string<'2','5'>, range<'0','5'>>> {};
-// clang-format on
 
 struct IPv4_address_literal
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
-};
+: seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {
-};
+struct h16 : rep_min_max<1, 4, HEXDIG> {};
 
-struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {
-};
+struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {};
 
-struct dcolon : two<':'> {
-};
+struct dcolon : two<':'> {};
 
-// clang-format off
 struct IPv6address : sor<seq<                                          rep<6, h16, colon>, ls32>,
                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
@@ -336,35 +282,27 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
-// clang-format on
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {
-};
+struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
-struct dcontent : ranges<33, 90, 94, 126> {
-};
+struct dcontent : ranges<33, 90, 94, 126> {};
 
-struct standardized_tag : ldh_str {
-};
+struct standardized_tag : ldh_str {};
 
-struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
-};
+struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {};
 
 // See rfc 5321 Section 4.1.3
 struct address_literal : seq<one<'['>,
                              sor<IPv4_address_literal,
                                  IPv6_address_literal,
                                  general_address_literal>,
-                             one<']'>> {
-};
+                             one<']'>> {};
 
 // textstring     = 1*(%d09 / %d32-126) ; HT, SP, Printable US-ASCII
 
-struct textstring : plus<sor<one<9>, range<32, 126>>> {
-};
+struct textstring : plus<sor<one<9>, range<32, 126>>> {};
 
-struct server_id : sor<domain, address_literal> {
-};
+struct server_id : sor<domain, address_literal> {};
 
 // Greeting       = ( "220 " (Domain / address-literal) [ SP textstring ] CRLF )
 //                  /
@@ -373,57 +311,46 @@ struct server_id : sor<domain, address_literal> {
 //                    "220 " [ textstring ] CRLF )
 
 struct greeting
-    : sor<seq<TAOCPP_PEGTL_ISTRING("220 "),
-              server_id,
-              opt<seq<SP, textstring>>,
-              CRLF>,
-          seq<TAOCPP_PEGTL_ISTRING("220-"),
-              server_id,
-              opt<seq<SP, textstring>>,
-              CRLF,
-              star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
-              seq<TAOCPP_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {
-};
+: sor<seq<TAOCPP_PEGTL_ISTRING("220 "), server_id, opt<seq<SP, textstring>>, CRLF>,
+      seq<TAOCPP_PEGTL_ISTRING("220-"), server_id, opt<seq<SP, textstring>>, CRLF,
+ star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
+      seq<TAOCPP_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {};
 
 // Reply-code     = %x32-35 %x30-35 %x30-39
 
 struct reply_code
-    : seq<range<0x32, 0x35>, range<0x30, 0x35>, range<0x30, 0x39>> {
-};
+: seq<range<0x32, 0x35>, range<0x30, 0x35>, range<0x30, 0x39>> {};
 
 // Reply-line     = *( Reply-code "-" [ textstring ] CRLF )
-//                   Reply-code [ SP textstring ] CRLF
+//                     Reply-code  [ SP textstring ] CRLF
 
-struct reply_lines : seq<star<seq<reply_code, one<'-'>, opt<textstring>, CRLF>>,
-                         seq<reply_code, opt<seq<SP, textstring>>, CRLF>> {
-};
+struct reply_lines
+: seq<star<seq<reply_code, one<'-'>, opt<textstring>, CRLF>>,
+           seq<reply_code, opt<seq<SP, textstring>>, CRLF>> {};
 
 // ehlo-greet     = 1*(%d0-9 / %d11-12 / %d14-127)
 //                    ; string of any characters other than CR or LF
 
-struct ehlo_greet : plus<sor<range<0, 9>, range<11, 12>, range<14, 127>>> {
-};
+struct ehlo_greet : plus<ranges<0, 9, 11, 12, 14, 127>> {};
 
 // ehlo-keyword   = (ALPHA / DIGIT) *(ALPHA / DIGIT / "-")
 //                  ; additional syntax of ehlo-params depends on
 //                  ; ehlo-keyword
 
-struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {
-};
+struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
 
 // ehlo-param     = 1*(%d33-126)
 //                  ; any CHAR excluding <SP> and all
 //                  ; control characters (US-ASCII 0-31 and 127
 //                  ; inclusive)
 
-struct ehlo_param : plus<range<33, 126>> {
-};
+struct ehlo_param : plus<range<33, 126>> {};
 
 // ehlo-line      = ehlo-keyword *( SP ehlo-param )
 // with extra support for AUTH=
 
-struct ehlo_line : seq<ehlo_keyword, star<seq<sor<SP, one<'='>>, ehlo_param>>> {
-};
+struct ehlo_line
+: seq<ehlo_keyword, star<seq<sor<SP, one<'='>>, ehlo_param>>> {};
 
 // ehlo-ok-rsp    = ( "250 " Domain [ SP ehlo-greet ] CRLF )
 //                  /
@@ -432,25 +359,21 @@ struct ehlo_line : seq<ehlo_keyword, star<seq<sor<SP, one<'='>>, ehlo_param>>> {
 //                    "250 " ehlo-line CRLF )
 
 struct ehlo_ok_rsp
-    : sor<seq<TAOCPP_PEGTL_ISTRING("250 "),
-              domain,
-              opt<seq<SP, ehlo_greet>>,
-              CRLF>,
-          seq<seq<TAOCPP_PEGTL_ISTRING("250-"),
-                  domain,
-                  opt<seq<SP, ehlo_greet>>,
-                  CRLF,
-                  star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
-                  seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>>> {
-};
+: sor<
+      seq<TAOCPP_PEGTL_ISTRING("250 "), domain, opt<seq<SP, ehlo_greet>>, CRLF>,
+  seq<seq<TAOCPP_PEGTL_ISTRING("250-"), domain, opt<seq<SP, ehlo_greet>>, CRLF,
+ star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
+
+      seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>>
+     > {};
 
 struct auth_login_username
-    : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {
-};
+    : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
 
 struct auth_login_password
-    : seq<TAOCPP_PEGTL_STRING("334 UGFzc3dvcmQ6"), CRLF> {
-};
+    : seq<TAOCPP_PEGTL_STRING("334 UGFzc3dvcmQ6"), CRLF> {};
+
+// clang-format on
 
 template <typename Rule>
 struct action : nothing<Rule> {
