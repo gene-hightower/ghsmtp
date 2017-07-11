@@ -347,10 +347,9 @@ struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
 struct ehlo_param : plus<range<33, 126>> {};
 
 // ehlo-line      = ehlo-keyword *( SP ehlo-param )
-// with extra support for AUTH=
 
-struct ehlo_line
-: seq<ehlo_keyword, star<seq<sor<SP, one<'='>>, ehlo_param>>> {};
+struct ehlo_line : seq<ehlo_keyword, star<seq<SP, ehlo_param>>> {
+};
 
 // ehlo-ok-rsp    = ( "250 " Domain [ SP ehlo-greet ] CRLF )
 //                  /
