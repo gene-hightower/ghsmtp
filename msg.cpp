@@ -1306,7 +1306,7 @@ struct action<dkim_signature> {
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     // LOG(INFO) << "dkim_signature check";
-    CHECK(ctx.dkv.check_signature(ctx.unstructured)) << ctx.unstructured;
+    CHECK(ctx.dkv.sig_syntax(ctx.unstructured)) << ctx.unstructured;
     ctx.unstructured.clear();
   }
 };

@@ -38,7 +38,7 @@ public:
   Verify();
 
   bool check();
-  bool check_signature(std::experimental::string_view str);
+  bool sig_syntax(std::experimental::string_view sig);
   void foreach_sig(std::function<void(char const* domain, bool passed)> func);
 };
 
@@ -53,6 +53,7 @@ public:
        char const* selector,
        char const* domain,
        body_type typ = body_type::text);
+
   std::string getsighdr();
 };
 }

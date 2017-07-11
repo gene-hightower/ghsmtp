@@ -221,9 +221,9 @@ bool Verify::check()
   return false;
 }
 
-bool Verify::check_signature(std::experimental::string_view str)
+bool Verify::sig_syntax(std::experimental::string_view sig)
 {
-  return dkim_sig_syntax(dkim_, uc(str.data()), str.length()) == DKIM_STAT_OK;
+  return dkim_sig_syntax(dkim_, uc(sig.data()), sig.length()) == DKIM_STAT_OK;
 }
 
 Sign::Sign(char const* secretkey,
