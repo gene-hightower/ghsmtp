@@ -1233,8 +1233,11 @@ struct action<received_spf> {
     auto res = spf_res.result();
     CHECK_NE(res, SPF::Result::INVALID);
 
-    LOG(INFO) << "new SPF result: " << res;
-    LOG(INFO) << "old SPF result: " << ctx.spf_result;
+    if (res != ctx.spf_result) {
+      LOG(WARNING) << "SPF results changed: "
+                   << "new result is \"" << res << "\", old result is \""
+                   << ctx.spf_result << "\"";
+    }
 
     // *** Get result from header:
 
