@@ -1217,7 +1217,7 @@ struct action<received_spf> {
   {
     // LOG(INFO) << "Received-SPF:";
 
-    // *** Do the check now?
+    // Do a fresh check now:
 
     auto node = get_hostname();
 
@@ -1227,19 +1227,21 @@ struct action<received_spf> {
     spf_req.set_ip_str(ctx.spf_info["client-ip"].c_str());
 
     spf_req.set_helo_dom(ctx.spf_info["helo"].c_str());
-    spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
+    if (ctx.spf_info.find("envelope-from") != ctx.spf_info.end()) {
+      spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
+    }
 
     SPF::Response spf_res(spf_req);
     auto res = spf_res.result();
     CHECK_NE(res, SPF::Result::INVALID);
 
-    if (res != ctx.spf_result) {
+    if (ctx.spf_result != SPF::as_cstr(res)) {
       LOG(WARNING) << "SPF results changed: "
                    << "new result is \"" << res << "\", old result is \""
                    << ctx.spf_result << "\"";
     }
 
-    // *** Get result from header:
+    // Get result from header:
 
     int pol_spf = DMARC_POLICY_SPF_OUTCOME_PASS;
 
@@ -1279,21 +1281,20 @@ struct action<received_spf> {
       if (dom == "<>") {
         dom = ctx.spf_info["helo"];
         origin = DMARC_POLICY_SPF_ORIGIN_HELO;
-        LOG(INFO) << "SPF: HELO " << dom;
+        LOG(INFO) << "SPF: origin HELO " << dom;
       }
       else {
         memory_input<> addr_in(dom, "dom");
-        if (parse_nested<RFC5322::addr_spec, RFC5322::action>(in, addr_in,
-                                                              ctx)) {
-          dom = ctx.mb_dom;
-          ctx.mb_loc.clear();
-          ctx.mb_dom.clear();
-        }
-        else {
+        if (!parse_nested<RFC5322::addr_spec, RFC5322::action>(in, addr_in,
+                                                               ctx)) {
           LOG(FATAL) << "Failed to parse domain: " << dom;
         }
+        dom = ctx.mb_dom;
+        origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+        LOG(INFO) << "SPF: origin MAIL FROM " << dom;
 
-        LOG(INFO) << "SPF: MAIL FROM " << dom;
+        ctx.mb_loc.clear();
+        ctx.mb_dom.clear();
       }
       ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
     }

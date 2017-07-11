@@ -27,6 +27,7 @@ enum class Result {
   PERMERROR = SPF_RESULT_PERMERROR,
 };
 
+char const* as_cstr(Result result);
 std::ostream& operator<<(std::ostream& os, Result result);
 
 class Server {

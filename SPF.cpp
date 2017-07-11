@@ -5,27 +5,32 @@
 
 namespace SPF {
 
-std::ostream& operator<<(std::ostream& os, Result result)
+char const* as_cstr(Result result)
 {
   switch (result) {
   case Result::INVALID:
-    return os << "invalid";
+    return "invalid";
   case Result::NEUTRAL:
-    return os << "neutral";
+    return "neutral";
   case Result::PASS:
-    return os << "pass";
+    return "pass";
   case Result::FAIL:
-    return os << "fail";
+    return "fail";
   case Result::SOFTFAIL:
-    return os << "softfail";
+    return "softfail";
   case Result::NONE:
-    return os << "none";
+    return "none";
   case Result::TEMPERROR:
-    return os << "temperror";
+    return "temperror";
   case Result::PERMERROR:
-    return os << "permerror";
+    return "permerror";
   }
-  return os << "Unknown";
+  return "Unknown";
+}
+
+std::ostream& operator<<(std::ostream& os, Result result)
+{
+  return os << as_cstr(result);
 }
 
 // We map libspf2's levels of error, warning, info and debug to our
