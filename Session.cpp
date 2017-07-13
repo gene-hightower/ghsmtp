@@ -153,6 +153,14 @@ void Session::log_lo_(char const* verb, string_view client_identity) const
   }
 }
 
+void Session::maybe_flush_()
+{
+  std::chrono::milliseconds wait{0};
+  if (!sock_.input_ready(wait)) {
+    out_() << std::flush;
+  }
+}
+
 void Session::ehlo(string_view client_identity)
 {
   reset_();
@@ -299,7 +307,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
     forward_path_.clear();
-    out_() << "250 2.1.0 OK\r\n" << std::flush;
+    out_() << "250 2.1.0 OK\r\n";
+    maybe_flush_();
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
     for (auto p : parameters) {
       LOG(INFO) << "  " << p.first << (p.second.empty() ? "" : "=") << p.second;
@@ -334,7 +343,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     }
     else {
       forward_path_.push_back(std::move(forward_path));
-      out_() << "250 2.1.5 OK\r\n" << std::flush;
+      out_() << "250 2.1.5 OK\r\n";
+      maybe_flush_();
       LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
     }
   }
@@ -501,14 +511,15 @@ void Session::bdat_msg_last(Message& msg, size_t n)
 void Session::bdat_error(Message& msg)
 {
   msg.trash();
-  out_() << "550 5.3.5 system error\r\n" << std::flush;
+  out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
   LOG(WARNING) << "DATA error";
 }
 
 void Session::rset()
 {
   reset_();
-  out_() << "250 2.0.0 OK\r\n" << std::flush;
+  out_() << "250 2.0.0 OK\r\n";
+  maybe_flush_();
   LOG(INFO) << "RSET";
 }
 

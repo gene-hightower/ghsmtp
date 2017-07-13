@@ -64,6 +64,7 @@ private:
   std::ostream& out_() { return sock_.out(); }
   void log_lo_(char const* verb,
                std::experimental::string_view client_identity) const;
+  void maybe_flush_();
 
   void reset_()
   {

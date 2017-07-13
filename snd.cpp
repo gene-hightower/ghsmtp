@@ -955,12 +955,6 @@ try_host:
   }
 
   if (FLAGS_use_chunking && ext_chunking) {
-    // NOW check returns
-    if (ext_pipelining) {
-      check_for_fail(in, cnn, "MAIL FROM");
-      check_for_fail(in, cnn, "RCPT TO");
-    }
-
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "> " << bdat_stream.str();
@@ -977,8 +971,13 @@ try_host:
     cnn.sock.out() << std::flush;
     CHECK(cnn.sock.out().good());
 
-    // If mail was not accepted for any transient reason, maybe goto
-    // try_host
+    // NOW check returns
+    if (ext_pipelining) {
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   else {
     LOG(INFO) << "> DATA";
@@ -1023,9 +1022,9 @@ try_host:
     // Done!
     cnn.sock.out() << ".\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
-    // If mail was not accepted for any transient reason, maybe goto
-    // try_host
+  }
+  if (cnn.reply_code.at(0) == '2') {
+    LOG(INFO) << "mail was sent successfully";
   }
 
   LOG(INFO) << "> QUIT";
