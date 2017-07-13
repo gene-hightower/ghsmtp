@@ -168,7 +168,6 @@ void Session::log_lo_(char const* verb, string_view client_identity) const
 void Session::flush()
 {
   out_() << std::flush;
-  LOG(INFO) << "flush";
 }
 
 void Session::ehlo(string_view client_identity)
