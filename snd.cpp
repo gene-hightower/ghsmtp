@@ -44,11 +44,14 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include <string>
 #include <unordered_map>
 
+#include <experimental/string_view>
+
+using namespace std::string_literals;
+using std::experimental::string_view;
+
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
-#include <experimental/string_view>
 
 namespace Config {
 constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
@@ -66,10 +69,6 @@ constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
-
-using namespace std::string_literals;
-
-using std::experimental::string_view;
 
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
@@ -348,8 +347,11 @@ struct ehlo_param : plus<range<33, 126>> {};
 
 // ehlo-line      = ehlo-keyword *( SP ehlo-param )
 
-struct ehlo_line : seq<ehlo_keyword, star<seq<SP, ehlo_param>>> {
-};
+// The AUTH= thing is so common with some servers (postfix) that I
+// guess we have to accept it.
+
+struct ehlo_line
+    : seq<ehlo_keyword, star<seq<sor<SP,one<'='>>, ehlo_param>>> {};
 
 // ehlo-ok-rsp    = ( "250 " Domain [ SP ehlo-greet ] CRLF )
 //                  /
@@ -429,6 +431,8 @@ struct action<ehlo_line> {
   {
     boost::to_upper(cnn.ehlo_keyword);
     cnn.ehlo_params[cnn.ehlo_keyword] = cnn.ehlo_param;
+    cnn.ehlo_keyword.clear();
+    cnn.ehlo_param.clear();
   }
 };
 
@@ -773,11 +777,10 @@ try_host:
   }
 
   bool ext_8bitmime = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
-  bool ext_binarymime
-      = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
+  bool ext_binmime = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
   bool ext_chunking = cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end();
 
-  if (ext_binarymime && !ext_chunking) {
+  if (ext_binmime && !ext_chunking) {
     LOG(ERROR)
         << "BINARYMIME requires CHUNKING, see RFC-3030 section 3 item 3.";
     LOG(INFO) << "> QUIT";
@@ -876,6 +879,10 @@ try_host:
   hdr_stream << eml;
   auto hdr_str = hdr_stream.str();
 
+  // In the case of DATA style transfer, this total_size number is an
+  // *estimate* only, as line endings may be translated or added
+  // during transfer.  In the BDAT case, this number must be exact.
+
   auto total_size = hdr_str.size();
   for (auto const& body : bodies)
     total_size += body.size();
@@ -894,7 +901,7 @@ try_host:
     param_stream << " SIZE=" << total_size;
   }
 
-  if (ext_binarymime) {
+  if (ext_binmime) {
     param_stream << " BODY=BINARYMIME";
   }
   else if (ext_8bitmime) {
@@ -952,7 +959,8 @@ try_host:
 
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    // If mail was not accepted for any transient, maybe goto try_host
+    // If mail was not accepted for any transient reason, maybe goto
+    // try_host
   }
   else {
     LOG(INFO) << "> DATA";
@@ -961,13 +969,13 @@ try_host:
 
     cnn.sock.out() << eml;
 
-    // This loop converts single LF line endings into CRLF.
+    // This loop converts single LF line endings into CRLF.  This loop
+    // does nothing to fix single CR characters not part of a CRLF
+    // pair.
 
     // This loop adds a CRLF and the end of the transmission if the
     // file doesn't already end with one.  This is an artifact of the
     // SMTP DATA protocol.
-
-    // This loop does nothing to fix single CR characters.
 
     for (auto const& body : bodies) {
       std::string line;
@@ -987,7 +995,8 @@ try_host:
     cnn.sock.out() << ".\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    // If mail was not accepted for any transient, maybe goto try_host
+    // If mail was not accepted for any transient reason, maybe goto
+    // try_host
   }
 
   LOG(INFO) << "> QUIT";
