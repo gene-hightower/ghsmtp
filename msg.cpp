@@ -1,4 +1,4 @@
-// Toy RFC-5322 message parser and validator.
+// Toy RFC-5322 message parser and DMARC validator.
 
 #include <string>
 #include <unordered_map>
@@ -78,8 +78,11 @@ constexpr char const* defined_fields[]{
 
     // MIME Fields
     "MIME-Version",
+
     "Content-Type",
     "Content-Transfer-Encoding",
+    "Content-ID",
+    "Content-Description",
 };
 // clang-format on
 
@@ -126,11 +129,12 @@ struct Ctx {
   std::string spf_result;
 
   std::string unstructured;
+  std::string id;
+
+  std::string message_id;
 
   std::string opt_name;
   std::string opt_value;
-
-  std::vector<std::string> msg_errors;
 
   std::string type;
   std::string subtype;
@@ -140,6 +144,8 @@ struct Ctx {
   bool composite_type{false};
 
   std::vector<std::pair<std::string, std::string>> ct_parameters;
+
+  std::vector<std::string> msg_errors;
 };
 
 struct UTF8_tail : range<0x80, 0xBF> {
@@ -743,14 +749,13 @@ struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
 //              "quoted-printable" / "base64" /
 //              ietf-token / x-token
 
-struct mechanism : seq<sor<TAOCPP_PEGTL_ISTRING("7bit"),
-                           TAOCPP_PEGTL_ISTRING("8bit"),
-                           TAOCPP_PEGTL_ISTRING("binary"),
-                           TAOCPP_PEGTL_ISTRING("quoted-printable"),
-                           TAOCPP_PEGTL_ISTRING("base64"),
-                           ietf_token,
-                           x_token>,
-                       eol> {
+struct mechanism : sor<TAOCPP_PEGTL_ISTRING("7bit"),
+                       TAOCPP_PEGTL_ISTRING("8bit"),
+                       TAOCPP_PEGTL_ISTRING("binary"),
+                       TAOCPP_PEGTL_ISTRING("quoted-printable"),
+                       TAOCPP_PEGTL_ISTRING("base64"),
+                       ietf_token,
+                       x_token> {
 };
 
 struct content_transfer_encoding
@@ -758,6 +763,13 @@ struct content_transfer_encoding
           opt<CFWS>,
           mechanism,
           eol> {
+};
+
+struct id : seq<TAOCPP_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
+};
+
+struct description
+    : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>> {
 };
 
 // Optional Fields
@@ -1009,11 +1021,25 @@ struct action<bcc> {
 // Identification Fields
 
 template <>
+struct action<msg_id> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.id = in.string();
+  }
+};
+
+template <>
 struct action<message_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    if (!ctx.message_id.empty()) {
+      LOG(ERROR) << "multiple message IDs: " << ctx.message_id << " and "
+                 << ctx.id;
+    }
+    ctx.message_id = ctx.id;
   }
 };
 
@@ -1384,6 +1410,24 @@ struct action<content_transfer_encoding> {
 };
 
 template <>
+struct action<id> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+  }
+};
+
+template <>
+struct action<description> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+  }
+};
+
+template <>
 struct action<attribute> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
@@ -1417,20 +1461,25 @@ struct action<body> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "body";
-    // auto body = string_view(in.begin(), in.end() - in.begin());
+    LOG(INFO) << "Message body:";
+    auto body = string_view(in.begin(), in.end() - in.begin());
 
     ctx.dkv.eoh();
-    ctx.dkv.body(string_view(in.begin(), in.end() - in.begin()));
-
-    // ctx.dkv.body(body);
+    ctx.dkv.body(body);
 
     if (ctx.mime_version) {
-      LOG(INFO) << "type == " << ctx.type;
-      LOG(INFO) << "subtype == " << ctx.subtype;
+      std::stringstream type;
+      type << "Content-Type: " << ctx.type << "/" << ctx.subtype;
       for (auto const& p : ctx.ct_parameters) {
-        LOG(INFO) << "  " << p.first << "=" << p.second;
+        if ((type.str().length() + (3 + p.first.length() + p.second.length()))
+            > 78)
+          type << ";\r\n\t";
+        else
+          type << "; ";
+        type << p.first << "=" << p.second;
       }
+      LOG(INFO) << type.str();
+
       // memory_input<> body_in(body, "body");
       // if (!parse_nested<RFC5322::, RFC5322::action>(in, body_in, ctx)) {
       //   LOG(ERROR) << "bad mime body";
@@ -1510,7 +1559,8 @@ struct action<message> {
 
     ctx.dmp.query_dmarc(from_domain.ascii().c_str());
 
-    LOG(INFO) << "Final DMARC advice for domain " << from_domain << ": "
+    LOG(INFO) << "Message-ID: " << ctx.message_id;
+    LOG(INFO) << "Final DMARC advice for " << from_domain << ": "
               << Advice_to_string(ctx.dmp.get_policy());
 
     if (ctx.msg_errors.size()) {
