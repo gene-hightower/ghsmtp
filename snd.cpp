@@ -885,7 +885,8 @@ try_host:
                        ? OpenDKIM::Sign::body_type::binary
                        : OpenDKIM::Sign::body_type::text;
 
-  std::ifstream keyfs("private.key");
+  auto key_file = FLAGS_selector + ".private";
+  std::ifstream keyfs(key_file.c_str());
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
   OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
                      body_type);
