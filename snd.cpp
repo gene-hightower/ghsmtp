@@ -2,6 +2,7 @@
 
 #include <gflags/gflags.h>
 
+DEFINE_bool(use_tls, true, "Use TLS");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
 DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail");
 
@@ -229,8 +230,8 @@ struct Connection {
 
   std::string reply_code;
 
-  Connection(int fd)
-    : sock(fd, fd, Config::read_timeout, Config::write_timeout)
+  Connection(int fd, std::function<void(void)> read_hook)
+    : sock(fd, fd, read_hook, Config::read_timeout, Config::write_timeout)
   {}
 };
 
@@ -585,7 +586,8 @@ namespace gflags {
 
 void self_test()
 {
-  static RFC5321::Connection cnn(0);
+  auto read_hook = []() {};
+  static RFC5321::Connection cnn(0, read_hook);
 
   const char* greet_list[]{
       "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
@@ -760,7 +762,8 @@ try_host:
   LOG(INFO) << "trying " << receivers[0].utf8() << ":" << FLAGS_service;
   auto fd = conn(receivers[0].ascii(), FLAGS_service);
   CHECK_NE(fd, -1);
-  RFC5321::Connection cnn(fd);
+  auto read_hook = []() {};
+  RFC5321::Connection cnn(fd, read_hook);
   // CRLF /only/
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
@@ -773,7 +776,8 @@ try_host:
   cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
   CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
 
-  if (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end()) {
+  if (FLAGS_use_tls
+      && (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end())) {
     LOG(INFO) << "> STARTTLS";
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));

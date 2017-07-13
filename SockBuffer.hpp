@@ -13,7 +13,7 @@
 #include <glog/logging.h>
 
 // We must define this to account for args to Sockbuffer
-#define BOOST_IOSTREAMS_MAX_FORWARDING_ARITY 5
+#define BOOST_IOSTREAMS_MAX_FORWARDING_ARITY 6
 
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -25,9 +25,11 @@ public:
   SockBuffer(SockBuffer const& that)
     : fd_in_(that.fd_in_)
     , fd_out_(that.fd_out_)
+    , read_hook_(that.read_hook_)
     , read_timeout_(that.read_timeout_)
     , write_timeout_(that.write_timeout_)
     , starttls_timeout_(that.starttls_timeout_)
+    , tls_(that.read_hook_)
   {
     CHECK(!that.timed_out_);
     CHECK(!that.tls_active_);
@@ -35,21 +37,24 @@ public:
 
   SockBuffer(int fd_in,
              int fd_out,
+             std::function<void(void)> read_hook,
              std::chrono::milliseconds read_timeout,
              std::chrono::milliseconds write_timeout,
              std::chrono::milliseconds starttls_timeout)
     : fd_in_(fd_in)
     , fd_out_(fd_out)
+    , read_hook_(read_hook)
     , read_timeout_(read_timeout)
     , write_timeout_(write_timeout)
     , starttls_timeout_(starttls_timeout)
+    , tls_(read_hook_)
   {
     POSIX::set_nonblocking(fd_in_);
     POSIX::set_nonblocking(fd_out_);
   }
   bool input_ready(std::chrono::milliseconds wait) const
   {
-    return POSIX::input_ready(fd_in_, wait);
+    return tls_active_ ? tls_.pending() : POSIX::input_ready(fd_in_, wait);
   }
   bool output_ready(std::chrono::milliseconds wait) const
   {
@@ -59,7 +64,8 @@ public:
   std::streamsize read(char* s, std::streamsize n)
   {
     return tls_active_ ? tls_.read(s, n, read_timeout_, timed_out_)
-                       : POSIX::read(fd_in_, s, n, read_timeout_, timed_out_);
+                       : POSIX::read(fd_in_, s, n, read_hook_, read_timeout_,
+                                     timed_out_);
   }
   std::streamsize write(const char* s, std::streamsize n)
   {
@@ -89,6 +95,8 @@ public:
 private:
   int fd_in_;
   int fd_out_;
+
+  std::function<void(void)> read_hook_;
 
   std::chrono::milliseconds read_timeout_;
   std::chrono::milliseconds write_timeout_;

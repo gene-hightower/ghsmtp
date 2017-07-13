@@ -50,6 +50,7 @@ std::streamsize
 POSIX::io_fd_(char const* fnm,
               std::function<ssize_t(int, void*, size_t)> io_fnc,
               std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
+              std::function<void(void)> read_hook,
               int fd,
               char* s,
               std::streamsize n,
@@ -78,6 +79,7 @@ POSIX::io_fd_(char const* fnm,
     if (now < (start + timeout)) {
       milliseconds time_left
           = duration_cast<milliseconds>((start + timeout) - now);
+      read_hook();
       if (rdy_fnc(fd, time_left))
         continue; // try io_fnc again
     }

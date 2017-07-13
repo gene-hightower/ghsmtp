@@ -2,10 +2,12 @@
 
 Sock::Sock(int fd_in,
            int fd_out,
+           std::function<void(void)> read_hook,
            std::chrono::milliseconds read_timeout,
            std::chrono::milliseconds write_timeout,
            std::chrono::milliseconds starttls_timeout)
-  : iostream_(fd_in, fd_out, read_timeout, write_timeout, starttls_timeout)
+  : iostream_(
+        fd_in, fd_out, read_hook, read_timeout, write_timeout, starttls_timeout)
 {
   // Get our local IP address as "us".
 

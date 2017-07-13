@@ -21,9 +21,14 @@ int main(int argc, char* argv[])
   int fd_out;
   PCHECK((fd_out = mkstemp(outfile)) != -1);
 
-  boost::iostreams::stream<SockBuffer> iostream{
-      fd_in, fd_out, std::chrono::seconds(10), std::chrono::seconds(10),
-      std::chrono::seconds(1)};
+  auto read_hook = []() { std::cout << "read_hook\n"; };
+
+  boost::iostreams::stream<SockBuffer> iostream{fd_in,
+                                                fd_out,
+                                                read_hook,
+                                                std::chrono::seconds(10),
+                                                std::chrono::seconds(10),
+                                                std::chrono::seconds(1)};
 
   std::string line;
   while (std::getline(iostream, line)) {

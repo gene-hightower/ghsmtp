@@ -25,6 +25,10 @@ constexpr std::streamsize max_xfer_size = 64 * 1024;
 namespace RFC5321 {
 
 struct Ctx {
+  Ctx(std::function<void(void)> read_hook)
+    : session(read_hook)
+  {
+  }
   Session session;
 
   std::unique_ptr<Message> msg;
@@ -878,26 +882,28 @@ int main(int argc, char const* argv[])
   // Don't wait for STARTTLS to fail if no cert.
   CHECK(boost::filesystem::exists(TLS::cert_path)) << "can't find cert file";
 
-  static RFC5321::Ctx ctx;
+  std::unique_ptr<RFC5321::Ctx> ctx;
+  auto read_hook = [&ctx]() { ctx->session.flush(); };
+  ctx = std::make_unique<RFC5321::Ctx>(read_hook);
 
-  ctx.session.greeting();
+  ctx->session.greeting();
 
-  istream_input<eol::crlf> in(ctx.session.in(), Config::bfr_size, "session");
+  istream_input<eol::crlf> in(ctx->session.in(), Config::bfr_size, "session");
 
   try {
-    if (!parse<RFC5321::grammar, RFC5321::action>(in, ctx)) {
-      if (ctx.session.timed_out()) {
-        ctx.session.time_out();
+    if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx)) {
+      if (ctx->session.timed_out()) {
+        ctx->session.time_out();
       }
       else {
-        ctx.session.error("syntax error from parser");
+        ctx->session.error("syntax error from parser");
       }
       return 1;
     }
   }
   catch (parse_error const& e) {
-    ctx.session.error(e.what());
+    ctx->session.error(e.what());
     return 1;
   }
-  ctx.session.error("unknown parser problem");
+  ctx->session.error("unknown parser problem");
 }

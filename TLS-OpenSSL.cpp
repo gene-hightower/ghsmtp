@@ -15,7 +15,10 @@
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
 
-TLS::TLS() {}
+TLS::TLS(std::function<void(void)> read_hook)
+  : read_hook_(read_hook)
+{
+}
 
 TLS::~TLS()
 {
@@ -243,6 +246,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
     case SSL_ERROR_WANT_READ: {
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
+      read_hook_();
       if (POSIX::input_ready(fd, time_left))
         continue; // try io_fnc again
       LOG(WARNING) << fnm << " timed out";

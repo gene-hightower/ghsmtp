@@ -21,7 +21,8 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(int fd_in = STDIN_FILENO,
+  explicit Session(std::function<void(void)> read_hook,
+                   int fd_in = STDIN_FILENO,
                    int fd_out = STDOUT_FILENO,
                    std::string fqdn = "");
 
@@ -56,6 +57,8 @@ public:
   bool timed_out() { return sock_.timed_out(); }
   std::istream& in() { return sock_.in(); }
 
+  void flush();
+
 private:
   friend struct Session_test;
 
@@ -64,7 +67,6 @@ private:
   std::ostream& out_() { return sock_.out(); }
   void log_lo_(char const* verb,
                std::experimental::string_view client_identity) const;
-  void maybe_flush_();
 
   void reset_()
   {

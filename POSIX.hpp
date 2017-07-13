@@ -6,6 +6,10 @@
 
 #include <unistd.h>
 
+namespace {
+void null_hook(void) {}
+}
+
 class POSIX {
 public:
   POSIX() = delete;
@@ -19,10 +23,12 @@ public:
   static std::streamsize read(int fd_in,
                               char* s,
                               std::streamsize n,
+                              std::function<void(void)> read_hook,
                               std::chrono::milliseconds timeout,
                               bool& t_o)
   {
-    return io_fd_("read", ::read, input_ready, fd_in, s, n, timeout, t_o);
+    return io_fd_("read", ::read, input_ready, read_hook, fd_in, s, n, timeout,
+                  t_o);
   }
 
   static std::streamsize write(int fd_out,
@@ -32,7 +38,8 @@ public:
                                bool& t_o)
   {
     auto s = const_cast<char*>(c_s);
-    return io_fd_("write", ::write, output_ready, fd_out, s, n, timeout, t_o);
+    return io_fd_("write", ::write, output_ready, null_hook, fd_out, s, n,
+                  timeout, t_o);
   }
 
 private:
@@ -40,6 +47,7 @@ private:
   io_fd_(char const* fnm,
          std::function<ssize_t(int, void*, size_t)> io_fnc,
          std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
+         std::function<void(void)> read_hook,
          int fd,
          char* s,
          std::streamsize n,
