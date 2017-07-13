@@ -2,31 +2,33 @@
 
 #include <gflags/gflags.h>
 
-DEFINE_bool(use_tls, true, "Use TLS");
-DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
-DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail");
+DEFINE_bool(nosend, false, "Don't actually send any mail.");
 
-DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
+DEFINE_bool(use_tls, true, "Use TLS.");
+DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
+DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
 
-DEFINE_string(receiver, "localhost", "FQDN of receiving node");
-DEFINE_string(service, "smtp-test", "service name");
+DEFINE_string(sender, "digilicious.com", "FQDN of sending node.");
 
-DEFINE_string(from, "test-it@digilicious.com", "rfc5321 MAIL FROM address");
-DEFINE_string(to, "test-it@digilicious.com", "rfc5321 RCPT TO address");
+DEFINE_string(receiver, "localhost", "FQDN of receiving node.");
+DEFINE_string(service, "smtp-test", "Service name.");
 
-DEFINE_string(from_name, "Mr. Test It", "rfc5322 From name");
-DEFINE_string(to_name, "Mr. Test It", "rfc5322 To name");
+DEFINE_string(from, "test-it@digilicious.com", "RFC5321 MAIL FROM address.");
+DEFINE_string(to, "test-it@digilicious.com", "RFC5321 RCPT TO address.");
 
-DEFINE_string(subject, "testing one, two, three...", "rfc5322 Subject");
-DEFINE_string(keywords, "ghsmtp", "rfc5322 Keywords");
+DEFINE_string(from_name, "Mr. Test It", "RFC5322 From name.");
+DEFINE_string(to_name, "Mr. Test It", "RFC5322 To name.");
 
-DEFINE_bool(ip4, false, "use only IP version 4");
-DEFINE_bool(ip6, false, "use only IP version 6");
+DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject.");
+DEFINE_string(keywords, "ghsmtp", "RFC5322 Keywords.");
 
-DEFINE_string(username, "", "AUTH username");
-DEFINE_string(password, "", "AUTH password");
+DEFINE_bool(ip4, false, "Use only IP version 4.");
+DEFINE_bool(ip6, false, "Use only IP version 6.");
 
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
+DEFINE_string(username, "", "AUTH username.");
+DEFINE_string(password, "", "AUTH password.");
+
+DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 
 #include "DKIM.hpp"
 #include "DNS.hpp"
@@ -825,6 +827,13 @@ try_host:
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     exit(EXIT_FAILURE);
+  }
+
+  if (FLAGS_nosend) {
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_SUCCESS);
   }
 
   std::vector<content> bodies;
