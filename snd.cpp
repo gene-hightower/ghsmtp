@@ -3,19 +3,20 @@
 #include <gflags/gflags.h>
 
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail");
+DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail");
 
 DEFINE_string(sender, "digilicious.com", "FQDN of sending node");
 
 DEFINE_string(receiver, "localhost", "FQDN of receiving node");
 DEFINE_string(service, "smtp-test", "service name");
 
-DEFINE_string(from, "♥@digilicious.com", "rfc5321 MAIL FROM address");
-DEFINE_string(to, "♥@digilicious.com", "rfc5321 RCPT TO address");
+DEFINE_string(from, "test-it@digilicious.com", "rfc5321 MAIL FROM address");
+DEFINE_string(to, "test-it@digilicious.com", "rfc5321 RCPT TO address");
 
-DEFINE_string(from_name, "基因", "rfc5322 From name");
-DEFINE_string(to_name, "基因", "rfc5322 To name");
+DEFINE_string(from_name, "Mr. Test It", "rfc5322 From name");
+DEFINE_string(to_name, "Mr. Test It", "rfc5322 To name");
 
-DEFINE_string(subject, "testing one, two, three…", "rfc5322 Subject");
+DEFINE_string(subject, "testing one, two, three...", "rfc5322 Subject");
 DEFINE_string(keywords, "ghsmtp", "rfc5322 Keywords");
 
 DEFINE_bool(ip4, false, "use only IP version 4");
@@ -666,6 +667,26 @@ private:
   boost::iostreams::mapped_file_source file_;
 };
 
+template <typename Input>
+void fail(Input& in, RFC5321::Connection& cnn)
+{
+  LOG(INFO) << "> QUIT";
+  cnn.sock.out() << "QUIT\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  exit(EXIT_FAILURE);
+}
+
+template <typename Input>
+void check_for_fail(Input& in, RFC5321::Connection& cnn, string_view cmd)
+{
+  cnn.sock.out() << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  if (cnn.reply_code.at(0) != '2') {
+    LOG(ERROR) << cmd << " returned " << cnn.reply_code;
+    fail(in, cnn);
+  }
+}
+
 int main(int argc, char* argv[])
 {
   // self_test();
@@ -673,10 +694,10 @@ int main(int argc, char* argv[])
   const auto hostname = get_hostname();
   FLAGS_sender = hostname.c_str();
 
-  const auto from = "♥@"s + hostname;
+  const auto from = "test-it@"s + hostname;
   FLAGS_from = from.c_str();
 
-  const auto to = "♥@"s + hostname;
+  const auto to = "test-it@"s + hostname;
   FLAGS_to = to.c_str();
 
   { // Need to work with either namespace.
@@ -777,10 +798,14 @@ try_host:
   }
 
   bool ext_8bitmime = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
-  bool ext_binmime = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
   bool ext_chunking = cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end();
+  bool ext_binarymime
+      = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
+  bool ext_pipelining
+      = FLAGS_use_pipelining
+        && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end());
 
-  if (ext_binmime && !ext_chunking) {
+  if (ext_binarymime && !ext_chunking) {
     LOG(ERROR)
         << "BINARYMIME requires CHUNKING, see RFC-3030 section 3 item 3.";
     LOG(INFO) << "> QUIT";
@@ -901,7 +926,7 @@ try_host:
     param_stream << " SIZE=" << total_size;
   }
 
-  if (ext_binmime) {
+  if (ext_binarymime && FLAGS_use_chunking) {
     param_stream << " BODY=BINARYMIME";
   }
   else if (ext_8bitmime) {
@@ -916,36 +941,29 @@ try_host:
   auto param_str = param_stream.str();
 
   LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param_str;
-  cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n"
-                 << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-  if (cnn.reply_code.at(0) != '2') {
-    // If sender was not accepted for any transient reason, maybe goto try_host
-    LOG(ERROR) << "MAIL FROM returned " << cnn.reply_code;
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_FAILURE);
+  cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n";
+  if (!ext_pipelining) {
+    check_for_fail(in, cnn, "MAIL FROM");
   }
 
   LOG(INFO) << "> RCPT TO:<" << FLAGS_to << ">";
-  cnn.sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-  if (cnn.reply_code.at(0) != '2') {
-    // If mailbox was not accepted for any transient reason, maybe goto try_host
-    LOG(ERROR) << "RCPT TO returned " << cnn.reply_code;
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_FAILURE);
+  cnn.sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n";
+  if (!ext_pipelining) {
+    check_for_fail(in, cnn, "RCPT TO");
   }
 
   if (FLAGS_use_chunking && ext_chunking) {
+    // NOW check returns
+    if (ext_pipelining) {
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "> " << bdat_stream.str();
 
-    cnn.sock.out() << bdat_stream.str() << "\r\n" << std::flush;
+    cnn.sock.out() << bdat_stream.str() << "\r\n";
     cnn.sock.out().write(hdr_str.data(), hdr_str.size());
     CHECK(cnn.sock.out().good());
 
@@ -957,15 +975,24 @@ try_host:
     cnn.sock.out() << std::flush;
     CHECK(cnn.sock.out().good());
 
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
     // If mail was not accepted for any transient reason, maybe goto
     // try_host
   }
   else {
     LOG(INFO) << "> DATA";
-    cnn.sock.out() << "DATA\r\n" << std::flush;
+    cnn.sock.out() << "DATA\r\n";
+
+    // NOW check returns
+    if (ext_pipelining) {
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+    cnn.sock.out() << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    if (cnn.reply_code != "354") {
+      LOG(ERROR) << "DATA returned " << cnn.reply_code;
+      fail(in, cnn);
+    }
 
     cnn.sock.out() << eml;
 
