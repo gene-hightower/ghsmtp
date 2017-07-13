@@ -445,6 +445,15 @@ struct action<esmtp_keyword> {
 };
 
 template <>
+struct action<bogus_cmd_0> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+  }
+};
+
+template <>
 struct action<bogus_cmd_1> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)

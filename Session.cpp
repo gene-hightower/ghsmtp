@@ -573,7 +573,7 @@ void Session::error(string_view log_msg)
 
 void Session::cmd_unrecognized(string_view log_msg)
 {
-  out_() << "502 5.5.1 command unrecognized\r\n" << std::flush;
+  out_() << "500 5.5.2 command unrecognized\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
