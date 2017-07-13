@@ -101,37 +101,45 @@ void Session::greeting()
       client_ = "unknown "s + sock_.them_address_literal();
     }
 
-    CDB white("ip-white");
-    if (white.lookup(sock_.them_c_str())) {
-      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+    if ((sock_.them_address_literal() == "[127.0.0.1]")
+        || (sock_.them_address_literal() == "[IPv6:::1]")) {
       ip_whitelisted_ = true;
     }
-    else if (IP4::is_address(sock_.them_c_str())) {
-      using namespace DNS;
-      Resolver res;
-
-      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-      auto reversed = IP4::reverse(sock_.them_c_str());
-      for (const auto& rbl : Config::rbls) {
-        if (has_record<RR_type::A>(res, reversed + rbl)) {
-          syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
-                 sock_.them_c_str(), rbl);
-          out_() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
-          std::exit(EXIT_SUCCESS);
-        }
+    else {
+      CDB white("ip-white");
+      if (white.lookup(sock_.them_c_str())) {
+        LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+        ip_whitelisted_ = true;
       }
-      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
-      // blacklisted";
+      else if (IP4::is_address(sock_.them_c_str())) {
+        using namespace DNS;
+        Resolver res;
+
+        // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+        auto reversed = IP4::reverse(sock_.them_c_str());
+        for (const auto& rbl : Config::rbls) {
+          if (has_record<RR_type::A>(res, reversed + rbl)) {
+            syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
+                   sock_.them_c_str(), rbl);
+            out_() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
+            std::exit(EXIT_SUCCESS);
+          }
+        }
+        // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
+        // blacklisted";
+      }
     }
 
     // Wait a bit of time for pre-greeting traffic.
-    std::chrono::milliseconds wait{Config::greeting_wait_ms};
+    if (!ip_whitelisted_) {
+      std::chrono::milliseconds wait{Config::greeting_wait_ms};
 
-    if (sock_.input_ready(wait)) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
-             sock_.them_c_str());
-      out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
-      std::exit(EXIT_SUCCESS);
+      if (sock_.input_ready(wait)) {
+        syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
+               sock_.them_c_str());
+        out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
+        std::exit(EXIT_SUCCESS);
+      }
     }
   } // if (sock_.has_peername())
 
@@ -609,9 +617,7 @@ bool Session::verify_client_(Domain const& client_identity)
   if ((client_identity == our_fqdn_) || (client_identity == "localhost")
       || (client_identity == "localhost.localdomain")) {
 
-    if ((our_fqdn_ != fcrdns_)
-        && (sock_.them_address_literal() != "[127.0.0.1]")
-        && (sock_.them_address_literal() != "[IPv6:::1]")) {
+    if (our_fqdn_ != fcrdns_) {
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       out_() << "550 5.7.1 liar\r\n" << std::flush;
