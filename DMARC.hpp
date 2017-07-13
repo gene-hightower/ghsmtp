@@ -121,8 +121,8 @@ public:
   {
     auto status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
     if (status != DMARC_PARSE_OKAY) {
-      LOG(ERROR) << "domain == " << domain;
-      LOG(ERROR) << opendmarc_policy_status_to_str(status);
+      LOG(ERROR) << domain << ": "
+                 << opendmarc_policy_status_to_str(status);
       return false;
     }
     return true;
