@@ -64,7 +64,7 @@ private:
   friend std::ostream& operator<<(std::ostream& os, Domain const& dom)
   {
     if (dom.ascii() == dom.utf8()) {
-      return os << '{' << dom.ascii() << '}';
+      return os << dom.ascii();
     }
     return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
   }
