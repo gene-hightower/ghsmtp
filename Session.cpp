@@ -299,7 +299,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
     forward_path_.clear();
-    out_() << "250 2.1.0 mail ok\r\n" << std::flush;
+    out_() << "250 2.1.0 OK\r\n" << std::flush;
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
     for (auto p : parameters) {
       LOG(INFO) << "  " << p.first << (p.second.empty() ? "" : "=") << p.second;
@@ -485,14 +485,14 @@ bool Session::bdat_start()
 
 void Session::bdat_msg(Message& msg, size_t n)
 {
-  out_() << "250 2.0.0 " << n << " octets received\r\n" << std::flush;
+  out_() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
 }
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
   msg.save();
-  out_() << "250 2.6.0 Message OK\r\n" << std::flush;
+  out_() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
             << msg.id();
