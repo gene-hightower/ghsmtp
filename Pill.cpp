@@ -29,27 +29,27 @@ Pill::Pill()
     do {
       x = *--osp;
       b32_str_[--resp] = b32_charset[x % 32];
-      x /= 32;
-      BOOST_FALLTHROUGH;
+      x /= 32; // falls through
+
     case 4:
       x |= (static_cast<unsigned long>(*--osp)) << 3;
       b32_str_[--resp] = b32_charset[x % 32];
       x /= 32;
       b32_str_[--resp] = b32_charset[x % 32];
-      x /= 32;
-      BOOST_FALLTHROUGH;
+      x /= 32; // falls through
+
     case 3:
       x |= (static_cast<unsigned long>(*--osp)) << 1;
       b32_str_[--resp] = b32_charset[x % 32];
-      x /= 32;
-      BOOST_FALLTHROUGH;
+      x /= 32; // falls through
+
     case 2:
       x |= (static_cast<unsigned long>(*--osp)) << 4;
       b32_str_[--resp] = b32_charset[x % 32];
       x /= 32;
       b32_str_[--resp] = b32_charset[x % 32];
-      x /= 32;
-      BOOST_FALLTHROUGH;
+      x /= 32; // falls through
+
     case 1:
       x |= (static_cast<unsigned long>(*--osp)) << 2;
       b32_str_[--resp] = b32_charset[x % 32];
