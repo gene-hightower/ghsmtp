@@ -17,8 +17,6 @@ namespace OpenDKIM {
 
 class Lib {
 public:
-  virtual ~Lib();
-
   void header(std::experimental::string_view header);
   void eoh();
   void body(std::experimental::string_view body);
@@ -27,6 +25,7 @@ public:
 
 protected:
   Lib();
+  ~Lib();
 
   DKIM_LIB* lib_{nullptr};
   DKIM* dkim_{nullptr};
