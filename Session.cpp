@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <string>
@@ -555,7 +556,12 @@ void Session::help(string_view str)
 void Session::quit()
 {
   out_() << "221 2.0.0 bye\r\n" << std::flush;
-  LOG(INFO) << "QUIT";
+
+  timespec time_used;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
+
+  LOG(INFO) << "QUIT " << time_used.tv_sec << "." << std::setw(9) << time_used.tv_nsec;
+
   std::exit(EXIT_SUCCESS);
 }
 
