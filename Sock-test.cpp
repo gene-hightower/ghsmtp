@@ -6,7 +6,8 @@ int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  Sock sock(STDIN_FILENO, STDOUT_FILENO);
+  auto read_hook = []() {};
+  Sock sock(STDIN_FILENO, STDOUT_FILENO, read_hook);
 
   char const* us = sock.us_c_str();
   if (*us) {
