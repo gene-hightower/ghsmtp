@@ -2,18 +2,23 @@
 
 #include <glog/logging.h>
 
-#include <boost/asio/ip/address.hpp>
+using namespace std::string_literals;
 
-#include <iostream>
+using namespace IP6;
 
 int main(int argc, char const* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  CHECK(IP6::is_address("::1"));
-  CHECK(IP6::is_address_literal("[IPv6:::1]"));
+  CHECK(is_address("::1"));
+  CHECK(is_address_literal("[IPv6:::1]"));
 
-  CHECK(IP6::is_address("2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-  CHECK(IP6::is_address_literal("[IPv6:2001:0db8:85a3:0000:0000:8a2e:0370:7334]"));
+  auto addr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334"s;
+  auto addr_lit = "[IPv6:2001:0db8:85a3:0000:0000:8a2e:0370:7334]"s;
 
+  CHECK(is_address(addr));
+  CHECK(is_address_literal(addr_lit));
+
+  CHECK_EQ(to_address_literal(addr), addr_lit);
+  CHECK_EQ(to_address(addr_lit), addr);
 }
