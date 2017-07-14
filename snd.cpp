@@ -106,9 +106,9 @@ struct u8char : sor<ch_1, ch_2, ch_3, ch_4> {};
 
 struct non_ascii : sor<ch_2, ch_3, ch_4> {};
 
-struct ascii : seq<star<ch_1>, eof> {};
+struct ascii_only : seq<star<ch_1>, eof> {};
 
-struct utf8 : seq<star<u8char>, eof> {};
+struct utf8_only : seq<star<u8char>, eof> {};
 }
 
 namespace RFC5322 {
@@ -199,6 +199,19 @@ struct domain_literal : seq<opt<CFWS>,
 struct domain : sor<dot_atom, domain_literal> {};
 
 struct addr_spec : seq<local_part, one<'@'>, domain> {};
+
+struct addr_spec_only : seq<addr_spec, eof> {};
+
+struct display_name : phrase {};
+
+struct display_name_only : seq<display_name, eof> {};
+
+// struct name_addr : seq<opt<display_name>, angle_addr> {};
+
+// struct mailbox : sor<name_addr, addr_spec> {};
+
+template <typename Rule>
+struct inaction : nothing<Rule> {};
 
 template <typename Rule>
 struct action : nothing<Rule> {};
@@ -737,6 +750,19 @@ std::string connectable_host(string_view dom)
   return connectable_host(Domain(dom));
 }
 
+static bool validate_name(const char* flagname, std::string const& value)
+{
+  memory_input<> name_in(value.c_str(), "name");
+  if (!parse<RFC5322::display_name_only, RFC5322::inaction>(name_in)) {
+    std::cerr << "Bad name syntax " << value;
+    return false;
+  }
+  return true;
+}
+
+DEFINE_validator(from_name, &validate_name);
+DEFINE_validator(to_name, &validate_name);
+
 int main(int argc, char* argv[])
 {
   // self_test();
@@ -766,23 +792,24 @@ int main(int argc, char* argv[])
 
   Mailbox from_mbx;
   memory_input<> from_in(FLAGS_from, "from");
-  if (!parse<RFC5322::addr_spec, RFC5322::action>(from_in, from_mbx)) {
+  if (!parse<RFC5322::addr_spec_only, RFC5322::action>(from_in, from_mbx)) {
     LOG(FATAL) << "Bad From: address syntax \"" << FLAGS_from << "\"";
   }
   LOG(INFO) << "from_mbx == " << from_mbx;
 
   memory_input<> local_from(from_mbx.local_part(), "from.local");
-  bool must_have_smtputf8 = !parse<chars::ascii>(local_from);
+  bool must_have_smtputf8 = !parse<chars::ascii_only>(local_from);
 
   Mailbox to_mbx;
   memory_input<> to_in(FLAGS_to, "to");
-  if (!parse<RFC5322::addr_spec, RFC5322::action>(to_in, to_mbx)) {
+  if (!parse<RFC5322::addr_spec_only, RFC5322::action>(to_in, to_mbx)) {
     LOG(FATAL) << "Bad address syntax \"" << FLAGS_to << "\"";
   }
   LOG(INFO) << "to_mbx == " << to_mbx;
 
   memory_input<> local_in(to_mbx.local_part(), "to.local");
-  must_have_smtputf8 = must_have_smtputf8 || !parse<chars::ascii>(local_in);
+  must_have_smtputf8
+      = must_have_smtputf8 || !parse<chars::ascii_only>(local_in);
 
   std::vector<std::string> receivers;
   if (!FLAGS_mx_host.empty()) {
