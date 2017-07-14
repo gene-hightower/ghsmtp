@@ -90,7 +90,7 @@ void Session::greeting()
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
       out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
-      std::exit(EXIT_SUCCESS);
+      exit_();
     }
 
     fcrdns_ = IP::fcrdns(sock_.them_c_str());
@@ -122,8 +122,8 @@ void Session::greeting()
           if (has_record<RR_type::A>(res, reversed + rbl)) {
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
-            out_() << "554 5.7.1 blocked by " << rbl << "\r\n" << std::flush;
-            std::exit(EXIT_SUCCESS);
+            out_() << "554 5.7.1 blocked\r\n" << std::flush;
+            exit_();
           }
         }
         // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
@@ -139,7 +139,7 @@ void Session::greeting()
         syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
                sock_.them_c_str());
         out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
-        std::exit(EXIT_SUCCESS);
+        exit_();
       }
     }
   } // if (sock_.has_peername())
@@ -165,10 +165,7 @@ void Session::log_lo_(char const* verb, string_view client_identity) const
   }
 }
 
-void Session::flush()
-{
-  out_() << std::flush;
-}
+void Session::flush() { out_() << std::flush; }
 
 void Session::ehlo(string_view client_identity)
 {
@@ -180,7 +177,7 @@ void Session::ehlo(string_view client_identity)
   if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
            sock_.them_c_str());
-    std::exit(EXIT_SUCCESS);
+    exit_();
   }
 
   out_() << "250-" << our_fqdn_.ascii() << "\r\n";
@@ -215,7 +212,7 @@ void Session::helo(string_view client_identity)
   if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
            sock_.them_c_str());
-    std::exit(EXIT_SUCCESS);
+    exit_();
   }
 
   out_() << "250 " << our_fqdn_.ascii() << "\r\n" << std::flush;
@@ -326,7 +323,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   else {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
            sock_.them_c_str());
-    std::exit(EXIT_SUCCESS);
+    exit_();
   }
 }
 
@@ -555,13 +552,8 @@ void Session::help(string_view str)
 void Session::quit()
 {
   out_() << "221 2.0.0 bye\r\n" << std::flush;
-
-  timespec time_used;
-  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
-
-  LOG(INFO) << "QUIT " << time_used.tv_sec << "." << std::setw(9) << time_used.tv_nsec;
-
-  std::exit(EXIT_SUCCESS);
+  LOG(INFO) << "QUIT";
+  exit_();
 }
 
 void Session::error(string_view log_msg)
@@ -588,7 +580,7 @@ void Session::time_out()
 {
   out_() << "421 4.4.2 time-out\r\n" << std::flush;
   LOG(ERROR) << "time-out" << (sock_.has_peername() ? " from " : "") << client_;
-  std::exit(EXIT_SUCCESS);
+  exit_();
 }
 
 void Session::starttls()
@@ -603,6 +595,17 @@ void Session::starttls()
     reset_();
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
+}
+
+void Session::exit_()
+{
+  timespec time_used;
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
+
+  LOG(INFO) << time_used.tv_sec << "." << std::setw(9) << std::setfill('0')
+            << time_used.tv_nsec;
+
+  std::exit(EXIT_SUCCESS);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -798,7 +801,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
                                            + three_level);
       }
       else {
-        out_() << "550 4.7.1 bad sender domain\r\n" << std::flush;
+        out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
         LOG(ERROR) << "sender \"" << sender
                    << "\" blocked by exact match on three-level-tlds list";
         return false;
@@ -813,7 +816,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
                                          + two_level);
     }
     else {
-      out_() << "550 4.7.1 bad sender domain\r\n" << std::flush;
+      out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
       LOG(ERROR) << "sender \"" << sender
                  << "\" blocked by exact match on two-level-tlds list";
       return false;
@@ -832,7 +835,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
   DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out_() << "550 4.7.1 blocked by " << uribl << "\r\n" << std::flush;
+      out_() << "554 5.7.1 blocked\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }

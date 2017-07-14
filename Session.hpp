@@ -85,6 +85,8 @@ private:
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
 
+  void exit_() __attribute__((noreturn));
+
 private:
   Sock sock_;
 
