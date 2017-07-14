@@ -1026,6 +1026,7 @@ struct action<msg_id> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.id = in.string();
+    boost::trim(ctx.id);
   }
 };
 
