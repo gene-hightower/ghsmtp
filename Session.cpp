@@ -735,7 +735,7 @@ bool Session::verify_sender_(Mailbox const& sender)
         return false;
     }
 
-    if (sock_.has_peername() && !ip_whitelisted_) {
+    if (sock_.has_peername()) {
       if (!verify_sender_spf_(sender))
         return false;
     }
