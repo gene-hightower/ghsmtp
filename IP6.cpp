@@ -78,6 +78,15 @@ std::string to_address_literal(std::experimental::string_view addr)
   return "[IPv6:"s + std::string(addr.data(), addr.size()) + "]"s;
 }
 
+std::string to_address(std::experimental::string_view addr)
+{
+  CHECK(is_address_literal(addr));
+  auto ret = std::string(addr.data(), addr.size());
+  ret.erase(ret.begin(), ret.begin() + 6);
+  ret.erase(ret.end() - 1);
+  return ret;
+}
+
 std::string reverse(std::experimental::string_view addr_str)
 {
   in6_addr addr;
