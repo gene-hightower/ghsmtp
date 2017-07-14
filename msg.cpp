@@ -830,7 +830,7 @@ struct fields : star<sor<
 };
 // clang-format on
 
-struct message : seq<fields, opt<seq<eol, body>>> {
+struct message : seq<fields, opt<seq<eol, body>>, eof> {
 };
 
 template <typename Rule>
