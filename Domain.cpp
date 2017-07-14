@@ -27,13 +27,13 @@ void Domain::set(std::experimental::string_view dom)
 {
   // Handle "bare" IP address literals, without the brackets.
   if (IP4::is_address(dom)) {
-    ascii_ = "["s + std::string(dom.data(), dom.length()) + "]"s;
+    ascii_ = IP4::to_address_literal(dom);
     utf8_ = ascii_;
     is_address_literal_ = true;
     return;
   }
   if (IP6::is_address(dom)) {
-    ascii_ = "[IPv6:"s + std::string(dom.data(), dom.length()) + "]"s;
+    ascii_ = IP6::to_address_literal(dom);
     utf8_ = ascii_;
     is_address_literal_ = true;
     return;
