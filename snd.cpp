@@ -17,8 +17,8 @@ DEFINE_string(service, "smtp-test", "Service name.");
 DEFINE_string(from, "test-it@digilicious.com", "RFC5321 MAIL FROM address.");
 DEFINE_string(to, "test-it@digilicious.com", "RFC5321 RCPT TO address.");
 
-DEFINE_string(from_name, "Mr. Test It", "RFC5322 From name.");
-DEFINE_string(to_name, "Mr. Test It", "RFC5322 To name.");
+DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From name.");
+DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To name.");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject.");
 DEFINE_string(keywords, "ghsmtp", "RFC5322 Keywords.");
