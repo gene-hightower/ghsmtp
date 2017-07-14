@@ -23,6 +23,15 @@ std::string to_address_literal(std::experimental::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
+std::string to_address(std::experimental::string_view addr)
+{
+  if (IP4::is_address_literal(addr))
+    return IP4::to_address(addr);
+  if (IP6::is_address_literal(addr))
+    return IP6::to_address(addr);
+  LOG(FATAL) << "not a valid IP address literal " << addr;
+}
+
 std::string reverse(std::experimental::string_view addr)
 {
   if (IP4::is_address(addr))
