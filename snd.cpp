@@ -10,7 +10,8 @@ DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
 
 DEFINE_string(sender, "digilicious.com", "FQDN of sending node.");
 
-DEFINE_string(receiver, "localhost", "FQDN of receiving node.");
+DEFINE_string(local_address, "", "Local address to bind.");
+DEFINE_string(mx_host, "localhost", "FQDN of receiving node.");
 DEFINE_string(service, "smtp-test", "Service name.");
 
 DEFINE_string(from, "test-it@digilicious.com", "RFC5321 MAIL FROM address.");
@@ -33,6 +34,8 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 #include "DKIM.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
+#include "IP4.hpp"
+#include "IP6.hpp"
 #include "Magic.hpp"
 #include "Mailbox.hpp"
 #include "Now.hpp"
@@ -487,6 +490,18 @@ int conn(std::string const& node, std::string const& service)
       int fd = socket(AF_INET, SOCK_STREAM, 0);
       PCHECK(fd >= 0) << "socket failed";
 
+      if (!FLAGS_local_address.empty()) {
+        sockaddr_in loc;
+        memset(&loc, 0, sizeof(loc));
+        loc.sin_family = AF_INET;
+        if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                           reinterpret_cast<void*>(&loc.sin_addr))) {
+          LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                     << " as IPv4 address";
+        }
+        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+      }
+
       char str[INET_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET, &(in4->sin_addr), str, sizeof str));
 
@@ -507,6 +522,18 @@ int conn(std::string const& node, std::string const& service)
 
       int fd = socket(AF_INET6, SOCK_STREAM, 0);
       PCHECK(fd >= 0) << "socket failed";
+
+      if (!FLAGS_local_address.empty()) {
+        sockaddr_in6 loc;
+        memset(&loc, 0, sizeof(loc));
+        loc.sin6_family = AF_INET6;
+        if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
+                           reinterpret_cast<void*>(&loc.sin6_addr))) {
+          LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                     << " as IPv6 address";
+        }
+        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+      }
 
       char str[INET6_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET6, &(in6->sin6_addr), str, sizeof str));
@@ -691,6 +718,25 @@ void check_for_fail(Input& in, RFC5321::Connection& cnn, string_view cmd)
   }
 }
 
+std::string connectable_host(Domain const& dom)
+{
+  if (IP4::is_address_literal(dom.ascii()))
+    return IP4::to_address(dom.ascii());
+  if (IP6::is_address_literal(dom.ascii()))
+    return IP6::to_address(dom.ascii());
+  return dom.ascii();
+}
+
+std::string connectable_host(Mailbox mbx)
+{
+  return connectable_host(mbx.domain());
+}
+
+std::string connectable_host(string_view dom)
+{
+  return connectable_host(Domain(dom));
+}
+
 int main(int argc, char* argv[])
 {
   // self_test();
@@ -738,9 +784,9 @@ int main(int argc, char* argv[])
   memory_input<> local_in(to_mbx.local_part(), "to.local");
   must_have_smtputf8 = must_have_smtputf8 || !parse<chars::ascii>(local_in);
 
-  std::vector<Domain> receivers;
-  if (!FLAGS_receiver.empty()) {
-    receivers.push_back(Domain(FLAGS_receiver));
+  std::vector<std::string> receivers;
+  if (!FLAGS_mx_host.empty()) {
+    receivers.push_back(connectable_host(FLAGS_mx_host));
   }
   else {
     // look up MX records for to_mbx.domain()
@@ -750,19 +796,19 @@ int main(int argc, char* argv[])
     auto mxs = DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii());
 
     if (mxs.empty()) {
-      receivers.push_back(to_mbx.domain());
+      receivers.push_back(connectable_host(to_mbx));
     }
     else {
       for (auto mx : mxs) {
-        receivers.push_back(Domain(mx));
+        receivers.push_back(mx);
       }
     }
   }
 
 try_host:
   CHECK(!receivers.empty()) << "no more hosts to try";
-  LOG(INFO) << "trying " << receivers[0].utf8() << ":" << FLAGS_service;
-  auto fd = conn(receivers[0].ascii(), FLAGS_service);
+  LOG(INFO) << "trying " << receivers[0] << ":" << FLAGS_service;
+  auto fd = conn(receivers[0], FLAGS_service);
   CHECK_NE(fd, -1);
   auto read_hook = []() {};
   RFC5321::Connection cnn(fd, read_hook);
@@ -791,7 +837,7 @@ try_host:
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
 
-  if (cnn.server_id != receivers[0].ascii()) {
+  if (cnn.server_id != receivers[0]) {
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 
