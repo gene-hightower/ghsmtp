@@ -40,7 +40,7 @@ public:
     return io_tls_("SSL_write", SSL_write, s, n, wait, t_o);
   }
 
-  std::string info();
+  std::string info() const;
 
 private:
   std::streamsize io_tls_(char const* fnm,

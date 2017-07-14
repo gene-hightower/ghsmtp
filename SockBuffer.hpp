@@ -83,14 +83,14 @@ public:
     tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
     tls_active_ = true;
   }
-  std::string tls_info()
+  std::string tls_info() const
   {
     if (tls_active_) {
       return tls_.info();
     }
     return "";
   }
-  bool tls() { return tls_active_; }
+  bool tls() const { return tls_active_; }
 
 private:
   int fd_in_;

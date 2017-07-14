@@ -204,7 +204,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
   }
 }
 
-std::string TLS::info()
+std::string TLS::info() const
 {
   std::ostringstream info;
 
