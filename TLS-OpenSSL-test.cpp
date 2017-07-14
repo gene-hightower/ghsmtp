@@ -8,7 +8,8 @@ int main(int argc, char* argv[])
 {
   google::InitGoogleLogging(argv[0]);
 
-  TLS tls;
+  auto read_hook = []() {};
+  TLS tls(read_hook);
 
   std::cout << "sizeof(TLS) == " << sizeof(TLS) << '\n';
 }
