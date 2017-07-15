@@ -90,7 +90,7 @@ void Session::greeting()
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
       out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
-      exit_();
+      std::exit(EXIT_SUCCESS);
     }
 
     fcrdns_ = IP::fcrdns(sock_.them_c_str());
@@ -123,7 +123,7 @@ void Session::greeting()
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
             out_() << "554 5.7.1 blocked\r\n" << std::flush;
-            exit_();
+            std::exit(EXIT_SUCCESS);
           }
         }
         // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
@@ -139,7 +139,7 @@ void Session::greeting()
         syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
                sock_.them_c_str());
         out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
-        exit_();
+        std::exit(EXIT_SUCCESS);
       }
     }
   } // if (sock_.has_peername())
@@ -323,7 +323,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   else {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
            sock_.them_c_str());
-    exit_();
+    std::exit(EXIT_SUCCESS);
   }
 }
 
