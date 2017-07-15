@@ -33,6 +33,45 @@ using std::experimental::string_view;
 
 using namespace std::string_literals;
 
+namespace {
+
+std::string esc(string_view str)
+{
+  std::string ret;
+  for (auto c : str) {
+    switch (c) {
+    case '\\':
+      ret += "\\\\"s;
+      break;
+    case '\a':
+      ret += "\\a"s;
+      break;
+    case '\b':
+      ret += "\\b"s;
+      break;
+    case '\f':
+      ret += "\\f"s;
+      break;
+    case '\n':
+      ret += "\\n"s;
+      break;
+    case '\r':
+      ret += "\\r"s;
+      break;
+    case '\t':
+      ret += "\\t"s;
+      break;
+    case '\'':
+      ret += "\'"s;
+      break;
+    default:
+      ret += c;
+    }
+  }
+  return ret;
+}
+}
+
 namespace RFC5322 {
 
 // clang-format off
@@ -338,30 +377,47 @@ struct group
 struct address : sor<mailbox, group> {
 };
 
-// *([CFWS] ",") mailbox *("," [mailbox / CFWS])
-// struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
-//                            mailbox,
-//                            star<one<','>, opt<sor<mailbox, CFWS>>>> {
-// };
+#define OBSOLETE_SYNTAX
 
+#ifdef OBSOLETE_SYNTAX
+// *([CFWS] ",") mailbox *("," [mailbox / CFWS])
+struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
+                           mailbox,
+                           star<one<','>, opt<sor<mailbox, CFWS>>>> {
+};
+
+struct mailbox_list : sor<list<mailbox, one<','>>, obs_mbox_list> {
+};
+#else
 struct mailbox_list : list<mailbox, one<','>> {
 };
+#endif
 
+#ifdef OBSOLETE_SYNTAX
 // *([CFWS] ",") address *("," [address / CFWS])
-// struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
-//                            address,
-//                            star<one<','>, opt<sor<address, CFWS>>>> {
-// };
+struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
+                           address,
+                           star<one<','>, opt<sor<address, CFWS>>>> {
+};
 
+struct address_list : sor<list<address, one<','>>, obs_addr_list> {
+};
+#else
 struct address_list : list<address, one<','>> {
 };
+#endif
 
+#ifdef OBSOLETE_SYNTAX
 // 1*([CFWS] ",") [CFWS]
-// struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
-// };
+struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
+};
 
+struct group_list : sor<mailbox_list, CFWS, obs_group_list> {
+};
+#else
 struct group_list : sor<mailbox_list, CFWS> {
 };
+#endif
 
 // 3.3. Date and Time Specification (mostly from RFC 2822)
 
@@ -571,6 +627,15 @@ struct resent_msg_id
 struct return_path : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"), path, eol> {
 };
 
+// Facebook, among others
+
+struct return_path_retarded : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"),
+                                  opt<CFWS>,
+                                  addr_spec,
+                                  star<WSP>,
+                                  eol> {
+};
+
 struct received_token : sor<angle_addr, addr_spec, domain, word> {
 };
 
@@ -742,6 +807,7 @@ struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
                      opt<CFWS>,
                      seq<type, one<'/'>, subtype>,
                      star<seq<one<';'>, opt<CFWS>, parameter>>,
+                     opt<one<';'>>, // not strictly RFC 2045, but common
                      eol> {
 };
 
@@ -769,7 +835,7 @@ struct id : seq<TAOCPP_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
 };
 
 struct description
-    : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>> {
+    : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
 };
 
 // Optional Fields
@@ -791,6 +857,7 @@ struct optional_field : seq<field_name, one<':'>, field_value, eol> {
 // clang-format off
 struct fields : star<sor<
                          return_path,
+                         return_path_retarded,
                          received,
                          received_spf,
 
@@ -824,6 +891,8 @@ struct fields : star<sor<
                          mime_version,
                          content,
                          content_transfer_encoding,
+                         id,
+                         description,
 
                          optional_field
                        >> {
@@ -886,9 +955,9 @@ struct action<optional_field> {
         // LOG(INFO) << in.string();
       }
       else {
-        auto err = "syntax error in: \""s + in.string() + "\""s;
+        auto err = "syntax error in: \""s + esc(in.string()) + "\""s;
         ctx.msg_errors.push_back(err);
-        LOG(ERROR) << err;
+        // LOG(ERROR) << err;
       }
     }
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
@@ -1171,6 +1240,17 @@ struct action<return_path> {
   static void apply(const Input& in, Ctx& ctx)
   {
     // LOG(INFO) << "Return-Path:";
+    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    ctx.mb_list.clear();
+  }
+};
+
+template <>
+struct action<return_path_retarded> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "Return-Path: is retarded";
     ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
     ctx.mb_list.clear();
   }
@@ -1462,24 +1542,25 @@ struct action<body> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Message body:";
+    // LOG(INFO) << "Message body:";
     auto body = string_view(in.begin(), in.end() - in.begin());
 
     ctx.dkv.eoh();
     ctx.dkv.body(body);
 
     if (ctx.mime_version) {
-      std::stringstream type;
-      type << "Content-Type: " << ctx.type << "/" << ctx.subtype;
-      for (auto const& p : ctx.ct_parameters) {
-        if ((type.str().length() + (3 + p.first.length() + p.second.length()))
-            > 78)
-          type << ";\r\n\t";
-        else
-          type << "; ";
-        type << p.first << "=" << p.second;
-      }
-      LOG(INFO) << type.str();
+      // std::stringstream type;
+      // type << "Content-Type: " << ctx.type << "/" << ctx.subtype;
+      // for (auto const& p : ctx.ct_parameters) {
+      //   if ((type.str().length() + (3 + p.first.length() +
+      //   p.second.length()))
+      //       > 78)
+      //     type << ";\r\n\t";
+      //   else
+      //     type << "; ";
+      //   type << p.first << "=" << p.second;
+      // }
+      // LOG(INFO) << type.str();
 
       // memory_input<> body_in(body, "body");
       // if (!parse_nested<RFC5322::, RFC5322::action>(in, body_in, ctx)) {
@@ -1560,7 +1641,7 @@ struct action<message> {
 
     ctx.dmp.query_dmarc(from_domain.ascii().c_str());
 
-    LOG(INFO) << "Message-ID: " << ctx.message_id;
+    // LOG(INFO) << "Message-ID: " << ctx.message_id;
     LOG(INFO) << "Final DMARC advice for " << from_domain << ": "
               << Advice_to_string(ctx.dmp.get_policy());
 
@@ -1569,6 +1650,33 @@ struct action<message> {
         LOG(ERROR) << e;
       }
     }
+  }
+};
+
+template <>
+struct action<obs_mbox_list> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "Obsolete mailbox list";
+  }
+};
+
+template <>
+struct action<obs_addr_list> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "Obsolete address list";
+  }
+};
+
+template <>
+struct action<obs_group_list> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "Obsolete group list";
   }
 };
 }
