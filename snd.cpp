@@ -21,7 +21,7 @@ DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From name.");
 DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To name.");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject.");
-DEFINE_string(keywords, "ghsmtp", "RFC5322 Keywords.");
+DEFINE_string(keywords, "", "RFC5322 Keywords.");
 
 DEFINE_bool(ip4, false, "Use only IP version 4.");
 DEFINE_bool(ip6, false, "Use only IP version 6.");
@@ -786,14 +786,12 @@ int main(int argc, char* argv[])
     LOG(FATAL) << "Must use /some/ IP version.";
   }
 
-  Domain sender(FLAGS_sender);
-
   // parse FLAGS_from and FLAGS_to as addr_spec
 
   Mailbox from_mbx;
   memory_input<> from_in(FLAGS_from, "from");
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(from_in, from_mbx)) {
-    LOG(FATAL) << "Bad From: address syntax \"" << FLAGS_from << "\"";
+    LOG(FATAL) << "Bad From: address syntax <" << FLAGS_from << ">";
   }
   LOG(INFO) << "from_mbx == " << from_mbx;
 
@@ -803,7 +801,7 @@ int main(int argc, char* argv[])
   Mailbox to_mbx;
   memory_input<> to_in(FLAGS_to, "to");
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(to_in, to_mbx)) {
-    LOG(FATAL) << "Bad address syntax \"" << FLAGS_to << "\"";
+    LOG(FATAL) << "Bad To: address syntax <" << FLAGS_to << ">";
   }
   LOG(INFO) << "to_mbx == " << to_mbx;
 
@@ -846,6 +844,8 @@ try_host:
     receivers.erase(receivers.begin());
     goto try_host;
   }
+
+  Domain sender(FLAGS_sender);
 
   LOG(INFO) << "> EHLO " << sender.utf8();
   cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
@@ -961,7 +961,9 @@ try_host:
   eml.add_hdr("Subject", FLAGS_subject);
   if (!FLAGS_keywords.empty())
     eml.add_hdr("Keywords", FLAGS_keywords);
+
   eml.add_hdr("MIME-Version", "1.0");
+  eml.add_hdr("Content-Language", "en-US");
 
   Magic magic; // to ID buffer contents
 
