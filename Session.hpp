@@ -68,6 +68,8 @@ private:
   void log_lo_(char const* verb,
                std::experimental::string_view client_identity) const;
 
+  std::experimental::string_view server_id() const;
+
   void reset_()
   {
     reverse_path_.clear();

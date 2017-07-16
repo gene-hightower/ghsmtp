@@ -20,7 +20,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <syslog.h>
 
@@ -144,7 +143,7 @@ void Session::greeting()
     }
   } // if (sock_.has_peername())
 
-  out_() << "220 " << our_fqdn_.ascii() << " ESMTP - ghsmtp\r\n" << std::flush;
+  out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
 
   LOG(INFO) << "connect from " << client_;
 }
@@ -165,6 +164,16 @@ void Session::log_lo_(char const* verb, string_view client_identity) const
   }
 }
 
+string_view Session::server_id() const
+{
+  if (our_fqdn_.is_address_literal()) {
+    return IP::to_address(our_fqdn_.ascii());
+  }
+  else {
+    return our_fqdn_.ascii();
+  }
+}
+
 void Session::flush() { out_() << std::flush; }
 
 void Session::ehlo(string_view client_identity)
@@ -180,7 +189,7 @@ void Session::ehlo(string_view client_identity)
     exit_();
   }
 
-  out_() << "250-" << our_fqdn_.ascii() << "\r\n";
+  out_() << "250-" << server_id() << "\r\n";
   // RFC 1870
   out_() << "250-SIZE " << Config::max_msg_size << "\r\n";
   // RFC 6152
@@ -215,7 +224,7 @@ void Session::helo(string_view client_identity)
     exit_();
   }
 
-  out_() << "250 " << our_fqdn_.ascii() << "\r\n" << std::flush;
+  out_() << "250 " << server_id() << "\r\n" << std::flush;
 
   log_lo_("HELO", client_identity);
 }
@@ -847,7 +856,8 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  SPF::Server spf_srv(our_fqdn_.ascii().c_str());
+  std::string sid{server_id()};
+  SPF::Server spf_srv(sid.c_str());
   SPF::Request spf_req(spf_srv);
 
   if (IP4::is_address(sock_.them_c_str())) {
@@ -863,7 +873,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   spf_req.set_helo_dom(client_identity_.ascii().c_str());
 
-  auto from = boost::lexical_cast<std::string>(sender);
+  auto from = static_cast<std::string>(sender);
 
   spf_req.set_env_from(from.c_str());
 

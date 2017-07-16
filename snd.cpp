@@ -3,8 +3,10 @@
 #include <gflags/gflags.h>
 
 DEFINE_bool(nosend, false, "Don't actually send any mail.");
-DEFINE_bool(rawdog, false, "Send the body exactly as is, don't fix CRLF issues "
-                           "or escape leading dots.");
+DEFINE_bool(rawdog,
+            false,
+            "Send the body exactly as is, don't fix CRLF issues "
+            "or escape leading dots.");
 
 DEFINE_bool(use_tls, true, "Use TLS.");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
@@ -382,9 +384,9 @@ struct ehlo_line
 //                    "250 " ehlo-line CRLF )
 
 struct ehlo_ok_rsp
-: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), domain, opt<seq<SP, ehlo_greet>>, CRLF>,
+: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<seq<SP, ehlo_greet>>, CRLF>,
 
-      seq<TAOCPP_PEGTL_ISTRING("250-"), domain, opt<seq<SP, ehlo_greet>>, CRLF,
+      seq<TAOCPP_PEGTL_ISTRING("250-"), server_id, opt<seq<SP, ehlo_greet>>, CRLF,
  star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
       seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>
       > {};
@@ -736,9 +738,9 @@ void check_for_fail(Input& in, RFC5321::Connection& cnn, string_view cmd)
 std::string connectable_host(Domain const& dom)
 {
   if (IP4::is_address_literal(dom.ascii()))
-    return IP4::to_address(dom.ascii());
+    return std::string(IP4::to_address(dom.ascii()));
   if (IP6::is_address_literal(dom.ascii()))
-    return IP6::to_address(dom.ascii());
+    return std::string(IP6::to_address(dom.ascii()));
   return dom.ascii();
 }
 

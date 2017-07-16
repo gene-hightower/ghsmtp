@@ -23,7 +23,7 @@ std::string to_address_literal(std::experimental::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string to_address(std::experimental::string_view addr)
+std::experimental::string_view to_address(std::experimental::string_view addr)
 {
   if (IP4::is_address_literal(addr))
     return IP4::to_address(addr);

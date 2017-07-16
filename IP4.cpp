@@ -49,13 +49,10 @@ std::string to_address_literal(std::experimental::string_view addr)
   return "["s + std::string(addr.data(), addr.size()) + "]"s;
 }
 
-std::string to_address(std::experimental::string_view addr)
+std::experimental::string_view to_address(std::experimental::string_view addr)
 {
   CHECK(is_address_literal(addr));
-  auto ret = std::string(addr.data(), addr.size());
-  ret.erase(ret.begin());
-  ret.erase(ret.end() - 1);
-  return ret;
+  return std::experimental::string_view(addr.begin() + 1, addr.length() - 2);
 }
 
 std::string reverse(std::experimental::string_view addr)
