@@ -856,6 +856,17 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
+  if (ip_whitelisted_) {
+    std::ostringstream received_spf;
+    received_spf << "Received-SPF: pass (" << server_id() << ": "
+                 << sock_.them_c_str()
+                 << " is whitelisted.) client-ip=" << sock_.them_c_str()
+                 << "; envelope-from=" << reverse_path_
+                 << "; helo=" << client_identity_ << ";";
+    received_spf_ = received_spf.str();
+    return true;
+  }
+
   std::string sid{server_id()};
   SPF::Server spf_srv(sid.c_str());
   SPF::Request spf_req(spf_srv);
