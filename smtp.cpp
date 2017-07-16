@@ -348,17 +348,20 @@ struct data_end : seq<dot, CRLF> {
 struct data_blank : CRLF {
 };
 
-struct data_dot : seq<one<'.'>, plus<not_one<'\r', '\n'>>, CRLF> {
+// Rules for strict RFC adherence:
+
+struct data_dot
+    : seq<one<'.'>, rep_min_max<1, 997, not_one<'\r', '\n'>>, CRLF> {
 };
 
-// Rule for strict RFC adherence:
-
-struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
+struct data_plain
+    : seq<not_one<'.'>, rep_min_max<0, 997, not_one<'\r', '\n'>>, CRLF> {
 };
 
-// But let's accept crud for a while...
+// But let's accept real-world crud, up to a point...
 
-struct anything_else : seq<not_one<'.'>, star<not_one<'\n'>>, LF> {
+struct anything_else
+    : seq<not_one<'.'>, rep_min_max<0, 4000, not_one<'\n'>>, opt<LF>> {
 };
 
 // This particular crud will trigger an error return with the "no bare
@@ -367,7 +370,8 @@ struct anything_else : seq<not_one<'.'>, star<not_one<'\n'>>, LF> {
 struct not_data_end : seq<dot, LF> {
 };
 
-struct data_line : sor<data_blank, data_dot, data_plain, not_data_end, anything_else> {
+struct data_line
+    : sor<data_blank, data_dot, data_plain, not_data_end, anything_else> {
 };
 
 // struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
