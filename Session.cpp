@@ -861,7 +861,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     received_spf << "Received-SPF: pass (" << server_id() << ": "
                  << sock_.them_c_str()
                  << " is whitelisted.) client-ip=" << sock_.them_c_str()
-                 << "; envelope-from=" << reverse_path_
+                 << "; envelope-from=" << sender
                  << "; helo=" << client_identity_ << ";";
     received_spf_ = received_spf.str();
     return true;
