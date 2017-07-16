@@ -3,6 +3,7 @@
 #include <gflags/gflags.h>
 
 DEFINE_bool(nosend, false, "Don't actually send any mail.");
+DEFINE_bool(rawdog, false, "Send the body exactly as is, don't fix CRLF issues or escape leading dots.");
 
 DEFINE_bool(use_tls, true, "Use TLS.");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
@@ -1097,13 +1098,16 @@ try_host:
       std::string line;
       imemstream isbody(body.data(), body.size());
       while (std::getline(isbody, line)) {
-        if (line.length() && (line.at(0) == '.')) {
-          cnn.sock.out() << '.';
+        if (FLAGS_rawdog) {
+          cnn.sock.out() << line << '\n';
         }
-        cnn.sock.out() << line;
-        if (line.back() != '\r')
-          cnn.sock.out() << '\r';
-        cnn.sock.out() << '\n';
+        else {
+          boost::erase_all(line, "\r");
+          if (line.length() && (line.at(0) == '.')) {
+            cnn.sock.out() << '.';
+          }
+          cnn.sock.out() << line << "\r\n";
+        }
       }
     }
 

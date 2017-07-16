@@ -1,6 +1,7 @@
 #include <fstream>
 
 #include "Session.hpp"
+#include "esc.hpp"
 
 #include <cstdlib>
 #include <memory>
@@ -352,21 +353,25 @@ struct data_dot : seq<one<'.'>, plus<not_one<'\r', '\n'>>, CRLF> {
 
 // Rule for strict RFC adherence:
 
-// struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
-// };
+struct data_plain : seq<not_one<'.'>, star<not_one<'\r', '\n'>>, CRLF> {
+};
 
 // But let's accept crud for a while...
-struct data_plain : seq<not_one<'.'>, star<not_one<'\n'>>, LF> {
+
+struct anything_else : seq<not_one<'.'>, star<not_one<'\n'>>, LF> {
 };
 
-struct data_line : sor<data_blank, data_dot, data_plain> {
+// This particular crud will trigger an error return with the "no bare
+// LF" message.
+
+struct not_data_end : seq<dot, LF> {
 };
 
-struct anything_else : seq<rep_min_max<1, Config::bfr_size, any>, eof> {
+struct data_line : sor<data_blank, data_dot, data_plain, not_data_end, anything_else> {
 };
 
-struct data_grammar
-    : sor<seq<star<seq<data_line, discard>>, data_end>, anything_else> {
+// struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
+struct data_grammar : until<data_end, star<seq<data_line, discard>>> {
 };
 
 struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
@@ -449,7 +454,8 @@ struct action<bogus_cmd_0> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command 0: \""s + esc(in.string())
+                                 + "\""s);
   }
 };
 
@@ -458,7 +464,8 @@ struct action<bogus_cmd_1> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command 1: \""s + esc(in.string())
+                                 + "\""s);
   }
 };
 
@@ -467,7 +474,8 @@ struct action<bogus_cmd_2> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command 2: \""s + esc(in.string())
+                                 + "\""s);
   }
 };
 
@@ -476,7 +484,8 @@ struct action<bogus_cmd_3> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command 3: \""s + esc(in.string())
+                                 + "\""s);
   }
 };
 
@@ -485,7 +494,8 @@ struct action<bogus_cmd> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + in.string() + "\""s);
+    ctx.session.cmd_unrecognized("bogus command: \""s + esc(in.string())
+                                 + "\""s);
   }
 };
 
@@ -494,7 +504,7 @@ struct action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("garbage in cmd stream: \""s + in.string()
+    ctx.session.cmd_unrecognized("garbage in cmd stream: \""s + esc(in.string())
                                  + "\""s);
   }
 };
@@ -786,11 +796,27 @@ struct data_action<data_dot> {
 };
 
 template <>
+struct data_action<not_data_end> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.session.bare_lf("\""s + esc(in.string()) + "\""s);
+  }
+};
+
+template <>
 struct data_action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.bare_lf("garbage in data stream: \""s + in.string() + "\""s);
+    LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
+    size_t len = in.end() - in.begin();
+    ctx.msg->write(in.begin(), len);
+    if (!ctx.hdr_end) {
+      if (ctx.hdr.size() < Config::max_hdr_size) {
+        ctx.hdr.append(in.begin(), len);
+      }
+    }
   }
 };
 

@@ -30,10 +30,11 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := msg smtp snd
+PROGRAMS := msg smtp snd fast
 
-msg_STEMS := msg DKIM Domain IP4 IP6 SPF hostname
-smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz hostname
+fast_STEMS := fast Message Pill date/tz
+msg_STEMS := msg DKIM Domain IP4 IP6 SPF esc hostname
+smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz esc hostname
 snd_STEMS := snd DKIM DNS Domain IP4 IP6 Magic POSIX Pill Session Sock TLS-OpenSSL base64 date/tz hostname
 
 TESTS := \

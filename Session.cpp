@@ -570,10 +570,10 @@ void Session::cmd_unrecognized(string_view log_msg)
 
 void Session::bare_lf(string_view log_msg)
 {
-  out_() << "554 5.6.11 malformed data/bare LF or CR, see "
-            "<https://cr.yp.to/docs/smtplf.html>\r\n"
+  out_() << "554 5.6.11 bare LF, see <https://cr.yp.to/docs/smtplf.html>\r\n"
          << std::flush;
   LOG(ERROR) << "Session::bare_lf: " << log_msg;
+  exit_();
 }
 
 void Session::time_out()
