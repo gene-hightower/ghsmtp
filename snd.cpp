@@ -521,10 +521,11 @@ int conn(std::string const& node, std::string const& service)
 
       char str[INET_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET, &(in4->sin_addr), str, sizeof str));
+      auto p = ntohs(in4->sin_port);
 
       if (connect(fd, addr, sizeof(*in4)) == 0) {
         freeaddrinfo(res);
-        LOG(INFO) << "connect " << str << ":" << ntohs(in4->sin_port);
+        LOG(INFO) << "connect " << str << ":" << p;
         return fd;
       }
       PLOG(WARNING) << "connect failed " << str << ":" << ntohs(in4->sin_port);
@@ -554,10 +555,11 @@ int conn(std::string const& node, std::string const& service)
 
       char str[INET6_ADDRSTRLEN]{0};
       PCHECK(inet_ntop(AF_INET6, &(in6->sin6_addr), str, sizeof str));
+      auto p = ntohs(in6->sin6_port);
 
       if (connect(fd, addr, sizeof(*in6)) == 0) {
         freeaddrinfo(res);
-        LOG(INFO) << "connect [" << str << "]:" << ntohs(in6->sin6_port);
+        LOG(INFO) << "connect [" << str << "]:" << p;
         return fd;
       }
       PLOG(WARNING) << "connect failed [" << str
