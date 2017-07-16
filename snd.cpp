@@ -3,7 +3,8 @@
 #include <gflags/gflags.h>
 
 DEFINE_bool(nosend, false, "Don't actually send any mail.");
-DEFINE_bool(rawdog, false, "Send the body exactly as is, don't fix CRLF issues or escape leading dots.");
+DEFINE_bool(rawdog, false, "Send the body exactly as is, don't fix CRLF issues "
+                           "or escape leading dots.");
 
 DEFINE_bool(use_tls, true, "Use TLS.");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
@@ -1086,14 +1087,6 @@ try_host:
 
     cnn.sock.out() << eml;
 
-    // This loop converts single LF line endings into CRLF.  This loop
-    // does nothing to fix single CR characters not part of a CRLF
-    // pair.
-
-    // This loop adds a CRLF and the end of the transmission if the
-    // file doesn't already end with one.  This is an artifact of the
-    // SMTP DATA protocol.
-
     for (auto const& body : bodies) {
       std::string line;
       imemstream isbody(body.data(), body.size());
@@ -1102,11 +1095,21 @@ try_host:
           cnn.sock.out() << line << '\n';
         }
         else {
-          boost::erase_all(line, "\r");
+          // This code converts single LF line endings into CRLF.
+          // This code does nothing to fix single CR characters not
+          // part of a CRLF pair.
+
+          // This loop adds a CRLF and the end of the transmission if
+          // the file doesn't already end with one.  This is a
+          // requirement of the SMTP DATA protocol.
+
           if (line.length() && (line.at(0) == '.')) {
             cnn.sock.out() << '.';
           }
-          cnn.sock.out() << line << "\r\n";
+          cnn.sock.out() << line;
+          if (line.back() != '\r')
+            cnn.sock.out() << '\r';
+          cnn.sock.out() << '\n';
         }
       }
     }
