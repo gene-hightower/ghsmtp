@@ -53,7 +53,7 @@ constexpr char const* const uribls[] = {
     "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
 };
 
-constexpr auto greeting_wait_ms = 3'000;
+constexpr auto greeting_wait = std::chrono::seconds(3);
 constexpr auto max_recipients_per_message = 1'000;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
@@ -132,9 +132,7 @@ void Session::greeting()
 
     // Wait a bit of time for pre-greeting traffic.
     if (!ip_whitelisted_) {
-      std::chrono::milliseconds wait{Config::greeting_wait_ms};
-
-      if (sock_.input_ready(wait)) {
+      if (sock_.input_ready(Config::greeting_wait)) {
         syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
                sock_.them_c_str());
         out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
