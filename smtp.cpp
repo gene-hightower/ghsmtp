@@ -105,86 +105,66 @@ struct no_last_dash { // not used now...
   }
 };
 
-struct UTF8_tail : range<0x80, 0xBF> {
-};
+// clang-format off
 
-struct UTF8_1 : range<0x00, 0x7F> {
-};
+struct UTF8_tail : range<0x80, 0xBF> {};
 
-struct UTF8_2 : seq<range<0xC2, 0xDF>, UTF8_tail> {
-};
+struct UTF8_1 : range<0x00, 0x7F> {};
+
+struct UTF8_2 : seq<range<0xC2, 0xDF>, UTF8_tail> {};
 
 struct UTF8_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, UTF8_tail>,
                     seq<range<0xE1, 0xEC>, rep<2, UTF8_tail>>,
                     seq<one<0xED>, range<0x80, 0x9F>, UTF8_tail>,
-                    seq<range<0xEE, 0xEF>, rep<2, UTF8_tail>>> {
-};
+                    seq<range<0xEE, 0xEF>, rep<2, UTF8_tail>>> {};
 
 struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
                     seq<range<0xF1, 0xF3>, rep<3, UTF8_tail>>,
-                    seq<one<0xF4>, range<0x80, 0x8F>, rep<2, UTF8_tail>>> {
-};
+                    seq<one<0xF4>, range<0x80, 0x8F>, rep<2, UTF8_tail>>> {};
 
-// UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
+struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
-struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
-};
-
-struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {
-};
+struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
 
 using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {
-};
+struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
 
 struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8_non_ascii, dash>> {
   // verify last char is a U_Let_dig
 };
 
-struct u_label : seq<u_let_dig, opt<u_ldh_str>> {
-};
+struct u_label : seq<u_let_dig, opt<u_ldh_str>> {};
 
-struct let_dig : sor<ALPHA, DIGIT> {
-};
+struct let_dig : sor<ALPHA, DIGIT> {};
 
 struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
   // verify last char is a U_Let_dig
 };
 
-struct label : seq<let_dig, opt<ldh_str>> {
-};
+struct label : seq<let_dig, opt<ldh_str>> {};
 
-struct sub_domain : sor<label, u_label> {
-};
+struct sub_domain : sor<label, u_label> {};
 
-struct domain : list<sub_domain, dot> {
-};
+struct domain : list<sub_domain, dot> {};
 
-// clang-format off
 struct dec_octet : sor<one<'0'>,
                        rep_min_max<1, 2, DIGIT>,
                        seq<one<'1'>, DIGIT, DIGIT>,
                        seq<one<'2'>, range<'0', '4'>, DIGIT>,
                        seq<string<'2','5'>, range<'0','5'>>> {};
-// clang-format on
 
 struct IPv4_address_literal
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
-};
+    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {
-};
+struct h16 : rep_min_max<1, 4, HEXDIG> {};
 
-struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {
-};
+struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {};
 
-struct dcolon : two<':'> {
-};
+struct dcolon : two<':'> {};
 
-// clang-format off
 struct IPv6address : sor<seq<                                          rep<6, h16, colon>, ls32>,
                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
@@ -194,50 +174,36 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
-// clang-format on
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {
-};
+struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
-struct dcontent : ranges<33, 90, 94, 126> {
-};
+struct dcontent : ranges<33, 90, 94, 126> {};
 
-struct standardized_tag : ldh_str {
-};
+struct standardized_tag : ldh_str {};
 
-struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
-};
+struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {};
 
 // See rfc 5321 Section 4.1.3
 struct address_literal : seq<one<'['>,
                              sor<IPv4_address_literal,
                                  IPv6_address_literal,
                                  general_address_literal>,
-                             one<']'>> {
-};
+                             one<']'>> {};
 
-struct at_domain : seq<one<'@'>, domain> {
-};
+struct at_domain : seq<one<'@'>, domain> {};
 
-struct a_d_l : list<at_domain, one<','>> {
-};
+struct a_d_l : list<at_domain, one<','>> {};
 
-struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {
-};
+struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {};
 
-struct graphic : range<32, 126> {
-};
+struct graphic : range<32, 126> {};
 
-struct quoted_pairSMTP : seq<one<'\\'>, graphic> {
-};
+struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
 
-struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {
-};
+struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
 
-struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {
-};
+struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
 
-// clang-format off
 struct atext : sor<ALPHA, DIGIT,
                    one<'!'>, one<'#'>,
                    one<'$'>, one<'%'>,
@@ -249,124 +215,94 @@ struct atext : sor<ALPHA, DIGIT,
                    one<'`'>, one<'{'>,
                    one<'|'>, one<'}'>,
                    one<'~'>,
-                   UTF8_non_ascii> {
-};
-// clang-format on
+                   UTF8_non_ascii> {};
 
-struct atom : plus<atext> {
-};
+struct atom : plus<atext> {};
 
-struct dot_string : list<atom, dot> {
-};
+struct dot_string : list<atom, dot> {};
 
-struct local_part : sor<dot_string, quoted_string> {
-};
+struct local_part : sor<dot_string, quoted_string> {};
 
-struct non_local_part : sor<domain, address_literal> {
-};
+struct non_local_part : sor<domain, address_literal> {};
 
-struct mailbox : seq<local_part, one<'@'>, non_local_part> {
-};
+struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
-struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {
-};
+struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {};
 
-struct bounce_path : TAOCPP_PEGTL_ISTRING("<>") {
-};
+struct bounce_path : TAOCPP_PEGTL_ISTRING("<>") {};
 
-struct reverse_path : sor<path, bounce_path> {
-};
+struct reverse_path : sor<path, bounce_path> {};
 
-struct magic_postmaster : TAOCPP_PEGTL_ISTRING("<Postmaster>") {
-};
+struct magic_postmaster : TAOCPP_PEGTL_ISTRING("<Postmaster>") {};
 
-struct forward_path : sor<path, magic_postmaster> {
-};
+struct forward_path : sor<path, magic_postmaster> {};
 
-struct esmtp_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {
-};
+struct esmtp_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
 
-struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {
-};
+struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {};
 
-struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {
-};
+struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {};
 
-struct mail_parameters : list<esmtp_param, SP> {
-};
+struct mail_parameters : list<esmtp_param, SP> {};
 
-struct rcpt_parameters : list<esmtp_param, SP> {
-};
+struct rcpt_parameters : list<esmtp_param, SP> {};
 
-struct string : sor<quoted_string, atom> {
-};
+struct string : sor<quoted_string, atom> {};
 
-struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"), SP, domain, CRLF> {
-};
+struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"),
+                  SP,
+                  sor<domain, address_literal>,
+                  CRLF> {};
 
 struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
                   SP,
                   sor<domain, address_literal>,
-                  CRLF> {
-};
+                  CRLF> {};
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
                        TAOCPP_PEGTL_ISTRING(" FROM:"),
                        opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                        reverse_path,
                        opt<seq<SP, mail_parameters>>,
-                       CRLF> {
-};
+                       CRLF> {};
 
 struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
                      TAOCPP_PEGTL_ISTRING(" TO:"),
                      opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                      forward_path,
                      opt<seq<SP, rcpt_parameters>>,
-                     CRLF> {
-};
+                     CRLF> {};
 
-struct chunk_size : plus<DIGIT> {
-};
+struct chunk_size : plus<DIGIT> {};
 
-struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {
-};
+struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {};
 
-struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {
-};
+struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {};
 
 struct bdat_last
-    : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {
-};
+    : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {};
 
-struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {
-};
+struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {};
 
-struct data_end : seq<dot, CRLF> {
-};
+struct data_end : seq<dot, CRLF> {};
 
-struct data_blank : CRLF {
-};
+struct data_blank : CRLF {};
 
 // Rules for strict RFC adherence:
 
 struct data_dot
-    : seq<one<'.'>, rep_min_max<1, 997, not_one<'\r', '\n'>>, CRLF> {
-};
+    : seq<one<'.'>, rep_min_max<1, 997, not_one<'\r', '\n'>>, CRLF> {};
 
-struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {
-};
+struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
 
 // But let's accept real-world crud, up to a point...
 
-struct anything_else : seq<rep_min_max<0, 4000, not_one<'\n'>>, one<'\n'>> {
-};
+struct anything_else : seq<rep_min_max<0, 4000, not_one<'\n'>>, one<'\n'>> {};
 
 // This particular crud will trigger an error return with the "no bare
 // LF" message.
 
-struct not_data_end : seq<dot, LF> {
-};
+struct not_data_end : seq<dot, LF> {};
 
 struct data_line : sor<at<data_end>,
                        seq<sor<data_blank,
@@ -374,50 +310,29 @@ struct data_line : sor<at<data_end>,
                                data_plain,
                                not_data_end,
                                anything_else>,
-                           discard>> {
-};
+                           discard>> {};
 
-// struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
-struct data_grammar : until<data_end, data_line> {
-};
+struct data_grammar : until<data_end, data_line> {};
 
-struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
-};
+struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {};
 
-struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, string>>, CRLF> {
-};
+struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, string>>, CRLF> {};
 
-struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {
-};
+struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {};
 
-struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {
-};
+struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {};
 
 struct starttls
-    : seq<TAOCPP_PEGTL_ISTRING("STAR"), TAOCPP_PEGTL_ISTRING("TTLS"), CRLF> {
-};
+    : seq<TAOCPP_PEGTL_ISTRING("STAR"), TAOCPP_PEGTL_ISTRING("TTLS"), CRLF> {};
 
-struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {
-};
+struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
 
-struct bogus_cmd_0 : CRLF {
-};
-struct bogus_cmd_1 : seq<not_one<'\r', '\n'>, CRLF> {
-};
-struct bogus_cmd_2 : seq<not_one<'\r', '\n'>, not_one<'\r', '\n'>, CRLF> {
-};
-struct bogus_cmd_3
-    : seq<not_one<'\r', '\n'>, not_one<'\r', '\n'>, not_one<'\r', '\n'>, CRLF> {
-};
-struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {
-};
+struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
+struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {};
 
 // commands in size order
 
-struct any_cmd : seq<sor<bogus_cmd_0,
-                         bogus_cmd_1,
-                         bogus_cmd_2,
-                         bogus_cmd_3,
+struct any_cmd : seq<sor<bogus_cmd_short,
                          data,
                          quit,
                          rset,
@@ -433,11 +348,11 @@ struct any_cmd : seq<sor<bogus_cmd_0,
                          mail_from,
                          bogus_cmd,
                          anything_else>,
-                     discard> {
-};
+                     discard> {};
 
-struct grammar : plus<any_cmd> {
-};
+struct grammar : plus<any_cmd> {};
+
+// clang-format on
 
 template <typename Rule>
 struct action : nothing<Rule> {
@@ -457,41 +372,12 @@ struct action<esmtp_keyword> {
 };
 
 template <>
-struct action<bogus_cmd_0> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.session.cmd_unrecognized("bogus command 0: \""s + esc(in.string())
-                                 + "\""s);
-  }
-};
-
 template <>
-struct action<bogus_cmd_1> {
+struct action<bogus_cmd_short> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command 1: \""s + esc(in.string())
-                                 + "\""s);
-  }
-};
-
-template <>
-struct action<bogus_cmd_2> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.session.cmd_unrecognized("bogus command 2: \""s + esc(in.string())
-                                 + "\""s);
-  }
-};
-
-template <>
-struct action<bogus_cmd_3> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.session.cmd_unrecognized("bogus command 3: \""s + esc(in.string())
+    ctx.session.cmd_unrecognized("bogus short command: \""s + esc(in.string())
                                  + "\""s);
   }
 };
