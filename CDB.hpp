@@ -24,16 +24,26 @@ public:
     dbpath.append(".cdb");
 
     fd_ = open(dbpath.c_str(), O_RDONLY);
-    PCHECK(fd_ >= 0) << " can't open " << dbpath;
-    cdb_init(&cdb_, fd_);
+    if (fd_ == -1) {
+      char err[256];
+      strerror_r(errno, err, sizeof(err));
+      LOG(WARNING) << "unable to open " << dbpath << ": " << err;
+    }
+    else {
+      cdb_init(&cdb_, fd_);
+    }
   }
   ~CDB()
   {
-    close(fd_);
-    cdb_free(&cdb_);
+    if (fd_ != -1) {
+      close(fd_);
+      cdb_free(&cdb_);
+    }
   }
   bool lookup(std::experimental::string_view key)
   {
+    if (fd_ == -1)
+      return false;
     CHECK_LT(key.length(), std::numeric_limits<unsigned int>::max());
     if (cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length()))
         > 0) {
