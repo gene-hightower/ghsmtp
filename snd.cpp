@@ -1111,6 +1111,8 @@ try_host:
       imemstream isbody(body.data(), body.size());
       while (std::getline(isbody, line)) {
         if (FLAGS_rawdog) {
+          // This adds a final newline and the end of the file,
+          // if no line ending was present.
           cnn.sock.out() << line << '\n';
         }
         else {
