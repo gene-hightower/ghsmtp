@@ -359,7 +359,7 @@ struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {
 
 // But let's accept real-world crud, up to a point...
 
-struct anything_else : seq<star<not_one<'\n'>>, one<'\n'>> {
+struct anything_else : seq<rep_min_max<0, 4000, not_one<'\n'>>, one<'\n'>> {
 };
 
 // This particular crud will trigger an error return with the "no bare
