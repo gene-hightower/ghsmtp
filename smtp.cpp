@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <memory>
 
+#include <signal.h>
+
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
@@ -328,7 +330,7 @@ struct starttls
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
 
 struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
-struct bogus_cmd : seq<star<not_one<'\r', '\n'>>, CRLF> {};
+struct bogus_cmd_long : seq<rep_min_max<4, 4000, not_one<'\r', '\n'>>, CRLF> {};
 
 // commands in size order
 
@@ -346,7 +348,7 @@ struct any_cmd : seq<sor<bogus_cmd_short,
                          starttls,
                          rcpt_to,
                          mail_from,
-                         bogus_cmd,
+                         bogus_cmd_long,
                          anything_else>,
                      discard> {};
 
@@ -383,7 +385,7 @@ struct action<bogus_cmd_short> {
 };
 
 template <>
-struct action<bogus_cmd> {
+struct action<bogus_cmd_long> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
@@ -855,11 +857,27 @@ void self_test()
   std::exit(EXIT_SUCCESS);
 }
 
+void timeout(int signum)
+{
+  const char errmsg[] = "421 4.4.2 time-out\r\n";
+  write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
+  _exit(1);
+}
+
 int main(int argc, char const* const argv[])
 {
   std::ios::sync_with_stdio(false);
 
   // self_test();
+
+  // Set timeout signal handler to limit total run time.
+  struct sigaction sact;
+  memset(&sact, 0, sizeof(sact));
+  PCHECK(sigemptyset(&sact.sa_mask) == 0);
+  sact.sa_flags = 0;
+  sact.sa_handler = timeout;
+  PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
+  alarm(10 * 60);
 
   close(2); // hackage to stop glog from spewing
 
