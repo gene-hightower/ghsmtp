@@ -26,7 +26,7 @@ constexpr std::streamsize max_xfer_size = 64 * 1024;
 namespace RFC5321 {
 
 struct Ctx {
-  Ctx(std::function<void(void)> read_hook)
+  Ctx(std::function<void(void)> read_hook = []() {})
     : session(read_hook)
   {
   }
@@ -354,14 +354,12 @@ struct data_dot
     : seq<one<'.'>, rep_min_max<1, 997, not_one<'\r', '\n'>>, CRLF> {
 };
 
-struct data_plain
-    : seq<not_one<'.'>, rep_min_max<0, 997, not_one<'\r', '\n'>>, CRLF> {
+struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {
 };
 
 // But let's accept real-world crud, up to a point...
 
-struct anything_else
-    : seq<not_one<'.'>, rep_min_max<0, 4000, not_one<'\n'>>, opt<LF>> {
+struct anything_else : seq<star<not_one<'\n'>>, one<'\n'>> {
 };
 
 // This particular crud will trigger an error return with the "no bare
@@ -370,12 +368,17 @@ struct anything_else
 struct not_data_end : seq<dot, LF> {
 };
 
-struct data_line
-    : sor<data_blank, data_dot, data_plain, not_data_end, anything_else> {
+struct data_line : sor<at<data_end>,
+                       seq<sor<data_blank,
+                               data_dot,
+                               data_plain,
+                               not_data_end,
+                               anything_else>,
+                           discard>> {
 };
 
 // struct data_grammar : seq<star<seq<data_line, discard>>, data_end> {
-struct data_grammar : until<data_end, star<seq<data_line, discard>>> {
+struct data_grammar : until<data_end, data_line> {
 };
 
 struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {
@@ -742,16 +745,18 @@ template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    if (ctx.msg->size_error()) {
-      ctx.session.data_size_error(*ctx.msg);
-      ctx.msg.reset();
-    }
-    else {
-      if (!ctx.hdr_end) {
-        LOG(WARNING) << "may not have all headers in this email";
+    if (ctx.msg) {
+      if (ctx.msg->size_error()) {
+        ctx.session.data_size_error(*ctx.msg);
+        ctx.msg.reset();
       }
-      ctx.session.data_msg_done(*ctx.msg);
-      ctx.msg.reset();
+      else {
+        if (!ctx.hdr_end) {
+          LOG(WARNING) << "may not have all headers in this email";
+        }
+        ctx.session.data_msg_done(*ctx.msg);
+        ctx.msg.reset();
+      }
     }
   }
 };
@@ -761,7 +766,9 @@ struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
     constexpr char CRLF[]{'\r', '\n'};
-    ctx.msg->write(CRLF, sizeof(CRLF));
+    if (ctx.msg) {
+      ctx.msg->write(CRLF, sizeof(CRLF));
+    }
     ctx.hdr.append(CRLF, sizeof(CRLF));
     ctx.hdr_end = true;
   }
@@ -773,7 +780,9 @@ struct data_action<data_plain> {
   static void apply(Input const& in, Ctx& ctx)
   {
     size_t len = in.end() - in.begin();
-    ctx.msg->write(in.begin(), len);
+    if (ctx.msg) {
+      ctx.msg->write(in.begin(), len);
+    }
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::max_hdr_size) {
         ctx.hdr.append(in.begin(), len);
@@ -788,7 +797,9 @@ struct data_action<data_dot> {
   static void apply(Input const& in, Ctx& ctx)
   {
     size_t len = in.end() - in.begin() - 1;
-    ctx.msg->write(in.begin() + 1, len);
+    if (ctx.msg) {
+      ctx.msg->write(in.begin() + 1, len);
+    }
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
       if (ctx.hdr.size() < Config::max_hdr_size) {
@@ -815,7 +826,10 @@ struct data_action<anything_else> {
   {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
     size_t len = in.end() - in.begin();
-    ctx.msg->write(in.begin(), len);
+    CHECK(len);
+    if (ctx.msg) {
+      ctx.msg->write(in.begin(), len);
+    }
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::max_hdr_size) {
         ctx.hdr.append(in.begin(), len);
@@ -911,11 +925,58 @@ struct action<quit> {
 };
 }
 
-int main(int argc, char const* argv[])
+void self_test()
 {
+  LOG(INFO) << "testing";
+
+  const char* in_list[]{
+      "anything\r\n"
+      ".\r\n", // end
+
+      ".anything\r\n",
+
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n",
+
+      "anything",  // no CRLF
+      ".anything", // no CRLF
+
+      "",
+
+      "anything\r\n"
+      "\nanything\r\n"
+      "\ranything\r\n"
+      "anything\r\n"
+      ".\r\n", // end
+  };
+
+  for (auto i : in_list) {
+    std::string bfr(i);
+    std::istringstream data(bfr);
+    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
+    RFC5321::Ctx ctx;
+    if (parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
+      LOG(INFO) << "pass: \"" << esc(i) << "\"";
+    }
+    else {
+      LOG(INFO) << "fail: \"" << esc(i) << "\"";
+    }
+  }
+
+  std::exit(EXIT_SUCCESS);
+}
+
+int main(int argc, char const* const argv[])
+{
+  std::ios::sync_with_stdio(false);
+
+  // self_test();
+
   close(2); // hackage to stop glog from spewing
 
-  std::ios::sync_with_stdio(false);
   google::InitGoogleLogging(argv[0]);
 
   // Don't wait for STARTTLS to fail if no cert.
