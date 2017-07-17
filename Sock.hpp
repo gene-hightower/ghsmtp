@@ -23,7 +23,7 @@ public:
 
   Sock(int fd_in,
        int fd_out,
-       std::function<void(void)> read_hook,
+       std::function<void(void)> read_hook = [](){},
        std::chrono::milliseconds read_timeout = Config::read_timeout_default,
        std::chrono::milliseconds write_timeout = Config::write_timeout_default,
        std::chrono::milliseconds starttls_timeout
