@@ -867,7 +867,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  std::string sid{server_id()};
+  auto sid = std::string(server_id().data(), server_id().length());
   SPF::Server spf_srv(sid.c_str());
   SPF::Request spf_req(spf_srv);
 
