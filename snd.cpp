@@ -2,6 +2,8 @@
 
 #include <gflags/gflags.h>
 
+DEFINE_bool(pipe, false, "Send to stdin/stdout");
+
 DEFINE_bool(nosend, false, "Don't actually send any mail.");
 DEFINE_bool(rawdog,
             false,
@@ -252,8 +254,8 @@ struct Connection {
 
   std::string reply_code;
 
-  Connection(int fd, std::function<void(void)> read_hook)
-    : sock(fd, fd, read_hook, Config::read_timeout, Config::write_timeout)
+  Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
+    : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
   {}
 };
 
@@ -635,7 +637,7 @@ namespace gflags {
 void self_test()
 {
   auto read_hook = []() {};
-  static RFC5321::Connection cnn(0, read_hook);
+  static RFC5321::Connection cnn(0, 1, read_hook);
 
   const char* greet_list[]{
       "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
@@ -771,6 +773,8 @@ DEFINE_validator(to_name, &validate_name);
 
 int main(int argc, char* argv[])
 {
+  std::ios::sync_with_stdio(false);
+
   // self_test();
 
   const auto hostname = get_hostname();
@@ -837,16 +841,26 @@ int main(int argc, char* argv[])
   }
 
 try_host:
-  CHECK(!receivers.empty()) << "no more hosts to try";
-  LOG(INFO) << "trying " << receivers[0] << ":" << FLAGS_service;
-  auto fd = conn(receivers[0], FLAGS_service);
-  CHECK_NE(fd, -1);
+  int fd_in = 0;
+  int fd_out = 1;
+
+  if (!FLAGS_pipe) {
+    CHECK(!receivers.empty()) << "no more hosts to try";
+    LOG(INFO) << "trying " << receivers[0] << ":" << FLAGS_service;
+    auto fd = conn(receivers[0], FLAGS_service);
+    CHECK_NE(fd, -1);
+    fd_in = fd;
+    fd_out = fd;
+  }
+
   auto read_hook = []() {};
-  RFC5321::Connection cnn(fd, read_hook);
+  RFC5321::Connection cnn(fd_in, fd_out, read_hook);
+
   // CRLF /only/
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
-    close(fd);
+    if (fd_in == fd_out)
+      close(fd_in);
     receivers.erase(receivers.begin());
     goto try_host;
   }
@@ -877,7 +891,8 @@ try_host:
   bool ext_smtputf8 = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
 
   if (must_have_smtputf8 && !ext_smtputf8) {
-    close(fd);
+    if (fd_in == fd_out)
+      close(fd_in);
     receivers.erase(receivers.begin());
     goto try_host;
   }
