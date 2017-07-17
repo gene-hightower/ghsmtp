@@ -12,7 +12,7 @@
 
 #include <glog/logging.h>
 
-// We must define this to account for args to Sockbuffer
+// We must define this to account for args to Sockbuffer ctor.
 #define BOOST_IOSTREAMS_MAX_FORWARDING_ARITY 6
 
 #include <boost/iostreams/concepts.hpp>
