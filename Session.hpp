@@ -21,7 +21,7 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(std::function<void(void)> read_hook,
+  explicit Session(std::function<void(void)> read_hook = [](){},
                    int fd_in = STDIN_FILENO,
                    int fd_out = STDOUT_FILENO,
                    std::string fqdn = "");
