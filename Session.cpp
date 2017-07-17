@@ -54,7 +54,7 @@ constexpr char const* const uribls[] = {
 };
 
 constexpr auto greeting_wait = std::chrono::seconds(3);
-constexpr auto max_recipients_per_message = 1'000;
+constexpr auto max_recipients_per_message = 100;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
