@@ -8,6 +8,7 @@ mkm
 msg
 p0f
 public_suffix_list.dat
+sasl
 smtp
 smtp.pem
 snd
