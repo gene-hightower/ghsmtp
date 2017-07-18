@@ -23,6 +23,8 @@ using std::experimental::string_view;
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+#include "test-credentials.ipp"
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
@@ -203,11 +205,8 @@ int main()
     LOG(WARNING) << m.first;
   }
 
-  auto username = "************"s;
-  auto password = "************"s;
-
   std::stringstream tok;
-  tok << '\0' << username << '\0' << password;
+  tok << '\0' << test::username << '\0' << test::password;
   auto init = Base64::enc(tok.str());
 
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
