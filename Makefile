@@ -15,11 +15,12 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := msg smtp snd
+PROGRAMS := msg smtp sasl snd
 
 msg_STEMS := msg DKIM Domain IP4 IP6 SPF esc hostname
+sasl_STEMS := sasl Base64 POSIX TLS-OpenSSL
 smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL date/tz esc hostname
-snd_STEMS := snd DKIM DNS Domain IP4 IP6 Magic POSIX Pill Session Sock TLS-OpenSSL base64 date/tz hostname
+snd_STEMS := snd Base64 DKIM DNS Domain IP4 IP6 Magic POSIX Pill Session Sock TLS-OpenSSL date/tz hostname
 
 TESTS := \
 	CDB-test \
@@ -82,9 +83,7 @@ clean::
 	./cdb-gen < $< | cdb -c $@
 
 clean::
-	rm -f two-level-tlds
 	rm -f two-level-tlds.cdb
-	rm -f three-level-tlds
 	rm -f three-level-tlds.cdb
 	rm -f white.cdb cdb-gen
 

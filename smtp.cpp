@@ -292,8 +292,9 @@ struct data_blank : CRLF {};
 
 // Rules for strict RFC adherence:
 
+// RFC 5321 text line length section 4.5.3.1.6.
 struct data_dot
-    : seq<one<'.'>, rep_min_max<1, 997, not_one<'\r', '\n'>>, CRLF> {};
+    : seq<one<'.'>, rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
 
 struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
 
@@ -430,6 +431,10 @@ struct action<local_part> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_loc = in.string();
+    // RFC 5321, section 4.5.3.1.1.
+    if (ctx.mb_loc.length() > 64) {
+      LOG(WARNING) << "local part too long " << ctx.mb_loc;
+    }
   }
 };
 
@@ -439,6 +444,10 @@ struct action<non_local_part> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_dom = in.string();
+    // RFC 5321, section 4.5.3.1.2.
+    if (ctx.mb_loc.length() > 255) {
+      LOG(WARNING) << "domain name or number too long " << ctx.mb_dom;
+    }
   }
 };
 

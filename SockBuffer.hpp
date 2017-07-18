@@ -37,10 +37,10 @@ public:
 
   SockBuffer(int fd_in,
              int fd_out,
-             std::function<void(void)> read_hook,
-             std::chrono::milliseconds read_timeout,
-             std::chrono::milliseconds write_timeout,
-             std::chrono::milliseconds starttls_timeout)
+             std::function<void(void)> read_hook = [](){},
+             std::chrono::milliseconds read_timeout = std::chrono::seconds(2),
+             std::chrono::milliseconds write_timeout = std::chrono::seconds(2),
+             std::chrono::milliseconds starttls_timeout = std::chrono::seconds(2))
     : fd_in_(fd_in)
     , fd_out_(fd_out)
     , read_hook_(read_hook)

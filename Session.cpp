@@ -139,11 +139,11 @@ void Session::greeting()
         std::exit(EXIT_SUCCESS);
       }
     }
+
+    LOG(INFO) << "connect from " << client_;
   } // if (sock_.has_peername())
 
   out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
-
-  LOG(INFO) << "connect from " << client_;
 }
 
 void Session::log_lo_(char const* verb, string_view client_identity) const
@@ -192,10 +192,15 @@ void Session::ehlo(string_view client_identity)
   out_() << "250-SIZE " << Config::max_msg_size << "\r\n";
   // RFC 6152
   out_() << "250-8BITMIME\r\n";
-  if (!sock_.tls()) { // If we're not already TLS, offer TLS
-    // RFC 3207
+
+  if (sock_.tls()) {
+    out_() << "250-AUTH LOGIN\r\n";
+  }
+  else {
+    // If we're not already TLS, offer TLS, à la RFC 3207
     out_() << "250-STARTTLS\r\n";
   }
+
   // RFC 2034
   out_() << "250-ENHANCEDSTATUSCODES\r\n";
   // RFC 2920
@@ -624,7 +629,8 @@ void Session::exit_()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (ip_whitelisted_ || client_identity.is_address_literal()) {
+  if (!sock_.has_peername() || ip_whitelisted_
+      || client_identity.is_address_literal()) {
     return true;
   }
 
@@ -854,11 +860,14 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  if (ip_whitelisted_) {
+  if (!sock_.has_peername() || ip_whitelisted_) {
+    auto ip_addr = sock_.them_c_str();
+    if (!sock_.has_peername()) {
+      ip_addr = "127.0.0.1"; // use localhost for local socket
+    }
     std::ostringstream received_spf;
-    received_spf << "Received-SPF: pass (" << server_id() << ": "
-                 << sock_.them_c_str()
-                 << " is whitelisted.) client-ip=" << sock_.them_c_str()
+    received_spf << "Received-SPF: pass (" << server_id() << ": " << ip_addr
+                 << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
                  << "; helo=" << client_identity_ << ";";
     received_spf_ = received_spf.str();

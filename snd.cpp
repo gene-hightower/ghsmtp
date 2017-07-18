@@ -37,6 +37,7 @@ DEFINE_string(password, "", "AUTH password.");
 
 DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 
+#include "Base64.hpp"
 #include "DKIM.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
@@ -47,7 +48,6 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
-#include "base64.hpp"
 #include "hostname.hpp"
 #include "imemstream.hpp"
 
@@ -249,8 +249,8 @@ struct Connection {
   std::string server_id;
 
   std::string ehlo_keyword;
-  std::string ehlo_param;
-  std::unordered_map<std::string, std::string> ehlo_params;
+  std::vector<std::string> ehlo_param;
+  std::unordered_map<std::string, std::vector<std::string>> ehlo_params;
 
   std::string reply_code;
 
@@ -446,7 +446,8 @@ struct action<ehlo_param> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    cnn.ehlo_param = in.string();
+    cnn.ehlo_param.push_back(in.string());
+    boost::to_upper(cnn.ehlo_param.back());
   }
 };
 
@@ -923,13 +924,6 @@ try_host:
     exit(EXIT_FAILURE);
   }
 
-  if (FLAGS_nosend) {
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_SUCCESS);
-  }
-
   std::vector<content> bodies;
 
   if (argc == 1) {
@@ -945,25 +939,58 @@ try_host:
   bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty())
-      max_msg_size = strtoul(cnn.ehlo_params["SIZE"].c_str(), nullptr, 10);
+      max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), nullptr, 10);
   }
   if (!max_msg_size) {
     max_msg_size = Config::max_msg_size;
   }
 
   if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
-    if (cnn.ehlo_params.find("AUTH") != cnn.ehlo_params.end()) {
-      LOG(INFO) << "> AUTH";
-      cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
-      CHECK((parse<RFC5321::auth_login_username>(in)));
-      cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
-      CHECK((parse<RFC5321::auth_login_password>(in)));
-      cnn.sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    auto auth = cnn.ehlo_params.find("AUTH");
+    if (auth != cnn.ehlo_params.end()) {
+
+      // perfer plain I guess.
+      if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
+          != auth->second.end()) {
+        LOG(INFO) << "> AUTH PLAIN";
+        std::stringstream tok;
+        tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
+        cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
+                       << std::flush;
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        if (cnn.reply_code != "235") {
+          LOG(ERROR) << "AUTH PLAIN returned " << cnn.reply_code;
+          fail(in, cnn);
+        }
+      }
+      else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
+               != auth->second.end()) {
+        LOG(INFO) << "> AUTH LOGIN";
+        cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
+        CHECK((parse<RFC5321::auth_login_username>(in)));
+        cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
+        CHECK((parse<RFC5321::auth_login_password>(in)));
+        cnn.sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        if (cnn.reply_code != "235") {
+          LOG(ERROR) << "AUTH LOGIN returned " << cnn.reply_code;
+          fail(in, cnn);
+        }
+      }
+      else {
+        LOG(WARNING) << "server doesn't support AUTH methods PLAIN or LOGIN";
+      }
     }
     else {
       LOG(WARNING) << "server doesn't support AUTH";
     }
+  }
+
+  if (FLAGS_nosend) {
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_SUCCESS);
   }
 
   Eml eml;
@@ -1087,6 +1114,10 @@ try_host:
     }
 
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    if (cnn.reply_code != "250") {
+      LOG(ERROR) << "BDAT returned " << cnn.reply_code;
+      fail(in, cnn);
+    }
   }
   else {
     LOG(INFO) << "> DATA";

@@ -25,7 +25,7 @@ char const* as_cstr(Result result)
   case Result::PERMERROR:
     return "permerror";
   }
-  return "Unknown";
+  return "** unknown **";
 }
 
 std::ostream& operator<<(std::ostream& os, Result result)
