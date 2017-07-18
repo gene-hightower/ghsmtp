@@ -5,48 +5,40 @@
 
 namespace DNS {
 
-std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
+char const* as_cstr(Pkt_rcode pkt_rcode)
 {
-  char const* msg = "Unknown";
   switch (pkt_rcode) {
   case DNS::Pkt_rcode::NOERROR:
-    msg = "NOERROR";
-    break;
+    return "NOERROR";
   case DNS::Pkt_rcode::FORMERR:
-    msg = "FORMERR";
-    break;
+    return "FORMERR";
   case DNS::Pkt_rcode::SERVFAIL:
-    msg = "SERVFAIL";
-    break;
+    return "SERVFAIL";
   case DNS::Pkt_rcode::NXDOMAIN:
-    msg = "NXDOMAIN";
-    break;
+    return "NXDOMAIN";
   case DNS::Pkt_rcode::NOTIMPL:
-    msg = "NOTIMPL";
-    break;
+    return "NOTIMPL";
   case DNS::Pkt_rcode::REFUSED:
-    msg = "REFUSED";
-    break;
+    return "REFUSED";
   case DNS::Pkt_rcode::YXDOMAIN:
-    msg = "YXDOMAIN";
-    break;
+    return "YXDOMAIN";
   case DNS::Pkt_rcode::YXRRSET:
-    msg = "YXRRSET";
-    break;
+    return "YXRRSET";
   case DNS::Pkt_rcode::NXRRSET:
-    msg = "NXRRSET";
-    break;
+    return "NXRRSET";
   case DNS::Pkt_rcode::NOTAUTH:
-    msg = "NOTAUTH";
-    break;
+    return "NOTAUTH";
   case DNS::Pkt_rcode::NOTZONE:
-    msg = "NOTZONE";
-    break;
+    return "NOTZONE";
   case DNS::Pkt_rcode::INTERNAL:
-    msg = "INTERNAL";
-    break;
+    return "INTERNAL";
   }
-  return os << msg;
+  return "** unknown **";
+}
+
+std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
+{
+  return os << as_cstr(pkt_rcode);
 }
 
 template <>

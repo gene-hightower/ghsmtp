@@ -39,6 +39,7 @@ enum class Pkt_rcode {
   INTERNAL = 666,
 };
 
+char const* as_cstr(Pkt_rcode pkt_rcode);
 std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode);
 
 template <RR_type type>
