@@ -206,8 +206,8 @@ int main()
     }
   }
 
-  auto username = "gene"s;
-  auto password = "****"s;
+  auto username = "************"s;
+  auto password = "************"s;
 
   std::stringstream tok;
   tok << '\0' << username << '\0' << password;
@@ -227,5 +227,7 @@ int main()
     if (!parse<dovecot::auth_resp, dovecot::action>(in, ctx)) {
       LOG(WARNING) << "auth response parse failed";
     }
+
+    LOG(INFO) << "AUTH: " << ctx.auth_resp;
   }
 }
