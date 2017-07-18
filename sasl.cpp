@@ -2,12 +2,12 @@
 //#include "SockBuffer.hpp"
 
 #include <boost/iostreams/concepts.hpp>
-#include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/iostreams/stream.hpp>
 
+#include <experimental/string_view>
 #include <iostream>
 #include <string>
-#include <experimental/string_view>
 
 using namespace std::string_literals;
 using std::experimental::string_view;
@@ -15,6 +15,7 @@ using std::experimental::string_view;
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+
 #include <sys/types.h>
 
 #include <glog/logging.h>
@@ -74,12 +75,7 @@ struct Context {
   std::vector<std::string> parameter;
   std::unordered_map<std::string, std::vector<std::string>> mech;
 
-  enum class auth_response {
-    none,
-    ok,
-    cont,
-    fail
-  };
+  enum class auth_response { none, ok, cont, fail };
 
   auth_response auth_resp = auth_response::none;
 };
@@ -105,7 +101,8 @@ std::ostream& operator<<(std::ostream& os, Context::auth_response rsp)
 }
 
 template <typename Rule>
-struct action : nothing<Rule> {};
+struct action : nothing<Rule> {
+};
 
 template <>
 struct action<cookie> {
@@ -168,18 +165,12 @@ struct action<auth_fail> {
     ctx.auth_resp = Context::auth_response::fail;
   }
 };
-
 }
 
 constexpr char const* defined_params[]{
-  "anonymous",
-    "plaintext",
-    "dictionary",
-    "active",
-    "forward-secrecy",
-    "mutual-auth",
-    "private",
-    };
+    "anonymous",       "plaintext",   "dictionary", "active",
+    "forward-secrecy", "mutual-auth", "private",
+};
 
 int main()
 {
@@ -190,12 +181,13 @@ int main()
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
   auto socket_path = "/var/spool/postfix/private/auth";
-  strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path)-1);
+  strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
 
   // boost::iostreams::stream<SockBuffer> ios(fd, fd);
-  boost::iostreams::stream<boost::iostreams::file_descriptor> ios(fd, boost::iostreams::close_handle);
+  boost::iostreams::stream<boost::iostreams::file_descriptor> ios(
+      fd, boost::iostreams::close_handle);
 
   ios << "VERSION\t1\t1\n"
       << "CPID\t" << getpid() << "\n"
@@ -215,7 +207,8 @@ int main()
   }
 
   auto username = "gene"s;
-  auto password = "sylvan cur pickup among listen nq"s;
+  auto password = "****"s;
+
   std::stringstream tok;
   tok << '\0' << username << '\0' << password;
   auto init = Base64::enc(tok.str());
@@ -223,18 +216,16 @@ int main()
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
     auto id = 0x12345678;
 
-    ios << "AUTH\t" << id
-        << "\tPLAIN"
-           "\tservice=SMTP"
-           "\tresp=" << init
-        << "\n"
-        << std::flush;
+    ios << "AUTH" << '\t' << id;
+
+    ios << "\tPLAIN";
+    ios << "\tservice=SMTP";
+    ios << "\tresp=" << init;
+
+    ios << "\n" << std::flush;
 
     if (!parse<dovecot::auth_resp, dovecot::action>(in, ctx)) {
       LOG(WARNING) << "auth response parse failed";
     }
-
-    
   }
-
 }
