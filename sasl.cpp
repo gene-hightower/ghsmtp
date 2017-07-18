@@ -201,9 +201,6 @@ int main()
 
   for (auto const& m : ctx.mech) {
     LOG(WARNING) << m.first;
-    for (auto const& p : m.second) {
-      LOG(WARNING) << "  " << p;
-    }
   }
 
   auto username = "************"s;
