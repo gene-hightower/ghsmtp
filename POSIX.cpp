@@ -79,7 +79,7 @@ POSIX::io_fd_(char const* fnm,
     if (now < (start + timeout)) {
       milliseconds time_left
           = duration_cast<milliseconds>((start + timeout) - now);
-      read_hook();
+      read_hook(); // should call in POSIX::input_ready
       if (rdy_fnc(fd, time_left))
         continue; // try io_fnc again
     }
