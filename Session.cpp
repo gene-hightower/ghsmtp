@@ -79,6 +79,8 @@ Session::Session(std::function<void(void)> read_hook,
     }
   }
   our_fqdn_.set(our_fqdn.c_str());
+  std::streamsize overhead = 1024 * 1024 * 1024;
+  sock_.set_max_read(Config::max_msg_size + overhead);
 }
 
 void Session::greeting()
@@ -279,8 +281,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         try {
           size_t sz = stoull(val);
           if (sz > Config::max_msg_size) {
-            out_() << "552 5.3.4 message size exceeds fixed maximium message "
-                      "size\r\n"
+            out_() << "552 5.3.4 message size exceeds fixed maximium size\r\n"
                    << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return;
@@ -326,7 +327,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     reverse_path_ = std::move(reverse_path);
     forward_path_.clear();
     out_() << "250 2.1.0 OK\r\n";
-    // no flush RFC-2920 section 3.1
+    // No flush RFC-2920 section 3.1, this could be part of a command group.
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
     for (auto p : parameters) {
       LOG(INFO) << "  " << p.first << (p.second.empty() ? "" : "=") << p.second;
@@ -362,7 +363,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     else {
       forward_path_.push_back(std::move(forward_path));
       out_() << "250 2.1.5 OK\r\n";
-      // no flush RFC-2920 section 3.1
+      // No flush RFC-2920 section 3.1, this could be part of a command group.
       LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
     }
   }
@@ -537,7 +538,7 @@ void Session::rset()
 {
   reset_();
   out_() << "250 2.0.0 OK\r\n";
-  // no flush RFC-2920 section 3.1
+  // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RSET";
 }
 
@@ -585,6 +586,14 @@ void Session::bare_lf(string_view log_msg)
   out_() << "554 5.6.11 bare LF, see <https://cr.yp.to/docs/smtplf.html>\r\n"
          << std::flush;
   LOG(ERROR) << "Session::bare_lf: " << log_msg;
+  exit_();
+}
+
+void Session::max_out()
+{
+  out_() << "552 5.3.4 message size exceeds fixed maximium size\r\n"
+         << std::flush;
+  LOG(ERROR) << "message size maxed out";
   exit_();
 }
 

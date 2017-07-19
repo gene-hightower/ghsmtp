@@ -22,7 +22,7 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(std::function<void(void)> read_hook = [](){},
+  explicit Session(std::function<void(void)> read_hook = []() {},
                    int fd_in = STDIN_FILENO,
                    int fd_out = STDOUT_FILENO,
                    std::string fqdn = "");
@@ -52,9 +52,11 @@ public:
   void cmd_unrecognized(std::experimental::string_view log_msg);
   void bare_lf(std::experimental::string_view log_msg);
 
+  void max_out() __attribute__((noreturn));
   void time_out() __attribute__((noreturn));
   void starttls();
 
+  bool maxed_out() { return sock_.maxed_out(); }
   bool timed_out() { return sock_.timed_out(); }
   std::istream& in() { return sock_.in(); }
 

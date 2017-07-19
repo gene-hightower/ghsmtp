@@ -23,7 +23,7 @@ public:
 
   Sock(int fd_in,
        int fd_out,
-       std::function<void(void)> read_hook = [](){},
+       std::function<void(void)> read_hook = []() {},
        std::chrono::milliseconds read_timeout = Config::read_timeout_default,
        std::chrono::milliseconds write_timeout = Config::write_timeout_default,
        std::chrono::milliseconds starttls_timeout
@@ -41,7 +41,13 @@ public:
   {
     return iostream_->input_ready(wait);
   }
+  bool maxed_out() { return iostream_->maxed_out(); }
   bool timed_out() { return iostream_->timed_out(); }
+
+  void set_max_read(std::streamsize max)
+  {
+    return iostream_->set_max_read(max);
+  }
 
   std::istream& in() { return iostream_; }
   std::ostream& out() { return iostream_; }
