@@ -72,6 +72,7 @@ struct auth_resp : sor<auth_ok, auth_cont, auth_fail> {};
 // clang-format on
 
 struct Context {
+  uint32_t id;
   std::string cookie;
   std::string sasl_mech;
   std::vector<std::string> parameter;
@@ -104,6 +105,15 @@ std::ostream& operator<<(std::ostream& os, Context::auth_response rsp)
 
 template <typename Rule>
 struct action : nothing<Rule> {
+};
+
+template <>
+struct action<id> {
+  template <typename Input>
+  static void apply(Input const& in, Context& ctx)
+  {
+    ctx.id = strtoul(in.string().c_str(), nullptr, 10);
+  }
 };
 
 template <>
@@ -202,7 +212,7 @@ int main()
   }
 
   for (auto const& m : ctx.mech) {
-    LOG(WARNING) << m.first;
+    LOG(INFO) << m.first;
   }
 
   std::stringstream tok;
@@ -210,7 +220,7 @@ int main()
   auto init = Base64::enc(tok.str());
 
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
-    auto id = 0x12345678;
+    uint32_t id = 0x12345678;
 
     ios << "AUTH" << '\t' << id;
 
@@ -224,6 +234,7 @@ int main()
       LOG(WARNING) << "auth response parse failed";
     }
 
+    CHECK_EQ(ctx.id, id);
     LOG(INFO) << "AUTH: " << ctx.auth_resp;
   }
 }
