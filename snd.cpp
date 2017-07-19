@@ -978,11 +978,13 @@ try_host:
         }
       }
       else {
-        LOG(WARNING) << "server doesn't support AUTH methods PLAIN or LOGIN";
+        LOG(ERROR) << "server doesn't support AUTH methods PLAIN or LOGIN";
+        fail(in, cnn);
       }
     }
     else {
-      LOG(WARNING) << "server doesn't support AUTH";
+      LOG(ERROR) << "server doesn't support AUTH";
+      fail(in, cnn);
     }
   }
 
