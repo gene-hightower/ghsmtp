@@ -300,7 +300,7 @@ struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
 
 // But let's accept real-world crud, up to a point...
 
-struct anything_else : seq<rep_min_max<0, 4000, not_one<'\n'>>, one<'\n'>> {};
+struct anything_else : seq<star<not_one<'\n'>>, one<'\n'>> {};
 
 // This particular crud will trigger an error return with the "no bare
 // LF" message.
@@ -331,7 +331,7 @@ struct starttls
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
 
 struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
-struct bogus_cmd_long : seq<rep_min_max<4, 4000, not_one<'\r', '\n'>>, CRLF> {};
+struct bogus_cmd_long : seq<rep_min_max<4, 1000, not_one<'\r', '\n'>>, CRLF> {};
 
 // commands in size order
 
