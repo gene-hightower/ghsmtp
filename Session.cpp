@@ -92,7 +92,7 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    fcrdns_ = IP::fcrdns(sock_.them_c_str());
+    fcrdns_ = IP::fcrdns(res_, sock_.them_c_str());
 
     if (!fcrdns_.empty()) {
       client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
@@ -113,12 +113,11 @@ void Session::greeting()
       }
       else if (IP4::is_address(sock_.them_c_str())) {
         using namespace DNS;
-        Resolver res;
 
         // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
         auto reversed = IP4::reverse(sock_.them_c_str());
         for (const auto& rbl : Config::rbls) {
-          if (has_record<RR_type::A>(res, reversed + rbl)) {
+          if (has_record<RR_type::A>(res_, reversed + rbl)) {
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
             out_() << "554 5.7.1 blocked\r\n" << std::flush;
@@ -194,7 +193,8 @@ void Session::ehlo(string_view client_identity)
   out_() << "250-8BITMIME\r\n";
 
   if (sock_.tls()) {
-    out_() << "250-AUTH LOGIN\r\n";
+    // Check sasl sources for auth types.
+    // out_() << "250-AUTH PLAIN\r\n";
   }
   else {
     // If we're not already TLS, offer TLS, à la RFC 3207
@@ -845,9 +845,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
 
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
-  DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
-    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+    if (DNS::has_record<DNS::RR_type::A>(res_, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 blocked\r\n" << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;

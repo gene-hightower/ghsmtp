@@ -8,6 +8,7 @@
 
 #include <experimental/string_view>
 
+#include "DNS.hpp"
 #include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
@@ -91,6 +92,8 @@ private:
 
 private:
   Sock sock_;
+
+  DNS::Resolver res_;
 
   Domain our_fqdn_;                   // who we identify as
   Domain fcrdns_;                     // who they look-up as
