@@ -905,6 +905,9 @@ int main(int argc, char const* const argv[])
 
   try {
     if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx)) {
+      if (ctx->session.maxed_out()) {
+        ctx->session.max_out();
+      }
       if (ctx->session.timed_out()) {
         ctx->session.time_out();
       }
