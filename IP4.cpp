@@ -75,10 +75,9 @@ std::string reverse(std::experimental::string_view addr)
   return reverse.str();
 }
 
-std::string fcrdns(char const* addr)
+std::string fcrdns(DNS::Resolver& res, char const* addr)
 {
   using namespace DNS;
-  Resolver res;
 
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 

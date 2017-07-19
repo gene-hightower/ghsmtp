@@ -3,6 +3,8 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
+#include <glog/logging.h>
+
 namespace IP {
 bool is_address(std::experimental::string_view addr)
 {
@@ -41,14 +43,14 @@ std::string reverse(std::experimental::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string fcrdns(char const* addr)
+std::string fcrdns(DNS::Resolver& res, char const* addr)
 {
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
   if (IP4::is_address(addr))
-    return IP4::fcrdns(addr);
+    return IP4::fcrdns(res, addr);
   if (IP6::is_address(addr))
-    return IP6::fcrdns(addr);
+    return IP6::fcrdns(res, addr);
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 }
