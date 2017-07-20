@@ -79,7 +79,9 @@ POSIX::io_fd_(char const* fnm,
     if (now < (start + timeout)) {
       milliseconds time_left
           = duration_cast<milliseconds>((start + timeout) - now);
-      read_hook(); // should call in POSIX::input_ready
+      if (*fnm == 'r') {
+        read_hook();
+      }
       if (rdy_fnc(fd, time_left))
         continue; // try io_fnc again
     }
@@ -89,8 +91,19 @@ POSIX::io_fd_(char const* fnm,
   }
 
   if (0 == n_ret) { // This happens for "normal" files.
-    LOG(WARNING) << fnm << " returned zero, interpreting as EOF";
-    return static_cast<std::streamsize>(-1);
+    LOG(WARNING) << fnm << " returned zero";
+    // return static_cast<std::streamsize>(-1);
+  }
+
+  // The stream buffer code above us can deal with a short read, but
+  // not a short write.
+
+  while ((*fnm == 'w') && n_ret && (n_ret < n)) {
+    auto next_n = io_fd_(fnm, io_fnc, rdy_fnc, read_hook, fd, s + n_ret,
+                         n - n_ret, timeout, t_o);
+    if (next_n == -1)
+      break;
+    n_ret += next_n;
   }
 
   return n_ret;
