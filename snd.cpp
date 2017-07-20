@@ -10,9 +10,10 @@ DEFINE_bool(rawdog,
             "Send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots.");
 
-DEFINE_bool(use_tls, true, "Use TLS.");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
 DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
+DEFINE_bool(use_size, true, "Use SIZE extension.");
+DEFINE_bool(use_tls, true, "Use TLS extension.");
 
 DEFINE_string(sender, "digilicious.com", "FQDN of sending node.");
 
@@ -1052,7 +1053,7 @@ try_host:
   for (auto const& body : bodies)
     total_size += body.size();
 
-  if (total_size > max_msg_size) {
+  if (FLAGS_use_size && (total_size > max_msg_size)) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
     LOG(INFO) << "> QUIT";
@@ -1062,7 +1063,7 @@ try_host:
   }
 
   std::stringstream param_stream;
-  if (ext_size) {
+  if (FLAGS_use_size && ext_size) {
     param_stream << " SIZE=" << total_size;
   }
 
@@ -1140,9 +1141,15 @@ try_host:
     cnn.sock.out() << eml;
 
     for (auto const& body : bodies) {
+      auto lineno = 0;
       std::string line;
       imemstream isbody(body.data(), body.size());
       while (std::getline(isbody, line)) {
+        ++lineno;
+        if (!cnn.sock.out().good()) {
+          cnn.sock.log_stats();
+          LOG(FATAL) << "output no good at line " << lineno;
+        }
         if (FLAGS_rawdog) {
           // This adds a final newline and the end of the file,
           // if no line ending was present.
@@ -1167,6 +1174,8 @@ try_host:
         }
       }
     }
+    CHECK(cnn.sock.out().good());
+    LOG(INFO) << "sent data";
 
     // Done!
     cnn.sock.out() << ".\r\n" << std::flush;
