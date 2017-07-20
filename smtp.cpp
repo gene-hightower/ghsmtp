@@ -20,7 +20,6 @@ using std::experimental::string_view;
 
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
-constexpr std::streamsize max_chunk_size = max_msg_size;
 constexpr std::streamsize max_hdr_size = 16 * 1024;
 constexpr std::streamsize max_xfer_size = 64 * 1024;
 }
@@ -63,7 +62,7 @@ struct Ctx {
 
   void new_msg()
   {
-    msg = std::make_unique<Message>();
+    msg = std::make_unique<Message>(session.max_msg_size());
     hdr.clear();
     hdr_end = false;
     hdr_parsed = false;
@@ -556,7 +555,7 @@ void bdat_act(Ctx& ctx)
 
     return;
   }
-  else if (ctx.chunk_size > Config::max_chunk_size) {
+  else if (ctx.chunk_size > ctx.msg->size_left()) {
     LOG(ERROR) << "BDAT size error, skiping " << ctx.chunk_size << " octets";
 
     ctx.session.data_size_error(*ctx.msg);
@@ -603,7 +602,7 @@ void bdat_act(Ctx& ctx)
   }
 
   if (ctx.msg->size_error()) {
-    LOG(ERROR) << "message size error after " << ctx.msg->count() << " octets";
+    LOG(ERROR) << "message size error after " << ctx.msg->size() << " octets";
     ctx.session.data_size_error(*ctx.msg);
     ctx.bdat_error = true;
     ctx.msg.reset();
@@ -745,7 +744,6 @@ struct action<data> {
 
       istream_input<eol::crlf> data_in(ctx.session.in(), Config::bfr_size,
                                        "data");
-
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
                 in, data_in, ctx)) {
@@ -886,7 +884,7 @@ int main(int argc, char const* const argv[])
   sact.sa_flags = 0;
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
-  alarm(10 * 60);
+  alarm(2 * 60);                // initial alarm
 
   close(2); // hackage to stop glog from spewing
 
