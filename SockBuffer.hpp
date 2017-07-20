@@ -100,6 +100,7 @@ public:
     }
     return written;
   }
+
   void starttls_server()
   {
     tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
@@ -110,14 +111,14 @@ public:
     tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
     tls_active_ = true;
   }
+  bool tls() const { return tls_active_; }
   std::string tls_info() const
   {
-    if (tls_active_) {
+    if (tls()) {
       return tls_.info();
     }
     return "";
   }
-  bool tls() const { return tls_active_; }
 
   void set_max_read(std::streamsize max)
   {
@@ -127,6 +128,18 @@ public:
 
     octets_read_ = 0;
     octets_written_ = 0;
+  }
+
+  void log_stats() const
+  {
+    LOG(INFO) << "read_limit_==" << (read_limit_ ? "true" : "false");
+    LOG(INFO) << "octets_read_==" << octets_read_;
+    LOG(INFO) << "octets_written_==" << octets_written_;
+    LOG(INFO) << "total_octets_read_==" << total_octets_read_;
+    LOG(INFO) << "total_octets_written_==" << total_octets_written_;
+    if (tls()) {
+      LOG(INFO) << tls_info();
+    }
   }
 
 private:

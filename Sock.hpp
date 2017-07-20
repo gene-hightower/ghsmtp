@@ -44,11 +44,6 @@ public:
   bool maxed_out() { return iostream_->maxed_out(); }
   bool timed_out() { return iostream_->timed_out(); }
 
-  void set_max_read(std::streamsize max)
-  {
-    return iostream_->set_max_read(max);
-  }
-
   std::istream& in() { return iostream_; }
   std::ostream& out() { return iostream_; }
 
@@ -56,6 +51,10 @@ public:
   void starttls_client() { iostream_->starttls_client(); }
   bool tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }
+
+  void set_max_read(std::streamsize max) { iostream_->set_max_read(max); }
+
+  void log_stats() { return iostream_->log_stats(); }
 
 private:
   boost::iostreams::stream<SockBuffer> iostream_;
