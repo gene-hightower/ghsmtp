@@ -18,7 +18,7 @@
 namespace Config {
 constexpr size_t kibibyte = 1024;
 constexpr size_t mebibyte = kibibyte * kibibyte;
-constexpr size_t max_msg_size_initial = 2 * mebibyte;
+constexpr size_t max_msg_size_initial = 1 * mebibyte;
 constexpr size_t max_msg_size_bro = 150 * mebibyte;
 }
 
@@ -73,9 +73,11 @@ public:
   void max_msg_size(size_t max)
   {
     max_msg_size_ = max;
-    constexpr auto overhead = 100 * Config::kibibyte;
+    auto overhead = max / 10;
     sock_.set_max_read(max_msg_size() + overhead);
   }
+
+  void log_stats() { sock_.log_stats(); }
 
 private:
   friend struct Session_test;
