@@ -747,6 +747,7 @@ struct action<data> {
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
                 in, data_in, ctx)) {
+          ctx.session.log_stats();
           ctx.session.error("bad data syntax");
         }
         return;
