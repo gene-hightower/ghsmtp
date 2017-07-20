@@ -17,7 +17,10 @@
 
 class Message {
 public:
-  Message() = default;
+  Message(std::streamsize max_size)
+    : max_size_(max_size)
+  {
+  }
 
   enum class SpamStatus : bool { ham, spam };
 
@@ -33,7 +36,8 @@ public:
   }
 
   bool size_error() const { return size_error_; }
-  std::streamsize count() const { return count_; }
+  size_t size() const { return count_; }
+  size_t size_left() const { return max_size_ - count_; }
 
   void save()
   {
@@ -51,16 +55,13 @@ private:
   Now then_;
 
   std::ofstream ofs_;
-  std::streamsize count_{0};
+  size_t count_{0};
 
   boost::filesystem::path tmpfn_;
   boost::filesystem::path newfn_;
 
+  size_t max_size_;
   bool size_error_{false};
 };
-
-namespace Config {
-constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
-}
 
 #endif // MESSAGE_DOT_HPP

@@ -79,8 +79,8 @@ Session::Session(std::function<void(void)> read_hook,
     }
   }
   our_fqdn_.set(our_fqdn.c_str());
-  std::streamsize overhead = 1024 * 1024 * 1024;
-  sock_.set_max_read(Config::max_msg_size + overhead);
+
+  max_msg_size(Config::max_msg_size_initial);
 }
 
 void Session::greeting()
@@ -190,7 +190,7 @@ void Session::ehlo(string_view client_identity)
 
   out_() << "250-" << server_id() << "\r\n";
   // RFC 1870
-  out_() << "250-SIZE " << Config::max_msg_size << "\r\n";
+  out_() << "250-SIZE " << max_msg_size_ << "\r\n";
   // RFC 6152
   out_() << "250-8BITMIME\r\n";
 
@@ -279,8 +279,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       }
       else {
         try {
-          size_t sz = stoull(val);
-          if (sz > Config::max_msg_size) {
+          auto sz = stoull(val);
+          if (sz > max_msg_size_) {
             out_() << "552 5.3.4 message size exceeds fixed maximium size\r\n"
                    << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
@@ -388,6 +388,7 @@ bool Session::data_start()
     return false;
   }
   out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
+
   LOG(INFO) << "DATA";
   return true;
 }
@@ -477,6 +478,11 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     status = Message::SpamStatus::ham;
   }
 
+  // All sources of ham get a fresh 5 minute timeout per message
+  if (status == Message::SpamStatus::ham) {
+    alarm(5 * 60);
+  }
+
   msg.open(our_fqdn_.utf8(), status);
   auto hdrs = added_headers_(msg);
   msg.write(hdrs.data(), hdrs.size());
@@ -486,7 +492,7 @@ void Session::data_msg_done(Message& msg)
 {
   msg.save();
   out_() << "250 2.0.0 OK\r\n" << std::flush;
-  LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
+  LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
 }
 
@@ -509,6 +515,7 @@ bool Session::bdat_start()
     LOG(ERROR) << "no valid recipients";
     return false;
   }
+
   return true;
 }
 
@@ -523,7 +530,7 @@ void Session::bdat_msg_last(Message& msg, size_t n)
   msg.save();
   out_() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
-  LOG(INFO) << "message delivered, " << msg.count() << " octets, with id "
+  LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
 }
 
@@ -614,6 +621,11 @@ void Session::starttls()
     out_() << "220 2.0.0 go for TLS\r\n" << std::flush;
     sock_.starttls_server();
     reset_();
+
+    // Check the certs at this point.
+
+    max_msg_size(Config::max_msg_size_bro);
+
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
   }
 }

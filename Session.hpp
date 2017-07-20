@@ -15,6 +15,13 @@
 #include "Sock.hpp"
 #include "TLD.hpp"
 
+namespace Config {
+constexpr size_t kibibyte = 1024;
+constexpr size_t mebibyte = kibibyte * kibibyte;
+constexpr size_t max_msg_size_initial = 2 * mebibyte;
+constexpr size_t max_msg_size_bro = 150 * mebibyte;
+}
+
 class Session {
 public:
   using parameters_t = std::unordered_map<std::string, std::string>;
@@ -62,6 +69,14 @@ public:
 
   void flush();
 
+  size_t max_msg_size() const { return max_msg_size_; }
+  void max_msg_size(size_t max)
+  {
+    max_msg_size_ = max;
+    constexpr auto overhead = 100 * Config::kibibyte;
+    sock_.set_max_read(max_msg_size() + overhead);
+  }
+
 private:
   friend struct Session_test;
 
@@ -96,6 +111,8 @@ private:
   Sock sock_;
 
   DNS::Resolver res_;
+
+  size_t max_msg_size_;
 
   Domain our_fqdn_;                   // who we identify as
   Domain fcrdns_;                     // who they look-up as

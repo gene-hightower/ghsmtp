@@ -80,6 +80,7 @@ public:
                                           read_timeout_, timed_out_);
     if (read != static_cast<std::streamsize>(-1)) {
       octets_read_ += read;
+      total_octets_read_ += read;
     }
     if (maxed_out()) {
       LOG(ERROR) << "read of " << read << " puts total of " << octets_read_
@@ -95,6 +96,7 @@ public:
                       : POSIX::write(fd_out_, s, n, write_timeout_, timed_out_);
     if (written != static_cast<std::streamsize>(-1)) {
       octets_written_ += written;
+      total_octets_written_ += written;
     }
     return written;
   }
@@ -116,10 +118,15 @@ public:
     return "";
   }
   bool tls() const { return tls_active_; }
+
   void set_max_read(std::streamsize max)
   {
     limit_read_ = true;
+
     read_limit_ = max;
+
+    octets_read_ = 0;
+    octets_written_ = 0;
   }
 
 private:
@@ -129,6 +136,8 @@ private:
   std::streamsize read_limit_{0};
   std::streamsize octets_read_{0};
   std::streamsize octets_written_{0};
+  std::streamsize total_octets_read_{0};
+  std::streamsize total_octets_written_{0};
 
   std::function<void(void)> read_hook_;
 

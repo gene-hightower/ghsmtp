@@ -13,14 +13,14 @@ int main(int argc, char* argv[])
   char env[] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 
-  Message msg;
+  Message msg(4096);
   msg.open("example.com", Message::SpamStatus::ham);
 
   auto ms = "foo bar baz"s;
   msg.write(ms.data(), ms.size());
   msg.save();
 
-  Message msg2;
+  Message msg2(4096);
   msg2.open("example.com", Message::SpamStatus::spam);
 
   CHECK(msg.id() != msg2.id());

@@ -61,7 +61,7 @@ void Message::open(std::string const& fqdn, SpamStatus spam)
 
 std::ostream& Message::write(char const* s, std::streamsize count)
 {
-  if (!size_error_ && (count_ + count) <= Config::max_msg_size) {
+  if (!size_error_ && (count_ + count) <= max_size_) {
     count_ += count;
     return ofs_.write(s, count);
   }
