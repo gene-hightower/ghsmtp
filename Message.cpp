@@ -4,10 +4,9 @@
 
 #include <sys/stat.h>
 
-void Message::open(std::string const& fqdn, SpamStatus spam)
+void Message::open(std::string const& fqdn, size_t max_size, SpamStatus spam)
 {
-  if (fqdn.empty())
-    return;
+  max_size_ = max_size;
 
   boost::filesystem::path maildir;
 
@@ -61,8 +60,8 @@ void Message::open(std::string const& fqdn, SpamStatus spam)
 
 std::ostream& Message::write(char const* s, std::streamsize count)
 {
-  if (!size_error_ && (count_ + count) <= max_size_) {
-    count_ += count;
+  if (!size_error_ && (size_ + count) <= max_size_) {
+    size_ += count;
     return ofs_.write(s, count);
   }
   size_error_ = true;

@@ -17,14 +17,11 @@
 
 class Message {
 public:
-  Message(std::streamsize max_size)
-    : max_size_(max_size)
-  {
-  }
+  Message() = default;
 
   enum class SpamStatus : bool { ham, spam };
 
-  void open(std::string const& fqdn, SpamStatus spam);
+  void open(std::string const& fqdn, size_t max_size, SpamStatus spam);
 
   Pill const& id() const { return s_; }
   Now const& when() const { return then_; }
@@ -36,8 +33,8 @@ public:
   }
 
   bool size_error() const { return size_error_; }
-  size_t size() const { return count_; }
-  size_t size_left() const { return max_size_ - count_; }
+  size_t size() const { return size_; }
+  size_t size_left() const { return max_size_ - size_; }
 
   void save()
   {
@@ -55,12 +52,12 @@ private:
   Now then_;
 
   std::ofstream ofs_;
-  size_t count_{0};
+  size_t size_{0};
+  size_t max_size_{0};
 
   boost::filesystem::path tmpfn_;
   boost::filesystem::path newfn_;
 
-  size_t max_size_;
   bool size_error_{false};
 };
 

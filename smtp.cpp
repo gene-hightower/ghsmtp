@@ -62,7 +62,7 @@ struct Ctx {
 
   void new_msg()
   {
-    msg = std::make_unique<Message>(session.max_msg_size());
+    msg = std::make_unique<Message>();
     hdr.clear();
     hdr_end = false;
     hdr_parsed = false;
@@ -884,7 +884,7 @@ int main(int argc, char const* const argv[])
   sact.sa_flags = 0;
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
-  alarm(2 * 60);                // initial alarm
+  alarm(2 * 60); // initial alarm
 
   close(2); // hackage to stop glog from spewing
 

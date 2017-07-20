@@ -478,12 +478,12 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     status = Message::SpamStatus::ham;
   }
 
-  // All sources of ham get a fresh 5 minute timeout per message
+  // All sources of ham get a fresh 5 minute timeout per message.
   if (status == Message::SpamStatus::ham) {
     alarm(5 * 60);
   }
 
-  msg.open(our_fqdn_.utf8(), status);
+  msg.open(our_fqdn_.utf8(), max_msg_size(), status);
   auto hdrs = added_headers_(msg);
   msg.write(hdrs.data(), hdrs.size());
 }
@@ -623,7 +623,6 @@ void Session::starttls()
     reset_();
 
     // Check the certs at this point.
-
     max_msg_size(Config::max_msg_size_bro);
 
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
