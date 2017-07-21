@@ -4,8 +4,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   Sock sock(STDIN_FILENO, STDOUT_FILENO);
 
   char const* us = sock.us_c_str();

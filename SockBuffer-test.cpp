@@ -7,8 +7,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   constexpr char infile[]{"input.txt"};
 
   int fd_in;

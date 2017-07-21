@@ -8,8 +8,6 @@ using namespace IP6;
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   CHECK(is_address("::1"));
   CHECK(is_address_literal("[IPv6:::1]"));
 

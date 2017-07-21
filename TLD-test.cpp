@@ -4,8 +4,6 @@
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   TLD tld;
 
   CHECK_NOTNULL(tld.get_registered_domain("digilicious.com"));

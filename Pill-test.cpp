@@ -7,8 +7,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   Pill red, blue;
   CHECK(red != blue);
 

@@ -26,7 +26,5 @@ struct Session_test {
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   Session_test::test();
 }

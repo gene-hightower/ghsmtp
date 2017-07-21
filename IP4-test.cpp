@@ -8,8 +8,6 @@ using namespace IP4;
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   CHECK(is_address_literal("[69.0.0.0]"));
   CHECK(!is_address_literal("69.0.0.0]"));
   CHECK(!is_address_literal("[69.0.0.0"));

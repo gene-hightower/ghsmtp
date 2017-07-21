@@ -4,8 +4,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   Now then;
 
   std::cout << "sizeof(Now) == " << sizeof(Now) << '\n';

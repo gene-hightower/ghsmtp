@@ -7,8 +7,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   Magic magic;
 
   std::vector<std::string> results;

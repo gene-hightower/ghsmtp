@@ -6,8 +6,6 @@
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   std::string d{"example.com."};
 
   CHECK(Domain::match(d, "EXAMPLE.COM"));

@@ -4,8 +4,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   POSIX::set_nonblocking(0);
 
   // Input /might/ be ready, so no CHECK().

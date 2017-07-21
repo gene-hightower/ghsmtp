@@ -2,8 +2,6 @@
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   CHECK_EQ(sizeof(DNS::Resolver), sizeof(void*));
   // CHECK_EQ(sizeof(DNS::Domain), sizeof(void*));
   CHECK_EQ(sizeof(DNS::Query<DNS::RR_type::A>), sizeof(void*));

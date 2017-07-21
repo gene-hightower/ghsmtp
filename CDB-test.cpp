@@ -6,8 +6,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   CDB cdb2("two-level-tlds");
 
   CHECK(cdb2.lookup("0.bg"));

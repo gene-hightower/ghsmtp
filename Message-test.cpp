@@ -8,8 +8,6 @@ using namespace std::string_literals;
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   char env[] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 

@@ -4,8 +4,6 @@
 
 int main(int argc, char const* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   CHECK_EQ(sizeof(SPF::Server), sizeof(void*));
   CHECK_EQ(sizeof(SPF::Request), sizeof(void*));
 

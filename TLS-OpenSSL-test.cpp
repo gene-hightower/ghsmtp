@@ -6,8 +6,6 @@
 
 int main(int argc, char* argv[])
 {
-  google::InitGoogleLogging(argv[0]);
-
   auto read_hook = []() {};
   TLS tls(read_hook);
 
