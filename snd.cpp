@@ -483,67 +483,42 @@ struct action<reply_code> {
 };
 }
 
-int conn(std::string const& node, std::string const& service)
+uint16_t get_port(char const* service)
 {
-  addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
+  char* ep;
+  auto service_no = strtoul(service, &ep, 10);
+  if (*ep == '\0') {
+    CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());
+    return static_cast<uint16_t>(service_no);
+  }
 
-  hints.ai_family = AF_UNSPEC;
-  if (FLAGS_ip6)
-    hints.ai_family = AF_INET6;
-  if (FLAGS_ip4)
-    hints.ai_family = AF_INET;
+  servent result_buf;
+  servent* result_ptr;
+  std::vector<char> str_buf(1024);
+  while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
+                         str_buf.size(), &result_ptr)
+         == ERANGE) {
+    str_buf.resize(str_buf.size() * 2);
+  }
+  if (result_ptr == nullptr) {
+    LOG(FATAL) << "service " << service << " unknown";
+  }
+  return ntohs(result_buf.s_port);
+}
 
-  hints.ai_socktype = SOCK_STREAM;
+int conn(DNS::Resolver& res,
+         std::string const& node,
+         std::string const& service)
+{
+  bool use_4 = !FLAGS_ip6;
+  bool use_6 = !FLAGS_ip4;
 
-  addrinfo* res = nullptr;
-  auto gaierr = getaddrinfo(node.c_str(), service.c_str(), &hints, &res);
-  CHECK(gaierr == 0) << "getaddrinfo failed: " << gai_strerror(gaierr);
-
-  for (auto r = res; r; r = r->ai_next) {
-    auto addr = r->ai_addr;
-    switch (addr->sa_family) {
-    case AF_INET: {
-      CHECK(!FLAGS_ip6);
-
-      auto in4 = reinterpret_cast<sockaddr_in*>(addr);
-
-      int fd = socket(AF_INET, SOCK_STREAM, 0);
-      PCHECK(fd >= 0) << "socket failed";
-
-      if (!FLAGS_local_address.empty()) {
-        sockaddr_in loc;
-        memset(&loc, 0, sizeof(loc));
-        loc.sin_family = AF_INET;
-        if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                           reinterpret_cast<void*>(&loc.sin_addr))) {
-          LOG(FATAL) << "can't interpret " << FLAGS_local_address
-                     << " as IPv4 address";
-        }
-        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
-      }
-
-      char str[INET_ADDRSTRLEN]{0};
-      PCHECK(inet_ntop(AF_INET, &(in4->sin_addr), str, sizeof str));
-      auto p = ntohs(in4->sin_port);
-
-      if (connect(fd, addr, sizeof(*in4)) == 0) {
-        freeaddrinfo(res);
-        LOG(INFO) << "connect " << str << ":" << p;
-        return fd;
-      }
-      PLOG(WARNING) << "connect failed " << str << ":" << ntohs(in4->sin_port);
-      close(fd);
-      break;
-    }
-
-    case AF_INET6: {
-      CHECK(!FLAGS_ip4);
-
-      auto in6 = reinterpret_cast<sockaddr_in6*>(addr);
-
+  auto port = get_port(service.c_str());
+  if (use_6) {
+    auto addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node);
+    for (auto addr : addrs) {
       int fd = socket(AF_INET6, SOCK_STREAM, 0);
-      PCHECK(fd >= 0) << "socket failed";
+      PCHECK(fd >= 0) << "socket() failed";
 
       if (!FLAGS_local_address.empty()) {
         sockaddr_in6 loc;
@@ -557,28 +532,61 @@ int conn(std::string const& node, std::string const& service)
         PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
       }
 
-      char str[INET6_ADDRSTRLEN]{0};
-      PCHECK(inet_ntop(AF_INET6, &(in6->sin6_addr), str, sizeof str));
-      auto p = ntohs(in6->sin6_port);
+      sockaddr_in6 in6;
+      memset(&in6, 0, sizeof(in6));
+      in6.sin6_family = AF_INET6;
+      in6.sin6_port = htons(port);
+      CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
+                         reinterpret_cast<void*>(&in6.sin6_addr)),
+               1);
 
-      if (connect(fd, addr, sizeof(*in6)) == 0) {
-        freeaddrinfo(res);
-        LOG(INFO) << "connect [" << str << "]:" << p;
+      if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))
+          == 0) {
+        LOG(INFO) << "connect " << addr << ":" << port;
         return fd;
       }
-      PLOG(WARNING) << "connect failed [" << str
-                    << "]:" << ntohs(in6->sin6_port);
-      close(fd);
-      break;
-    }
 
-    default:
-      LOG(FATAL) << "unknown address type: " << addr->sa_family;
-      break;
+      PLOG(WARNING) << "connect failed " << addr << ":" << port;
+      close(fd);
+    }
+  }
+  if (use_4) {
+    auto addrs = DNS::get_records<DNS::RR_type::A>(res, node);
+    for (auto addr : addrs) {
+      int fd = socket(AF_INET, SOCK_STREAM, 0);
+      PCHECK(fd >= 0) << "socket() failed";
+
+      if (!FLAGS_local_address.empty()) {
+        sockaddr_in loc;
+        memset(&loc, 0, sizeof(loc));
+        loc.sin_family = AF_INET;
+        if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                           reinterpret_cast<void*>(&loc.sin_addr))) {
+          LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                     << " as IPv4 address";
+        }
+        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+      }
+
+      sockaddr_in in4;
+      memset(&in4, 0, sizeof(in4));
+      in4.sin_family = AF_INET;
+      in4.sin_port = htons(port);
+      CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
+                         reinterpret_cast<void*>(&in4.sin_addr)),
+               1);
+
+      if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))
+          == 0) {
+        LOG(INFO) << "connect " << addr << ":" << port;
+        return fd;
+      }
+
+      PLOG(WARNING) << "connect failed " << addr << ":" << port;
+      close(fd);
     }
   }
 
-  freeaddrinfo(res);
   return -1;
 }
 
@@ -764,7 +772,7 @@ static bool validate_name(const char* flagname, std::string const& value)
 {
   memory_input<> name_in(value.c_str(), "name");
   if (!parse<RFC5322::display_name_only, RFC5322::inaction>(name_in)) {
-    std::cerr << "Bad name syntax " << value;
+    LOG(ERROR) << "Bad name syntax " << value;
     return false;
   }
   return true;
@@ -794,9 +802,7 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  if (FLAGS_ip4 && FLAGS_ip6) {
-    LOG(FATAL) << "Must use /some/ IP version.";
-  }
+  CHECK(!(FLAGS_ip4 && FLAGS_ip6)) << "Must use /some/ IP version.";
 
   // parse FLAGS_from and FLAGS_to as addr_spec
 
@@ -821,13 +827,14 @@ int main(int argc, char* argv[])
   must_have_smtputf8
       = must_have_smtputf8 || !parse<chars::ascii_only>(local_in);
 
+  DNS::Resolver res;
+
   std::vector<std::string> receivers;
   if (!FLAGS_mx_host.empty()) {
     receivers.push_back(connectable_host(FLAGS_mx_host));
   }
   else {
     // look up MX records for to_mbx.domain()
-    DNS::Resolver res;
 
     // returns list of servers sorted by priority, low to high
     auto mxs = DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii());
@@ -849,7 +856,7 @@ try_host:
   if (!FLAGS_pipe) {
     CHECK(!receivers.empty()) << "no more hosts to try";
     LOG(INFO) << "trying " << receivers[0] << ":" << FLAGS_service;
-    auto fd = conn(receivers[0], FLAGS_service);
+    auto fd = conn(res, receivers[0], FLAGS_service);
     CHECK_NE(fd, -1);
     fd_in = fd;
     fd_out = fd;
@@ -939,8 +946,14 @@ try_host:
   auto max_msg_size = 0u;
   bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
   if (ext_size) {
-    if (!cnn.ehlo_params["SIZE"].empty())
-      max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), nullptr, 10);
+    if (!cnn.ehlo_params["SIZE"].empty()) {
+      char* ep;
+      max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
+      if (*ep != '\0') {
+        LOG(WARNING) << "garbage in SIZE argument: "
+                     << cnn.ehlo_params["SIZE"][0];
+      }
+    }
   }
   if (!max_msg_size) {
     max_msg_size = Config::max_msg_size;
