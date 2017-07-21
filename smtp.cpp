@@ -389,7 +389,7 @@ struct action<bogus_cmd_long> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    LOG(INFO) << "bogus_long_short";
+    LOG(INFO) << "bogus_cmd_long";
     ctx.session.cmd_unrecognized(in.string());
   }
 };
