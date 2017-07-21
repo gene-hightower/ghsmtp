@@ -57,7 +57,7 @@ public:
   void quit() __attribute__((noreturn));
   void error(std::experimental::string_view log_msg);
   void cmd_unrecognized(std::experimental::string_view log_msg);
-  void bare_lf(std::experimental::string_view log_msg);
+  void bare_lf();
 
   void max_out() __attribute__((noreturn));
   void time_out() __attribute__((noreturn));
@@ -68,6 +68,7 @@ public:
   std::istream& in() { return sock_.in(); }
 
   void flush();
+  void last_in_group_();
 
   size_t max_msg_size() const { return max_msg_size_; }
   void max_msg_size(size_t max)

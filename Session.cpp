@@ -15,6 +15,7 @@
 #include "Message.hpp"
 #include "SPF.hpp"
 #include "Session.hpp"
+#include "esc.hpp"
 #include "hostname.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -83,6 +84,9 @@ Session::Session(std::function<void(void)> read_hook,
   max_msg_size(Config::max_msg_size_initial);
 }
 
+// Error codes from connection establishment are 220 or 554, according
+// to RFC 5321.  That's it.
+
 void Session::greeting()
 {
   if (sock_.has_peername()) {
@@ -90,7 +94,7 @@ void Session::greeting()
     if (black.lookup(sock_.them_c_str())) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
              sock_.them_c_str());
-      out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
+      out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
       std::exit(EXIT_SUCCESS);
     }
 
@@ -122,7 +126,8 @@ void Session::greeting()
           if (has_record<RR_type::A>(res_, reversed + rbl)) {
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
-            out_() << "554 5.7.1 blocked\r\n" << std::flush;
+            out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
+                   << std::flush;
             std::exit(EXIT_SUCCESS);
           }
         }
@@ -136,7 +141,7 @@ void Session::greeting()
       if (sock_.input_ready(Config::greeting_wait)) {
         syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
                sock_.them_c_str());
-        out_() << "550 5.3.2 service currently unavailable\r\n" << std::flush;
+        out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
         std::exit(EXIT_SUCCESS);
       }
     }
@@ -175,8 +180,16 @@ string_view Session::server_id() const
 
 void Session::flush() { out_() << std::flush; }
 
+void Session::last_in_group_()
+{
+  if (sock_.input_ready(std::chrono::seconds(0))) {
+    LOG(WARNING) << "pipelining error";
+  }
+}
+
 void Session::ehlo(string_view client_identity)
 {
+  last_in_group_();
   reset_();
   extensions_ = true;
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
@@ -218,6 +231,7 @@ void Session::ehlo(string_view client_identity)
 
 void Session::helo(string_view client_identity)
 {
+  last_in_group_(); // no pipelining with old protocol
   reset_();
   extensions_ = false;
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
@@ -258,7 +272,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         // everything is cool, this is our default...
       }
       else if (val == "7BIT") {
-        LOG(WARNING) << "7BIT transport requested";
+        // nothing to see here, move along...
       }
       else if (val == "BINARYMIME") {
         binarymime_ = true;
@@ -281,7 +295,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
         try {
           auto sz = stoull(val);
           if (sz > max_msg_size_) {
-            out_() << "552 5.3.4 message size exceeds fixed maximium size\r\n"
+            out_() << "552 5.3.4 message size exceeds maximium size\r\n"
                    << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return;
@@ -317,7 +331,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   for (const auto bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
-      out_() << "550 5.7.26 bad sender\r\n" << std::flush;
+      out_() << "550 5.1.8 bad sender\r\n" << std::flush;
       LOG(WARNING) << "bad sender " << sender;
       return;
     }
@@ -372,6 +386,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
 bool Session::data_start()
 {
+  last_in_group_();
+
   if (binarymime_) {
     out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
     LOG(ERROR) << "DATA does not support BINARYMIME";
@@ -499,7 +515,7 @@ void Session::data_msg_done(Message& msg)
 void Session::data_size_error(Message& msg)
 {
   msg.trash();
-  out_() << "552 5.3.4 Channel size limit exceeded\r\n" << std::flush;
+  out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "DATA size error";
 }
 
@@ -551,12 +567,14 @@ void Session::rset()
 
 void Session::noop(string_view str)
 {
+  last_in_group_();
   out_() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "NOOP" << (str.length() ? " " : "") << str;
 }
 
 void Session::vrfy(string_view str)
 {
+  last_in_group_();
   out_() << "252 2.0.0 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY" << (str.length() ? " " : "") << str;
 }
@@ -571,6 +589,7 @@ void Session::help(string_view str)
 
 void Session::quit()
 {
+  last_in_group_();
   out_() << "221 2.0.0 bye\r\n" << std::flush;
   LOG(INFO) << "QUIT";
   exit_();
@@ -578,28 +597,29 @@ void Session::quit()
 
 void Session::error(string_view log_msg)
 {
-  out_() << "550 5.3.5 system error\r\n" << std::flush;
+  out_() << "421 4.3.5 system error\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
-void Session::cmd_unrecognized(string_view log_msg)
+void Session::cmd_unrecognized(string_view cmd)
 {
-  out_() << "500 5.5.2 command unrecognized\r\n" << std::flush;
-  LOG(ERROR) << log_msg;
-}
-
-void Session::bare_lf(string_view log_msg)
-{
-  out_() << "554 5.6.11 bare LF, see <https://cr.yp.to/docs/smtplf.html>\r\n"
+  auto escaped = esc(cmd);
+  out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"\r\n"
          << std::flush;
-  LOG(ERROR) << "Session::bare_lf: " << log_msg;
+  LOG(ERROR) << "command unrecognized: \"" << escaped << "\"";
+}
+
+void Session::bare_lf()
+{
+  // Error code used by Office 365.
+  out_() << "554 5.6.11 bare LF\r\n" << std::flush;
+  LOG(ERROR) << "bare LF";
   exit_();
 }
 
 void Session::max_out()
 {
-  out_() << "552 5.3.4 message size exceeds fixed maximium size\r\n"
-         << std::flush;
+  out_() << "552 5.3.4 message size exceeds maximium size\r\n" << std::flush;
   LOG(ERROR) << "message size maxed out";
   exit_();
 }
@@ -702,7 +722,7 @@ bool Session::verify_client_(Domain const& client_identity)
     if (!Domain::match(cid_lc, tld)) {
       if (black.lookup(tld)) {
         LOG(ERROR) << "blacklisted TLD " << tld;
-        out_() << "550 4.7.0 blacklisted identity\r\n" << std::flush;
+        out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
         return false;
       }
     }
@@ -867,7 +887,8 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
   for (const auto& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res_, (sender + ".") + uribl)) {
-      out_() << "554 5.7.1 blocked\r\n" << std::flush;
+      out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
+             << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
       return false;
     }
@@ -917,7 +938,9 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   SPF::Response spf_res(spf_req);
 
   if (spf_res.result() == SPF::Result::FAIL) {
-    out_() << "550 4.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
+    // Error code from RFC 7372, section 3.2.  Also:
+    // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+    out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
     LOG(ERROR) << spf_res.header_comment();
     return false;
   }

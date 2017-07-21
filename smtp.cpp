@@ -379,8 +379,8 @@ struct action<bogus_cmd_short> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus short command: \""s + esc(in.string())
-                                 + "\""s);
+    LOG(INFO) << "bogus_cmd_short";
+    ctx.session.cmd_unrecognized(in.string());
   }
 };
 
@@ -389,8 +389,8 @@ struct action<bogus_cmd_long> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("bogus command: \""s + esc(in.string())
-                                 + "\""s);
+    LOG(INFO) << "bogus_long_short";
+    ctx.session.cmd_unrecognized(in.string());
   }
 };
 
@@ -399,8 +399,8 @@ struct action<anything_else> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.session.cmd_unrecognized("garbage in cmd stream: \""s + esc(in.string())
-                                 + "\""s);
+    LOG(INFO) << "anything_else";
+    ctx.session.cmd_unrecognized(in.string());
   }
 };
 
@@ -708,11 +708,7 @@ struct data_action<data_dot> {
 
 template <>
 struct data_action<not_data_end> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.session.bare_lf("\""s + esc(in.string()) + "\""s);
-  }
+  static void apply0(Ctx& ctx) { ctx.session.bare_lf(); }
 };
 
 template <>
@@ -748,14 +744,20 @@ struct action<data> {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
                 in, data_in, ctx)) {
           ctx.session.log_stats();
-          ctx.session.error("bad data syntax");
+          if (!(ctx.session.maxed_out() || ctx.session.timed_out())) {
+            ctx.session.error("bad DATA syntax");
+          }
         }
         return;
       }
       catch (parse_error const& e) {
-        ctx.session.error(e.what());
+        LOG(WARNING) << e.what();
+        ctx.session.error("unable to parse DATA stream");
       }
-      ctx.session.error("unknown data parser problem");
+      catch (std::exception const& e) {
+        LOG(WARNING) << e.what();
+        ctx.session.error("unknown problem in DATA stream");
+      }
     }
   }
 };
@@ -902,23 +904,23 @@ int main(int argc, char const* const argv[])
 
   istream_input<eol::crlf> in(ctx->session.in(), Config::bfr_size, "session");
 
+  int ret = 0;
   try {
-    if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx)) {
-      if (ctx->session.maxed_out()) {
-        ctx->session.max_out();
-      }
-      if (ctx->session.timed_out()) {
-        ctx->session.time_out();
-      }
-      else {
-        ctx->session.error("syntax error from parser");
-      }
-      return 1;
-    }
+    ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
   }
-  catch (parse_error const& e) {
-    ctx->session.error(e.what());
-    return 1;
+  catch (std::exception const& e) {
+    LOG(WARNING) << e.what();
   }
-  ctx->session.error("unknown parser problem");
+
+  if (ctx->session.maxed_out()) {
+    ctx->session.max_out();
+  }
+  else if (ctx->session.timed_out()) {
+    ctx->session.time_out();
+  }
+  else {
+    ctx->session.error("syntax error from parser");
+  }
+
+  return ret;
 }
