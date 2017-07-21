@@ -13,6 +13,8 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
+#include <glog/logging.h>
+
 namespace IP6 {
 
 using dot = one<'.'>;
