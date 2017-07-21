@@ -1,7 +1,15 @@
+#include "DNS.hpp"
+
 #include <algorithm>
+#include <cstdlib>
 #include <iomanip>
 
-#include "DNS.hpp"
+#include <ldns/ldns.h>
+#undef bool
+
+#include <arpa/inet.h>
+
+#include <glog/logging.h>
 
 namespace DNS {
 
@@ -39,6 +47,75 @@ char const* as_cstr(Pkt_rcode pkt_rcode)
 std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
 {
   return os << as_cstr(pkt_rcode);
+}
+
+Resolver::Resolver()
+{
+  auto status = ldns_resolver_new_frm_file(&res_, nullptr);
+
+  CHECK_EQ(status, LDNS_STATUS_OK) << "failed to initialize DNS resolver: "
+                                   << ldns_get_errorstr_by_id(status);
+}
+
+Resolver::~Resolver() { ldns_resolver_deep_free(res_); }
+
+Domain::Domain(std::string domain)
+  : domain_(domain)
+  , drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain_.c_str())))
+{
+}
+
+Domain::~Domain() { ldns_rdf_deep_free(drdfp_); }
+
+template <RR_type type>
+Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
+{
+  ldns_status status = ldns_resolver_query_status(
+      &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
+      LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
+
+  CHECK_EQ(status, LDNS_STATUS_OK) << "Query (" << dom.domain_ << ") "
+                                   << "ldns_resolver_query_status failed: "
+                                   << ldns_get_errorstr_by_id(status);
+}
+
+template <RR_type type>
+Query<type>::~Query()
+{
+  if (p_) {
+    ldns_pkt_free(p_);
+  }
+}
+
+template <RR_type type>
+Pkt_rcode Query<type>::get_rcode() const
+{
+  if (p_) {
+    return static_cast<Pkt_rcode>(ldns_pkt_get_rcode(p_));
+  }
+  return Pkt_rcode::INTERNAL;
+}
+
+template <RR_type type>
+Rrlist<type>::Rrlist(Query<type> const& q)
+{
+  if (q.p_) {
+    rrlst_ = ldns_pkt_rr_list_by_type(
+        q.p_, static_cast<ldns_enum_rr_type>(type), LDNS_SECTION_ANSWER);
+  }
+}
+
+template <RR_type type>
+Rrlist<type>::~Rrlist()
+{
+  if (!empty()) // since we don't assert success in the ctr()
+    ldns_rr_list_deep_free(rrlst_);
+}
+
+template <RR_type type>
+bool Rrlist<type>::empty() const
+{
+  return nullptr == rrlst_;
 }
 
 template <>
@@ -193,7 +270,7 @@ std::vector<std::string> Rrlist<RR_type::AAAA>::get() const
 }
 
 template <RR_type T>
-inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
+std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 {
   auto sz = ldns_rdf_size(rdf);
 
@@ -235,4 +312,43 @@ inline std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 
   return str.str();
 }
+
+template <RR_type type>
+std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
+{
+  auto data = static_cast<char const*>(rdf->_data);
+  auto udata = static_cast<unsigned char const*>(rdf->_data);
+
+  return std::string(data + 1, static_cast<std::string::size_type>(*udata));
+}
+
+template <RR_type type>
+bool has_record(Resolver const& res, std::string addr)
+{
+  Domain dom(addr);
+  Query<type> q(res, dom);
+  Rrlist<type> rrlst(q);
+  return !rrlst.empty();
+}
+
+template <RR_type type>
+std::vector<std::string> get_records(Resolver const& res, std::string addr)
+{
+  Domain dom(addr);
+  Query<type> q(res, dom);
+  Rrlist<type> rrlst(q);
+  return rrlst.get();
+}
+
+template bool has_record<RR_type::A>(Resolver const& res, std::string addr);
+template bool has_record<RR_type::AAAA>(Resolver const& res, std::string addr);
+
+template std::vector<std::string> get_records<RR_type::A>(Resolver const& res,
+                                                          std::string addr);
+template std::vector<std::string>
+get_records<RR_type::AAAA>(Resolver const& res, std::string addr);
+template std::vector<std::string> get_records<RR_type::MX>(Resolver const& res,
+                                                           std::string addr);
+template std::vector<std::string> get_records<RR_type::PTR>(Resolver const& res,
+                                                            std::string addr);
 }

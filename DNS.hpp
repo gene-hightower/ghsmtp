@@ -1,16 +1,14 @@
 #ifndef DNS_DOT_HPP
 #define DNS_DOT_HPP
 
-#include <cstdlib>
+#include <ldns/packet.h>
+#include <ldns/rr.h>
+
+typedef struct ldns_struct_resolver ldns_resolver;
+
 #include <iostream>
-#include <unordered_map>
-
-#include <ldns/ldns.h>
-#undef bool
-
-#include <arpa/inet.h>
-
-#include <glog/logging.h>
+#include <string>
+#include <vector>
 
 namespace DNS {
 
@@ -52,14 +50,8 @@ public:
   Resolver(Resolver const&) = delete;
   Resolver& operator=(Resolver const&) = delete;
 
-  Resolver()
-  {
-    auto status = ldns_resolver_new_frm_file(&res_, nullptr);
-
-    CHECK_EQ(status, LDNS_STATUS_OK) << "failed to initialize DNS resolver: "
-                                     << ldns_get_errorstr_by_id(status);
-  }
-  ~Resolver() { ldns_resolver_deep_free(res_); }
+  Resolver();
+  ~Resolver();
 
 private:
   ldns_resolver* res_;
@@ -76,12 +68,8 @@ public:
   Domain(Domain const&) = delete;
   Domain& operator=(Domain const&) = delete;
 
-  explicit Domain(std::string domain)
-    : domain_(domain)
-    , drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain_.c_str())))
-  {
-  }
-  ~Domain() { ldns_rdf_deep_free(drdfp_); }
+  explicit Domain(std::string domain);
+  ~Domain();
 
 private:
   std::string domain_;
@@ -100,30 +88,10 @@ public:
   Query(Query const&) = delete;
   Query& operator=(Query const&) = delete;
 
-  Query(Resolver const& res, Domain const& dom)
-  {
-    ldns_status status = ldns_resolver_query_status(
-        &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
-        LDNS_RR_CLASS_IN, LDNS_RD);
+  Query(Resolver const& res, Domain const& dom);
+  ~Query();
 
-    CHECK_EQ(status, LDNS_STATUS_OK) << "Query (" << dom.domain_ << ") "
-                                     << "ldns_resolver_query_status failed: "
-                                     << ldns_get_errorstr_by_id(status);
-  }
-  ~Query()
-  {
-    if (p_) {
-      ldns_pkt_free(p_);
-    }
-  }
-
-  Pkt_rcode get_rcode() const
-  {
-    if (p_) {
-      return static_cast<Pkt_rcode>(ldns_pkt_get_rcode(p_));
-    }
-    return Pkt_rcode::INTERNAL;
-  }
+  Pkt_rcode get_rcode() const;
 
 private:
   ldns_pkt* p_{nullptr};
@@ -137,19 +105,9 @@ public:
   Rrlist(Rrlist const&) = delete;
   Rrlist& operator=(Rrlist const&) = delete;
 
-  explicit Rrlist(Query<type> const& q)
-  {
-    if (q.p_) {
-      rrlst_ = ldns_pkt_rr_list_by_type(
-          q.p_, static_cast<ldns_enum_rr_type>(type), LDNS_SECTION_ANSWER);
-    }
-  }
-  ~Rrlist()
-  {
-    if (!empty()) // since we don't assert success in the ctr()
-      ldns_rr_list_deep_free(rrlst_);
-  }
-  bool empty() const { return nullptr == rrlst_; }
+  explicit Rrlist(Query<type> const& q);
+  ~Rrlist();
+  bool empty() const;
 
   std::vector<std::string> get() const;
 
@@ -161,32 +119,10 @@ private:
 };
 
 template <RR_type type>
-inline std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
-{
-  auto data = static_cast<char const*>(rdf->_data);
-  auto udata = static_cast<unsigned char const*>(rdf->_data);
-
-  return std::string(data + 1, static_cast<std::string::size_type>(*udata));
-}
+bool has_record(Resolver const& res, std::string addr);
 
 template <RR_type type>
-inline bool has_record(Resolver const& res, std::string addr)
-{
-  Domain dom(addr);
-  Query<type> q(res, dom);
-  Rrlist<type> rrlst(q);
-  return !rrlst.empty();
-}
-
-template <RR_type type>
-inline std::vector<std::string> get_records(Resolver const& res,
-                                            std::string addr)
-{
-  Domain dom(addr);
-  Query<type> q(res, dom);
-  Rrlist<type> rrlst(q);
-  return rrlst.get();
-}
+std::vector<std::string> get_records(Resolver const& res, std::string addr);
 
 } // namespace DNS
 
