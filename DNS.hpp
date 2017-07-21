@@ -18,8 +18,8 @@ enum class RR_type {
   A = LDNS_RR_TYPE_A,
   AAAA = LDNS_RR_TYPE_AAAA,
   CNAME = LDNS_RR_TYPE_CNAME,
-  PTR = LDNS_RR_TYPE_PTR,
   MX = LDNS_RR_TYPE_MX,
+  PTR = LDNS_RR_TYPE_PTR,
   TLSA = LDNS_RR_TYPE_TLSA,
   TXT = LDNS_RR_TYPE_TXT,
 };
@@ -54,7 +54,10 @@ public:
 
   Resolver()
   {
-    CHECK(LDNS_STATUS_OK == ldns_resolver_new_frm_file(&res_, nullptr));
+    auto status = ldns_resolver_new_frm_file(&res_, nullptr);
+
+    CHECK_EQ(status, LDNS_STATUS_OK) << "failed to initialize DNS resolver: "
+                                     << ldns_get_errorstr_by_id(status);
   }
   ~Resolver() { ldns_resolver_deep_free(res_); }
 
@@ -99,16 +102,13 @@ public:
 
   Query(Resolver const& res, Domain const& dom)
   {
-    ldns_status stat = ldns_resolver_query_status(
+    ldns_status status = ldns_resolver_query_status(
         &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
         LDNS_RR_CLASS_IN, LDNS_RD);
 
-    if (stat != LDNS_STATUS_OK) {
-      LOG(ERROR) << "Query (" << dom.domain_ << ") "
-                 << "ldns_resolver_query_status failed: stat=="
-                 << static_cast<unsigned>(stat) << " "
-                 << ldns_get_errorstr_by_id(stat);
-    }
+    CHECK_EQ(status, LDNS_STATUS_OK) << "Query (" << dom.domain_ << ") "
+                                     << "ldns_resolver_query_status failed: "
+                                     << ldns_get_errorstr_by_id(status);
   }
   ~Query()
   {
@@ -166,7 +166,7 @@ inline std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
   auto data = static_cast<char const*>(rdf->_data);
   auto udata = static_cast<unsigned char const*>(rdf->_data);
 
-  return std::string(data + 1, static_cast<size_t>(*udata));
+  return std::string(data + 1, static_cast<std::string::size_type>(*udata));
 }
 
 template <RR_type type>
