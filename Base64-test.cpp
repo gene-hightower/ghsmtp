@@ -4,16 +4,10 @@
 
 int main(int argc, char* argv[])
 {
-  constexpr char const* text = R"xxyyzz(
-The Fat Man design was tested in the Trinity nuclear test in July
-1945. Project Y personnel formed pit crews and assembly teams for the
-bombing of Hiroshima and Nagasaki and participated in the bombing as
-weaponeers and observers. After the war ended, the laboratory
-supported the Operation Crossroads nuclear tests at Bikini Atoll. A
-new Z Division was created to control testing, stockpiling and bomb
-assembly activities, which were concentrated at Sandia Base. The Los
-Alamos Laboratory became Los Alamos Scientific Laboratory in 1947.
-)xxyyzz";
+  constexpr char const* text = R"(
+“We are all in the gutter, but some of us are looking at the stars.”
+                                                     ― Oscar Wilde
+)";
 
   CHECK_EQ(Base64::dec(Base64::enc(text)), text);
 
