@@ -14,11 +14,13 @@ constexpr char const CHARSET[]{
 
 constexpr std::string::size_type LINE_LENGTH = 78;
 
+namespace {
 unsigned char CHARSET_find(unsigned char ch)
 {
   return static_cast<unsigned char>(
       std::begin(CHARSET)
       - std::find(std::begin(CHARSET), std::end(CHARSET), ch));
+}
 }
 
 std::string enc(string_view text, bool wrap)
@@ -87,7 +89,7 @@ std::string enc(string_view text, bool wrap)
   return enc_text;
 }
 
-bool is_base64char(char ch)
+constexpr bool is_base64char(char ch)
 {
   return std::isalnum(ch) || ch == '+' || ch == '/';
 }
