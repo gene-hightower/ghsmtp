@@ -23,6 +23,7 @@ smtp_STEMS := smtp DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS
 snd_STEMS := snd Base64 DKIM DNS Domain IP4 IP6 Magic POSIX Pill Session Sock TLS-OpenSSL date/tz hostname
 
 TESTS := \
+	Base64-test \
 	CDB-test \
 	DNS-test \
 	Domain-test \
@@ -41,6 +42,7 @@ TESTS := \
 	TLD-test \
 	TLS-OpenSSL-test
 
+Base64-test_STEMS := Base64
 DNS-test_STEMS := DNS
 Domain-test_STEMS := Domain IP4 IP6
 IP4-test_STEMS := IP4

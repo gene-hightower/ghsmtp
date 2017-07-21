@@ -1,8 +1,7 @@
 #include "Base64.hpp"
 
+#include <algorithm>
 #include <cctype>
-
-#include <boost/algorithm/string/trim.hpp>
 
 using std::string;
 using std::experimental::string_view;
@@ -18,8 +17,8 @@ namespace {
 unsigned char CHARSET_find(unsigned char ch)
 {
   return static_cast<unsigned char>(
-      std::begin(CHARSET)
-      - std::find(std::begin(CHARSET), std::end(CHARSET), ch));
+      std::find(std::begin(CHARSET), std::end(CHARSET), ch)
+      - std::begin(CHARSET));
 }
 }
 
@@ -102,7 +101,7 @@ std::string dec(string_view text)
   int count_4_chars = 0;
 
   for (string::size_type ch = 0; ch < text.length() && text[ch] != '='; ch++) {
-    if ((ch == '\r') || (ch == '\n'))
+    if ((text[ch] == '\r') || (text[ch] == '\n'))
       continue;
 
     if (!is_base64char(text[ch]))
@@ -141,8 +140,6 @@ std::string dec(string_view text)
     for (int i = 0; i < count_4_chars - 1; i++)
       dec_text += group_8bit[i];
   }
-
-  boost::trim_right(dec_text);
 
   return dec_text;
 }
