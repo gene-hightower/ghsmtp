@@ -5,7 +5,8 @@
 #include <string>
 
 namespace Base64 {
-std::string enc(std::experimental::string_view in, bool wrap = false);
+std::string enc(std::experimental::string_view in,
+                std::string::size_type wrap = 0);
 std::string dec(std::experimental::string_view in);
 }
 

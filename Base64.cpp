@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 
 using std::string;
 using std::experimental::string_view;
@@ -10,8 +11,6 @@ namespace Base64 {
 
 constexpr char const CHARSET[]{
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
-
-constexpr std::string::size_type LINE_LENGTH = 78;
 
 namespace {
 unsigned char CHARSET_find(unsigned char ch)
@@ -22,7 +21,7 @@ unsigned char CHARSET_find(unsigned char ch)
 }
 }
 
-std::string enc(string_view text, bool wrap)
+std::string enc(string_view text, string::size_type wrap)
 {
   unsigned char group_8bit[3];
   unsigned char group_6bit[4];
@@ -47,7 +46,7 @@ std::string enc(string_view text, bool wrap)
       line_len += 4;
     }
 
-    if (wrap && (line_len == LINE_LENGTH - 2)) {
+    if (wrap && (line_len == wrap - 2)) {
       enc_text += "\r\n";
       line_len = 0;
     }
@@ -67,7 +66,7 @@ std::string enc(string_view text, bool wrap)
     group_6bit[3] = group_8bit[2] & 0x3f;
 
     for (int i = 0; i < count_3_chars + 1; i++) {
-      if (wrap && (line_len == LINE_LENGTH - 2)) {
+      if (wrap && (line_len == wrap - 2)) {
         enc_text += "\r\n";
         line_len = 0;
       }
@@ -76,7 +75,7 @@ std::string enc(string_view text, bool wrap)
     }
 
     while (count_3_chars++ < 3) {
-      if (wrap && (line_len == LINE_LENGTH - 2)) {
+      if (wrap && (line_len == wrap - 2)) {
         enc_text += "\r\n";
         line_len = 0;
       }
