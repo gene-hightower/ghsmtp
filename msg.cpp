@@ -30,8 +30,6 @@
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
-using std::string_view;
-
 using namespace std::string_literals;
 
 namespace RFC5322 {
@@ -87,7 +85,7 @@ constexpr char const* defined_fields[]{
 };
 // clang-format on
 
-bool is_defined_field(string_view value)
+bool is_defined_field(std::string_view value)
 {
   auto first = std::begin(defined_fields);
   auto last = std::end(defined_fields);
@@ -904,6 +902,12 @@ struct action<field_value> {
   }
 };
 
+template <typename Input>
+static void header(Input const& in, Ctx& ctx)
+{
+  ctx.dkv.header(std::string_view(in.begin(), in.end() - in.begin()));
+}
+
 template <>
 struct action<optional_field> {
   template <typename Input>
@@ -922,7 +926,7 @@ struct action<optional_field> {
         // LOG(ERROR) << err;
       }
     }
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.unstructured.clear();
     ctx.mb_list.clear();
   }
@@ -963,7 +967,7 @@ struct action<orig_date> {
   static void apply(const Input& in, Ctx& ctx)
   {
     // LOG(INFO) << "Date:";
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -983,7 +987,7 @@ struct action<from> {
       ctx.msg_errors.push_back(msg);
     }
 
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.from_list = std::move(ctx.mb_list);
     ctx.mb_list.clear();
   }
@@ -1000,7 +1004,7 @@ struct action<sender> {
       ctx.msg_errors.push_back(err);
       err += ", this: "s + in.string();
     }
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     CHECK_EQ(ctx.mb_list.size(), 1);
     ctx.sender = std::move(ctx.mb_list[0]);
     ctx.mb_list.clear();
@@ -1012,7 +1016,7 @@ struct action<reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1024,7 +1028,7 @@ struct action<to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1034,7 +1038,7 @@ struct action<cc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1044,7 +1048,7 @@ struct action<bcc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1066,7 +1070,7 @@ struct action<message_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     if (!ctx.message_id.empty()) {
       LOG(ERROR) << "multiple message IDs: " << ctx.message_id << " and "
                  << ctx.id;
@@ -1080,7 +1084,7 @@ struct action<in_reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1089,7 +1093,7 @@ struct action<references> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1100,7 +1104,7 @@ struct action<subject> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.unstructured.clear();
   }
 };
@@ -1110,7 +1114,7 @@ struct action<comments> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.unstructured.clear();
   }
 };
@@ -1120,7 +1124,7 @@ struct action<keywords> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1131,7 +1135,7 @@ struct action<resent_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1140,7 +1144,7 @@ struct action<resent_from> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1150,7 +1154,7 @@ struct action<resent_sender> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1160,7 +1164,7 @@ struct action<resent_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1170,7 +1174,7 @@ struct action<resent_cc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1180,7 +1184,7 @@ struct action<resent_bcc> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1190,7 +1194,7 @@ struct action<resent_msg_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1201,8 +1205,7 @@ struct action<return_path> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    // LOG(INFO) << "Return-Path:";
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1213,7 +1216,7 @@ struct action<return_path_retarded> {
   static void apply(const Input& in, Ctx& ctx)
   {
     LOG(INFO) << "Return-Path: is retarded";
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1223,8 +1226,7 @@ struct action<received> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    // LOG(INFO) << "Received:";
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mb_list.clear();
   }
 };
@@ -1377,8 +1379,7 @@ struct action<dkim_signature> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
-    // LOG(INFO) << "dkim_signature check";
+    header(in, ctx);
     CHECK(ctx.dkv.sig_syntax(ctx.unstructured)) << ctx.unstructured;
     ctx.unstructured.clear();
   }
@@ -1397,9 +1398,8 @@ struct action<mime_version> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     ctx.mime_version = true;
-    // ctx.unstructured.clear();
   }
 };
 
@@ -1408,7 +1408,7 @@ struct action<content> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     // ctx.unstructured.clear();
   }
 };
@@ -1447,7 +1447,7 @@ struct action<content_transfer_encoding> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
     // ctx.unstructured.clear();
   }
 };
@@ -1457,7 +1457,7 @@ struct action<id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1466,7 +1466,7 @@ struct action<description> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    ctx.dkv.header(string_view(in.begin(), in.end() - in.begin()));
+    header(in, ctx);
   }
 };
 
@@ -1505,7 +1505,7 @@ struct action<body> {
   static void apply(const Input& in, Ctx& ctx)
   {
     // LOG(INFO) << "Message body:";
-    auto body = string_view(in.begin(), in.end() - in.begin());
+    auto body = std::string_view(in.begin(), in.end() - in.begin());
 
     ctx.dkv.eoh();
     ctx.dkv.body(body);
