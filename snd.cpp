@@ -24,11 +24,12 @@ DEFINE_string(service, "smtp-test", "Service name.");
 DEFINE_string(from, "test-it@digilicious.com", "RFC5321 MAIL FROM address.");
 DEFINE_string(to, "test-it@digilicious.com", "RFC5321 RCPT TO address.");
 
-DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From name.");
-DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To name.");
+DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From: name.");
+DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name.");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject.");
-DEFINE_string(keywords, "", "RFC5322 Keywords.");
+DEFINE_string(keywords, "", "RFC5322 Keywords: header.");
+DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header.");
 
 DEFINE_bool(ip4, false, "Use only IP version 4.");
 DEFINE_bool(ip6, false, "Use only IP version 6.");
@@ -515,22 +516,23 @@ int conn(DNS::Resolver& res,
   auto port = get_port(service.c_str());
   if (use_6) {
     auto addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node);
-    for (auto addr : addrs) {
-      int fd = socket(AF_INET6, SOCK_STREAM, 0);
-      PCHECK(fd >= 0) << "socket() failed";
 
-      if (!FLAGS_local_address.empty()) {
-        sockaddr_in6 loc;
-        memset(&loc, 0, sizeof(loc));
-        loc.sin6_family = AF_INET6;
-        if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
-                           reinterpret_cast<void*>(&loc.sin6_addr))) {
-          LOG(FATAL) << "can't interpret " << FLAGS_local_address
-                     << " as IPv6 address";
-        }
-        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+    int fd = socket(AF_INET6, SOCK_STREAM, 0);
+    PCHECK(fd >= 0) << "socket() failed";
+
+    if (!FLAGS_local_address.empty()) {
+      sockaddr_in6 loc;
+      memset(&loc, 0, sizeof(loc));
+      loc.sin6_family = AF_INET6;
+      if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
+                         reinterpret_cast<void*>(&loc.sin6_addr))) {
+        LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                   << " as IPv6 address";
       }
+      PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+    }
 
+    for (auto addr : addrs) {
       sockaddr_in6 in6;
       memset(&in6, 0, sizeof(in6));
       in6.sin6_family = AF_INET6;
@@ -538,35 +540,36 @@ int conn(DNS::Resolver& res,
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
-
-      if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))
-          == 0) {
-        LOG(INFO) << "connect " << addr << ":" << port;
-        return fd;
+      if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
+        PLOG(WARNING) << "connect failed " << addr << ":" << port;
+        continue;
       }
 
-      PLOG(WARNING) << "connect failed " << addr << ":" << port;
-      close(fd);
+      LOG(INFO) << "connected to " << addr << ":" << port;
+      return fd;
     }
+
+    close(fd);
   }
   if (use_4) {
     auto addrs = DNS::get_records<DNS::RR_type::A>(res, node);
-    for (auto addr : addrs) {
-      int fd = socket(AF_INET, SOCK_STREAM, 0);
-      PCHECK(fd >= 0) << "socket() failed";
 
-      if (!FLAGS_local_address.empty()) {
-        sockaddr_in loc;
-        memset(&loc, 0, sizeof(loc));
-        loc.sin_family = AF_INET;
-        if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                           reinterpret_cast<void*>(&loc.sin_addr))) {
-          LOG(FATAL) << "can't interpret " << FLAGS_local_address
-                     << " as IPv4 address";
-        }
-        PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    PCHECK(fd >= 0) << "socket() failed";
+
+    if (!FLAGS_local_address.empty()) {
+      sockaddr_in loc;
+      memset(&loc, 0, sizeof(loc));
+      loc.sin_family = AF_INET;
+      if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                         reinterpret_cast<void*>(&loc.sin_addr))) {
+        LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                   << " as IPv4 address";
       }
+      PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+    }
 
+    for (auto addr : addrs) {
       sockaddr_in in4;
       memset(&in4, 0, sizeof(in4));
       in4.sin_family = AF_INET;
@@ -574,16 +577,16 @@ int conn(DNS::Resolver& res,
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
-
-      if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))
-          == 0) {
-        LOG(INFO) << "connect " << addr << ":" << port;
-        return fd;
+      if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
+        PLOG(WARNING) << "connect failed " << addr << ":" << port;
+        continue;
       }
 
-      PLOG(WARNING) << "connect failed " << addr << ":" << port;
-      close(fd);
+      LOG(INFO) << "connected to " << addr << ":" << port;
+      return fd;
     }
+
+    close(fd);
   }
 
   return -1;
@@ -848,6 +851,8 @@ int main(int argc, char* argv[])
     }
   }
 
+  Domain sender(FLAGS_sender);
+
 try_host:
   int fd_in = 0;
   int fd_out = 1;
@@ -872,8 +877,6 @@ try_host:
     receivers.erase(receivers.begin());
     goto try_host;
   }
-
-  Domain sender(FLAGS_sender);
 
   LOG(INFO) << "> EHLO " << sender.utf8();
   cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
@@ -1024,6 +1027,8 @@ try_host:
   eml.add_hdr("Subject", FLAGS_subject);
   if (!FLAGS_keywords.empty())
     eml.add_hdr("Keywords", FLAGS_keywords);
+  if (!FLAGS_in_reply_to.empty())
+    eml.add_hdr("In-Reply-To", FLAGS_in_reply_to);
 
   eml.add_hdr("MIME-Version", "1.0");
   eml.add_hdr("Content-Language", "en-US");
