@@ -1,4 +1,4 @@
-USES := ldns libglog libcurl libidn2 opendkim openssl
+USES := ldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -DSMTP_HOME=$(shell pwd) -funsigned-char
 
