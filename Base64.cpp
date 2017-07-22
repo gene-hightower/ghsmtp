@@ -97,7 +97,7 @@ std::string dec(std::string_view text)
   int count_4_chars = 0;
 
   for (std::string::size_type ch = 0; ch < text.length(); ch++) {
-    if (text[ch] != '=')
+    if (text[ch] == '=')
       break;
 
     if ((text[ch] == '\r') || (text[ch] == '\n'))
