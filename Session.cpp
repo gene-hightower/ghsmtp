@@ -428,18 +428,20 @@ std::string Session::added_headers_(Message const& msg)
 
   // STD 3 section 5.2.8
   if (forward_path_.size()) {
-    auto len = 0;
+    auto len = 12;
     headers << "\r\n        for ";
     for (size_t i = 0; i < forward_path_.size(); ++i) {
+      auto fwd = static_cast<std::string>(forward_path_[i]);
       if (i) {
         headers << ',';
-        if ((len + forward_path_[i].length()) > 80) {
-          headers << "\r\n        ";
-          len = 0;
-        }
+        ++len;
       }
-      headers << '<' << forward_path_[i] << '>';
-      len += forward_path_[i].length();
+      if ((len + fwd.length() + 2) > 80) {
+        headers << "\r\n        ";
+        len = 8;
+      }
+      headers << '<' << fwd << '>';
+      len += fwd.length() + 2;
     }
   }
 

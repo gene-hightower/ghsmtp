@@ -1564,18 +1564,18 @@ struct action<message> {
       }
 
       // find sender in from list
-      auto s = find(begin(ctx.from_list), end(ctx.from_list), ctx.sender);
-      if (s == end(ctx.from_list)) {
-        // can't be found, not an error
-        LOG(ERROR) << "No 'From:' match to 'Sender:'";
+      // auto s = find(begin(ctx.from_list), end(ctx.from_list), ctx.sender);
+      // if (s == end(ctx.from_list)) {
+      //   // can't be found, not an error
+      //   LOG(ERROR) << "No 'From:' match to 'Sender:'";
 
-        // must check all From:s
-        LOG(FATAL) << "write code to check all From: addresses";
-      }
-      else {
-        from_domain = ctx.sender;
-        LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain();
-      }
+      //   // must check all From:s
+      //   LOG(FATAL) << "write code to check all From: addresses";
+      // }
+      // else {
+      //   from_domain = ctx.sender;
+      //   LOG(INFO) << "using 'Sender:' domain " << ctx.sender.domain();
+      // }
     }
     else {
 

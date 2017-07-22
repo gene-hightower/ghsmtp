@@ -36,20 +36,9 @@ public:
 
   bool empty() const { return local_part().empty() && domain().empty(); }
 
-  auto length() const
-  {
-    return local_part().length()
-           + (domain().utf8().length() ? (domain().utf8().length() + 1) : 0);
-  }
-
   operator std::string() const
   {
     return local_part() + (domain().empty() ? "" : ("@" + domain().utf8()));
-  }
-
-  bool operator==(Mailbox const& rhs) const
-  {
-    return (local_part() == rhs.local_part()) && (domain() == rhs.domain());
   }
 
 private:
