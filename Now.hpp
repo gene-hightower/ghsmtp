@@ -11,7 +11,7 @@ public:
 
   auto sec() const { return tv_.tv_sec; }
   auto usec() const { return tv_.tv_usec; }
-  const char* string() const { return c_str_; }
+  const char* c_str() const { return c_str_; }
 
 private:
   timeval tv_;

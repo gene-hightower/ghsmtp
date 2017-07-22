@@ -1018,7 +1018,7 @@ try_host:
   mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
           << sender.utf8() << '>';
   eml.add_hdr("Message-ID", mid_str.str());
-  eml.add_hdr("Date", date.string());
+  eml.add_hdr("Date", date.c_str());
   std::string rfc5322_from = FLAGS_from_name + " <" + FLAGS_from + ">";
   eml.add_hdr("From", rfc5322_from);
   std::string rfc5322_to = FLAGS_to_name + " <" + FLAGS_to + ">";
