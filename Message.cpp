@@ -33,7 +33,7 @@ void Message::open(std::string const& fqdn, size_t max_size, SpamStatus spam)
     maildir /= ".Junk";
   }
 
-  // Unique name, see: <http://cr.yp.to/proto/maildir.html>
+  // Unique name, see: <https://cr.yp.to/proto/maildir.html>
   std::ostringstream uniq;
   uniq << then_.sec() << '.' << 'R' << s_ << '.' << fqdn;
 
