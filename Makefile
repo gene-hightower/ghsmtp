@@ -85,8 +85,11 @@ clean::
 	./cdb-gen < $< | cdb -c $@
 
 clean::
-	rm -f two-level-tlds.cdb
+	rm -f black.cdb
+	rm -f ip-black.cdb
+	rm -f ip-white.cdb
 	rm -f three-level-tlds.cdb
+	rm -f two-level-tlds.cdb
 	rm -f white.cdb cdb-gen
 
 black.cdb: black cdb-gen
