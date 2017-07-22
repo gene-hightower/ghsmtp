@@ -24,7 +24,7 @@
 
 #include <syslog.h>
 
-using std::string_view;
+using namespace std::string_literals;
 
 namespace Config {
 constexpr char const* const accept_domains[] = {};
@@ -62,8 +62,6 @@ constexpr auto max_recipients_per_message = 100;
 constexpr auto read_timeout = std::chrono::minutes(5);
 constexpr auto write_timeout = std::chrono::seconds(30);
 }
-
-using namespace std::string_literals;
 
 Session::Session(std::function<void(void)> read_hook,
                  int fd_in,
@@ -152,7 +150,7 @@ void Session::greeting()
   out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
 }
 
-void Session::log_lo_(char const* verb, string_view client_identity) const
+void Session::log_lo_(char const* verb, std::string_view client_identity) const
 {
   if (sock_.has_peername()) {
     if (fcrdns_ == client_identity_) {
@@ -168,7 +166,7 @@ void Session::log_lo_(char const* verb, string_view client_identity) const
   }
 }
 
-string_view Session::server_id() const
+std::string_view Session::server_id() const
 {
   if (our_fqdn_.is_address_literal()) {
     return IP::to_address(our_fqdn_.ascii());
@@ -187,7 +185,7 @@ void Session::last_in_group_()
   }
 }
 
-void Session::ehlo(string_view client_identity)
+void Session::ehlo(std::string_view client_identity)
 {
   last_in_group_();
   reset_();
@@ -229,7 +227,7 @@ void Session::ehlo(string_view client_identity)
   log_lo_("EHLO", client_identity);
 }
 
-void Session::helo(string_view client_identity)
+void Session::helo(std::string_view client_identity)
 {
   last_in_group_(); // no pipelining with old protocol
   reset_();
@@ -565,21 +563,21 @@ void Session::rset()
   LOG(INFO) << "RSET";
 }
 
-void Session::noop(string_view str)
+void Session::noop(std::string_view str)
 {
   last_in_group_();
   out_() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "NOOP" << (str.length() ? " " : "") << str;
 }
 
-void Session::vrfy(string_view str)
+void Session::vrfy(std::string_view str)
 {
   last_in_group_();
   out_() << "252 2.0.0 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY" << (str.length() ? " " : "") << str;
 }
 
-void Session::help(string_view str)
+void Session::help(std::string_view str)
 {
   out_() << "214 2.0.0 see https://digilicious.com/smtp.html and "
             "https://tools.ietf.org/html/rfc5321\r\n"
@@ -595,13 +593,13 @@ void Session::quit()
   exit_();
 }
 
-void Session::error(string_view log_msg)
+void Session::error(std::string_view log_msg)
 {
   out_() << "421 4.3.5 system error\r\n" << std::flush;
   LOG(ERROR) << log_msg;
 }
 
-void Session::cmd_unrecognized(string_view cmd)
+void Session::cmd_unrecognized(std::string_view cmd)
 {
   auto escaped = esc(cmd);
   out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"\r\n"
