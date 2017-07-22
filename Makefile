@@ -7,7 +7,6 @@ LDLIBS += \
 	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
-	-lcrypto \
 	-lgflags \
 	-lmagic \
 	-lopendmarc \
