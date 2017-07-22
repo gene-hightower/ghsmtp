@@ -4,9 +4,6 @@
 #include <cctype>
 #include <stdexcept>
 
-using std::string;
-using std::string_view;
-
 namespace Base64 {
 
 constexpr char const CHARSET[]{
@@ -21,17 +18,17 @@ unsigned char CHARSET_find(unsigned char ch)
 }
 }
 
-std::string enc(string_view text, string::size_type wrap)
+std::string enc(std::string_view text, std::string::size_type wrap)
 {
   unsigned char group_8bit[3];
   unsigned char group_6bit[4];
   int count_3_chars = 0;
 
   std::string enc_text;
-  string::size_type line_len = 0;
+  std::string::size_type line_len = 0;
 
-  for (string::size_type cur_char = 0; cur_char < text.length(); cur_char++) {
-    group_8bit[count_3_chars++] = text[cur_char];
+  for (std::string::size_type ch = 0; ch < text.length(); ch++) {
+    group_8bit[count_3_chars++] = text[ch];
     if (count_3_chars == 3) {
       group_6bit[0] = (group_8bit[0] & 0xfc) >> 2;
       group_6bit[1]
@@ -92,14 +89,17 @@ constexpr bool is_base64char(char ch)
   return std::isalnum(ch) || ch == '+' || ch == '/';
 }
 
-std::string dec(string_view text)
+std::string dec(std::string_view text)
 {
   std::string dec_text;
   unsigned char group_6bit[4];
   unsigned char group_8bit[3];
   int count_4_chars = 0;
 
-  for (string::size_type ch = 0; ch < text.length() && text[ch] != '='; ch++) {
+  for (std::string::size_type ch = 0; ch < text.length(); ch++) {
+    if (text[ch] != '=')
+      break;
+
     if ((text[ch] == '\r') || (text[ch] == '\n'))
       continue;
 
