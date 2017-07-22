@@ -1,52 +1,34 @@
 #ifndef NOW_DOT_HPP
 #define NOW_DOT_HPP
 
-#include <chrono>
-#include <iostream>
+#include <sys/time.h>
 
 #include <glog/logging.h>
 
-#include "date/tz.h"
-
 class Now {
 public:
-  Now()
-    : v_{std::chrono::system_clock::now()}
-    , str_{
-          // RFC 5322 section 3.3 date-time.
-          date::format("%a, %d %b %Y %H:%M:%S %z",
-                       date::make_zoned(date::current_zone(),
-                                        date::floor<std::chrono::seconds>(v_)))}
-  {
-    CHECK_EQ(str_.length(), 31) << str_ << " is the wrong length";
-  }
+  Now();
 
-  auto sec() const
-  {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-               v_.time_since_epoch())
-        .count();
-  }
-  auto usec() const
-  {
-    return std::chrono::duration_cast<std::chrono::microseconds>(
-               v_.time_since_epoch())
-        .count();
-  }
-
-  std::string const& string() const { return str_; }
-
-  bool operator==(Now const& that) const { return v_ == that.v_; }
-  bool operator!=(Now const& that) const { return !(*this == that); }
+  auto sec() const { return tv_.tv_sec; }
+  auto usec() const { return tv_.tv_usec; }
+  const char* string() const { return c_str_; }
 
 private:
-  std::chrono::time_point<std::chrono::system_clock> v_;
-  std::string str_;
+  timeval tv_;
+  char c_str_[32]; // RFC 5322 date-time section 3.3.
 
   friend std::ostream& operator<<(std::ostream& s, Now const& now)
   {
-    return s << now.str_;
+    return s << now.c_str_;
   }
 };
+
+inline Now::Now()
+{
+  PCHECK(gettimeofday(&tv_, 0) == 0);
+  tm* ptm = CHECK_NOTNULL(localtime(&tv_.tv_sec));
+  CHECK_EQ(strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", ptm),
+           sizeof(c_str_) - 1);
+}
 
 #endif // NOW_DOT_HPP

@@ -16,7 +16,4 @@ int main(int argc, char* argv[])
   then_again_str << then_again;
 
   CHECK_EQ(then_str.str(), then_again_str.str());
-
-  Now now;
-  CHECK_NE(now, then);
 }
