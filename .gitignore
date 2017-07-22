@@ -4,6 +4,8 @@
 *.o
 *~
 cdb-gen
+ghsmtp.private
+ghsmtp.public
 mkm
 msg
 p0f
@@ -12,6 +14,7 @@ sasl
 smtp
 smtp.pem
 snd
+test-credentials.ipp
 three-level-black.cdb
 three-level-tlds
 three-level-tlds.cdb
@@ -19,4 +22,3 @@ two-level-black.cdb
 two-level-tlds
 two-level-tlds.cdb
 two-level-white.cdb
-test-credentials.ipp
