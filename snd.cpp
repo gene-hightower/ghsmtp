@@ -61,7 +61,6 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 #include <unordered_map>
 
 using namespace std::string_literals;
-using std::string_view;
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -686,7 +685,7 @@ enum class data_type {
   binary, // binary
 };
 
-data_type type(string_view d)
+data_type type(std::string_view d)
 {
   memory_input<> in(d.data(), d.size(), "data");
   if (parse<RFC5322::body_ascii>(in)) {
@@ -719,7 +718,7 @@ public:
   data_type type() const { return type_; }
 
   bool empty() const { return size() == 0; }
-  operator string_view() const { return string_view(data(), size()); }
+  operator std::string_view() const { return std::string_view(data(), size()); }
 
 private:
   char const* data_{nullptr};
@@ -741,7 +740,7 @@ void fail(Input& in, RFC5321::Connection& cnn)
 }
 
 template <typename Input>
-void check_for_fail(Input& in, RFC5321::Connection& cnn, string_view cmd)
+void check_for_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
 {
   cnn.sock.out() << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -765,7 +764,7 @@ std::string connectable_host(Mailbox mbx)
   return connectable_host(mbx.domain());
 }
 
-std::string connectable_host(string_view dom)
+std::string connectable_host(std::string_view dom)
 {
   return connectable_host(Domain(dom));
 }

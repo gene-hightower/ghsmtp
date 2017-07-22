@@ -16,8 +16,6 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
-using std::string_view;
-
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
 constexpr std::streamsize max_hdr_size = 16 * 1024;
@@ -466,7 +464,7 @@ struct action<helo> {
   {
     auto beg = in.begin() + 5; // +5 for the length of "HELO "
     auto end = in.end() - 2;   // -2 for the CRLF
-    ctx.session.helo(string_view(beg, end - beg));
+    ctx.session.helo(std::string_view(beg, end - beg));
     ctx.bdat_rset();
   }
 };
@@ -478,7 +476,7 @@ struct action<ehlo> {
   {
     auto beg = in.begin() + 5; // +5 for the length of "EHLO "
     auto end = in.end() - 2;   // -2 for the CRLF
-    ctx.session.ehlo(string_view(beg, end - beg));
+    ctx.session.ehlo(std::string_view(beg, end - beg));
     ctx.bdat_rset();
   }
 };
@@ -772,11 +770,11 @@ struct action<rset> {
 };
 
 template <typename Input>
-string_view get_string(Input const& in)
+std::string_view get_string(Input const& in)
 {
   auto beg = in.begin() + 4;
   auto len = in.end() - beg;
-  auto str = string_view(beg, len);
+  auto str = std::string_view(beg, len);
   if (str.front() == ' ')
     str.remove_prefix(1);
   return str;

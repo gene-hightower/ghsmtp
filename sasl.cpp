@@ -7,10 +7,8 @@
 
 #include <iostream>
 #include <string>
-#include <string_view>
 
 using namespace std::string_literals;
-using std::string_view;
 
 #include <netdb.h>
 #include <sys/socket.h>

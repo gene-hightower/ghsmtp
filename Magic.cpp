@@ -4,8 +4,6 @@
 
 #include <glog/logging.h>
 
-using std::string_view;
-
 Magic::Magic()
   : magic_(CHECK_NOTNULL(magic_open(MAGIC_MIME)))
 {
@@ -14,7 +12,7 @@ Magic::Magic()
 
 Magic::~Magic() { magic_close(magic_); }
 
-std::string Magic::buffer(string_view bfr) const
+std::string Magic::buffer(std::string_view bfr) const
 {
   auto data = reinterpret_cast<void const*>(bfr.data());
   return CHECK_NOTNULL(magic_buffer(magic_, data, bfr.size()));

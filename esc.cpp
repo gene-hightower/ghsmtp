@@ -1,10 +1,8 @@
 #include "esc.hpp"
 
-using std::string_view;
-
 using namespace std::string_literals;
 
-std::string esc(string_view str)
+std::string esc(std::string_view str)
 {
   std::string ret;
   for (auto c : str) {
