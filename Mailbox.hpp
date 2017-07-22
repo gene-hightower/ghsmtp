@@ -23,14 +23,12 @@ public:
   }
   void set_domain(std::string domain)
   {
-    domain_str_ = std::move(domain);
-    boost::to_lower(domain_str_);
-    domain_.set(domain_str_.c_str());
+    boost::to_lower(domain);
+    domain_.set(domain.c_str());
   }
   void clear()
   {
     local_part_.clear();
-    domain_str_.clear();
     domain_.clear();
   }
   std::string const& local_part() const { return local_part_; }
@@ -56,7 +54,6 @@ public:
 
 private:
   std::string local_part_;
-  std::string domain_str_;
   Domain domain_;
 };
 
