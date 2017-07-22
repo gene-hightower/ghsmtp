@@ -56,12 +56,11 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector.");
 #include <iostream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
-#include <experimental/string_view>
-
 using namespace std::string_literals;
-using std::experimental::string_view;
+using std::string_view;
 
 #include <netdb.h>
 #include <sys/socket.h>

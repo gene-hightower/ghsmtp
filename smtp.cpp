@@ -16,7 +16,7 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
-using std::experimental::string_view;
+using std::string_view;
 
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;

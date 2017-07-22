@@ -12,7 +12,7 @@
 using namespace std::string_literals;
 
 namespace {
-std::string nfkc(std::experimental::string_view str)
+std::string nfkc(std::string_view str)
 {
   size_t length = 0;
   auto udata = reinterpret_cast<const uint8_t*>(str.data());
@@ -23,7 +23,7 @@ std::string nfkc(std::experimental::string_view str)
 }
 }
 
-void Domain::set(std::experimental::string_view dom)
+void Domain::set(std::string_view dom)
 {
   // Handle "bare" IP address literals, without the brackets.
   if (IP4::is_address(dom)) {

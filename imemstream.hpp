@@ -3,8 +3,7 @@
 
 #include <istream>
 #include <streambuf>
-
-#include <experimental/string_view>
+#include <string_view>
 
 struct membuf : std::streambuf {
   membuf(char const* base, size_t size)
@@ -20,7 +19,7 @@ struct imemstream : virtual membuf, std::istream {
     , std::istream(static_cast<std::streambuf*>(this))
   {
   }
-  imemstream(std::experimental::string_view s)
+  imemstream(std::string_view s)
     : membuf(s.data(), s.length())
     , std::istream(static_cast<std::streambuf*>(this))
   {

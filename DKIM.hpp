@@ -3,7 +3,7 @@
 
 #include <functional>
 
-#include <experimental/string_view>
+#include <string_view>
 
 struct dkim_lib;
 typedef struct dkim_lib DKIM_LIB;
@@ -17,10 +17,10 @@ namespace OpenDKIM {
 
 class Lib {
 public:
-  void header(std::experimental::string_view header);
+  void header(std::string_view header);
   void eoh();
-  void body(std::experimental::string_view body);
-  void chunk(std::experimental::string_view chunk);
+  void body(std::string_view body);
+  void chunk(std::string_view chunk);
   void eom();
 
 protected:
@@ -37,7 +37,7 @@ public:
   Verify();
 
   bool check();
-  bool sig_syntax(std::experimental::string_view sig);
+  bool sig_syntax(std::string_view sig);
   void foreach_sig(std::function<void(char const* domain, bool passed)> func);
 };
 

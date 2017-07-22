@@ -3,10 +3,9 @@
 
 #include <random>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
-
-#include <experimental/string_view>
 
 #include "DNS.hpp"
 #include "Domain.hpp"
@@ -35,8 +34,8 @@ public:
                    std::string fqdn = "");
 
   void greeting();
-  void ehlo(std::experimental::string_view client_identity);
-  void helo(std::experimental::string_view client_identity);
+  void ehlo(std::string_view client_identity);
+  void helo(std::string_view client_identity);
   void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
@@ -51,12 +50,12 @@ public:
   void bdat_error(Message& msg);
 
   void rset();
-  void noop(std::experimental::string_view str);
-  void vrfy(std::experimental::string_view str);
-  void help(std::experimental::string_view str);
+  void noop(std::string_view str);
+  void vrfy(std::string_view str);
+  void help(std::string_view str);
   void quit() __attribute__((noreturn));
-  void error(std::experimental::string_view log_msg);
-  void cmd_unrecognized(std::experimental::string_view log_msg);
+  void error(std::string_view log_msg);
+  void cmd_unrecognized(std::string_view log_msg);
   void bare_lf();
 
   void max_out() __attribute__((noreturn));
@@ -86,10 +85,9 @@ private:
   std::string added_headers_(Message const& msg);
 
   std::ostream& out_() { return sock_.out(); }
-  void log_lo_(char const* verb,
-               std::experimental::string_view client_identity) const;
+  void log_lo_(char const* verb, std::string_view client_identity) const;
 
-  std::experimental::string_view server_id() const;
+  std::string_view server_id() const;
 
   void reset_()
   {

@@ -24,7 +24,4 @@ struct Session_test {
   }
 };
 
-int main(int argc, char* argv[])
-{
-  Session_test::test();
-}
+int main(int argc, char* argv[]) { Session_test::test(); }

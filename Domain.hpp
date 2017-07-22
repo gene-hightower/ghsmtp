@@ -3,20 +3,19 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <experimental/string_view>
+#include <string_view>
 
 class Domain {
 public:
   Domain() = default;
 
-  Domain(std::experimental::string_view dom) { set(dom); }
+  Domain(std::string_view dom) { set(dom); }
 
-  void set(std::experimental::string_view dom);
+  void set(std::string_view dom);
   void clear();
   bool empty() const { return ascii_.empty() && utf8_.empty(); }
 
-  static bool match(std::experimental::string_view a,
-                    std::experimental::string_view b)
+  static bool match(std::string_view a, std::string_view b)
   {
     if ((0 != a.length()) && ('.' == a.back())) {
       a.remove_suffix(1);

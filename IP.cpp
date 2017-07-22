@@ -6,17 +6,17 @@
 #include <glog/logging.h>
 
 namespace IP {
-bool is_address(std::experimental::string_view addr)
+bool is_address(std::string_view addr)
 {
   return IP4::is_address(addr) || IP6::is_address(addr);
 }
 
-bool is_address_literal(std::experimental::string_view addr)
+bool is_address_literal(std::string_view addr)
 {
   return IP4::is_address_literal(addr) || IP6::is_address_literal(addr);
 }
 
-std::string to_address_literal(std::experimental::string_view addr)
+std::string to_address_literal(std::string_view addr)
 {
   if (IP4::is_address(addr))
     return IP4::to_address_literal(addr);
@@ -25,7 +25,7 @@ std::string to_address_literal(std::experimental::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::experimental::string_view to_address(std::experimental::string_view addr)
+std::string_view to_address(std::string_view addr)
 {
   if (IP4::is_address_literal(addr))
     return IP4::to_address(addr);
@@ -34,7 +34,7 @@ std::experimental::string_view to_address(std::experimental::string_view addr)
   LOG(FATAL) << "not a valid IP address literal " << addr;
 }
 
-std::string reverse(std::experimental::string_view addr)
+std::string reverse(std::string_view addr)
 {
   if (IP4::is_address(addr))
     return IP4::reverse(addr);

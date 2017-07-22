@@ -5,12 +5,12 @@
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/iostreams/stream.hpp>
 
-#include <experimental/string_view>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 using namespace std::string_literals;
-using std::experimental::string_view;
+using std::string_view;
 
 #include <netdb.h>
 #include <sys/socket.h>

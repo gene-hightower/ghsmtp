@@ -4,7 +4,7 @@
 
 #include <glog/logging.h>
 
-using std::experimental::string_view;
+using std::string_view;
 
 Magic::Magic()
   : magic_(CHECK_NOTNULL(magic_open(MAGIC_MIME)))

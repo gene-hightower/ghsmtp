@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 using std::string;
-using std::experimental::string_view;
+using std::string_view;
 
 namespace Base64 {
 

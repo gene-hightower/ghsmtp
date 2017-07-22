@@ -31,7 +31,7 @@ Lib::~Lib()
   dkim_close(lib_);
 }
 
-void Lib::header(std::experimental::string_view header)
+void Lib::header(std::string_view header)
 {
   if (header.back() == '\n')
     header.remove_suffix(1);
@@ -61,14 +61,14 @@ void Lib::eoh()
   }
 }
 
-void Lib::body(std::experimental::string_view body)
+void Lib::body(std::string_view body)
 {
   CHECK_EQ((status_ = dkim_body(dkim_, uc(body.data()), body.length())),
            DKIM_STAT_OK)
       << "dkim_body error: " << dkim_getresultstr(status_);
 }
 
-void Lib::chunk(std::experimental::string_view chunk)
+void Lib::chunk(std::string_view chunk)
 {
   CHECK_EQ((status_ = dkim_chunk(dkim_, uc(chunk.data()), chunk.length())),
            DKIM_STAT_OK)
@@ -221,7 +221,7 @@ bool Verify::check()
   return false;
 }
 
-bool Verify::sig_syntax(std::experimental::string_view sig)
+bool Verify::sig_syntax(std::string_view sig)
 {
   return dkim_sig_syntax(dkim_, uc(sig.data()), sig.length()) == DKIM_STAT_OK;
 }

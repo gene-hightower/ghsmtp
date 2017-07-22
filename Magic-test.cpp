@@ -11,11 +11,11 @@ int main(int argc, char* argv[])
 
   std::vector<std::string> results;
 
-  for (auto arg=1; arg<argc; ++arg) {
+  for (auto arg = 1; arg < argc; ++arg) {
     results.push_back(magic.file(argv[arg]));
   }
 
-  for (auto arg=1; arg<argc; ++arg) {
-    std::cout << results[arg-1] << '\n';
+  for (auto arg = 1; arg < argc; ++arg) {
+    std::cout << results[arg - 1] << '\n';
   }
 }

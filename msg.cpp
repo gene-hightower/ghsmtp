@@ -30,7 +30,7 @@
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
-using std::experimental::string_view;
+using std::string_view;
 
 using namespace std::string_literals;
 

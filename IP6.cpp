@@ -57,7 +57,7 @@ struct ipv6_address_literal
     : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
 };
 
-bool is_address(std::experimental::string_view addr)
+bool is_address(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "ip6");
   if (parse<IP6::ipv6_address>(in)) {
@@ -66,7 +66,7 @@ bool is_address(std::experimental::string_view addr)
   return false;
 }
 
-bool is_address_literal(std::experimental::string_view addr)
+bool is_address_literal(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "ip6");
   if (parse<IP6::ipv6_address_literal>(in)) {
@@ -75,18 +75,18 @@ bool is_address_literal(std::experimental::string_view addr)
   return false;
 }
 
-std::string to_address_literal(std::experimental::string_view addr)
+std::string to_address_literal(std::string_view addr)
 {
   return "[IPv6:"s + std::string(addr.data(), addr.size()) + "]"s;
 }
 
-std::experimental::string_view to_address(std::experimental::string_view addr)
+std::string_view to_address(std::string_view addr)
 {
   CHECK(is_address_literal(addr));
-  return std::experimental::string_view(addr.begin() + 6, addr.length() - 7);
+  return std::string_view(addr.begin() + 6, addr.length() - 7);
 }
 
-std::string reverse(std::experimental::string_view addr_str)
+std::string reverse(std::string_view addr_str)
 {
   in6_addr addr;
 

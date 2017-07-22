@@ -22,7 +22,7 @@ inline boost::xpressive::cregex single_octet()
   // clang-format on
 }
 
-bool is_address(std::experimental::string_view addr)
+bool is_address(std::string_view addr)
 {
   using namespace boost::xpressive;
 
@@ -32,7 +32,7 @@ bool is_address(std::experimental::string_view addr)
   return regex_match(addr.begin(), addr.end(), matches, re);
 }
 
-bool is_address_literal(std::experimental::string_view addr)
+bool is_address_literal(std::string_view addr)
 {
   using namespace boost::xpressive;
 
@@ -43,19 +43,19 @@ bool is_address_literal(std::experimental::string_view addr)
   return regex_match(addr.begin(), addr.end(), matches, re);
 }
 
-std::string to_address_literal(std::experimental::string_view addr)
+std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
   return "["s + std::string(addr.data(), addr.size()) + "]"s;
 }
 
-std::experimental::string_view to_address(std::experimental::string_view addr)
+std::string_view to_address(std::string_view addr)
 {
   CHECK(is_address_literal(addr));
-  return std::experimental::string_view(addr.begin() + 1, addr.length() - 2);
+  return std::string_view(addr.begin() + 1, addr.length() - 2);
 }
 
-std::string reverse(std::experimental::string_view addr)
+std::string reverse(std::string_view addr)
 {
   using namespace boost::xpressive;
 
@@ -68,8 +68,8 @@ std::string reverse(std::experimental::string_view addr)
 
   std::ostringstream reverse;
   for (int n = 4; n > 0; --n) {
-    std::experimental::string_view octet(matches[n].first,
-                                         matches[n].second - matches[n].first);
+    std::string_view octet(matches[n].first,
+                           matches[n].second - matches[n].first);
     reverse << octet << '.'; // and leave a trailing '.'
   }
   return reverse.str();

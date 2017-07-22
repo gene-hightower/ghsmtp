@@ -24,7 +24,7 @@
 
 #include <syslog.h>
 
-using std::experimental::string_view;
+using std::string_view;
 
 namespace Config {
 constexpr char const* const accept_domains[] = {};

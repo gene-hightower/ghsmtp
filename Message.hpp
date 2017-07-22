@@ -4,8 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
-
-#include <experimental/string_view>
+#include <string_view>
 
 #include <boost/filesystem.hpp>
 
@@ -27,7 +26,7 @@ public:
   Now const& when() const { return then_; }
 
   std::ostream& write(char const* s, std::streamsize count);
-  std::ostream& write(std::experimental::string_view s)
+  std::ostream& write(std::string_view s)
   {
     return write(s.data(), s.length());
   }

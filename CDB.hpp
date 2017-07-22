@@ -5,7 +5,7 @@ extern "C" {
 #include <cdb.h>
 }
 
-#include <experimental/string_view>
+#include <string_view>
 
 #include <glog/logging.h>
 
@@ -17,7 +17,7 @@ extern "C" {
 
 class CDB {
 public:
-  CDB(std::experimental::string_view db)
+  CDB(std::string_view db)
   {
     std::string dbpath = STRINGIFY(SMTP_HOME) "/";
     dbpath.append(db.begin(), db.end());
@@ -40,7 +40,7 @@ public:
       cdb_free(&cdb_);
     }
   }
-  bool lookup(std::experimental::string_view key)
+  bool lookup(std::string_view key)
   {
     if (fd_ == -1)
       return false;
