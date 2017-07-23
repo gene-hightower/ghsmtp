@@ -5,10 +5,7 @@
 
 #include <string_view>
 
-struct dkim_lib;
 typedef struct dkim_lib DKIM_LIB;
-
-struct dkim;
 typedef struct dkim DKIM;
 
 typedef int DKIM_STAT;
