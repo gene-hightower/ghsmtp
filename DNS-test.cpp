@@ -4,7 +4,11 @@
 
 #include <ldns/packet.h>
 #include <ldns/rr.h>
-//#undef bool                     // this is fucking rude...
+
+#ifdef bool
+#warning leaving bool a defined macro is fucking rude...
+#undef bool
+#endif
 
 int main(int argc, char const* argv[])
 {
