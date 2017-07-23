@@ -5,7 +5,7 @@ using namespace std::string_literals;
 std::string esc(std::string_view str)
 {
   std::string ret;
-  ret.reserve(str.length());
+  ret.reserve(str.length() + 2);
   for (auto c : str) {
     switch (c) {
     case '\\':
