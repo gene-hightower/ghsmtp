@@ -13,23 +13,39 @@ extern "C" {
 
 namespace SPF {
 
+// clang-format off
 Result::Result(int value)
 {
-  // clang-format off
   switch (value) {
-  case SPF_RESULT_INVALID:   value_ = value_t::INVALID;   break;
-  case SPF_RESULT_NEUTRAL:   value_ = value_t::NEUTRAL;   break;
-  case SPF_RESULT_PASS:      value_ = value_t::PASS;      break;
-  case SPF_RESULT_FAIL:      value_ = value_t::FAIL;      break;
-  case SPF_RESULT_SOFTFAIL:  value_ = value_t::SOFTFAIL;  break;
-  case SPF_RESULT_NONE:      value_ = value_t::NONE;      break;
-  case SPF_RESULT_TEMPERROR: value_ = value_t::TEMPERROR; break;
-  case SPF_RESULT_PERMERROR: value_ = value_t::PERMERROR; break;
+  case SPF_RESULT_INVALID:   value_ = INVALID;   break;
+  case SPF_RESULT_NEUTRAL:   value_ = NEUTRAL;   break;
+  case SPF_RESULT_PASS:      value_ = PASS;      break;
+  case SPF_RESULT_FAIL:      value_ = FAIL;      break;
+  case SPF_RESULT_SOFTFAIL:  value_ = SOFTFAIL;  break;
+  case SPF_RESULT_NONE:      value_ = NONE;      break;
+  case SPF_RESULT_TEMPERROR: value_ = TEMPERROR; break;
+  case SPF_RESULT_PERMERROR: value_ = PERMERROR; break;
   default:
     LOG(ERROR) << "unrecognized SPF_result_t value: " << value;
   }
-  // clang-format on
 }
+
+char const* Result::c_str(value_t value)
+{
+  switch (value) {
+  case INVALID:   return "invalid";
+  case NEUTRAL:   return "neutral";
+  case PASS:      return "pass";
+  case FAIL:      return "fail";
+  case SOFTFAIL:  return "softfail";
+  case NONE:      return "none";
+  case TEMPERROR: return "temperror";
+  case PERMERROR: return "permerror";
+  }
+  LOG(ERROR) << "unknown Result value";
+  return "** unknown **";
+}
+// clang-format on
 
 std::ostream& operator<<(std::ostream& os, Result result)
 {

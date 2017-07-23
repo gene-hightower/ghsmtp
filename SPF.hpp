@@ -37,23 +37,9 @@ public:
   static constexpr auto NONE      = value_t::NONE;
   static constexpr auto TEMPERROR = value_t::TEMPERROR;
   static constexpr auto PERMERROR = value_t::PERMERROR;
-
-  static char const* c_str(value_t value)
-  {
-    switch (value) {
-    case INVALID:   return "invalid";
-    case NEUTRAL:   return "neutral";
-    case PASS:      return "pass";
-    case FAIL:      return "fail";
-    case SOFTFAIL:  return "softfail";
-    case NONE:      return "none";
-    case TEMPERROR: return "temperror";
-    case PERMERROR: return "permerror";
-    }
-    LOG(ERROR) << "unknown Result value";
-    return "** unknown **";
-  }
   // clang-format on
+
+  static char const* c_str(value_t value);
 
   char const* c_str() const { return c_str(value_); }
 
