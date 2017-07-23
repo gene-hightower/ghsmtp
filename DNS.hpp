@@ -1,48 +1,112 @@
 #ifndef DNS_DOT_HPP
 #define DNS_DOT_HPP
 
-#include <ldns/packet.h>
-#include <ldns/rr.h>
-
+typedef struct ldns_struct_pkt ldns_pkt;
+typedef struct ldns_struct_rdf ldns_rdf;
 typedef struct ldns_struct_resolver ldns_resolver;
+typedef struct ldns_struct_rr_list ldns_rr_list;
 
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace DNS {
+// clang-format off
 
-enum class RR_type {
-  A = LDNS_RR_TYPE_A,
-  AAAA = LDNS_RR_TYPE_AAAA,
-  CNAME = LDNS_RR_TYPE_CNAME,
-  MX = LDNS_RR_TYPE_MX,
-  PTR = LDNS_RR_TYPE_PTR,
-  TLSA = LDNS_RR_TYPE_TLSA,
-  TXT = LDNS_RR_TYPE_TXT,
+class RR_type {
+public:
+  RR_type(int value);           // int for ldns_rr_type
+
+  enum class value_t {          // same values as ldns_rr_type
+    NONE  = 0,
+    A     = 1,
+    AAAA  = 28,
+    CNAME = 5,
+    MX    = 15,
+    PTR   = 12,
+    TLSA  = 52,
+    TXT   = 16,
+  };
+
+  static constexpr auto NONE  = value_t::NONE;
+  static constexpr auto A     = value_t::A;
+  static constexpr auto AAAA  = value_t::AAAA;
+  static constexpr auto CNAME = value_t::CNAME;
+  static constexpr auto MX    = value_t::MX;
+  static constexpr auto PTR   = value_t::PTR;
+  static constexpr auto TLSA  = value_t::TLSA;
+  static constexpr auto TXT   = value_t::TXT;
+
+  static char const* c_str(value_t value);
+  char const* c_str() const { return c_str(value_); }
+  explicit operator char const*() const { return c_str(); }
+
+  operator value_t() const { return value_; }
+  value_t value() const { return value_; }
+
+private:
+  value_t value_{NONE};
 };
 
-enum class Pkt_rcode {
-  NOERROR = LDNS_RCODE_NOERROR,
-  FORMERR = LDNS_RCODE_FORMERR,
-  SERVFAIL = LDNS_RCODE_SERVFAIL,
-  NXDOMAIN = LDNS_RCODE_NXDOMAIN,
-  NOTIMPL = LDNS_RCODE_NOTIMPL,
-  REFUSED = LDNS_RCODE_REFUSED,
-  YXDOMAIN = LDNS_RCODE_YXDOMAIN,
-  YXRRSET = LDNS_RCODE_YXRRSET,
-  NXRRSET = LDNS_RCODE_NXRRSET,
-  NOTAUTH = LDNS_RCODE_NOTAUTH,
-  NOTZONE = LDNS_RCODE_NOTZONE,
-  INTERNAL = 666,
+class Pkt_rcode {
+public:
+  Pkt_rcode(int value);         // int for ldns_pkt_rcode
+
+  enum class value_t {          // same values as ldns_pkt_rcode
+    NOERROR  = 0,
+    FORMERR  = 1,
+    SERVFAIL = 2,
+    NXDOMAIN = 3,
+    NOTIMPL  = 4,
+    REFUSED  = 5,
+    YXDOMAIN = 6,
+    YXRRSET  = 7,
+    NXRRSET  = 8,
+    NOTAUTH  = 9,
+    NOTZONE  = 10,
+    INTERNAL = 666,
+  };
+
+  static constexpr auto NOERROR  = value_t::NOERROR;
+  static constexpr auto FORMERR  = value_t::FORMERR;
+  static constexpr auto SERVFAIL = value_t::SERVFAIL;
+  static constexpr auto NXDOMAIN = value_t::NXDOMAIN;
+  static constexpr auto NOTIMPL  = value_t::NOTIMPL;
+  static constexpr auto REFUSED  = value_t::REFUSED;
+  static constexpr auto YXDOMAIN = value_t::YXDOMAIN;
+  static constexpr auto YXRRSET  = value_t::YXRRSET;
+  static constexpr auto NXRRSET  = value_t::NXRRSET;
+  static constexpr auto NOTAUTH  = value_t::NOTAUTH;
+  static constexpr auto NOTZONE  = value_t::NOTZONE;
+  static constexpr auto INTERNAL = value_t::INTERNAL;
+
+  static char const* c_str(value_t value);
+
+  char const* c_str() const { return c_str(value_); }
+
+  operator value_t() const { return value_; }
+  explicit operator char const*() const { return c_str(); }
+
+private:
+  value_t value_{NOERROR};
+
 };
+// clang-format on
 
-char const* as_cstr(Pkt_rcode pkt_rcode);
-std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode);
+} // namespace DNS
 
-template <RR_type type>
+std::ostream& operator<<(std::ostream& os, DNS::RR_type::value_t const& value);
+std::ostream& operator<<(std::ostream& os, DNS::RR_type const& value);
+
+std::ostream& operator<<(std::ostream& os,
+                         DNS::Pkt_rcode::value_t const& value);
+std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode const& value);
+
+namespace DNS {
+
+template <RR_type::value_t type>
 class Query;
-template <RR_type type>
+template <RR_type::value_t type>
 class Rrlist;
 
 class Resolver {
@@ -56,11 +120,11 @@ public:
 private:
   ldns_resolver* res_;
 
-  friend class Query<RR_type::A>;
-  friend class Query<RR_type::AAAA>;
-  friend class Query<RR_type::MX>;
-  friend class Query<RR_type::PTR>;
-  friend class Query<RR_type::TXT>;
+  friend class Query<RR_type::value_t::A>;
+  friend class Query<RR_type::value_t::AAAA>;
+  friend class Query<RR_type::value_t::MX>;
+  friend class Query<RR_type::value_t::PTR>;
+  friend class Query<RR_type::value_t::TXT>;
 };
 
 class Domain {
@@ -82,7 +146,7 @@ private:
   friend class Query<RR_type::TXT>;
 };
 
-template <RR_type type>
+template <RR_type::value_t type>
 class Query {
 public:
   Query(Query const&) = delete;
@@ -99,7 +163,7 @@ private:
   friend class Rrlist<type>;
 };
 
-template <RR_type type>
+template <RR_type::value_t type>
 class Rrlist {
 public:
   Rrlist(Rrlist const&) = delete;
@@ -118,10 +182,10 @@ private:
   std::string rr_str(ldns_rdf const* rdf) const;
 };
 
-template <RR_type type>
+template <RR_type::value_t type>
 bool has_record(Resolver const& res, std::string addr);
 
-template <RR_type type>
+template <RR_type::value_t type>
 std::vector<std::string> get_records(Resolver const& res, std::string addr);
 
 } // namespace DNS

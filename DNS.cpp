@@ -5,49 +5,87 @@
 #include <iomanip>
 
 #include <ldns/ldns.h>
-#undef bool
+#include <ldns/packet.h>
+#include <ldns/rr.h>
+#undef bool // this is fucking rude...
 
 #include <arpa/inet.h>
 
 #include <glog/logging.h>
 
 namespace DNS {
+// clang-format off
 
-char const* as_cstr(Pkt_rcode pkt_rcode)
+RR_type::RR_type(int value)
 {
-  switch (pkt_rcode) {
-  case DNS::Pkt_rcode::NOERROR:
-    return "NOERROR";
-  case DNS::Pkt_rcode::FORMERR:
-    return "FORMERR";
-  case DNS::Pkt_rcode::SERVFAIL:
-    return "SERVFAIL";
-  case DNS::Pkt_rcode::NXDOMAIN:
-    return "NXDOMAIN";
-  case DNS::Pkt_rcode::NOTIMPL:
-    return "NOTIMPL";
-  case DNS::Pkt_rcode::REFUSED:
-    return "REFUSED";
-  case DNS::Pkt_rcode::YXDOMAIN:
-    return "YXDOMAIN";
-  case DNS::Pkt_rcode::YXRRSET:
-    return "YXRRSET";
-  case DNS::Pkt_rcode::NXRRSET:
-    return "NXRRSET";
-  case DNS::Pkt_rcode::NOTAUTH:
-    return "NOTAUTH";
-  case DNS::Pkt_rcode::NOTZONE:
-    return "NOTZONE";
-  case DNS::Pkt_rcode::INTERNAL:
-    return "INTERNAL";
+  switch (value) {
+  case LDNS_RR_TYPE_A:     value_ = A;     break;
+  case LDNS_RR_TYPE_AAAA:  value_ = AAAA;  break;
+  case LDNS_RR_TYPE_CNAME: value_ = CNAME; break;
+  case LDNS_RR_TYPE_MX:    value_ = MX;    break;
+  case LDNS_RR_TYPE_PTR:   value_ = PTR;   break;
+  case LDNS_RR_TYPE_TLSA:  value_ = TLSA;  break;
+  case LDNS_RR_TYPE_TXT:   value_ = TXT;   break;
+  default:
+    LOG(ERROR) << "unrecognized ldns_rr_type value: " << value;    
   }
+}
+
+char const* RR_type::c_str(RR_type::value_t value)
+{
+  switch (value) {
+  case RR_type::NONE:  return "NONE";
+  case RR_type::A:     return "A";
+  case RR_type::AAAA:  return "AAAA";
+  case RR_type::CNAME: return "CNAME";
+  case RR_type::MX:    return "MX";
+  case RR_type::PTR:   return "PTR";
+  case RR_type::TLSA:  return "TLSA";
+  case RR_type::TXT:   return "TXT";
+  }
+  LOG(ERROR) << "unknown RR_type value: " << value;
   return "** unknown **";
 }
 
-std::ostream& operator<<(std::ostream& os, Pkt_rcode pkt_rcode)
+Pkt_rcode::Pkt_rcode(int value)
 {
-  return os << as_cstr(pkt_rcode);
+  switch (value) {
+  case LDNS_RCODE_NOERROR:  value_ = NOERROR;  break;
+  case LDNS_RCODE_FORMERR:  value_ = FORMERR;  break;
+  case LDNS_RCODE_SERVFAIL: value_ = SERVFAIL; break;
+  case LDNS_RCODE_NXDOMAIN: value_ = NXDOMAIN; break;
+  case LDNS_RCODE_NOTIMPL:  value_ = NOTIMPL;  break;
+  case LDNS_RCODE_REFUSED:  value_ = REFUSED;  break;
+  case LDNS_RCODE_YXDOMAIN: value_ = YXDOMAIN; break;
+  case LDNS_RCODE_YXRRSET:  value_ = YXRRSET;  break;
+  case LDNS_RCODE_NXRRSET:  value_ = NXRRSET;  break;
+  case LDNS_RCODE_NOTAUTH:  value_ = NOTAUTH;  break;
+  case LDNS_RCODE_NOTZONE:  value_ = NOTZONE;  break;
+  default:
+    LOG(ERROR) << "unrecognized ldns_pkt_rcode value: " << value;    
+  }
 }
+
+char const* Pkt_rcode::c_str(Pkt_rcode::value_t value)
+{
+  switch (value) {
+  case Pkt_rcode::NOERROR:  return "NOERROR";
+  case Pkt_rcode::FORMERR:  return "FORMERR";
+  case Pkt_rcode::SERVFAIL: return "SERVFAIL";
+  case Pkt_rcode::NXDOMAIN: return "NXDOMAIN";
+  case Pkt_rcode::NOTIMPL:  return "NOTIMPL";
+  case Pkt_rcode::REFUSED:  return "REFUSED";
+  case Pkt_rcode::YXDOMAIN: return "YXDOMAIN";
+  case Pkt_rcode::YXRRSET:  return "YXRRSET";
+  case Pkt_rcode::NXRRSET:  return "NXRRSET";
+  case Pkt_rcode::NOTAUTH:  return "NOTAUTH";
+  case Pkt_rcode::NOTZONE:  return "NOTZONE";
+  case Pkt_rcode::INTERNAL: return "INTERNAL";
+  }
+  LOG(ERROR) << "unknown Pkt_rcode value: " << value;
+  return "** unknown **";
+}
+// clang-format on
 
 Resolver::Resolver()
 {
@@ -67,7 +105,7 @@ Domain::Domain(std::string domain)
 
 Domain::~Domain() { ldns_rdf_deep_free(drdfp_); }
 
-template <RR_type type>
+template <RR_type::value_t type>
 Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
 {
   ldns_status status = ldns_resolver_query_status(
@@ -79,7 +117,7 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
                                    << ldns_get_errorstr_by_id(status);
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 Query<type>::~Query()
 {
   if (p_) {
@@ -87,7 +125,7 @@ Query<type>::~Query()
   }
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 Pkt_rcode Query<type>::get_rcode() const
 {
   if (p_) {
@@ -96,7 +134,7 @@ Pkt_rcode Query<type>::get_rcode() const
   return Pkt_rcode::INTERNAL;
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 Rrlist<type>::Rrlist(Query<type> const& q)
 {
   if (q.p_) {
@@ -105,21 +143,21 @@ Rrlist<type>::Rrlist(Query<type> const& q)
   }
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 Rrlist<type>::~Rrlist()
 {
   if (!empty()) // since we don't assert success in the ctr()
     ldns_rr_list_deep_free(rrlst_);
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 bool Rrlist<type>::empty() const
 {
   return nullptr == rrlst_;
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::MX>::get() const
+std::vector<std::string> Rrlist<RR_type::value_t::MX>::get() const
 {
   std::vector<std::string> hosts;
   std::vector<uint16_t> priorities;
@@ -167,7 +205,7 @@ std::vector<std::string> Rrlist<RR_type::MX>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::TXT>::get() const
+std::vector<std::string> Rrlist<RR_type::value_t::TXT>::get() const
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -191,7 +229,7 @@ std::vector<std::string> Rrlist<RR_type::TXT>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::PTR>::get() const
+std::vector<std::string> Rrlist<RR_type::value_t::PTR>::get() const
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -217,7 +255,7 @@ std::vector<std::string> Rrlist<RR_type::PTR>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::A>::get() const
+std::vector<std::string> Rrlist<RR_type::value_t::A>::get() const
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -243,7 +281,7 @@ std::vector<std::string> Rrlist<RR_type::A>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::AAAA>::get() const
+std::vector<std::string> Rrlist<RR_type::value_t::AAAA>::get() const
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -269,7 +307,7 @@ std::vector<std::string> Rrlist<RR_type::AAAA>::get() const
   return ret;
 }
 
-template <RR_type T>
+template <RR_type::value_t T>
 std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 {
   auto sz = ldns_rdf_size(rdf);
@@ -313,7 +351,7 @@ std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
   return str.str();
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 {
   auto data = static_cast<char const*>(rdf->_data);
@@ -322,7 +360,7 @@ std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
   return std::string(data + 1, static_cast<std::string::size_type>(*udata));
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 bool has_record(Resolver const& res, std::string addr)
 {
   Domain dom(addr);
@@ -331,7 +369,7 @@ bool has_record(Resolver const& res, std::string addr)
   return !rrlst.empty();
 }
 
-template <RR_type type>
+template <RR_type::value_t type>
 std::vector<std::string> get_records(Resolver const& res, std::string addr)
 {
   Domain dom(addr);
@@ -340,15 +378,37 @@ std::vector<std::string> get_records(Resolver const& res, std::string addr)
   return rrlst.get();
 }
 
-template bool has_record<RR_type::A>(Resolver const& res, std::string addr);
-template bool has_record<RR_type::AAAA>(Resolver const& res, std::string addr);
+template bool has_record<RR_type::value_t::A>(Resolver const& res,
+                                              std::string addr);
+template bool has_record<RR_type::value_t::AAAA>(Resolver const& res,
+                                                 std::string addr);
 
-template std::vector<std::string> get_records<RR_type::A>(Resolver const& res,
-                                                          std::string addr);
 template std::vector<std::string>
-get_records<RR_type::AAAA>(Resolver const& res, std::string addr);
-template std::vector<std::string> get_records<RR_type::MX>(Resolver const& res,
-                                                           std::string addr);
-template std::vector<std::string> get_records<RR_type::PTR>(Resolver const& res,
-                                                            std::string addr);
+get_records<RR_type::value_t::A>(Resolver const& res, std::string addr);
+template std::vector<std::string>
+get_records<RR_type::value_t::AAAA>(Resolver const& res, std::string addr);
+template std::vector<std::string>
+get_records<RR_type::value_t::MX>(Resolver const& res, std::string addr);
+template std::vector<std::string>
+get_records<RR_type::value_t::PTR>(Resolver const& res, std::string addr);
+} // namespace DNS
+
+std::ostream& operator<<(std::ostream& os, DNS::RR_type::value_t const& value)
+{
+  return os << DNS::RR_type::c_str(value);
+}
+
+std::ostream& operator<<(std::ostream& os, DNS::RR_type const& value)
+{
+  return os << value.c_str();
+}
+
+std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode::value_t const& value)
+{
+  return os << DNS::Pkt_rcode::c_str(value);
+}
+
+std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode const& value)
+{
+  return os << value.c_str();
 }
