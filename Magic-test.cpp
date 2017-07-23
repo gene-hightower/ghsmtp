@@ -1,21 +1,24 @@
 #include "Magic.hpp"
 
+#include <algorithm>
+#include <cstring>
+#include <iomanip>
 #include <iostream>
-#include <string>
-
-#include <glog/logging.h>
 
 int main(int argc, char* argv[])
 {
   Magic magic;
 
-  std::vector<std::string> results;
-
+  size_t width = 0;
   for (auto arg = 1; arg < argc; ++arg) {
-    results.push_back(magic.file(argv[arg]));
+    auto idx = arg - 1;
+    auto len = strlen(argv[idx]);
+    width = std::max(width, len);
   }
 
   for (auto arg = 1; arg < argc; ++arg) {
-    std::cout << results[arg - 1] << '\n';
+    auto idx = arg - 1;
+    std::cout << std::setw(width) << argv[idx] << ": " << magic.file(argv[idx])
+              << '\n';
   }
 }
