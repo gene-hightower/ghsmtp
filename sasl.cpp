@@ -78,27 +78,30 @@ struct Context {
 
   enum class auth_response { none, ok, cont, fail };
 
-  auth_response auth_resp = auth_response::none;
-};
+  // clang-format off
+  static constexpr auto none = auth_response::none;
+  static constexpr auto ok   = auth_response::ok;
+  static constexpr auto cont = auth_response::cont;
+  static constexpr auto fail = auth_response::fail;
 
-char const* as_cstr(Context::auth_response rsp)
-{
-  switch (rsp) {
-  case Context::auth_response::none:
-    return "none";
-  case Context::auth_response::ok:
-    return "ok";
-  case Context::auth_response::cont:
-    return "cont";
-  case Context::auth_response::fail:
-    return "fail";
+  static char const* c_str(auth_response rsp)
+  {
+    switch (rsp) {
+    case none: return "none";
+    case ok:   return "ok";
+    case cont: return "cont";
+    case fail: return "fail";
+    }
+    return "** unknown **";
   }
-  return "** unknown **";
-}
+  // clang-format on
+
+  auth_response auth_resp{none};
+};
 
 std::ostream& operator<<(std::ostream& os, Context::auth_response rsp)
 {
-  return os << as_cstr(rsp);
+  return os << Context::c_str(rsp);
 }
 
 template <typename Rule>
