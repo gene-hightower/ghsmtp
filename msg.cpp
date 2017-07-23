@@ -1306,7 +1306,7 @@ struct action<received_spf> {
     auto res = spf_res.result();
     CHECK_NE(res, SPF::Result::INVALID);
 
-    if (ctx.spf_result != SPF::as_cstr(res)) {
+    if (ctx.spf_result != res.c_str()) {
       LOG(WARNING) << "SPF results changed: "
                    << "new result is \"" << res << "\", old result is \""
                    << ctx.spf_result << "\"";

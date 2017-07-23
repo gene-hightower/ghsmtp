@@ -3,53 +3,67 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
+#include <arpa/inet.h> // in_addr required by spf2/spf.h
+#include <arpa/nameser.h>
+
+extern "C" {
+#define HAVE_NS_TYPE
+#include <spf2/spf.h>
+}
+
 namespace SPF {
 
-char const* as_cstr(Result result)
+Result::Result(int value)
 {
-  switch (result) {
-  case Result::INVALID:
-    return "invalid";
-  case Result::NEUTRAL:
-    return "neutral";
-  case Result::PASS:
-    return "pass";
-  case Result::FAIL:
-    return "fail";
-  case Result::SOFTFAIL:
-    return "softfail";
-  case Result::NONE:
-    return "none";
-  case Result::TEMPERROR:
-    return "temperror";
-  case Result::PERMERROR:
-    return "permerror";
+  // clang-format off
+  switch (value) {
+  case SPF_RESULT_INVALID:   value_ = value_t::INVALID;   break;
+  case SPF_RESULT_NEUTRAL:   value_ = value_t::NEUTRAL;   break;
+  case SPF_RESULT_PASS:      value_ = value_t::PASS;      break;
+  case SPF_RESULT_FAIL:      value_ = value_t::FAIL;      break;
+  case SPF_RESULT_SOFTFAIL:  value_ = value_t::SOFTFAIL;  break;
+  case SPF_RESULT_NONE:      value_ = value_t::NONE;      break;
+  case SPF_RESULT_TEMPERROR: value_ = value_t::TEMPERROR; break;
+  case SPF_RESULT_PERMERROR: value_ = value_t::PERMERROR; break;
+  default:
+    LOG(ERROR) << "unrecognized SPF_result_t value: " << value;
   }
-  return "** unknown **";
+  // clang-format on
 }
 
 std::ostream& operator<<(std::ostream& os, Result result)
 {
-  return os << as_cstr(result);
+  return os << result.c_str();
 }
 
-// We map libspf2's levels of error, warning, info and debug to our
-// own fatal, error, warning and info log levels.
+std::ostream& operator<<(std::ostream& os, Result::value_t result)
+{
+  return os << Result::c_str(result);
+}
 
-static void log_error(const char* file, int line, char const* errmsg)
-    __attribute__((noreturn));
-static void log_error(const char* file, int line, char const* errmsg)
+Server::Server(char const* fqdn)
+  : srv_(CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1)))
 {
-  LOG(FATAL) << file << ":" << line << " " << errmsg;
+  CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, CHECK_NOTNULL(fqdn)));
 }
-static void log_warning(const char* file, int line, char const* errmsg)
+
+Server::~Server() { SPF_server_free(srv_); }
+
+Server::initializer::initializer()
 {
-  LOG(ERROR) << file << ":" << line << " " << errmsg;
+  // Hook info libspf2's error procs.
+  SPF_error_handler = log_error_;
+  SPF_warning_handler = log_warning_;
+  SPF_info_handler = log_info_;
+  SPF_debug_handler = nullptr;
 }
-static void log_info(const char* file, int line, char const* errmsg)
+
+Request::Request(Server const& srv)
+  : req_(CHECK_NOTNULL(SPF_request_new(srv.srv_)))
 {
-  LOG(WARNING) << file << ":" << line << " " << errmsg;
 }
+
+Request::~Request() { SPF_request_free(req_); }
 
 void Request::set_ip_str(char const* ip)
 {
@@ -63,16 +77,49 @@ void Request::set_ip_str(char const* ip)
     LOG(FATAL) << "non IP address passwd to set_ip_str: " << ip;
   }
 }
-
-struct Init {
-  Init()
-  {
-    SPF_error_handler = log_error;
-    SPF_warning_handler = log_warning;
-    SPF_info_handler = log_info;
-    SPF_debug_handler = nullptr;
-  }
-};
-
-static Init init;
+void Request::set_ipv4_str(char const* ipv4)
+{
+  CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv4_str(req_, ipv4));
 }
+void Request::set_ipv6_str(char const* ipv6)
+{
+  CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv6_str(req_, ipv6));
+}
+void Request::set_helo_dom(char const* dom)
+{
+  CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_helo_dom(req_, dom));
+}
+void Request::set_env_from(char const* frm)
+{
+  CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_env_from(req_, frm));
+}
+
+Response::Response(Request const& req)
+{
+  // We ignore the return code from this call, as everything we need
+  // to know is in the SPF_response_t struct.
+  SPF_request_query_mailfrom(req.req_, &res_);
+  CHECK_NOTNULL(res_);
+}
+
+Response::~Response() { SPF_response_free(res_); }
+
+Result Response::result() const { return Result(SPF_response_result(res_)); }
+
+char const* Response::smtp_comment() const
+{
+  return SPF_response_get_smtp_comment(res_);
+}
+
+char const* Response::header_comment() const
+{
+  return SPF_response_get_header_comment(res_);
+}
+
+char const* Response::received_spf() const
+{
+  return SPF_response_get_received_spf(res_);
+}
+}
+
+SPF::Server::initializer SPF::Server::init;

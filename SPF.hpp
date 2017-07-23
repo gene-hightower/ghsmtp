@@ -2,48 +2,102 @@
 #define SPF_DOT_HPP
 
 #include <ostream>
-#include <unordered_map>
-
-#include <arpa/inet.h> // in_addr required by spf2/spf.h
-#include <arpa/nameser.h>
-
-extern "C" {
-#define HAVE_NS_TYPE
-#include <spf2/spf.h>
-}
 
 #include <glog/logging.h>
 
+// forward stuff from <spf2/spf.h>
+typedef struct SPF_server_struct SPF_server_t;
+typedef struct SPF_request_struct SPF_request_t;
+typedef struct SPF_response_struct SPF_response_t;
+
 namespace SPF {
 
-enum class Result {
-  INVALID = SPF_RESULT_INVALID,
-  NEUTRAL = SPF_RESULT_NEUTRAL,
-  PASS = SPF_RESULT_PASS,
-  FAIL = SPF_RESULT_FAIL,
-  SOFTFAIL = SPF_RESULT_SOFTFAIL,
-  NONE = SPF_RESULT_NONE,
-  TEMPERROR = SPF_RESULT_TEMPERROR,
-  PERMERROR = SPF_RESULT_PERMERROR,
+class Result {
+public:
+  Result() = default;
+  Result(int value); // int for SPF_result_t
+
+  enum class value_t {
+    INVALID,
+    NEUTRAL,
+    PASS,
+    FAIL,
+    SOFTFAIL,
+    NONE,
+    TEMPERROR,
+    PERMERROR,
+  };
+
+  // clang-format off
+  static constexpr auto INVALID   = value_t::INVALID;
+  static constexpr auto NEUTRAL   = value_t::NEUTRAL;
+  static constexpr auto PASS      = value_t::PASS;
+  static constexpr auto FAIL      = value_t::FAIL;
+  static constexpr auto SOFTFAIL  = value_t::SOFTFAIL;
+  static constexpr auto NONE      = value_t::NONE;
+  static constexpr auto TEMPERROR = value_t::TEMPERROR;
+  static constexpr auto PERMERROR = value_t::PERMERROR;
+
+  static char const* c_str(value_t value)
+  {
+    switch (value) {
+    case INVALID:   return "invalid";
+    case NEUTRAL:   return "neutral";
+    case PASS:      return "pass";
+    case FAIL:      return "fail";
+    case SOFTFAIL:  return "softfail";
+    case NONE:      return "none";
+    case TEMPERROR: return "temperror";
+    case PERMERROR: return "permerror";
+    }
+    LOG(ERROR) << "unknown Result value";
+    return "** unknown **";
+  }
+  // clang-format on
+
+  char const* c_str() const { return c_str(value_); }
+
+  operator value_t() const { return value_; }
+  explicit operator char const*() const { return c_str(); }
+
+private:
+  value_t value_{INVALID};
 };
 
-char const* as_cstr(Result result);
 std::ostream& operator<<(std::ostream& os, Result result);
+std::ostream& operator<<(std::ostream& os, Result::value_t result);
 
 class Server {
 public:
   Server(Server const&) = delete;
   Server& operator=(Server const&) = delete;
 
-  explicit Server(char const* fqdn)
-    : srv_(CHECK_NOTNULL(SPF_server_new(SPF_DNS_RESOLV, 1)))
-  {
-    CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, CHECK_NOTNULL(fqdn)));
-  }
-  ~Server() { SPF_server_free(srv_); }
+  explicit Server(char const* fqdn);
+  ~Server();
+
+  static class initializer {
+  public:
+    initializer();
+  } init;
 
 private:
   SPF_server_t* srv_{nullptr};
+
+  // We map libspf2's levels of error, warning, info and debug to our
+  // own fatal, error, warning and info log levels.
+  static void log_error_(const char* file, int line, char const* errmsg)
+      __attribute__((noreturn))
+  {
+    LOG(FATAL) << file << ":" << line << " " << errmsg;
+  }
+  static void log_warning_(const char* file, int line, char const* errmsg)
+  {
+    LOG(ERROR) << file << ":" << line << " " << errmsg;
+  }
+  static void log_info_(const char* file, int line, char const* errmsg)
+  {
+    LOG(WARNING) << file << ":" << line << " " << errmsg;
+  }
 
   friend class Request;
 };
@@ -53,29 +107,14 @@ public:
   Request(Request const&) = delete;
   Request& operator=(Request const&) = delete;
 
-  explicit Request(Server const& srv)
-    : req_(CHECK_NOTNULL(SPF_request_new(srv.srv_)))
-  {
-  }
-  ~Request() { SPF_request_free(req_); }
-  void set_ip_str(char const* ip);
+  explicit Request(Server const& srv);
+  ~Request();
 
-  void set_ipv4_str(char const* ipv4)
-  {
-    CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv4_str(req_, ipv4));
-  }
-  void set_ipv6_str(char const* ipv6)
-  {
-    CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_ipv6_str(req_, ipv6));
-  }
-  void set_helo_dom(char const* dom)
-  {
-    CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_helo_dom(req_, dom));
-  }
-  void set_env_from(char const* frm)
-  {
-    CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_env_from(req_, frm));
-  }
+  void set_ip_str(char const* ip);
+  void set_ipv4_str(char const* ipv4);
+  void set_ipv6_str(char const* ipv6);
+  void set_helo_dom(char const* dom);
+  void set_env_from(char const* frm);
 
 private:
   SPF_request_t* req_{nullptr};
@@ -88,30 +127,13 @@ public:
   Response(Response const&) = delete;
   Response& operator=(Response const&) = delete;
 
-  explicit Response(Request const& req)
-  {
-    // We ignore the return code from this call, as everything we need
-    // to know is in the SPF_response_t struct.
-    SPF_request_query_mailfrom(req.req_, &res_);
-    CHECK_NOTNULL(res_);
-  }
-  ~Response() { SPF_response_free(res_); }
-  Result result() const
-  {
-    return static_cast<Result>(SPF_response_result(res_));
-  }
-  char const* smtp_comment() const
-  {
-    return SPF_response_get_smtp_comment(res_);
-  }
-  char const* header_comment() const
-  {
-    return SPF_response_get_header_comment(res_);
-  }
-  char const* received_spf() const
-  {
-    return SPF_response_get_received_spf(res_);
-  }
+  explicit Response(Request const& req);
+  ~Response();
+
+  Result result() const;
+  char const* smtp_comment() const;
+  char const* header_comment() const;
+  char const* received_spf() const;
 
 private:
   SPF_response_t* res_{nullptr};
