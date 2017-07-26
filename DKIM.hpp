@@ -2,7 +2,6 @@
 #define DKIM_DOT_HPP
 
 #include <functional>
-
 #include <string_view>
 
 typedef struct dkim_lib DKIM_LIB;

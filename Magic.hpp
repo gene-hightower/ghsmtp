@@ -2,7 +2,6 @@
 #define MAGIC_DOT_HPP
 
 #include <string>
-
 #include <string_view>
 
 typedef struct magic_set* magic_t;
