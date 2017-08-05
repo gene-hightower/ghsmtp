@@ -117,9 +117,8 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
                  << "ldns_resolver_query_status failed: "
                  << ldns_get_errorstr_by_id(status);
 
-    // Must reset RTT if it failed with a timeout, and we have only
-    // one nameserver, we must reset the RTT otherwise all future use
-    // of this resolver object will fail.
+    // If we have only one nameserver, reset the RTT otherwise all
+    // future use of this resolver object will fail.
 
     if (ldns_resolver_nameserver_count(res.res_) == 1) {
       if (ldns_resolver_rtt(res.res_) == LDNS_RESOLV_RTT_INF) {
