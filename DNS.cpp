@@ -112,9 +112,22 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
       &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
       LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
 
-  CHECK_EQ(status, LDNS_STATUS_OK) << "Query (" << dom.domain_ << ") "
-                                   << "ldns_resolver_query_status failed: "
-                                   << ldns_get_errorstr_by_id(status);
+  if (status != LDNS_STATUS_OK) {
+    LOG(WARNING) << "Query (" << dom.domain_ << ") "
+                 << "ldns_resolver_query_status failed: "
+                 << ldns_get_errorstr_by_id(status);
+
+    // Must reset RTT if it failed with a timeout, and we have only
+    // one nameserver, we must reset the RTT otherwise all future use
+    // of this resolver object will fail.
+
+    if (ldns_resolver_rtt(res.res_) == LDNS_RESOLV_RTT_INF) {
+      if (ldns_resolver_nameserver_count(res.res_) == 1) {
+        ldns_resolver_set_nameserver_rtt(res.res_, 0,
+                                         LDNS_RESOLV_RTT_MIN); // "reachable"
+      }
+    }
+  }
 }
 
 template <RR_type::value_t type>
