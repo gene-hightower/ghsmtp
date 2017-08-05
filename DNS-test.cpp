@@ -5,10 +5,12 @@
 #include <ldns/packet.h>
 #include <ldns/rr.h>
 
-#ifdef bool
-#warning leaving bool a defined macro is fucking rude...
+// Leaving bool and friends defined macros is rude in C++.  This is
+// (apparently) thanks to advice from:
+// <https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Particular-Headers.html>
 #undef bool
-#endif
+#undef false
+#undef true
 
 int main(int argc, char const* argv[])
 {
