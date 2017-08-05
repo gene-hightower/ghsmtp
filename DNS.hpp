@@ -39,14 +39,14 @@ public:
 
   static constexpr char const* c_str(value_t value) {
     switch (value) {
-    case RR_type::NONE:  return "NONE";
-    case RR_type::A:     return "A";
-    case RR_type::AAAA:  return "AAAA";
-    case RR_type::CNAME: return "CNAME";
-    case RR_type::MX:    return "MX";
-    case RR_type::PTR:   return "PTR";
-    case RR_type::TLSA:  return "TLSA";
-    case RR_type::TXT:   return "TXT";
+    case NONE:  return "NONE";
+    case A:     return "A";
+    case AAAA:  return "AAAA";
+    case CNAME: return "CNAME";
+    case MX:    return "MX";
+    case PTR:   return "PTR";
+    case TLSA:  return "TLSA";
+    case TXT:   return "TXT";
     }
     return "** unknown **";
   }
