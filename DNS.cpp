@@ -121,8 +121,8 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
     // one nameserver, we must reset the RTT otherwise all future use
     // of this resolver object will fail.
 
-    if (ldns_resolver_rtt(res.res_) == LDNS_RESOLV_RTT_INF) {
-      if (ldns_resolver_nameserver_count(res.res_) == 1) {
+    if (ldns_resolver_nameserver_count(res.res_) == 1) {
+      if (ldns_resolver_rtt(res.res_) == LDNS_RESOLV_RTT_INF) {
         ldns_resolver_set_nameserver_rtt(res.res_, 0,
                                          LDNS_RESOLV_RTT_MIN); // "reachable"
       }
