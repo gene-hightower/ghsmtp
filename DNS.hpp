@@ -37,7 +37,20 @@ public:
   static constexpr auto TLSA  = value_t::TLSA;
   static constexpr auto TXT   = value_t::TXT;
 
-  static char const* c_str(value_t value);
+  static constexpr char const* c_str(value_t value) {
+    switch (value) {
+    case RR_type::NONE:  return "NONE";
+    case RR_type::A:     return "A";
+    case RR_type::AAAA:  return "AAAA";
+    case RR_type::CNAME: return "CNAME";
+    case RR_type::MX:    return "MX";
+    case RR_type::PTR:   return "PTR";
+    case RR_type::TLSA:  return "TLSA";
+    case RR_type::TXT:   return "TXT";
+    }
+    return "** unknown **";
+  }
+
   char const* c_str() const { return c_str(value_); }
   explicit operator char const*() const { return c_str(); }
 
@@ -79,13 +92,6 @@ public:
   static constexpr auto NOTAUTH  = value_t::NOTAUTH;
   static constexpr auto NOTZONE  = value_t::NOTZONE;
   static constexpr auto INTERNAL = value_t::INTERNAL;
-
-  static char const* c_str(value_t value);
-
-  char const* c_str() const { return c_str(value_); }
-
-  operator value_t() const { return value_; }
-  explicit operator char const*() const { return c_str(); }
 
 private:
   value_t value_{NOERROR};

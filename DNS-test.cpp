@@ -29,18 +29,6 @@ int main(int argc, char const* argv[])
   CHECK(RR_type::PTR   == RR_type(LDNS_RR_TYPE_PTR));
   CHECK(RR_type::TLSA  == RR_type(LDNS_RR_TYPE_TLSA));
   CHECK(RR_type::TXT   == RR_type(LDNS_RR_TYPE_TXT));
-
-  CHECK(Pkt_rcode::NOERROR  == Pkt_rcode(LDNS_RCODE_NOERROR));
-  CHECK(Pkt_rcode::FORMERR  == Pkt_rcode(LDNS_RCODE_FORMERR));
-  CHECK(Pkt_rcode::SERVFAIL == Pkt_rcode(LDNS_RCODE_SERVFAIL));
-  CHECK(Pkt_rcode::NXDOMAIN == Pkt_rcode(LDNS_RCODE_NXDOMAIN));
-  CHECK(Pkt_rcode::NOTIMPL  == Pkt_rcode(LDNS_RCODE_NOTIMPL));
-  CHECK(Pkt_rcode::REFUSED  == Pkt_rcode(LDNS_RCODE_REFUSED));
-  CHECK(Pkt_rcode::YXDOMAIN == Pkt_rcode(LDNS_RCODE_YXDOMAIN));
-  CHECK(Pkt_rcode::YXRRSET  == Pkt_rcode(LDNS_RCODE_YXRRSET));
-  CHECK(Pkt_rcode::NXRRSET  == Pkt_rcode(LDNS_RCODE_NXRRSET));
-  CHECK(Pkt_rcode::NOTAUTH  == Pkt_rcode(LDNS_RCODE_NOTAUTH));
-  CHECK(Pkt_rcode::NOTZONE  == Pkt_rcode(LDNS_RCODE_NOTZONE));
   // clang-format on
 
   DNS::Resolver res;

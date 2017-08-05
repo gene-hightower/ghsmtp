@@ -37,22 +37,6 @@ RR_type::RR_type(int value)
   }
 }
 
-char const* RR_type::c_str(RR_type::value_t value)
-{
-  switch (value) {
-  case RR_type::NONE:  return "NONE";
-  case RR_type::A:     return "A";
-  case RR_type::AAAA:  return "AAAA";
-  case RR_type::CNAME: return "CNAME";
-  case RR_type::MX:    return "MX";
-  case RR_type::PTR:   return "PTR";
-  case RR_type::TLSA:  return "TLSA";
-  case RR_type::TXT:   return "TXT";
-  }
-  LOG(ERROR) << "unknown RR_type value: " << value;
-  return "** unknown **";
-}
-
 Pkt_rcode::Pkt_rcode(int value)
 {
   switch (value) {
@@ -72,25 +56,6 @@ Pkt_rcode::Pkt_rcode(int value)
   }
 }
 
-char const* Pkt_rcode::c_str(Pkt_rcode::value_t value)
-{
-  switch (value) {
-  case Pkt_rcode::NOERROR:  return "NOERROR";
-  case Pkt_rcode::FORMERR:  return "FORMERR";
-  case Pkt_rcode::SERVFAIL: return "SERVFAIL";
-  case Pkt_rcode::NXDOMAIN: return "NXDOMAIN";
-  case Pkt_rcode::NOTIMPL:  return "NOTIMPL";
-  case Pkt_rcode::REFUSED:  return "REFUSED";
-  case Pkt_rcode::YXDOMAIN: return "YXDOMAIN";
-  case Pkt_rcode::YXRRSET:  return "YXRRSET";
-  case Pkt_rcode::NXRRSET:  return "NXRRSET";
-  case Pkt_rcode::NOTAUTH:  return "NOTAUTH";
-  case Pkt_rcode::NOTZONE:  return "NOTZONE";
-  case Pkt_rcode::INTERNAL: return "INTERNAL";
-  }
-  LOG(ERROR) << "unknown Pkt_rcode value: " << value;
-  return "** unknown **";
-}
 // clang-format on
 
 Resolver::Resolver()
@@ -417,16 +382,6 @@ std::ostream& operator<<(std::ostream& os, DNS::RR_type::value_t const& value)
 }
 
 std::ostream& operator<<(std::ostream& os, DNS::RR_type const& value)
-{
-  return os << value.c_str();
-}
-
-std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode::value_t const& value)
-{
-  return os << DNS::Pkt_rcode::c_str(value);
-}
-
-std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode const& value)
 {
   return os << value.c_str();
 }
