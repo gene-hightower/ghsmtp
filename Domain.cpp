@@ -12,6 +12,10 @@
 using namespace std::string_literals;
 
 namespace {
+
+// Normalization Form KC (NFKC) Compatibility Decomposition, followed
+// by Canonical Composition, see <http://unicode.org/reports/tr15/>
+
 std::string nfkc(std::string_view str)
 {
   size_t length = 0;
