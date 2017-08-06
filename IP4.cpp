@@ -75,7 +75,7 @@ std::string reverse(std::string_view addr)
   return reverse.str();
 }
 
-std::string fcrdns(DNS::Resolver& res, char const* addr)
+std::string fcrdns(char const* addr)
 {
   using namespace DNS;
 
@@ -84,6 +84,7 @@ std::string fcrdns(DNS::Resolver& res, char const* addr)
   auto reversed = reverse(addr);
 
   // The reverse part, check PTR records.
+  DNS::Resolver res;
   auto ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
   auto ptr = std::find_if(

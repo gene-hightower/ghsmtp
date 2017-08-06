@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "DNS.hpp"
 #include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
@@ -110,8 +109,6 @@ private:
 
 private:
   Sock sock_;
-
-  DNS::Resolver res_;
 
   size_t max_msg_size_;
 

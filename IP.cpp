@@ -43,14 +43,14 @@ std::string reverse(std::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string fcrdns(DNS::Resolver& res, char const* addr)
+std::string fcrdns(char const* addr)
 {
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
   if (IP4::is_address(addr))
-    return IP4::fcrdns(res, addr);
+    return IP4::fcrdns(addr);
   if (IP6::is_address(addr))
-    return IP6::fcrdns(res, addr);
+    return IP6::fcrdns(addr);
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 }

@@ -96,7 +96,7 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    fcrdns_ = IP::fcrdns(res_, sock_.them_c_str());
+    fcrdns_ = IP::fcrdns(sock_.them_c_str());
 
     if (!fcrdns_.empty()) {
       client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
@@ -120,8 +120,9 @@ void Session::greeting()
 
         // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
         auto reversed = IP4::reverse(sock_.them_c_str());
+        DNS::Resolver res;
         for (const auto& rbl : Config::rbls) {
-          if (has_record<RR_type::A>(res_, reversed + rbl)) {
+          if (has_record<RR_type::A>(res, reversed + rbl)) {
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
             out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
@@ -885,8 +886,9 @@ bool Session::verify_sender_domain_(Domain const& sender)
 
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
+  DNS::Resolver res;
   for (const auto& uribl : Config::uribls) {
-    if (DNS::has_record<DNS::RR_type::A>(res_, (sender + ".") + uribl)) {
+    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
       LOG(ERROR) << sender << " blocked by " << uribl;
