@@ -18,12 +18,13 @@ int main(int argc, char const* argv[])
   CHECK(0 == strcmp(res.header_comment(), "Example.com: domain of "
                                           "digilicious.com designates "
                                           "108.83.36.113 as permitted sender"));
-  CHECK(0 == strcmp(res.received_spf(), "Received-SPF: pass (Example.com: "
-                                        "domain of digilicious.com designates "
-                                        "108.83.36.113 as permitted sender) "
-                                        "client-ip=108.83.36.113; "
-                                        "envelope-from=postmaster@digilicious."
-                                        "com; helo=digilicious.com;"));
+  CHECK(0 == strcmp(res.received_spf(),
+                    "Received-SPF: pass (Example.com: "
+                    "domain of digilicious.com designates "
+                    "108.83.36.113 as permitted sender) "
+                    "client-ip=108.83.36.113; "
+                    "envelope-from=\"postmaster@digilicious."
+                    "com\"; helo=digilicious.com;"));
   SPF::Request req2(srv);
   req2.set_ipv4_str("10.1.1.1");
   req2.set_helo_dom("digilicious.com");
@@ -33,12 +34,13 @@ int main(int argc, char const* argv[])
   CHECK(0 == strcmp(res2.header_comment(), "Example.com: domain of "
                                            "digilicious.com does not designate "
                                            "10.1.1.1 as permitted sender"));
-  CHECK(0 == strcmp(res2.received_spf(), "Received-SPF: fail (Example.com: "
-                                         "domain of digilicious.com does not "
-                                         "designate 10.1.1.1 as permitted "
-                                         "sender) client-ip=10.1.1.1; "
-                                         "envelope-from=postmaster@digilicious."
-                                         "com; helo=digilicious.com;"));
+  CHECK(0 == strcmp(res2.received_spf(),
+                    "Received-SPF: fail (Example.com: "
+                    "domain of digilicious.com does not "
+                    "designate 10.1.1.1 as permitted "
+                    "sender) client-ip=10.1.1.1; "
+                    "envelope-from=\"postmaster@digilicious."
+                    "com\"; helo=digilicious.com;"));
   CHECK(0 == strcmp(res2.smtp_comment(), "Please see "
                                          "http://www.openspf.org/"
                                          "Why?id=postmaster%40digilicious.com&"
