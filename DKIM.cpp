@@ -1,8 +1,7 @@
 #include "DKIM.hpp"
 
-#define _Bool bool
+#include <cstdbool> // needs to be above <dkim.h>
 #include <dkim.h>
-#undef _Bool
 
 #include <glog/logging.h>
 

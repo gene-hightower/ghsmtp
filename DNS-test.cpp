@@ -2,15 +2,9 @@
 
 #include <glog/logging.h>
 
+#include <cstdbool> // needs to be above ldns includes
 #include <ldns/packet.h>
 #include <ldns/rr.h>
-
-// Leaving bool and friends defined macros is rude in C++.  This is
-// (apparently) thanks to advice from:
-// <https://www.gnu.org/software/autoconf/manual/autoconf-2.69/html_node/Particular-Headers.html>
-#undef bool
-#undef false
-#undef true
 
 int main(int argc, char const* argv[])
 {
