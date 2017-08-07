@@ -4,6 +4,8 @@
 #include <cctype>
 #include <stdexcept>
 
+#include <glog/logging.h>
+
 namespace Base64 {
 
 constexpr char const CHARSET[]{
@@ -24,7 +26,14 @@ std::string enc(std::string_view text, std::string::size_type wrap)
   unsigned char group_6bit[4];
   int count_3_chars = 0;
 
+  auto input_size = text.length();
+  auto padding = ((input_size % 3) ? (3 - (input_size % 3)) : 0);
+  auto code_padded_size = ((input_size + padding) / 3) * 4;
+  auto newline_size = wrap ? ((code_padded_size) / wrap) * 2 : 0;
+  auto total_size = code_padded_size + newline_size;
+
   std::string enc_text;
+  enc_text.reserve(total_size);
   std::string::size_type line_len = 0;
 
   for (std::string::size_type ch = 0; ch < text.length(); ch++) {
@@ -43,7 +52,7 @@ std::string enc(std::string_view text, std::string::size_type wrap)
       line_len += 4;
     }
 
-    if (wrap && (line_len == wrap - 2)) {
+    if (wrap && (line_len == wrap)) {
       enc_text += "\r\n";
       line_len = 0;
     }
@@ -63,7 +72,7 @@ std::string enc(std::string_view text, std::string::size_type wrap)
     group_6bit[3] = group_8bit[2] & 0x3f;
 
     for (int i = 0; i < count_3_chars + 1; i++) {
-      if (wrap && (line_len == wrap - 2)) {
+      if (wrap && (line_len == wrap)) {
         enc_text += "\r\n";
         line_len = 0;
       }
@@ -72,7 +81,7 @@ std::string enc(std::string_view text, std::string::size_type wrap)
     }
 
     while (count_3_chars++ < 3) {
-      if (wrap && (line_len == wrap - 2)) {
+      if (wrap && (line_len == wrap)) {
         enc_text += "\r\n";
         line_len = 0;
       }
@@ -80,6 +89,8 @@ std::string enc(std::string_view text, std::string::size_type wrap)
       line_len++;
     }
   }
+
+  CHECK_EQ(enc_text.length(), total_size);
 
   return enc_text;
 }
@@ -91,7 +102,11 @@ constexpr bool is_base64char(char ch)
 
 std::string dec(std::string_view text)
 {
+  auto input_size = text.length();
+  auto max_size = (input_size / 4) * 3;
+
   std::string dec_text;
+  dec_text.reserve(max_size);
   unsigned char group_6bit[4];
   unsigned char group_8bit[3];
   int count_4_chars = 0;
