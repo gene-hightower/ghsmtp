@@ -2,45 +2,68 @@
 
 #include "DNS.hpp"
 
-#include <boost/xpressive/xpressive.hpp>
-
 #include <glog/logging.h>
 
 using namespace std::string_literals;
 
+#include <tao/pegtl.hpp>
+#include <tao/pegtl/contrib/abnf.hpp>
+
+using namespace tao::pegtl;
+using namespace tao::pegtl::abnf;
+
 namespace IP4 {
 
-inline boost::xpressive::cregex single_octet()
-{
-  using namespace boost::xpressive;
+using dot = one<'.'>;
 
-  // clang-format off
-  return (as_xpr('2') >> '5' >> range('0', '5'))  // 250->255
-         | ('2' >> range('0', '4') >> _d)         // 200->249
-         | (range('0', '1') >> repeat<2>(_d))     // 000->199
-         | repeat<1, 2>(_d);                      //   0->99
-  // clang-format on
-}
+// clang-format off
+struct dec_octet : sor<rep_min_max<1, 2, DIGIT>,
+                       seq<range<'0', '1'>, DIGIT, DIGIT>,
+                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
+                       seq<string<'2','5'>, range<'0','5'>>> {};
+// clang-format on
+
+struct ipv4_address
+    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet, eof> {
+};
+
+struct ipv4_address_lit : seq<one<'['>,
+                              dec_octet,
+                              dot,
+                              dec_octet,
+                              dot,
+                              dec_octet,
+                              dot,
+                              dec_octet,
+                              one<']'>,
+                              eof> {
+};
+
+template <typename Rule>
+struct action : nothing<Rule> {
+};
+
+template <>
+struct action<dec_octet> {
+  template <typename Input>
+  static void apply(Input const& in, std::vector<unsigned>& a)
+  {
+    auto oct = strtoul(in.string().c_str(), nullptr, 10);
+    LOG(INFO) << "oct == " << oct;
+    a.push_back(oct);
+  }
+};
 
 bool is_address(std::string_view addr)
 {
-  using namespace boost::xpressive;
-
-  auto octet = single_octet();
-  cregex re = octet >> '.' >> octet >> '.' >> octet >> '.' >> octet;
-  cmatch matches;
-  return regex_match(addr.begin(), addr.end(), matches, re);
+  memory_input<> in(addr.data(), addr.size(), "addr");
+  return parse<ipv4_address>(in);
 }
 
 bool is_address_literal(std::string_view addr)
 {
-  using namespace boost::xpressive;
-
-  auto octet = single_octet();
-  cregex re
-      = '[' >> octet >> '.' >> octet >> '.' >> octet >> '.' >> octet >> ']';
-  cmatch matches;
-  return regex_match(addr.begin(), addr.end(), matches, re);
+  memory_input<> in(addr.data(), addr.size(), "addr");
+  return parse<ipv4_address_lit>(in);
 }
 
 std::string to_address_literal(std::string_view addr)
@@ -57,21 +80,15 @@ std::string_view to_address(std::string_view addr)
 
 std::string reverse(std::string_view addr)
 {
-  using namespace boost::xpressive;
-
-  auto octet = single_octet();
-  cregex re = (s1 = octet) >> '.' >> (s2 = octet) >> '.' >> (s3 = octet) >> '.'
-              >> (s4 = octet);
-  cmatch matches;
-  CHECK(regex_match(addr.begin(), addr.end(), matches, re))
-      << "IP4::reverse called with bad dotted quad: " << addr;
+  memory_input<> in(addr.data(), addr.size(), "addr");
+  std::vector<unsigned> a;
+  a.reserve(4);
+  auto ret = parse<ipv4_address, action>(in, a);
+  CHECK(ret);
 
   std::ostringstream reverse;
-  for (int n = 4; n > 0; --n) {
-    std::string_view octet(matches[n].first,
-                           matches[n].second - matches[n].first);
-    reverse << octet << '.'; // and leave a trailing '.'
-  }
+  reverse << a[3] << '.' << a[2] << '.' << a[1] << '.' << a[0] << '.';
+
   return reverse.str();
 }
 
