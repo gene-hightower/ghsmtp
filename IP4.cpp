@@ -49,7 +49,6 @@ struct action<dec_octet> {
   static void apply(Input const& in, std::vector<unsigned>& a)
   {
     auto oct = strtoul(in.string().c_str(), nullptr, 10);
-    LOG(INFO) << "oct == " << oct;
     a.push_back(oct);
   }
 };
