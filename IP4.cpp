@@ -46,10 +46,9 @@ struct action : nothing<Rule> {
 template <>
 struct action<dec_octet> {
   template <typename Input>
-  static void apply(Input const& in, std::vector<unsigned>& a)
+  static void apply(Input const& in, std::vector<std::string>& a)
   {
-    auto oct = strtoul(in.string().c_str(), nullptr, 10);
-    a.push_back(oct);
+    a.push_back(in.string());
   }
 };
 
@@ -80,7 +79,7 @@ std::string_view to_address(std::string_view addr)
 std::string reverse(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "addr");
-  std::vector<unsigned> a;
+  std::vector<std::string> a;
   a.reserve(4);
   auto ret = parse<ipv4_address, action>(in, a);
   CHECK(ret);
