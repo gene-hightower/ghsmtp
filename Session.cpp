@@ -100,6 +100,20 @@ void Session::greeting()
 
     if (!fcrdns_.empty()) {
       client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
+
+      // check domain
+      char const* tld = tld_db_.get_registered_domain(fcrdns_.utf8().c_str());
+      CDB white("white");
+      if (tld && white.lookup(tld)) {
+        LOG(INFO) << "TLD domain " << tld << " whitelisted";
+        domain_whitelisted_ = true;
+      }
+      else {
+        if (white.lookup(fcrdns_.utf8().c_str())) {
+          LOG(INFO) << "domain " << fcrdns_ << " whitelisted";
+          domain_whitelisted_ = true;
+        }
+      }
     }
     else {
       client_ = "unknown "s + sock_.them_address_literal();
@@ -136,7 +150,7 @@ void Session::greeting()
     }
 
     // Wait a bit of time for pre-greeting traffic.
-    if (!ip_whitelisted_) {
+    if (!(ip_whitelisted_ || domain_whitelisted_)) {
       if (sock_.input_ready(Config::greeting_wait)) {
         syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
                sock_.them_c_str());
@@ -670,7 +684,7 @@ void Session::exit_()
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
-  if (!sock_.has_peername() || ip_whitelisted_
+  if (!sock_.has_peername() || ip_whitelisted_ || domain_whitelisted_
       || client_identity.is_address_literal()) {
     return true;
   }
