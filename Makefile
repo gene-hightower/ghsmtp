@@ -17,6 +17,7 @@ LDLIBS += \
 PROGRAMS := msg smtp sasl snd
 
 msg_STEMS := msg \
+	CDB \
 	DKIM \
 	DNS \
 	Domain \
@@ -32,6 +33,7 @@ sasl_STEMS := sasl \
 	TLS-OpenSSL
 
 smtp_STEMS := smtp \
+	CDB \
 	DNS \
 	Domain \
 	IP \
@@ -49,6 +51,7 @@ smtp_STEMS := smtp \
 
 snd_STEMS := snd \
 	Base64 \
+	CDB \
 	DKIM \
 	DNS \
 	Domain \
@@ -87,6 +90,7 @@ TESTS := \
 	TLS-OpenSSL-test
 
 Base64-test_STEMS := Base64
+CDB-test_STEMS := CDB
 DNS-test_STEMS := DNS
 Domain-test_STEMS := DNS Domain IP4 IP6
 IP4-test_STEMS := DNS IP4
@@ -97,7 +101,7 @@ Message-test_STEMS := DNS Domain IP4 IP6 Message Pill
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := DNS IP4 IP6 SPF
-Session-test_STEMS := DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL esc hostname
+Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL esc hostname
 Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
