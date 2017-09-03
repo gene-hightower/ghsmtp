@@ -78,9 +78,9 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
       LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
 
   if (status != LDNS_STATUS_OK) {
-    LOG(WARNING) << "Query (" << dom.domain_ << ") "
-                 << "ldns_resolver_query_status failed: "
-                 << ldns_get_errorstr_by_id(status);
+    // LOG(WARNING) << "Query (" << dom.domain_ << ") "
+    //              << "ldns_resolver_query_status failed: "
+    //              << ldns_get_errorstr_by_id(status);
 
     // If we have only one nameserver, reset the RTT otherwise all
     // future use of this resolver object will fail.
