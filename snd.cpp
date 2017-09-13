@@ -520,8 +520,7 @@ int conn(DNS::Resolver& res,
     PCHECK(fd >= 0) << "socket() failed";
 
     if (!FLAGS_local_address.empty()) {
-      sockaddr_in6 loc;
-      memset(&loc, 0, sizeof(loc));
+      sockaddr_in6 loc{};
       loc.sin6_family = AF_INET6;
       if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
                          reinterpret_cast<void*>(&loc.sin6_addr))) {
@@ -532,8 +531,7 @@ int conn(DNS::Resolver& res,
     }
 
     for (auto addr : addrs) {
-      sockaddr_in6 in6;
-      memset(&in6, 0, sizeof(in6));
+      sockaddr_in6 in6{};
       in6.sin6_family = AF_INET6;
       in6.sin6_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
@@ -557,8 +555,7 @@ int conn(DNS::Resolver& res,
     PCHECK(fd >= 0) << "socket() failed";
 
     if (!FLAGS_local_address.empty()) {
-      sockaddr_in loc;
-      memset(&loc, 0, sizeof(loc));
+      sockaddr_in loc{};
       loc.sin_family = AF_INET;
       if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
                          reinterpret_cast<void*>(&loc.sin_addr))) {
@@ -569,8 +566,7 @@ int conn(DNS::Resolver& res,
     }
 
     for (auto addr : addrs) {
-      sockaddr_in in4;
-      memset(&in4, 0, sizeof(in4));
+      sockaddr_in in4{};
       in4.sin_family = AF_INET;
       in4.sin_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),

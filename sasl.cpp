@@ -190,8 +190,7 @@ int main()
   auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
   PCHECK(fd >= 0) << "socket failed";
 
-  sockaddr_un addr;
-  memset(&addr, 0, sizeof(addr));
+  sockaddr_un addr{};
   addr.sun_family = AF_UNIX;
   auto socket_path = "/var/spool/postfix/private/auth";
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
