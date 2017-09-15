@@ -887,8 +887,7 @@ int main(int argc, char* argv[])
   }
 
   // Set timeout signal handler to limit total run time.
-  struct sigaction sact;
-  memset(&sact, 0, sizeof(sact));
+  struct sigaction sact{};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
   sact.sa_flags = 0;
   sact.sa_handler = timeout;

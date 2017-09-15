@@ -84,8 +84,7 @@ int main(int argc, char const* argv[])
   auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
   PCHECK(fd >= 0) << "socket() failed";
 
-  sockaddr_un addr;
-  memset(&addr, 0, sizeof(addr));
+  sockaddr_un addr{};
   addr.sun_family = AF_UNIX;
   strncpy(addr.sun_path, "/run/p0f.sock", sizeof(addr.sun_path) - 1);
 
