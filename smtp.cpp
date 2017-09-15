@@ -1,3 +1,5 @@
+#include <gflags/gflags.h>
+
 #include <fstream>
 
 #include "Session.hpp"
@@ -872,11 +874,17 @@ void timeout(int signum)
   _exit(1);
 }
 
-int main(int argc, char const* const argv[])
+int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
 
   // self_test();
+
+  { // Need to work with either namespace.
+    using namespace gflags;
+    using namespace google;
+    ParseCommandLineFlags(&argc, &argv, true);
+  }
 
   // Set timeout signal handler to limit total run time.
   struct sigaction sact;
