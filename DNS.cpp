@@ -27,7 +27,7 @@ RR_type::RR_type(int value)
   case LDNS_RR_TYPE_TLSA:  value_ = TLSA;  break;
   case LDNS_RR_TYPE_TXT:   value_ = TXT;   break;
   default:
-    LOG(ERROR) << "unrecognized ldns_rr_type value: " << value;    
+    LOG(FATAL) << "unrecognized ldns_rr_type value: " << value;    
   }
 }
 
@@ -46,7 +46,7 @@ Pkt_rcode::Pkt_rcode(int value)
   case LDNS_RCODE_NOTAUTH:  value_ = NOTAUTH;  break;
   case LDNS_RCODE_NOTZONE:  value_ = NOTZONE;  break;
   default:
-    LOG(ERROR) << "unrecognized ldns_pkt_rcode value: " << value;    
+    LOG(FATAL) << "unrecognized ldns_pkt_rcode value: " << value;    
   }
 }
 
