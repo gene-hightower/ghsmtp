@@ -193,16 +193,16 @@ std::string_view Session::server_id() const
 
 void Session::flush() { out_() << std::flush; }
 
-void Session::last_in_group_()
+void Session::last_in_group_(std::string_view verb)
 {
   if (sock_.input_ready(std::chrono::seconds(0))) {
-    LOG(WARNING) << "pipelining error";
+    LOG(WARNING) << "pipelining error; input ready processing " << verb;
   }
 }
 
 void Session::ehlo(std::string_view client_identity)
 {
-  last_in_group_();
+  last_in_group_("EHLO");
   reset_();
   extensions_ = true;
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
@@ -244,7 +244,7 @@ void Session::ehlo(std::string_view client_identity)
 
 void Session::helo(std::string_view client_identity)
 {
-  last_in_group_(); // no pipelining with old protocol
+  last_in_group_("HELO"); // no pipelining with old protocol
   reset_();
   extensions_ = false;
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
@@ -399,7 +399,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
 bool Session::data_start()
 {
-  last_in_group_();
+  last_in_group_("DATA");
 
   if (binarymime_) {
     out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
@@ -582,14 +582,14 @@ void Session::rset()
 
 void Session::noop(std::string_view str)
 {
-  last_in_group_();
+  last_in_group_("NOOP");
   out_() << "250 2.0.0 OK\r\n" << std::flush;
   LOG(INFO) << "NOOP" << (str.length() ? " " : "") << str;
 }
 
 void Session::vrfy(std::string_view str)
 {
-  last_in_group_();
+  last_in_group_("VRFY");
   out_() << "252 2.0.0 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY" << (str.length() ? " " : "") << str;
 }
@@ -604,7 +604,7 @@ void Session::help(std::string_view str)
 
 void Session::quit()
 {
-  last_in_group_();
+  last_in_group_("QUIT");
   out_() << "221 2.0.0 bye\r\n" << std::flush;
   LOG(INFO) << "QUIT";
   exit_();

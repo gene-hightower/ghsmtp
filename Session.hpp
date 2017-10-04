@@ -66,7 +66,7 @@ public:
   std::istream& in() { return sock_.in(); }
 
   void flush();
-  void last_in_group_();
+  void last_in_group_(std::string_view verb);
 
   size_t max_msg_size() const { return max_msg_size_; }
   void max_msg_size(size_t max)
