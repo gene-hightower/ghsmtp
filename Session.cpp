@@ -214,7 +214,12 @@ void Session::ehlo(std::string_view client_identity)
     exit_();
   }
 
-  out_() << "250-" << server_id() << "\r\n";
+  out_() << "250-" << server_id();
+  if (sock_.has_peername()) {
+    out_() << " at your service, " << client_;
+  }
+  out_() << "\r\n";
+
   // RFC 1870
   out_() << "250-SIZE " << max_msg_size_ << "\r\n";
   // RFC 6152
