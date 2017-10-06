@@ -596,7 +596,7 @@ void Session::noop(std::string_view str)
 void Session::vrfy(std::string_view str)
 {
   last_in_group_("VRFY");
-  out_() << "252 2.0.0 try it\r\n" << std::flush;
+  out_() << "252 2.1.5 try it\r\n" << std::flush;
   LOG(INFO) << "VRFY" << (str.length() ? " " : "") << str;
 }
 
