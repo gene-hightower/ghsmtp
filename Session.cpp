@@ -39,6 +39,7 @@ constexpr char const* const bad_recipients[] = {
     "mixmaster",
     "nobody",
     "oq6_2nbq",
+    "sales",
     "truthfinder",
     "zk4k7g",
 };
