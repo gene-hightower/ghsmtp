@@ -203,7 +203,9 @@ void Session::last_in_group_(std::string_view verb)
 
 void Session::ehlo(std::string_view client_identity)
 {
-  last_in_group_("EHLO");
+  constexpr auto verb = "EHLO";
+
+  last_in_group_(verb);
   reset_();
   extensions_ = true;
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
@@ -245,12 +247,14 @@ void Session::ehlo(std::string_view client_identity)
   // RFC 6531
   out_() << "250 SMTPUTF8\r\n" << std::flush;
 
-  log_lo_("EHLO", client_identity);
+  log_lo_(verb, client_identity);
 }
 
 void Session::helo(std::string_view client_identity)
 {
-  last_in_group_("HELO"); // no pipelining with old protocol
+  constexpr auto verb = "HELO";
+
+  last_in_group_(verb);
   reset_();
   extensions_ = false;
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
@@ -264,7 +268,7 @@ void Session::helo(std::string_view client_identity)
 
   out_() << "250 " << server_id() << "\r\n" << std::flush;
 
-  log_lo_("HELO", client_identity);
+  log_lo_(verb, client_identity);
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
@@ -361,10 +365,11 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     forward_path_.clear();
     out_() << "250 2.1.0 OK\r\n";
     // No flush RFC-2920 section 3.1, this could be part of a command group.
-    LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">";
+    std::ostringstream params;
     for (auto p : parameters) {
-      LOG(INFO) << "  " << p.first << (p.second.empty() ? "" : "=") << p.second;
+      params << " " << p.first << (p.second.empty() ? "" : "=") << p.second;
     }
+    LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
   }
   else {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
