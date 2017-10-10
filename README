@@ -4,13 +4,14 @@ A program to receive Internet (RFC 5321) mail.
 
 Free software — AGPLv3 with OpenSSL exception.
 
-Written using Standard C++ — plus Ragel, OpenSSL, boost, ldns, spf2,
-regdom, TinyCDB, glog etc.  Compiles with recent GCC and Clang.
+Written using Standard C++ — plus PEGTL, (at one time Ragel), OpenSSL,
+boost, ldns, spf2, regdom, TinyCDB, glog etc.  Compiles with recent
+GCC and Clang.
 
 No runtime configuration file — code as configuration.
 
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
 
-I run it on the Fedora distribution of systemd — might also work on
-other platforms.
+I run it on the Fedora distribution of GNU/Linux/systemd — might also
+work on other platforms.
