@@ -445,6 +445,8 @@ std::string Session::added_headers_(Message const& msg)
     headers << received_spf_ << "\r\n";
   }
 
+  // STD 3 section 5.2.8
+
   headers << "Received: from " << client_identity_.utf8();
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
@@ -452,7 +454,6 @@ std::string Session::added_headers_(Message const& msg)
   headers << "\r\n        by " << our_fqdn_.utf8() << " with " << protocol_
           << " id " << msg.id();
 
-  // STD 3 section 5.2.8
   if (forward_path_.size()) {
     auto len = 12;
     headers << "\r\n        for ";
