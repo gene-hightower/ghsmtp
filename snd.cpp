@@ -614,10 +614,6 @@ private:
   }
 };
 
-namespace gflags {
-// in case we didn't have one
-}
-
 // // clang-format off
 // char const* const signhdrs[] = {
 //     "From",
@@ -778,6 +774,10 @@ static bool validate_name(const char* flagname, std::string const& value)
 DEFINE_validator(from_name, &validate_name);
 DEFINE_validator(to_name, &validate_name);
 
+namespace gflags {
+// in case we didn't have one
+}
+
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -912,12 +912,9 @@ try_host:
         && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end());
 
   if (ext_binarymime && !ext_chunking) {
-    LOG(ERROR)
-        << "BINARYMIME requires CHUNKING, see RFC-3030 section 3 item 3.";
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_FAILURE);
+    LOG(WARNING)
+        << "BINARYMIME implies CHUNKING, see RFC-3030 section 3 item 3.";
+    ext_chunking = true;
   }
 
   if (ext_smtputf8 && !ext_8bitmime) {
@@ -1163,8 +1160,8 @@ try_host:
           LOG(FATAL) << "output no good at line " << lineno;
         }
         if (FLAGS_rawdog) {
-          // This adds a final newline and the end of the file,
-          // if no line ending was present.
+          // This adds a final newline at the end of the file, if no
+          // line ending was present.
           cnn.sock.out() << line << '\n';
         }
         else {
