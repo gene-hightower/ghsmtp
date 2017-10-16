@@ -1,4 +1,6 @@
 #include <gflags/gflags.h>
+namespace gflags {
+};
 
 #include <fstream>
 
@@ -885,7 +887,8 @@ int main(int argc, char* argv[])
   }
 
   // Set timeout signal handler to limit total run time.
-  struct sigaction sact{};
+  struct sigaction sact {
+  };
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
   sact.sa_flags = 0;
   sact.sa_handler = timeout;
