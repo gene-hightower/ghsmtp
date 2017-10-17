@@ -7,7 +7,9 @@
 namespace fs = std::filesystem;
 using std::error_code;
 
-#elif __has_include(<experimental / filesystem>)
+// clang-format off
+#elif __has_include(<experimental/filesystem>)
+// clang-format on
 
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
