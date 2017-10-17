@@ -6,13 +6,13 @@
 #include <sstream>
 #include <string_view>
 
-#include <boost/filesystem.hpp>
-
 #include <pwd.h>
 #include <sys/types.h>
 
 #include "Now.hpp"
 #include "Pill.hpp"
+
+#include "fs.hpp"
 
 class Message {
 public:
@@ -54,8 +54,8 @@ private:
   size_t size_{0};
   size_t max_size_{0};
 
-  boost::filesystem::path tmpfn_;
-  boost::filesystem::path newfn_;
+  fs::path tmpfn_;
+  fs::path newfn_;
 
   bool size_error_{false};
 };

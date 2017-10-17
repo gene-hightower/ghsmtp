@@ -8,7 +8,7 @@ void Message::open(std::string const& fqdn, size_t max_size, SpamStatus spam)
 {
   max_size_ = max_size;
 
-  boost::filesystem::path maildir;
+  fs::path maildir;
 
   char const* ev = getenv("MAILDIR");
   if (ev) {
@@ -46,7 +46,7 @@ void Message::open(std::string const& fqdn, size_t max_size, SpamStatus spam)
   umask(077);
 
   // mkdirs for tmpfn_ and newfn_
-  boost::system::error_code ec;
+  error_code ec;
   create_directories(tmpfn_, ec);
   create_directories(newfn_, ec);
 

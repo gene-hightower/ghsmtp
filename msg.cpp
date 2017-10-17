@@ -7,10 +7,6 @@
 #include <glog/logging.h>
 
 #include <boost/algorithm/string.hpp>
-
-#define BOOST_FILESYSTEM_NO_DEPRECATED
-#include <boost/filesystem.hpp>
-
 #include <boost/iostreams/device/mapped_file.hpp>
 
 #include <iostream>
@@ -21,6 +17,8 @@
 #include "SPF.hpp"
 #include "esc.hpp"
 #include "hostname.hpp"
+
+#include "fs.hpp"
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -1731,7 +1729,7 @@ int main(int argc, char const* argv[])
 
   for (auto i = 1; i < argc; ++i) {
     auto fn = argv[i];
-    boost::filesystem::path name(fn);
+    fs::path name(fn);
     boost::iostreams::mapped_file_source f(name);
     memory_input<> in(f.data(), f.size(), fn);
     LOG(INFO) << "### " << fn;
