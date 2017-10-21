@@ -360,18 +360,21 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
+  std::ostringstream params;
+  for (auto p : parameters) {
+    params << " " << p.first << (p.second.empty() ? "" : "=") << p.second;
+  }
+
   if (verify_sender_(reverse_path)) {
     reverse_path_ = std::move(reverse_path);
     forward_path_.clear();
     out_() << "250 2.1.0 OK\r\n";
     // No flush RFC-2920 section 3.1, this could be part of a command group.
-    std::ostringstream params;
-    for (auto p : parameters) {
-      params << " " << p.first << (p.second.empty() ? "" : "=") << p.second;
-    }
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
   }
   else {
+    LOG(ERROR) << "** Failed! ** MAIL FROM:<" << reverse_path_ << ">"
+               << params.str();
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
            sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
