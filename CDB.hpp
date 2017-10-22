@@ -4,7 +4,9 @@
 #include <memory>
 #include <string_view>
 
-struct cdb;
+extern "C" {
+#include <cdb.h>
+}
 
 class CDB {
 public:
@@ -14,7 +16,7 @@ public:
 
 private:
   int fd_{-1};
-  std::unique_ptr<struct cdb> cdb_;
+  struct cdb cdb_;
 };
 
 #endif // CDB_DOT_HPP
