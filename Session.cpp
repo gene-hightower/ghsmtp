@@ -373,7 +373,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
   }
   else {
-    LOG(ERROR) << "** Failed! ** MAIL FROM:<" << reverse_path_ << ">"
+    LOG(ERROR) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
                << params.str();
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
            sock_.them_c_str());
