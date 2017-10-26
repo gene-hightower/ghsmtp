@@ -82,37 +82,26 @@ public:
 
   static constexpr auto NOERROR
              = value_t::NOERROR;
-
   static constexpr auto FORMERR
              = value_t::FORMERR;
-
   static constexpr auto SERVFAIL
              = value_t::SERVFAIL;
-
   static constexpr auto NXDOMAIN
              = value_t::NXDOMAIN;
-
   static constexpr auto NOTIMPL
              = value_t::NOTIMPL;
-
   static constexpr auto REFUSED
              = value_t::REFUSED;
-
   static constexpr auto YXDOMAIN
              = value_t::YXDOMAIN;
-
   static constexpr auto YXRRSET
              = value_t::YXRRSET;
-
   static constexpr auto NXRRSET
              = value_t::NXRRSET;
-
   static constexpr auto NOTAUTH
              = value_t::NOTAUTH;
-
   static constexpr auto NOTZONE
              = value_t::NOTZONE;
-
   static constexpr auto INTERNAL
              = value_t::INTERNAL;
 
