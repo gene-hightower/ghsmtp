@@ -772,6 +772,7 @@ void check_for_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
     LOG(ERROR) << cmd << " returned " << cnn.reply_code;
     fail(in, cnn);
   }
+  in.discard();
 }
 
 std::string connectable_host(Domain const& dom)
@@ -1041,6 +1042,8 @@ try_host:
     exit(EXIT_SUCCESS);
   }
 
+  in.discard();
+
   Eml eml;
 
   Now date;
@@ -1231,6 +1234,7 @@ try_host:
   if (cnn.reply_code.at(0) == '2') {
     LOG(INFO) << "mail was sent successfully";
   }
+  in.discard();
 
   LOG(INFO) << "> QUIT";
   cnn.sock.out() << "QUIT\r\n" << std::flush;
