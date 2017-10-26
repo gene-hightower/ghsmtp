@@ -206,7 +206,11 @@ struct domain : sor<dot_atom, domain_literal> {};
 
 struct addr_spec : seq<local_part, one<'@'>, domain> {};
 
-struct addr_spec_only : seq<addr_spec, eof> {};
+struct postmaster : TAOCPP_PEGTL_ISTRING("Postmaster") {};
+
+struct addr_spec_or_postmaster : sor<addr_spec, postmaster> {};
+
+struct addr_spec_only : seq<addr_spec_or_postmaster, eof> {};
 
 struct display_name : phrase {};
 
