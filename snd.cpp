@@ -254,6 +254,8 @@ struct Connection {
 
   std::string reply_code;
 
+  bool ehlo_ok{false};
+
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
     : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
   {}
@@ -393,6 +395,12 @@ struct ehlo_ok_rsp
       seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>
       > {};
 
+struct ehlo_rsp
+  : sor<ehlo_ok_rsp, reply_lines> {};
+
+struct helo_ok_rsp
+  : seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<seq<SP, ehlo_greet>>, CRLF> {};
+
 struct auth_login_username
     : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
 
@@ -428,6 +436,7 @@ struct action<ehlo_ok_rsp> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
+    cnn.ehlo_ok = true;
     LOG(INFO) << "< " << in.string();
   }
 };
@@ -650,15 +659,34 @@ void self_test()
       "220-e-mail sent from the internet.\r\n"
       "220-Effective immediately:\r\n"
       "220-AOL may no longer accept connections from IP addresses\r\n"
-      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"
-
-  };
+      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"};
 
   for (auto i : greet_list) {
     memory_input<> in(i, i);
     if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
             in, cnn)) {
       LOG(ERROR) << "Error parsing greeting \"" << i << "\"";
+    }
+  }
+
+  const char* ehlo_rsp_list[]{
+      "250-digilicious.com at your service, localhost. [IPv6:::1]\r\n"
+      "250-SIZE 15728640\r\n"
+      "250-8BITMIME\r\n"
+      "250-STARTTLS\r\n"
+      "250-ENHANCEDSTATUSCODES\r\n"
+      "250-PIPELINING\r\n"
+      "250-BINARYMIME\r\n"
+      "250-CHUNKING\r\n"
+      "250 SMTPUTF8\r\n",
+      "500 5.5.1 command unrecognized: \"EHLO digilicious.com\\r\\n\"\r\n",
+  };
+
+  for (auto i : ehlo_rsp_list) {
+    memory_input<> in(i, i);
+    if (!parse<RFC5321::ehlo_rsp, RFC5321::action /*, tao::pegtl::tracer*/>(
+            in, cnn)) {
+      LOG(ERROR) << "Error parsing ehlo response \"" << i << "\"";
     }
   }
 }
@@ -875,7 +903,13 @@ try_host:
 
   LOG(INFO) << "> EHLO " << sender.utf8();
   cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
-  CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+
+  CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
+  if (!cnn.ehlo_ok) {
+    LOG(INFO) << "> HELO " << sender.utf8();
+    cnn.sock.out() << "HELO " << sender.utf8() << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)));
+  }
 
   if (FLAGS_use_tls
       && (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end())) {
