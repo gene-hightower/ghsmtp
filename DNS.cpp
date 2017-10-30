@@ -331,6 +331,8 @@ std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 template <RR_type::value_t type>
 std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 {
+  CHECK_NOTNULL(rdf);
+
   auto data = static_cast<char const*>(rdf->_data);
   auto udata = static_cast<unsigned char const*>(rdf->_data);
 
