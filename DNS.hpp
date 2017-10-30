@@ -51,11 +51,11 @@ public:
     return "** unknown **";
   }
 
-  char const* c_str() const { return c_str(value_); }
-  explicit operator char const*() const { return c_str(); }
+  constexpr char const* c_str() const { return c_str(value_); }
+  constexpr explicit operator char const*() const { return c_str(); }
 
-  operator value_t() const { return value_; }
-  value_t value() const { return value_; }
+  constexpr operator value_t() const { return value_; }
+  constexpr value_t value() const { return value_; }
 
 private:
   value_t value_{NONE};
@@ -80,30 +80,18 @@ public:
     INTERNAL = 666,
   };
 
-  static constexpr auto NOERROR
-             = value_t::NOERROR;
-  static constexpr auto FORMERR
-             = value_t::FORMERR;
-  static constexpr auto SERVFAIL
-             = value_t::SERVFAIL;
-  static constexpr auto NXDOMAIN
-             = value_t::NXDOMAIN;
-  static constexpr auto NOTIMPL
-             = value_t::NOTIMPL;
-  static constexpr auto REFUSED
-             = value_t::REFUSED;
-  static constexpr auto YXDOMAIN
-             = value_t::YXDOMAIN;
-  static constexpr auto YXRRSET
-             = value_t::YXRRSET;
-  static constexpr auto NXRRSET
-             = value_t::NXRRSET;
-  static constexpr auto NOTAUTH
-             = value_t::NOTAUTH;
-  static constexpr auto NOTZONE
-             = value_t::NOTZONE;
-  static constexpr auto INTERNAL
-             = value_t::INTERNAL;
+  static constexpr auto NOERROR  = value_t::NOERROR;
+  static constexpr auto FORMERR  = value_t::FORMERR;
+  static constexpr auto SERVFAIL = value_t::SERVFAIL;
+  static constexpr auto NXDOMAIN = value_t::NXDOMAIN;
+  static constexpr auto NOTIMPL  = value_t::NOTIMPL;
+  static constexpr auto REFUSED  = value_t::REFUSED;
+  static constexpr auto YXDOMAIN = value_t::YXDOMAIN;
+  static constexpr auto YXRRSET  = value_t::YXRRSET;
+  static constexpr auto NXRRSET  = value_t::NXRRSET;
+  static constexpr auto NOTAUTH  = value_t::NOTAUTH;
+  static constexpr auto NOTZONE  = value_t::NOTZONE;
+  static constexpr auto INTERNAL = value_t::INTERNAL;
 
 private:
   value_t value_{NOERROR};
