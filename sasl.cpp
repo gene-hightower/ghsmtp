@@ -1,5 +1,5 @@
 #include "Base64.hpp"
-//#include "SockBuffer.hpp"
+#include "SockBuffer.hpp"
 
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
@@ -7,8 +7,6 @@
 
 #include <iostream>
 #include <string>
-
-using namespace std::string_literals;
 
 #include <netdb.h>
 #include <sys/socket.h>
@@ -84,7 +82,7 @@ struct Context {
   static constexpr auto cont = auth_response::cont;
   static constexpr auto fail = auth_response::fail;
 
-  static char const* c_str(auth_response rsp)
+  static constexpr char const* c_str(auth_response rsp)
   {
     switch (rsp) {
     case none: return "none";
@@ -195,18 +193,17 @@ int main()
   auto socket_path = "/var/spool/postfix/private/auth";
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-  PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
+  PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
+    << "connect to " << socket_path << " failed";
 
-  // boost::iostreams::stream<SockBuffer> ios(fd, fd);
-  boost::iostreams::stream<boost::iostreams::file_descriptor> ios(
-      fd, boost::iostreams::close_handle);
+  boost::iostreams::stream<SockBuffer> ios(fd, fd);
 
   ios << "VERSION\t1\t1\n"
       << "CPID\t" << getpid() << "\n"
       << std::flush;
 
   dovecot::Context ctx;
-  istream_input<eol::lf> in(ios, 8 * 1024, "sasl");
+  istream_input<eol::lf> in(ios, 4 * 1024, "sasl");
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }
@@ -222,13 +219,11 @@ int main()
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
     uint32_t id = 0x12345678;
 
-    ios << "AUTH" << '\t' << id;
-
-    ios << "\tPLAIN";
-    ios << "\tservice=SMTP";
-    ios << "\tresp=" << init;
-
-    ios << "\n" << std::flush;
+    ios << "AUTH\t" << id
+        << "\tPLAIN"
+        << "\tservice=SMTP"
+        << "\tresp=" << init
+        << '\n' << std::flush;
 
     if (!parse<dovecot::auth_resp, dovecot::action>(in, ctx)) {
       LOG(WARNING) << "auth response parse failed";
