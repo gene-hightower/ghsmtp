@@ -87,7 +87,9 @@ TESTS := \
 	Sock-test \
 	SockBuffer-test \
 	TLD-test \
-	TLS-OpenSSL-test
+	TLS-OpenSSL-test \
+	smtp-test \
+	snd-test
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB
@@ -105,6 +107,9 @@ Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session S
 Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
+
+smtp-test_STEMS := $(filter-out smtp,$(smtp_STEMS))
+snd-test_STEMS := $(filter-out snd,$(snd_STEMS))
 
 databases := \
 	black.cdb \

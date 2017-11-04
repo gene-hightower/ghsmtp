@@ -823,50 +823,6 @@ struct action<quit> {
 };
 }
 
-void self_test()
-{
-  LOG(INFO) << "testing";
-
-  const char* in_list[]{
-      "anything\r\n"
-      ".\r\n", // end
-
-      ".anything\r\n",
-
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n",
-
-      "anything",  // no CRLF
-      ".anything", // no CRLF
-
-      "",
-
-      "anything\r\n"
-      "\nanything\r\n"
-      "\ranything\r\n"
-      "anything\r\n"
-      ".\r\n", // end
-  };
-
-  for (auto i : in_list) {
-    std::string bfr(i);
-    std::istringstream data(bfr);
-    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
-    RFC5321::Ctx ctx;
-    if (parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
-      LOG(INFO) << "pass: \"" << esc(i) << "\"";
-    }
-    else {
-      LOG(INFO) << "fail: \"" << esc(i) << "\"";
-    }
-  }
-
-  std::exit(EXIT_SUCCESS);
-}
-
 void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
@@ -877,8 +833,6 @@ void timeout(int signum)
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
-
-  // self_test();
 
   { // Need to work with either namespace.
     using namespace gflags;
