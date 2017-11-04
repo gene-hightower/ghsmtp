@@ -88,6 +88,7 @@ TESTS := \
 	SockBuffer-test \
 	TLD-test \
 	TLS-OpenSSL-test \
+	msg-test \
 	smtp-test \
 	snd-test
 
@@ -108,6 +109,7 @@ Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 
+msg-test_STEMS := $(filter-out msg,$(msg_STEMS))
 smtp-test_STEMS := $(filter-out smtp,$(smtp_STEMS))
 snd-test_STEMS := $(filter-out snd,$(snd_STEMS))
 
