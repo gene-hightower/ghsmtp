@@ -1198,5 +1198,6 @@ try_host:
   LOG(INFO) << "> QUIT";
   cnn.sock.out() << "QUIT\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-  exit(EXIT_SUCCESS);
+
+  return 0;
 }
