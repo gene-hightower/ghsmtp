@@ -29,12 +29,12 @@ int main(int argc, char* argv[])
   addrinfo* result;
   int err = getaddrinfo(argv[1], nullptr, &hints, &result);
   if (err) {
-    cerr << "getaddrinfo failure: " << gai_strerror(err) << endl;
+    cerr << "getaddrinfo failure: " << gai_strerror(err) << '\n';
     return 1;
   }
 
   if (0 == result) {
-    cerr << "no results" << endl;
+    cerr << "no results\n";
     return 2;
   }
 
@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
       cout << "AF_INET6";
       break;
     default:
-      cout << "unknown ai_family " << rp->ai_family << endl;
+      cout << "unknown ai_family " << rp->ai_family << '\n';
       return 3;
     }
 
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
       cout << " SOCK_DGRAM";
       break;
     default:
-      cout << "unknown ai_socktype " << rp->ai_socktype << endl;
+      cout << "unknown ai_socktype " << rp->ai_socktype << '\n';
       return 4;
     }
 
@@ -71,14 +71,14 @@ int main(int argc, char* argv[])
       cout << " IPPROTO_UDP";
       break;
     default:
-      cout << "unknown ai_protocol " << rp->ai_protocol << endl;
+      cout << "unknown ai_protocol " << rp->ai_protocol << '\n';
       return 5;
     }
 
-    cout << endl;
+    cout << '\n';
 
     if (rp->ai_canonname)
-      cout << "canonname == " << rp->ai_canonname << endl;
+      cout << "canonname == " << rp->ai_canonname << '\n';
 
     char net_addr[INET6_ADDRSTRLEN];
 
@@ -96,14 +96,14 @@ int main(int argc, char* argv[])
       break;
     }
     default:
-      cout << "unknown ai_addrlen" << rp->ai_addrlen << endl;
+      cout << "unknown ai_addrlen" << rp->ai_addrlen << '\n';
       return 6;
     }
 
     char host[NI_MAXHOST];
     char serv[NI_MAXSERV];
 
-    cout << "addr      == " << net_addr << endl;
+    cout << "addr      == " << net_addr << '\n';
 
     if (AF_INET == rp->ai_family) {
       sockaddr_in adr;
@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
       err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host,
                         sizeof host, serv, sizeof serv, 0);
       if (err) {
-        cerr << "4 getnameinfo failure: " << gai_strerror(err) << endl;
+        cerr << "4 getnameinfo failure: " << gai_strerror(err) << '\n';
         return 7;
       }
     }
@@ -124,12 +124,12 @@ int main(int argc, char* argv[])
       err = getnameinfo(reinterpret_cast<sockaddr*>(&adr), sizeof adr, host,
                         sizeof host, serv, sizeof serv, 0);
       if (err) {
-        cerr << "6 getnameinfo failure: " << gai_strerror(err) << endl;
+        cerr << "6 getnameinfo failure: " << gai_strerror(err) << '\n';
         return 8;
       }
     }
 
-    cout << "reverse   == " << host << endl;
+    cout << "reverse   == " << host << '\n';
   }
 
   freeaddrinfo(result);
