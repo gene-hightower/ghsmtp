@@ -159,7 +159,7 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-include ../MKUltra/rules
+include MKUltra/rules
 
 regression: $(programs) $(TEST_MAILDIR)
 	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
