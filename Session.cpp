@@ -17,6 +17,7 @@
 #include "Session.hpp"
 #include "esc.hpp"
 #include "hostname.hpp"
+#include "iequal.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -136,7 +137,7 @@ void Session::greeting()
         // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
         auto reversed = IP4::reverse(sock_.them_c_str());
         DNS::Resolver res;
-        for (const auto& rbl : Config::rbls) {
+        for (auto const& rbl : Config::rbls) {
           if (has_record<RR_type::A>(res, reversed + rbl)) {
             syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
                    sock_.them_c_str(), rbl);
@@ -283,34 +284,28 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   bool smtputf8 = false;
 
   // Take a look at the optional parameters:
-  for (auto const& p : parameters) {
-    std::string name = p.first;
-    std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-
-    std::string val = p.second;
-    std::transform(val.begin(), val.end(), val.begin(), ::toupper);
-
-    if (name == "BODY") {
-      if (val == "8BITMIME") {
+  for (auto const&[name, val] : parameters) {
+    if (iequal(name, "BODY")) {
+      if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...
       }
-      else if (val == "7BIT") {
+      else if (iequal(val, "7BIT")) {
         // nothing to see here, move along...
       }
-      else if (val == "BINARYMIME") {
+      else if (iequal(val, "BINARYMIME")) {
         binarymime_ = true;
       }
       else {
         LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
       }
     }
-    else if (name == "SMTPUTF8") {
+    else if (iequal(name, "SMTPUTF8")) {
       if (!val.empty()) {
         LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
       }
       smtputf8 = true;
     }
-    else if (name == "SIZE") {
+    else if (iequal(name, "SIZE")) {
       if (val.empty()) {
         LOG(WARNING) << "SIZE parameter has no value.";
       }
@@ -325,10 +320,10 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
           }
         }
         catch (std::invalid_argument const& e) {
-          LOG(WARNING) << "SIZE parameter has invalid value: " << p.second;
+          LOG(WARNING) << "SIZE parameter has invalid value: " << val;
         }
         catch (std::out_of_range const& e) {
-          LOG(WARNING) << "SIZE parameter has out-of-range value: " << p.second;
+          LOG(WARNING) << "SIZE parameter has out-of-range value: " << val;
         }
         // I guess we just ignore bad size parameters.
       }
@@ -352,7 +347,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   auto sender = static_cast<std::string>(reverse_path);
 
-  for (const auto bad_sender : Config::bad_senders) {
+  for (auto const& bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
       out_() << "550 5.1.8 bad sender\r\n" << std::flush;
       LOG(WARNING) << "bad sender " << sender;
@@ -361,8 +356,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   std::ostringstream params;
-  for (auto p : parameters) {
-    params << " " << p.first << (p.second.empty() ? "" : "=") << p.second;
+  for (auto const&[name, value] : parameters) {
+    params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
   if (verify_sender_(reverse_path)) {
@@ -391,9 +386,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto& p : parameters) {
-    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << p.first << "="
-                 << p.second;
+  for (auto const&[name, value] : parameters) {
+    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
   if (verify_recipient_(forward_path)) {
@@ -769,7 +763,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   auto accepted_domain = false;
-  for (const auto d : Config::accept_domains) {
+  for (auto const& d : Config::accept_domains) {
     if (recipient.domain() == d) {
       accepted_domain = true;
       break;
@@ -791,7 +785,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  for (const auto bad_recipient : Config::bad_recipients) {
+  for (auto const& bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
       out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
@@ -916,7 +910,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
   DNS::Resolver res;
-  for (const auto& uribl : Config::uribls) {
+  for (auto const& uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
