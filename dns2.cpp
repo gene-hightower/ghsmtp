@@ -3,6 +3,8 @@
 #include "DNS.hpp"
 #include "IP4.hpp"
 
+#include <glog/logging.h>
+
 void do_dotted_quad(char const* addr)
 {
   DNS::Resolver res;
@@ -42,8 +44,7 @@ void do_dotted_quad(char const* addr)
 
   std::string fcrdns;
 
-  std::vector<std::string> ptrs
-      = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
+  auto ptrs = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
 
   for (auto ptr : ptrs) {
     // chop off the trailing '.'
@@ -51,9 +52,8 @@ void do_dotted_quad(char const* addr)
     if ((-1 != last) && ('.' == ptr.at(last))) {
       ptr.erase(last, 1);
     }
-    std::vector<std::string> addrs
-        = DNS::get_records<DNS::RR_type::A>(res, ptr);
-    for (const auto a : addrs) {
+    auto addrs = DNS::get_records<DNS::RR_type::A>(res, ptr);
+    for (auto const& a : addrs) {
       if (a == addr) {
         fcrdns = ptr;
         goto found;
@@ -67,9 +67,8 @@ void do_dotted_quad(char const* addr)
 found:
   std::cout << fcrdns << '\n';
 
-  std::vector<std::string> txts
-      = DNS::get_records<DNS::RR_type::TXT>(res, fcrdns);
-  for (const auto txt : txts) {
+  auto txts = DNS::get_records<DNS::RR_type::TXT>(res, fcrdns);
+  for (auto const& txt : txts) {
     std::cout << "\"" << txt << "\"\n";
   }
 }
@@ -78,15 +77,13 @@ void do_domain(char const* domain)
 {
   DNS::Resolver res;
 
-  std::vector<std::string> addrs
-      = DNS::get_records<DNS::RR_type::A>(res, domain);
-  for (const auto a : addrs) {
+  auto addrs = DNS::get_records<DNS::RR_type::A>(res, domain);
+  for (auto const& a : addrs) {
     std::cout << a << '\n';
   }
 
-  std::vector<std::string> txts
-      = DNS::get_records<DNS::RR_type::TXT>(res, domain);
-  for (const auto txt : txts) {
+  auto txts = DNS::get_records<DNS::RR_type::TXT>(res, domain);
+  for (auto const& txt : txts) {
     std::cout << "\"" << txt << "\"\n";
   }
 }
