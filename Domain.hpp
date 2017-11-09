@@ -1,9 +1,11 @@
 #ifndef DOMAIN_DOT_HPP
 #define DOMAIN_DOT_HPP
 
-#include <boost/algorithm/string/predicate.hpp>
-
+#include <iostream>
+#include <string>
 #include <string_view>
+
+#include "iequal.hpp"
 
 class Domain {
 public:
@@ -23,7 +25,7 @@ public:
     if ((0 != b.length()) && ('.' == b.back())) {
       b.remove_suffix(1);
     }
-    return boost::iequals(a, b);
+    return iequal(a, b);
   }
 
   bool operator==(std::string const& rhs) const
