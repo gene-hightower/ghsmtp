@@ -126,11 +126,11 @@ public:
 private:
   ldns_resolver* res_;
 
-  friend class Query<RR_type::value_t::A>;
-  friend class Query<RR_type::value_t::AAAA>;
-  friend class Query<RR_type::value_t::MX>;
-  friend class Query<RR_type::value_t::PTR>;
-  friend class Query<RR_type::value_t::TXT>;
+  friend class Query<RR_type::A>;
+  friend class Query<RR_type::AAAA>;
+  friend class Query<RR_type::MX>;
+  friend class Query<RR_type::PTR>;
+  friend class Query<RR_type::TXT>;
 };
 
 class Domain {
