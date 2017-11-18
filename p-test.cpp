@@ -76,7 +76,7 @@ template <>
 struct action<quit> {
   static void apply0(Ctx& ctx) { std::cout << "quit\n"; }
 };
-}
+} // namespace smtp
 
 int main(int argc, char const* argv[])
 {

@@ -53,4 +53,4 @@ std::string fcrdns(char const* addr)
     return IP6::fcrdns(addr);
   LOG(FATAL) << "not a valid IP address " << addr;
 }
-}
+} // namespace IP

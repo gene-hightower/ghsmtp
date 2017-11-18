@@ -25,7 +25,7 @@ std::string nfkc(std::string_view str)
   free(norm);
   return str_norm;
 }
-}
+} // namespace
 
 void Domain::set(std::string_view dom)
 {

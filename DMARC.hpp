@@ -161,6 +161,6 @@ public:
 private:
   DMARC_POLICY_T* pctx_{nullptr};
 };
-}
+} // namespace OpenDMARC
 
 #endif // DMARC_DOT_HPP

@@ -88,7 +88,7 @@ constexpr std::streamsize bfr_size = 4 * 1024;
 
 constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
-}
+} // namespace Config
 
 // clang-format off
 
@@ -493,7 +493,7 @@ struct action<reply_code> {
     cnn.reply_code = in.string();
   }
 };
-}
+} // namespace RFC5321
 
 uint16_t get_port(char const* service)
 {
@@ -535,8 +535,9 @@ int conn(DNS::Resolver& res,
     if (!FLAGS_local_address.empty()) {
       sockaddr_in6 loc{};
       loc.sin6_family = AF_INET6;
-      if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
-                         reinterpret_cast<void*>(&loc.sin6_addr))) {
+      if (1
+          != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
+                       reinterpret_cast<void*>(&loc.sin6_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv6 address";
       }
@@ -570,8 +571,9 @@ int conn(DNS::Resolver& res,
     if (!FLAGS_local_address.empty()) {
       sockaddr_in loc{};
       loc.sin_family = AF_INET;
-      if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                         reinterpret_cast<void*>(&loc.sin_addr))) {
+      if (1
+          != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                       reinterpret_cast<void*>(&loc.sin_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv4 address";
       }

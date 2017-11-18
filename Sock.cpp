@@ -11,8 +11,9 @@ Sock::Sock(int fd_in,
 {
   // Get our local IP address as "us".
 
-  if (-1 == getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr_),
-                        &us_addr_len_)) {
+  if (-1
+      == getsockname(fd_in, reinterpret_cast<struct sockaddr*>(&us_addr_),
+                     &us_addr_len_)) {
     // Ignore ENOTSOCK errors from getsockname, useful for testing.
     PLOG_IF(WARNING, ENOTSOCK != errno) << "getsockname failed";
   }
@@ -43,8 +44,9 @@ Sock::Sock(int fd_in,
 
   // Get the remote IP address as "them".
 
-  if (-1 == getpeername(fd_out, reinterpret_cast<struct sockaddr*>(&them_addr_),
-                        &them_addr_len_)) {
+  if (-1
+      == getpeername(fd_out, reinterpret_cast<struct sockaddr*>(&them_addr_),
+                     &them_addr_len_)) {
     // Ignore ENOTSOCK errors from getpeername, useful for testing.
     PLOG_IF(WARNING, ENOTSOCK != errno) << "getpeername failed";
   }

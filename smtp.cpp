@@ -24,7 +24,7 @@ namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
 constexpr std::streamsize max_hdr_size = 16 * 1024;
 constexpr std::streamsize max_xfer_size = 64 * 1024;
-}
+} // namespace Config
 
 namespace RFC5321 {
 
@@ -821,7 +821,7 @@ template <>
 struct action<quit> {
   static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.quit(); }
 };
-}
+} // namespace RFC5321
 
 void timeout(int signum)
 {

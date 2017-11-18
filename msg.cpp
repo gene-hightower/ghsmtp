@@ -218,7 +218,7 @@ struct ccontent : sor<ctext, quoted_pair, comment> {
 };
 
 struct comment
-    : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {
+  : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {
 };
 
 struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {
@@ -229,11 +229,11 @@ struct qcontent : sor<qtext, quoted_pair> {
 
 // Corrected in errata ID: 3135
 struct quoted_string
-    : seq<opt<CFWS>,
-          DQUOTE,
-          sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
-          DQUOTE,
-          opt<CFWS>> {
+  : seq<opt<CFWS>,
+        DQUOTE,
+        sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
+        DQUOTE,
+        opt<CFWS>> {
 };
 // *([FWS] VCHAR) *WSP
 struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
@@ -263,7 +263,7 @@ struct dec_octet : sor<one<'0'>,
 // clang-format on
 
 struct ipv4_address
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
+  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
 };
 
 struct h16 : rep_min_max<1, 4, HEXDIG> {
@@ -313,8 +313,8 @@ struct addr_spec : seq<local_part, one<'@'>, domain> {
 struct angle_addr : seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>> {
 };
 
-struct path : sor<angle_addr,
-                  seq<opt<CFWS>, one<'<'>, opt<CFWS>, one<'>'>, opt<CFWS>>> {
+struct path
+  : sor<angle_addr, seq<opt<CFWS>, one<'<'>, opt<CFWS>, one<'>'>, opt<CFWS>>> {
 };
 
 struct display_name : phrase {
@@ -329,7 +329,7 @@ struct mailbox : sor<name_addr, addr_spec> {
 struct group_list;
 
 struct group
-    : seq<display_name, one<':'>, opt<group_list>, one<';'>, opt<CFWS>> {
+  : seq<display_name, one<':'>, opt<group_list>, one<';'>, opt<CFWS>> {
 };
 
 struct address : sor<mailbox, group> {
@@ -452,10 +452,10 @@ struct millisecond : rep<3, DIGIT> {
 
 // RFC-5322 extension is optional milliseconds
 struct time_of_day
-    : seq<hour,
-          one<':'>,
-          minute,
-          opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {
+  : seq<hour,
+        one<':'>,
+        minute,
+        opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {
 };
 
 // struct obs_zone : sor<range<65, 73>,
@@ -481,7 +481,7 @@ struct time : seq<time_of_day, FWS, zone> {
 };
 
 struct date_time
-    : seq<opt<seq<day_of_week, one<','>>>, date, FWS, time, opt<CFWS>> {
+  : seq<opt<seq<day_of_week, one<','>>>, date, FWS, time, opt<CFWS>> {
 };
 
 // The Origination Date Field
@@ -506,7 +506,7 @@ struct cc : seq<TAOCPP_PEGTL_ISTRING("Cc:"), address_list, eol> {
 };
 
 struct bcc
-    : seq<TAOCPP_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
 };
 
 // Identification Fields
@@ -520,24 +520,19 @@ struct id_left : dot_atom_text {
 struct id_right : sor<dot_atom_text, no_fold_literal> {
 };
 
-struct msg_id : seq<opt<CFWS>,
-                    one<'<'>,
-                    id_left,
-                    one<'@'>,
-                    id_right,
-                    one<'>'>,
-                    opt<CFWS>> {
+struct msg_id
+  : seq<opt<CFWS>, one<'<'>, id_left, one<'@'>, id_right, one<'>'>, opt<CFWS>> {
 };
 
 struct message_id : seq<TAOCPP_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {
 };
 
 struct in_reply_to
-    : seq<TAOCPP_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
 };
 
 struct references
-    : seq<TAOCPP_PEGTL_ISTRING("References:"), plus<msg_id>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("References:"), plus<msg_id>, eol> {
 };
 
 // Informational Fields
@@ -549,7 +544,7 @@ struct comments : seq<TAOCPP_PEGTL_ISTRING("Comments:"), unstructured, eol> {
 };
 
 struct keywords
-    : seq<TAOCPP_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {
 };
 
 // Resent Fields
@@ -558,11 +553,11 @@ struct resent_date : seq<TAOCPP_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {
 };
 
 struct resent_from
-    : seq<TAOCPP_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
 };
 
 struct resent_sender
-    : seq<TAOCPP_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
 };
 
 struct resent_to : seq<TAOCPP_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
@@ -577,7 +572,7 @@ struct resent_bcc : seq<TAOCPP_PEGTL_ISTRING("Resent-Bcc:"),
 };
 
 struct resent_msg_id
-    : seq<TAOCPP_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {
 };
 
 // Trace Fields
@@ -634,9 +629,9 @@ struct spf_key_value_pair : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {
 };
 
 struct spf_key_value_list
-    : seq<spf_key_value_pair,
-          star<seq<one<';'>, opt<CFWS>, spf_key_value_pair>>,
-          opt<one<';'>>> {
+  : seq<spf_key_value_pair,
+        star<seq<one<';'>, opt<CFWS>, spf_key_value_pair>>,
+        opt<one<';'>>> {
 };
 
 struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
@@ -649,7 +644,7 @@ struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
 };
 
 struct dkim_signature
-    : seq<TAOCPP_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
 };
 
 struct mime_version : seq<TAOCPP_PEGTL_ISTRING("MIME-Version:"),
@@ -783,17 +778,17 @@ struct mechanism : sor<TAOCPP_PEGTL_ISTRING("7bit"),
 };
 
 struct content_transfer_encoding
-    : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"),
-          opt<CFWS>,
-          mechanism,
-          eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"),
+        opt<CFWS>,
+        mechanism,
+        eol> {
 };
 
 struct id : seq<TAOCPP_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
 };
 
 struct description
-    : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
 };
 
 // Optional Fields
@@ -1639,7 +1634,7 @@ struct action<obs_group_list> {
     LOG(INFO) << "Obsolete group list";
   }
 };
-}
+} // namespace RFC5322
 
 int main(int argc, char const* argv[])
 {

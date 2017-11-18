@@ -176,7 +176,7 @@ struct action<auth_fail> {
     ctx.auth_resp = Context::auth_response::fail;
   }
 };
-}
+} // namespace dovecot
 
 constexpr char const* defined_params[]{
     "anonymous",       "plaintext",   "dictionary", "active",
@@ -194,7 +194,7 @@ int main()
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
-    << "connect to " << socket_path << " failed";
+      << "connect to " << socket_path << " failed";
 
   boost::iostreams::stream<SockBuffer> ios(fd, fd);
 
@@ -219,11 +219,10 @@ int main()
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
     uint32_t id = 0x12345678;
 
-    ios << "AUTH\t" << id
-        << "\tPLAIN"
+    ios << "AUTH\t" << id << "\tPLAIN"
         << "\tservice=SMTP"
-        << "\tresp=" << init
-        << '\n' << std::flush;
+        << "\tresp=" << init << '\n'
+        << std::flush;
 
     if (!parse<dovecot::auth_resp, dovecot::action>(in, ctx)) {
       LOG(WARNING) << "auth response parse failed";

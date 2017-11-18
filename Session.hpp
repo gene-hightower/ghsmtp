@@ -18,7 +18,7 @@ constexpr size_t kibibyte = 1024;
 constexpr size_t mebibyte = kibibyte * kibibyte;
 constexpr size_t max_msg_size_initial = 15 * mebibyte;
 constexpr size_t max_msg_size_bro = 150 * mebibyte;
-}
+} // namespace Config
 
 class Session {
 public:

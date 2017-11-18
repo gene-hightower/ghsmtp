@@ -24,7 +24,7 @@ struct dec_octet : sor<rep_min_max<1, 2, DIGIT>,
 // clang-format on
 
 struct ipv4_address
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet, eof> {
+  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet, eof> {
 };
 
 struct ipv4_address_lit : seq<one<'['>,
@@ -114,4 +114,4 @@ std::string fcrdns(char const* addr)
   }
   return "";
 }
-}
+} // namespace IP4

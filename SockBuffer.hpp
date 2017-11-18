@@ -19,7 +19,7 @@
 #include <boost/iostreams/stream.hpp>
 
 class SockBuffer
-    : public boost::iostreams::device<boost::iostreams::bidirectional> {
+  : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(SockBuffer const& that)

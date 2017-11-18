@@ -8,7 +8,7 @@
 
 namespace {
 void null_hook(void) {}
-}
+} // namespace
 
 class POSIX {
 public:

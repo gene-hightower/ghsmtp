@@ -49,11 +49,14 @@ constexpr char const* const bad_recipients[] = {
 constexpr char const* const bad_senders[] = {};
 
 constexpr char const* const rbls[] = {
-    "zen.spamhaus.org", "b.barracudacentral.org",
+    "zen.spamhaus.org",
+    "b.barracudacentral.org",
 };
 
 constexpr char const* const uribls[] = {
-    "dbl.spamhaus.org", "black.uribl.com", "multi.surbl.org",
+    "dbl.spamhaus.org",
+    "black.uribl.com",
+    "multi.surbl.org",
 };
 
 constexpr auto greeting_wait = std::chrono::seconds(3);
@@ -63,7 +66,7 @@ constexpr auto max_recipients_per_message = 100;
 // section 4.5.3.2.7.
 constexpr auto read_timeout = std::chrono::minutes(5);
 constexpr auto write_timeout = std::chrono::seconds(30);
-}
+} // namespace Config
 
 Session::Session(std::function<void(void)> read_hook,
                  int fd_in,
@@ -284,7 +287,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   bool smtputf8 = false;
 
   // Take a look at the optional parameters:
-  for (auto const&[name, val] : parameters) {
+  for (auto const& [name, val] : parameters) {
     if (iequal(name, "BODY")) {
       if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...
@@ -356,7 +359,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   std::ostringstream params;
-  for (auto const&[name, value] : parameters) {
+  for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
@@ -386,7 +389,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto const&[name, value] : parameters) {
+  for (auto const& [name, value] : parameters) {
     LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
