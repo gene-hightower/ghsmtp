@@ -1035,7 +1035,7 @@ try_host:
 
   auto key_file = FLAGS_selector + ".private";
   std::ifstream keyfs(key_file.c_str());
-  CHECK(keyfs.good());
+  CHECK(keyfs.good()) << "can't access " << key_file;
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
   OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
                      body_type);
