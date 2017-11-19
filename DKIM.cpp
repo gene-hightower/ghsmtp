@@ -1,6 +1,11 @@
 #include "DKIM.hpp"
 
 #include <cstdbool> // needs to be above <dkim.h>
+
+#ifdef __clang__
+using _Bool = bool;
+#endif
+
 #include <dkim.h>
 
 #include <glog/logging.h>
