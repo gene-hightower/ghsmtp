@@ -95,7 +95,7 @@ std::string enc(std::string_view text, std::string::size_type wrap)
   return enc_text;
 }
 
-constexpr bool is_base64char(char ch)
+inline bool is_base64char(char ch)
 {
   return std::isalnum(ch) || ch == '+' || ch == '/';
 }

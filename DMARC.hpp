@@ -11,7 +11,7 @@
 
 namespace OpenDMARC {
 
-inline constexpr u_char* uc(char const* cp)
+inline u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
 }
