@@ -1,7 +1,3 @@
-#define main no_main
-#include "snd.cpp"
-#undef main
-
 int main()
 {
   auto read_hook = []() {};

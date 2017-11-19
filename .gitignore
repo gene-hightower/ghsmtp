@@ -8,12 +8,16 @@ ghsmtp.private
 ghsmtp.txt
 mkm
 msg
+msg-test.cpp
+notes.txt
 p0f
 public_suffix_list.dat
 sasl
 smtp
+smtp-test.cpp
 smtp.pem
 snd
+snd-test.cpp
 test-credentials.ipp
 three-level-black.cdb
 three-level-tlds
@@ -22,4 +26,3 @@ two-level-black.cdb
 two-level-tlds
 two-level-tlds.cdb
 two-level-white.cdb
-notes.txt

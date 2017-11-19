@@ -1,7 +1,3 @@
-#define main no_main
-#include "msg.cpp"
-#undef main
-
 int main()
 {
   CHECK(RFC5322::is_defined_field("Subject"));
