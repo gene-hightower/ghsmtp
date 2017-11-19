@@ -110,20 +110,20 @@ struct no_last_dash { // not used now...
 
 // clang-format off
 
-struct UTF8_tail : range<0x80, 0xBF> {};
+struct UTF8_tail : range<'\x80', '\xBF'> {};
 
-struct UTF8_1 : range<0x00, 0x7F> {};
+struct UTF8_1 : range<'\x00', '\x7F'> {};
 
-struct UTF8_2 : seq<range<0xC2, 0xDF>, UTF8_tail> {};
+struct UTF8_2 : seq<range<'\xC2', '\xDF'>, UTF8_tail> {};
 
-struct UTF8_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, UTF8_tail>,
-                    seq<range<0xE1, 0xEC>, rep<2, UTF8_tail>>,
-                    seq<one<0xED>, range<0x80, 0x9F>, UTF8_tail>,
-                    seq<range<0xEE, 0xEF>, rep<2, UTF8_tail>>> {};
+struct UTF8_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
+                    seq<range<'\xE1', '\xEC'>, rep<2, UTF8_tail>>,
+                    seq<one<'\xED'>, range<'\x80', '\x9F'>, UTF8_tail>,
+                    seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {};
 
-struct UTF8_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, UTF8_tail>>,
-                    seq<range<0xF1, 0xF3>, rep<3, UTF8_tail>>,
-                    seq<one<0xF4>, range<0x80, 0x8F>, rep<2, UTF8_tail>>> {};
+struct UTF8_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
+                    seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
+                    seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {};
 
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
@@ -373,7 +373,6 @@ struct action<esmtp_keyword> {
   }
 };
 
-template <>
 template <>
 struct action<bogus_cmd_short> {
   template <typename Input>

@@ -93,20 +93,20 @@ constexpr auto write_timeout = std::chrono::minutes(3);
 // clang-format off
 
 namespace chars {
-struct tail : range<0x80, 0xBF> {};
+struct tail : range<'\x80', '\xBF'> {};
 
-struct ch_1 : range<0x00, 0x7F> {};
+struct ch_1 : range<'\x00', '\x7F'> {};
 
-struct ch_2 : seq<range<0xC2, 0xDF>, tail> {};
+struct ch_2 : seq<range<'\xC2', '\xDF'>, tail> {};
 
-struct ch_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, tail>,
-                  seq<range<0xE1, 0xEC>, rep<2, tail>>,
-                  seq<one<0xED>, range<0x80, 0x9F>, tail>,
-                  seq<range<0xEE, 0xEF>, rep<2, tail>>> {};
+struct ch_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, tail>,
+                  seq<range<'\xE1', '\xEC'>, rep<2, tail>>,
+                  seq<one<'\xED'>, range<'\x80', '\x9F'>, tail>,
+                  seq<range<'\xEE', '\xEF'>, rep<2, tail>>> {};
 
-struct ch_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, tail>>,
-                  seq<range<0xF1, 0xF3>, rep<3, tail>>,
-                  seq<one<0xF4>, range<0x80, 0x8F>, rep<2, tail>>> {};
+struct ch_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, tail>>,
+                  seq<range<'\xF1', '\xF3'>, rep<3, tail>>,
+                  seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, tail>>> {};
 
 struct u8char : sor<ch_1, ch_2, ch_3, ch_4> {};
 
