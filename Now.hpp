@@ -25,7 +25,7 @@ private:
 
 inline Now::Now()
 {
-  PCHECK(gettimeofday(&tv_, 0) == 0);
+  PCHECK(gettimeofday(&tv_, nullptr) == 0);
   tm* ptm = CHECK_NOTNULL(localtime(&tv_.tv_sec));
   CHECK_EQ(strftime(c_str_, sizeof c_str_, "%a, %d %b %Y %H:%M:%S %z", ptm),
            sizeof(c_str_) - 1);
