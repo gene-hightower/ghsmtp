@@ -822,6 +822,7 @@ struct action<quit> {
 };
 } // namespace RFC5321
 
+void timeout(int signum) __attribute__((noreturn));
 void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
