@@ -55,7 +55,7 @@ public:
   void quit() __attribute__((noreturn));
   void error(std::string_view log_msg);
   void cmd_unrecognized(std::string_view log_msg);
-  void bare_lf();
+  void bare_lf() __attribute__((noreturn));
 
   void max_out() __attribute__((noreturn));
   void time_out() __attribute__((noreturn));
