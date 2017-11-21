@@ -840,13 +840,6 @@ bool Session::verify_sender_domain_(Domain const& sender)
   std::vector<std::string> labels;
   boost::algorithm::split(labels, sndr_lc, boost::algorithm::is_any_of("."));
 
-  if (labels.size() < 2) { // This is not a valid domain.
-    out_() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
-           << std::flush;
-    LOG(ERROR) << "sender \"" << sndr_lc << "\" invalid syntax";
-    return false;
-  }
-
   CDB white("white");
   if (white.lookup(sndr_lc)) {
     LOG(INFO) << "sender \"" << sndr_lc << "\" whitelisted";
@@ -857,6 +850,13 @@ bool Session::verify_sender_domain_(Domain const& sender)
       LOG(INFO) << "sender \"" << sender.utf8() << "\" whitelisted";
       return true;
     }
+  }
+
+  if (labels.size() < 2) { // This is not a valid domain.
+    out_() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
+           << std::flush;
+    LOG(ERROR) << "sender \"" << sndr_lc << "\" invalid syntax";
+    return false;
   }
 
   auto tld = tld_db_.get_registered_domain(sndr_lc.c_str());
