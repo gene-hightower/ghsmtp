@@ -1,7 +1,3 @@
-#define main no_main
-#include "smtp.cpp"
-#undef main
-
 int main()
 {
   const char* good_list[]{

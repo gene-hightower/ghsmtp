@@ -1,6 +1,11 @@
 #include "DKIM.hpp"
 
 #include <cstdbool> // needs to be above <dkim.h>
+
+#ifdef __clang__
+using _Bool = bool;
+#endif
+
 #include <dkim.h>
 
 #include <glog/logging.h>
@@ -15,7 +20,7 @@ char const* c(unsigned char* cp) { return reinterpret_cast<char const*>(cp); }
 
 constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
 constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
-}
+} // namespace
 
 namespace OpenDKIM {
 
@@ -245,4 +250,4 @@ std::string Sign::getsighdr()
   status_ = dkim_getsighdr_d(dkim_, initial, &buf, &len);
   return std::string(c(buf), len);
 }
-}
+} // namespace OpenDKIM

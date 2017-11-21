@@ -18,7 +18,7 @@ constexpr size_t kibibyte = 1024;
 constexpr size_t mebibyte = kibibyte * kibibyte;
 constexpr size_t max_msg_size_initial = 15 * mebibyte;
 constexpr size_t max_msg_size_bro = 150 * mebibyte;
-}
+} // namespace Config
 
 class Session {
 public:
@@ -55,7 +55,7 @@ public:
   void quit() __attribute__((noreturn));
   void error(std::string_view log_msg);
   void cmd_unrecognized(std::string_view log_msg);
-  void bare_lf();
+  void bare_lf() __attribute__((noreturn));
 
   void max_out() __attribute__((noreturn));
   void time_out() __attribute__((noreturn));

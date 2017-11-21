@@ -88,25 +88,25 @@ constexpr std::streamsize bfr_size = 4 * 1024;
 
 constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
-}
+} // namespace Config
 
 // clang-format off
 
 namespace chars {
-struct tail : range<0x80, 0xBF> {};
+struct tail : range<'\x80', '\xBF'> {};
 
-struct ch_1 : range<0x00, 0x7F> {};
+struct ch_1 : range<'\x00', '\x7F'> {};
 
-struct ch_2 : seq<range<0xC2, 0xDF>, tail> {};
+struct ch_2 : seq<range<'\xC2', '\xDF'>, tail> {};
 
-struct ch_3 : sor<seq<one<0xE0>, range<0xA0, 0xBF>, tail>,
-                  seq<range<0xE1, 0xEC>, rep<2, tail>>,
-                  seq<one<0xED>, range<0x80, 0x9F>, tail>,
-                  seq<range<0xEE, 0xEF>, rep<2, tail>>> {};
+struct ch_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, tail>,
+                  seq<range<'\xE1', '\xEC'>, rep<2, tail>>,
+                  seq<one<'\xED'>, range<'\x80', '\x9F'>, tail>,
+                  seq<range<'\xEE', '\xEF'>, rep<2, tail>>> {};
 
-struct ch_4 : sor<seq<one<0xF0>, range<0x90, 0xBF>, rep<2, tail>>,
-                  seq<range<0xF1, 0xF3>, rep<3, tail>>,
-                  seq<one<0xF4>, range<0x80, 0x8F>, rep<2, tail>>> {};
+struct ch_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, tail>>,
+                  seq<range<'\xF1', '\xF3'>, rep<3, tail>>,
+                  seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, tail>>> {};
 
 struct u8char : sor<ch_1, ch_2, ch_3, ch_4> {};
 
@@ -493,7 +493,7 @@ struct action<reply_code> {
     cnn.reply_code = in.string();
   }
 };
-}
+} // namespace RFC5321
 
 uint16_t get_port(char const* service)
 {
@@ -535,8 +535,9 @@ int conn(DNS::Resolver& res,
     if (!FLAGS_local_address.empty()) {
       sockaddr_in6 loc{};
       loc.sin6_family = AF_INET6;
-      if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
-                         reinterpret_cast<void*>(&loc.sin6_addr))) {
+      if (1
+          != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
+                       reinterpret_cast<void*>(&loc.sin6_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv6 address";
       }
@@ -570,8 +571,9 @@ int conn(DNS::Resolver& res,
     if (!FLAGS_local_address.empty()) {
       sockaddr_in loc{};
       loc.sin_family = AF_INET;
-      if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                         reinterpret_cast<void*>(&loc.sin_addr))) {
+      if (1
+          != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                       reinterpret_cast<void*>(&loc.sin_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv4 address";
       }
@@ -1035,7 +1037,7 @@ try_host:
 
   auto key_file = FLAGS_selector + ".private";
   std::ifstream keyfs(key_file.c_str());
-  CHECK(keyfs.good());
+  CHECK(keyfs.good()) << "can't access " << key_file;
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
   OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
                      body_type);

@@ -51,6 +51,6 @@ public:
 
   std::string getsighdr();
 };
-}
+} // namespace OpenDKIM
 
 #endif // DKIM_DOT_HPP

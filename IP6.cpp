@@ -29,7 +29,7 @@ struct dec_octet : sor<one<'0'>,
 // clang-format on
 
 struct ipv4_address
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
+  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
 };
 
 struct h16 : rep_min_max<1, 4, HEXDIG> {
@@ -54,7 +54,7 @@ struct ipv6_address : sor<seq<                                          rep<6, h
 // clang-format on
 
 struct ipv6_address_literal
-    : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
+  : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
 };
 
 bool is_address(std::string_view addr)
@@ -136,4 +136,4 @@ std::string fcrdns(char const* addr)
   }
   return "";
 }
-}
+} // namespace IP6

@@ -1,14 +1,11 @@
-#define main no_main
-#include "msg.cpp"
-#undef main
-
 int main()
 {
   CHECK(RFC5322::is_defined_field("Subject"));
   CHECK(!RFC5322::is_defined_field("X-Subject"));
 
   const char* ip_list[]{
-      "2607:f8b0:4001:c0b::22a", "127.0.0.1",
+      "2607:f8b0:4001:c0b::22a",
+      "127.0.0.1",
   };
 
   for (auto i : ip_list) {
@@ -83,4 +80,3 @@ int main()
     }
   }
 }
-

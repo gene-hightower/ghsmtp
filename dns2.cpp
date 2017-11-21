@@ -44,7 +44,8 @@ void do_dotted_quad(char const* addr)
 
   std::string fcrdns;
 
-  auto ptrs = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
+  auto ptrs
+      = DNS::get_records<DNS::RR_type::PTR>(res, reversed + "in-addr.arpa");
 
   for (auto ptr : ptrs) {
     // chop off the trailing '.'

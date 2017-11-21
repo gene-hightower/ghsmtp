@@ -15,9 +15,10 @@ int main(int argc, char const* argv[])
   req.set_env_from("postmaster@digilicious.com");
   SPF::Response res(req);
   CHECK_EQ(res.result(), SPF::Result::PASS);
-  CHECK(0 == strcmp(res.header_comment(), "Example.com: domain of "
-                                          "digilicious.com designates "
-                                          "108.83.36.113 as permitted sender"));
+  CHECK(0
+        == strcmp(res.header_comment(), "Example.com: domain of "
+                                        "digilicious.com designates "
+                                        "108.83.36.113 as permitted sender"));
   auto pass_new = "Received-SPF: pass (Example.com: "
                   "domain of digilicious.com designates "
                   "108.83.36.113 as permitted sender) "
@@ -40,9 +41,10 @@ int main(int argc, char const* argv[])
   req2.set_env_from("postmaster@digilicious.com");
   SPF::Response res2(req2);
   CHECK_EQ(res2.result(), SPF::Result::FAIL);
-  CHECK(0 == strcmp(res2.header_comment(), "Example.com: domain of "
-                                           "digilicious.com does not designate "
-                                           "10.1.1.1 as permitted sender"));
+  CHECK(0
+        == strcmp(res2.header_comment(), "Example.com: domain of "
+                                         "digilicious.com does not designate "
+                                         "10.1.1.1 as permitted sender"));
 
   auto fail_new = "Received-SPF: fail (Example.com: "
                   "domain of digilicious.com does not "
@@ -60,9 +62,10 @@ int main(int argc, char const* argv[])
   CHECK((0 == strcmp(res2.received_spf(), fail_new))
         || (0 == strcmp(res2.received_spf(), fail_old)));
 
-  CHECK(0 == strcmp(res2.smtp_comment(), "Please see "
-                                         "http://www.openspf.org/"
-                                         "Why?id=postmaster%40digilicious.com&"
-                                         "ip=10.1.1.1&receiver=Example.com : "
-                                         "Reason: mechanism"));
+  CHECK(0
+        == strcmp(res2.smtp_comment(), "Please see "
+                                       "http://www.openspf.org/"
+                                       "Why?id=postmaster%40digilicious.com&"
+                                       "ip=10.1.1.1&receiver=Example.com : "
+                                       "Reason: mechanism"));
 }

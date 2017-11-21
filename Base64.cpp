@@ -18,7 +18,7 @@ unsigned char CHARSET_find(unsigned char ch)
       std::find(std::begin(CHARSET), std::end(CHARSET), ch)
       - std::begin(CHARSET));
 }
-}
+} // namespace
 
 std::string enc(std::string_view text, std::string::size_type wrap)
 {
@@ -95,7 +95,7 @@ std::string enc(std::string_view text, std::string::size_type wrap)
   return enc_text;
 }
 
-constexpr bool is_base64char(char ch)
+inline bool is_base64char(char ch)
 {
   return std::isalnum(ch) || ch == '+' || ch == '/';
 }
@@ -157,4 +157,4 @@ std::string dec(std::string_view text)
 
   return dec_text;
 }
-}
+} // namespace Base64

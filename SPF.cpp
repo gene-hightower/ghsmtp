@@ -136,6 +136,6 @@ char const* Response::received_spf() const
 {
   return SPF_response_get_received_spf(res_);
 }
-}
+} // namespace SPF
 
 SPF::Server::initializer SPF::Server::init;

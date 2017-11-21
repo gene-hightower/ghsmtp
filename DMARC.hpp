@@ -11,7 +11,7 @@
 
 namespace OpenDMARC {
 
-u_char* uc(char const* cp)
+inline u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
 }
@@ -161,6 +161,6 @@ public:
 private:
   DMARC_POLICY_T* pctx_{nullptr};
 };
-}
+} // namespace OpenDMARC
 
 #endif // DMARC_DOT_HPP

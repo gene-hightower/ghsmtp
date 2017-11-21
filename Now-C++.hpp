@@ -10,13 +10,31 @@ Also: this went away:
 ==32766== Conditional jump or move depends on uninitialised value(s)
 ==32766==    at 0x844FF22: __strftime_internal (strftime_l.c:543)
 ==32766==    by 0x8451FA5: strftime_l (strftime_l.c:459)
-==32766==    by 0x7B81C88: std::__timepunct<char>::_M_put(char*, unsigned long, char const*, tm const*) const (time_members.cc:47)
-==32766==    by 0x7BD7621: std::time_put<char, std::ostreambuf_iterator<char, std::char_traits<char> > >::do_put(std::ostreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, char, tm const*, char, char) const (locale_facets_nonio.tcc:1343)
-==32766==    by 0x7BD5BC6: std::time_put<char, std::ostreambuf_iterator<char, std::char_traits<char> > >::put(std::ostreambuf_iterator<char, std::char_traits<char> >, std::ios_base&, char, tm const*, char const*, char const*) const (locale_facets_nonio.tcc:1302)
-==32766==    by 0x415C71: RFC5321::Ctx::new_msg() (in /z/home/gene/work/ghsmtp/smtp)
-==32766==    by 0x4187A3: bool tao::pegtl::internal::seq<tao::pegtl::sor<RFC5321::bogus_cmd_short, RFC5321::data, RFC5321::quit, RFC5321::rset, RFC5321::noop, RFC5321::vrfy, RFC5321::help, RFC5321::helo, RFC5321::ehlo, RFC5321::bdat, RFC5321::bdat_last, RFC5321::starttls, RFC5321::rcpt_to, RFC5321::mail_from, RFC5321::bogus_cmd_long, RFC5321::anything_else>, tao::pegtl::discard>::match<(tao::pegtl::apply_mode)1, (tao::pegtl::rewind_mode)1, RFC5321::action, tao::pegtl::normal, tao::pegtl::istream_input<tao::pegtl::ascii::eol::crlf>, RFC5321::Ctx&>(tao::pegtl::istream_input<tao::pegtl::ascii::eol::crlf>&, RFC5321::Ctx&) (in /z/home/gene/work/ghsmtp/smtp)
+==32766==    by 0x7B81C88: std::__timepunct<char>::_M_put(char*, unsigned long,
+char const*, tm const*) const (time_members.cc:47)
+==32766==    by 0x7BD7621: std::time_put<char, std::ostreambuf_iterator<char,
+std::char_traits<char> > >::do_put(std::ostreambuf_iterator<char,
+std::char_traits<char> >, std::ios_base&, char, tm const*, char, char) const
+(locale_facets_nonio.tcc:1343)
+==32766==    by 0x7BD5BC6: std::time_put<char, std::ostreambuf_iterator<char,
+std::char_traits<char> > >::put(std::ostreambuf_iterator<char,
+std::char_traits<char> >, std::ios_base&, char, tm const*, char const*, char
+const*) const (locale_facets_nonio.tcc:1302)
+==32766==    by 0x415C71: RFC5321::Ctx::new_msg() (in
+/z/home/gene/work/ghsmtp/smtp)
+==32766==    by 0x4187A3: bool
+tao::pegtl::internal::seq<tao::pegtl::sor<RFC5321::bogus_cmd_short,
+RFC5321::data, RFC5321::quit, RFC5321::rset, RFC5321::noop, RFC5321::vrfy,
+RFC5321::help, RFC5321::helo, RFC5321::ehlo, RFC5321::bdat, RFC5321::bdat_last,
+RFC5321::starttls, RFC5321::rcpt_to, RFC5321::mail_from,
+RFC5321::bogus_cmd_long, RFC5321::anything_else>,
+tao::pegtl::discard>::match<(tao::pegtl::apply_mode)1,
+(tao::pegtl::rewind_mode)1, RFC5321::action, tao::pegtl::normal,
+tao::pegtl::istream_input<tao::pegtl::ascii::eol::crlf>,
+RFC5321::Ctx&>(tao::pegtl::istream_input<tao::pegtl::ascii::eol::crlf>&,
+RFC5321::Ctx&) (in /z/home/gene/work/ghsmtp/smtp)
 ==32766==    by 0x41092A: main (in /z/home/gene/work/ghsmtp/smtp)
-==32766== 
+==32766==
 
 */
 

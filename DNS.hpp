@@ -28,6 +28,11 @@ public:
     TXT   = 16,
   };
 
+  RR_type(value_t value)
+    : value_(value)
+  {
+  }
+
   static constexpr auto NONE  = value_t::NONE;
   static constexpr auto A     = value_t::A;
   static constexpr auto AAAA  = value_t::AAAA;
@@ -80,6 +85,11 @@ public:
     INTERNAL = 666,
   };
 
+  Pkt_rcode(value_t value)
+    : value_(value)
+  {
+  }
+
   static constexpr auto NOERROR  = value_t::NOERROR;
   static constexpr auto FORMERR  = value_t::FORMERR;
   static constexpr auto SERVFAIL = value_t::SERVFAIL;
@@ -92,6 +102,9 @@ public:
   static constexpr auto NOTAUTH  = value_t::NOTAUTH;
   static constexpr auto NOTZONE  = value_t::NOTZONE;
   static constexpr auto INTERNAL = value_t::INTERNAL;
+
+  constexpr operator value_t() const { return value_; }
+  constexpr value_t value() const { return value_; }
 
 private:
   value_t value_{NOERROR};

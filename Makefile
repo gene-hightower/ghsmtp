@@ -165,3 +165,21 @@ regression: $(programs) $(TEST_MAILDIR)
 	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
 	ls -l smtp
 	size smtp
+
+all:: snd-test.cpp
+
+snd-test.cpp: snd.cpp snd-test-main.cpp
+	sed -e 's/main(int/no_main(int/' snd.cpp > snd-test.cpp
+	cat snd-test-main.cpp >> snd-test.cpp
+
+all:: msg-test.cpp
+
+msg-test.cpp: msg.cpp msg-test-main.cpp
+	sed -e 's/main(int/no_main(int/' msg.cpp > msg-test.cpp
+	cat msg-test-main.cpp >> msg-test.cpp
+
+all:: smtp-test.cpp
+
+smtp-test.cpp: smtp.cpp smtp-test-main.cpp
+	sed -e 's/main(int/no_main(int/' smtp.cpp > smtp-test.cpp
+	cat smtp-test-main.cpp >> smtp-test.cpp
