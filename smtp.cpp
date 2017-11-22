@@ -854,7 +854,8 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   // Don't wait for STARTTLS to fail if no cert.
-  CHECK(fs::exists(TLS::cert_path)) << "can't find cert file";
+  CHECK(fs::exists(TLS::cert_path))
+      << "can't find cert file " << TLS::cert_path;
 
   std::unique_ptr<RFC5321::Ctx> ctx;
   auto read_hook = [&ctx]() { ctx->session.flush(); };
