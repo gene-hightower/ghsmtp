@@ -11,4 +11,4 @@ openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:4096 -keyout smtp.key -ou
 
 cat smtp.key smtp.crt > smtp.pem
 
-tlsa --certificate smtp.crt $CN
+tlsa --port 25 --certificate smtp.crt $CN
