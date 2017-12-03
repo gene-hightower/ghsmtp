@@ -18,7 +18,7 @@ public:
   }
   ~TLD() { freeTldTree(tree_); }
 
-  char const* get_registered_domain(char const* dom)
+  char const* get_registered_domain(char const* dom) const
   {
     return getRegisteredDomain(dom, tree_);
   }
