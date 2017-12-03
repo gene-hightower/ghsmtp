@@ -60,8 +60,15 @@ private:
   socklen_t us_addr_len_{sizeof us_addr_};
   socklen_t them_addr_len_{sizeof them_addr_};
 
-  sockaddr_storage us_addr_{0};
-  sockaddr_storage them_addr_{0};
+  union sa {
+    struct sockaddr addr;
+    struct sockaddr_in addr_in;
+    struct sockaddr_in6 addr_in6;
+    struct sockaddr_storage addr_storage;
+  };
+
+  sa us_addr_{0};
+  sa them_addr_{0};
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
