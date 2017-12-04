@@ -160,9 +160,10 @@ struct UTF8_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
                     seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {
 };
 
-struct UTF8_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
-                    seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
-                    seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {
+struct UTF8_4
+  : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
+        seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
+        seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {
 };
 
 // UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
