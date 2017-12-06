@@ -18,9 +18,35 @@
 #include <boost/iostreams/concepts.hpp>
 #include <boost/iostreams/stream.hpp>
 
+namespace Config {
+constexpr std::chrono::seconds default_read_timeout{2};
+constexpr std::chrono::seconds default_write_timeout{2};
+constexpr std::chrono::seconds default_starttls_timeout{2};
+} // namespace Config
+
 class SockBuffer
   : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
+  SockBuffer(int fd_in,
+             int fd_out,
+             std::function<void(void)> read_hook = []() {},
+             std::chrono::milliseconds read_timeout
+             = Config::default_read_timeout,
+             std::chrono::milliseconds write_timeout
+             = Config::default_write_timeout,
+             std::chrono::milliseconds starttls_timeout
+             = Config::default_starttls_timeout)
+    : fd_in_(fd_in)
+    , fd_out_(fd_out)
+    , read_hook_(read_hook)
+    , read_timeout_(read_timeout)
+    , write_timeout_(write_timeout)
+    , starttls_timeout_(starttls_timeout)
+    , tls_(read_hook_)
+  {
+    POSIX::set_nonblocking(fd_in_);
+    POSIX::set_nonblocking(fd_out_);
+  }
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(SockBuffer const& that)
     : fd_in_(that.fd_in_)
@@ -36,24 +62,6 @@ public:
     CHECK(!that.tls_active_);
   }
 
-  SockBuffer(int fd_in,
-             int fd_out,
-             std::function<void(void)> read_hook = []() {},
-             std::chrono::milliseconds read_timeout = std::chrono::seconds(2),
-             std::chrono::milliseconds write_timeout = std::chrono::seconds(2),
-             std::chrono::milliseconds starttls_timeout
-             = std::chrono::seconds(2))
-    : fd_in_(fd_in)
-    , fd_out_(fd_out)
-    , read_hook_(read_hook)
-    , read_timeout_(read_timeout)
-    , write_timeout_(write_timeout)
-    , starttls_timeout_(starttls_timeout)
-    , tls_(read_hook_)
-  {
-    POSIX::set_nonblocking(fd_in_);
-    POSIX::set_nonblocking(fd_out_);
-  }
   bool input_ready(std::chrono::milliseconds wait) const
   {
     return tls_active_ ? tls_.pending() : POSIX::input_ready(fd_in_, wait);
