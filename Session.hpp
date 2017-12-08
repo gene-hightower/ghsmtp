@@ -129,7 +129,7 @@ private:
 
   bool binarymime_{false};
   bool extensions_{false};
-  bool domain_whitelisted_{false};
+  bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
   bool reverse_path_verified_{false};
 };
