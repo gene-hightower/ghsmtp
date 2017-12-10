@@ -187,7 +187,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     milliseconds time_left
         = duration_cast<milliseconds>((start + timeout) - now);
 
-    switch (SSL_get_error(ssl_, rc)) {
+    switch (auto err = SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
           << "starttls timed out on input_ready";
@@ -199,6 +199,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
       continue; // try SSL_accept again
 
     default:
+      LOG(ERROR) << "err == " << err;
       ssl_error();
     }
   }
@@ -242,7 +243,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
 
     milliseconds time_left = duration_cast<milliseconds>((start + wait) - now);
 
-    switch (SSL_get_error(ssl_, n_ret)) {
+    switch (auto err = SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
@@ -265,6 +266,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
     }
 
     default:
+      LOG(ERROR) << "err == " << err;
       ssl_error();
     }
   }
