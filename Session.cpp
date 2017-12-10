@@ -690,8 +690,7 @@ void Session::exit_()
 /////////////////////////////////////////////////////////////////////////////
 
 // All of the verify_* functions send their own error messages back to
-// the client on failure, and return false.  The exception is the very
-// bad recipient list that exits right away.
+// the client on failure, and return false.
 
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
