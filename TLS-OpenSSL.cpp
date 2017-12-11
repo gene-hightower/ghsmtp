@@ -79,6 +79,64 @@ void TLS::starttls_client(int fd_in,
   }
 }
 
+struct session_context {
+  int verify_depth{3};
+  bool verbose_mode{true};
+  bool always_continue{true};
+};
+
+static int session_context_index = -1;
+
+static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
+{
+  LOG(INFO) << "verify_callback";
+
+  auto cert = X509_STORE_CTX_get_current_cert(ctx);
+  auto err = X509_STORE_CTX_get_error(ctx);
+
+  auto ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+
+  CHECK_GE(session_context_index, 0);
+
+  auto mydata = reinterpret_cast<session_context*>(
+      SSL_get_ex_data(ssl, session_context_index));
+
+  auto depth = X509_STORE_CTX_get_error_depth(ctx);
+
+  // auto max_depth = SSL_get_verify_depth(ssl) - 1;
+
+  char buf[256];
+  X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
+
+  if (depth > mydata->verify_depth) {
+    preverify_ok = 0;
+    err = X509_V_ERR_CERT_CHAIN_TOO_LONG;
+    X509_STORE_CTX_set_error(ctx, err);
+  }
+  if (!preverify_ok) {
+    LOG(INFO) << "verify error:num=" << err << ':'
+              << X509_verify_cert_error_string(err) << ": depth=" << depth
+              << ':' << buf;
+  }
+  else if (mydata->verbose_mode) {
+    LOG(INFO) << "depth=" << depth << ':' << buf;
+  }
+
+  if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
+    if (cert)
+      X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
+    else
+      strcpy(buf, "<unknown>");
+    LOG(INFO) << "issuer=" << buf;
+  }
+
+  if (mydata->always_continue)
+    return 1;
+
+  return preverify_ok;
+}
+
 void TLS::starttls_server(int fd_in,
                           int fd_out,
                           std::chrono::milliseconds timeout)
@@ -174,6 +232,19 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
+  if (session_context_index < 0) {
+    session_context_index
+        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+  }
+
+  session_context context;
+  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
+
+  SSL_set_ex_data(ssl_, session_context_index, &context);
+
+  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                     verify_callback);
+
   using namespace std::chrono;
   time_point<system_clock> start = system_clock::now();
 
@@ -202,6 +273,18 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
       LOG(ERROR) << "err == " << err;
       ssl_error();
     }
+  }
+
+  if (SSL_get_peer_certificate(ssl_)) {
+    if (SSL_get_verify_result(ssl_) == X509_V_OK) {
+      LOG(INFO) << "client certificate verified";
+    }
+    else {
+      LOG(WARNING) << "client certificate failed to verify";
+    }
+  }
+  else {
+    LOG(INFO) << "no client certificate";
   }
 }
 
