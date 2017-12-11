@@ -17,8 +17,7 @@ int main(int argc, char* argv[])
   }
 
   for (auto arg = 1; arg < argc; ++arg) {
-    auto idx = arg - 1;
-    std::cout << std::setw(width) << argv[idx] << ": " << magic.file(argv[idx])
+    std::cout << std::setw(width) << argv[arg] << ": " << magic.file(argv[arg])
               << '\n';
   }
 }
