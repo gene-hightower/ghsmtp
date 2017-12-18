@@ -42,6 +42,8 @@ void TLS::starttls_client(int fd_in,
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
+  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
+
   constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
   SSL_CTX_set_options(ctx_, flags);
 
@@ -148,6 +150,8 @@ void TLS::starttls_server(int fd_in,
 
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
+
+  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
   constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
   SSL_CTX_set_options(ctx_, flags);
