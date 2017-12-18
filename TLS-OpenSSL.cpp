@@ -42,8 +42,9 @@ void TLS::starttls_client(int fd_in,
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-  constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
-  SSL_CTX_set_options(ctx_, flags);
+  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
   ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
   SSL_set_rfd(ssl_, fd_in);
@@ -80,7 +81,7 @@ void TLS::starttls_client(int fd_in,
 }
 
 struct session_context {
-  int verify_depth{3};
+  int verify_depth{10};
   bool verbose_mode{true};
   bool always_continue{true};
 };
@@ -149,8 +150,9 @@ void TLS::starttls_server(int fd_in,
   const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
-  constexpr long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
-  SSL_CTX_set_options(ctx_, flags);
+  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
   // <https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37376.pdf>
 
