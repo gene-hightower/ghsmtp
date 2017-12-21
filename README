@@ -8,8 +8,6 @@ Written using Standard C++ — plus PEGTL, (at one time Ragel), OpenSSL,
 boost, ldns, spf2, regdom, TinyCDB, glog etc.  Compiles with recent
 GCC and Clang.
 
-No runtime configuration file — code as configuration.
-
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
 
