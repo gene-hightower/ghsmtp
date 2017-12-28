@@ -195,8 +195,8 @@ void TLS::starttls_server(int fd_in,
   // CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
   //     << "Can't set cipher list to " << cipher_list;
 
-  CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
-      << "Can't load certificate file \"" << cert_path << "\"";
+  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path) > 0)
+      << "Can't load certificate chain file \"" << cert_path << "\"";
 
   CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load private key file \"" << key_path << "\"";
