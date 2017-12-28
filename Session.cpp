@@ -28,7 +28,9 @@
 using namespace std::string_literals;
 
 namespace Config {
-constexpr char const* const accept_domains[] = {};
+constexpr char const* const accept_domains[] = {
+    "anyold.host",
+};
 
 // clang-format off
 constexpr char const* const bad_recipients[] = {
