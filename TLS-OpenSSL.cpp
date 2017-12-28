@@ -46,10 +46,8 @@ void TLS::starttls_client(int fd_in,
 
   CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
-  CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
-      << "Can't load certificate file \"" << cert_path << "\"";
-
-  constexpr auto key_path = cert_path;
+  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path) > 0)
+      << "Can't load certificate chain file \"" << cert_path << "\"";
 
   CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load private key file \"" << key_path << "\"";
@@ -199,8 +197,9 @@ void TLS::starttls_server(int fd_in,
 
   CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
       << "Can't load certificate file \"" << cert_path << "\"";
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
-      << "Can't load private key file \"" << cert_path << "\"";
+
+  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load private key file \"" << key_path << "\"";
 
   CHECK(SSL_CTX_check_private_key(ctx_))
       << "Private key does not match the public certificate";
