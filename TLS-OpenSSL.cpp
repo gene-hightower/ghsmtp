@@ -46,6 +46,17 @@ void TLS::starttls_client(int fd_in,
 
   CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
+  CHECK(SSL_CTX_use_certificate_file(ctx_, cert_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load certificate file \"" << cert_path << "\"";
+
+  constexpr auto key_path = cert_path;
+
+  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load private key file \"" << key_path << "\"";
+
+  CHECK(SSL_CTX_check_private_key(ctx_))
+      << "Private key does not match the public certificate";
+
   ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
@@ -74,6 +85,9 @@ void TLS::starttls_client(int fd_in,
           << "starttls timed out on output_ready";
       continue; // try SSL_accept again
 
+    case SSL_ERROR_SYSCALL:
+      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+
     default:
       ssl_error();
     }
@@ -90,8 +104,6 @@ static int session_context_index = -1;
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 {
-  LOG(INFO) << "verify_callback";
-
   auto cert = X509_STORE_CTX_get_current_cert(ctx);
   auto err = X509_STORE_CTX_get_error(ctx);
 
@@ -230,6 +242,12 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
   // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
 
+  session_context context;
+  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
+
+  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                     verify_callback);
+
   ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
@@ -238,14 +256,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     session_context_index
         = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
-
-  session_context context;
-  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
-
   SSL_set_ex_data(ssl_, session_context_index, &context);
-
-  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
-                     verify_callback);
 
   using namespace std::chrono;
   time_point<system_clock> start = system_clock::now();
@@ -260,7 +271,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     milliseconds time_left
         = duration_cast<milliseconds>((start + timeout) - now);
 
-    switch (auto err = SSL_get_error(ssl_, rc)) {
+    switch (SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
           << "starttls timed out on input_ready";
@@ -271,8 +282,10 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
           << "starttls timed out on output_ready";
       continue; // try SSL_accept again
 
+    case SSL_ERROR_SYSCALL:
+      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+
     default:
-      LOG(ERROR) << "err == " << err;
       ssl_error();
     }
   }
@@ -328,7 +341,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
 
     milliseconds time_left = duration_cast<milliseconds>((start + wait) - now);
 
-    switch (auto err = SSL_get_error(ssl_, n_ret)) {
+    switch (SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
@@ -350,8 +363,10 @@ std::streamsize TLS::io_tls_(char const* fnm,
       return static_cast<std::streamsize>(-1);
     }
 
+    case SSL_ERROR_SYSCALL:
+      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+
     default:
-      LOG(ERROR) << "err == " << err;
       ssl_error();
     }
   }
