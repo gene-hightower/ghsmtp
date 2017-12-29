@@ -51,7 +51,6 @@ smtp_STEMS := smtp \
 
 snd_STEMS := snd \
 	Base64 \
-	CDB \
 	DKIM \
 	DNS \
 	Domain \
@@ -59,11 +58,9 @@ snd_STEMS := snd \
 	IP4 \
 	IP6 \
 	Magic \
-	Message \
 	POSIX \
 	Pill \
 	SPF \
-	Session \
 	Sock \
 	TLS-OpenSSL \
 	esc \
