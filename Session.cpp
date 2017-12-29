@@ -722,10 +722,11 @@ bool Session::verify_client_(Domain const& client_identity)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    LOG(ERROR) << "invalid sender" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
-    out_() << "550 4.1.8 invalid sender system address\r\n" << std::flush;
-    return false;
+    // Sometimes we may went to look at mail from misconfigured
+    // sending systems.
+    LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
+                 << client_ << " claiming " << client_identity;
+    return true;
   }
 
   CDB black("black");
