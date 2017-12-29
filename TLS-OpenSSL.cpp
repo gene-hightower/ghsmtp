@@ -292,13 +292,11 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
   if (SSL_get_peer_certificate(ssl_)) {
     if (SSL_get_verify_result(ssl_) == X509_V_OK) {
       LOG(INFO) << "client certificate verified";
+      verified_ = true;
     }
     else {
       LOG(WARNING) << "client certificate failed to verify";
     }
-  }
-  else {
-    LOG(INFO) << "no client certificate";
   }
 }
 
@@ -313,6 +311,9 @@ std::string TLS::info() const
     int alg_bits;
     int bits = SSL_CIPHER_get_bits(c, &alg_bits);
     info << " bits=" << bits << "/" << alg_bits;
+    if (verified_) {
+      info << " verified";
+    }
   }
 
   return info.str();

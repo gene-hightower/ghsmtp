@@ -57,6 +57,7 @@ private:
   SSL_CTX* ctx_{nullptr};
   SSL* ssl_{nullptr};
   std::function<void(void)> read_hook_;
+  bool verified_{false};
 };
 
 #endif // OPENSSL_DOT_HPP
