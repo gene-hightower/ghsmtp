@@ -662,6 +662,7 @@ void Session::time_out()
 
 void Session::starttls()
 {
+  last_in_group_("STARTTLS");
   if (sock_.tls()) {
     out_() << "554 5.5.1 TLS already active\r\n" << std::flush;
     LOG(ERROR) << "STARTTLS issued with TLS already active";
