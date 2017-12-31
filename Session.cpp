@@ -28,6 +28,8 @@
 using namespace std::string_literals;
 
 namespace Config {
+constexpr auto max_unrecognized_cmds{20};
+
 constexpr char const* const accept_domains[] = {
     "anyold.host",
 };
@@ -624,6 +626,13 @@ void Session::quit()
   exit_();
 }
 
+void Session::auth()
+{
+  syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] auth", sock_.them_c_str());
+  out_() << "454 4.7.0 authentication failure\r\n" << std::flush;
+  exit_();
+}
+
 void Session::error(std::string_view log_msg)
 {
   out_() << "421 4.3.5 system error\r\n" << std::flush;
@@ -633,9 +642,18 @@ void Session::error(std::string_view log_msg)
 void Session::cmd_unrecognized(std::string_view cmd)
 {
   auto escaped = esc(cmd);
+  LOG(ERROR) << "command unrecognized: \"" << escaped << "\"";
+
+  if (++n_unrecognized_cmds_ >= Config::max_unrecognized_cmds) {
+    out_() << "500 5.5.1 command unrecognized: \"" << escaped
+           << "\" exceeds limit\r\n"
+           << std::flush;
+    LOG(ERROR) << n_unrecognized_cmds_ << " unrecognized commands is too many";
+    exit_();
+  }
+
   out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"\r\n"
          << std::flush;
-  LOG(ERROR) << "command unrecognized: \"" << escaped << "\"";
 }
 
 void Session::bare_lf()

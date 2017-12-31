@@ -53,6 +53,7 @@ public:
   void vrfy(std::string_view str);
   void help(std::string_view str);
   void quit() __attribute__((noreturn));
+  void auth() __attribute__((noreturn));
   void error(std::string_view log_msg);
   void cmd_unrecognized(std::string_view log_msg);
   void bare_lf() __attribute__((noreturn));
@@ -126,6 +127,8 @@ private:
   std::random_device rd_;
 
   TLD tld_db_;
+
+  int n_unrecognized_cmds_{0};
 
   bool binarymime_{false};
   bool extensions_{false};
