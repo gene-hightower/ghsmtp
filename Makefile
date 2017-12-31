@@ -180,3 +180,6 @@ all:: smtp-test.cpp
 smtp-test.cpp: smtp.cpp smtp-test-main.cpp
 	sed -e 's/main(int/no_main(int/' smtp.cpp > smtp-test.cpp
 	cat smtp-test-main.cpp >> smtp-test.cpp
+
+clean::
+	rm -f snd-test.cpp msg-test.cpp smtp-test.cpp
