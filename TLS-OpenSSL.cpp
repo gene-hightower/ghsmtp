@@ -135,11 +135,13 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
   }
 
   if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
-    if (cert)
+    if (cert) {
       X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
-    else
-      strcpy(buf, "<unknown>");
-    LOG(INFO) << "issuer=" << buf;
+      LOG(INFO) << "issuer=" << buf;
+    }
+    else {
+      LOG(INFO) << "issuer=<unknown>";
+    }
   }
 
   if (mydata->always_continue)
