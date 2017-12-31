@@ -621,7 +621,7 @@ void Session::help(std::string_view str)
 void Session::quit()
 {
   last_in_group_("QUIT");
-  out_() << "221 2.0.0 bye\r\n" << std::flush;
+  out_() << "221 2.0.0 closing connection\r\n" << std::flush;
   LOG(INFO) << "QUIT";
   exit_();
 }
