@@ -329,6 +329,55 @@ struct starttls
 
 struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
 
+// Anti-AUTH support
+
+// base64-char     = ALPHA / DIGIT / "+" / "/"
+//                   ;; Case-sensitive
+
+struct base64_char : sor<ALPHA, DIGIT, one<'+'>, one<'/'>> {};
+
+// base64-terminal = (2base64-char "==") / (3base64-char "=")
+
+struct base64_terminal : sor<seq<rep<2, base64_char>, TAOCPP_PEGTL_ISTRING("==")>,
+                             seq<rep<3, base64_char>, one<'='>>
+                             > {};
+
+// base64          = base64-terminal /
+//                   ( 1*(4base64-char) [base64-terminal] )
+
+struct base64 : sor<base64_terminal,
+                    seq<plus<rep<4, base64_char>>,
+                        opt<base64_terminal>>
+                    > {};
+
+// initial-response= base64 / "="
+
+struct initial_response : sor<base64, one<'='>> {};
+
+// cancel-response = "*"
+
+struct cancel_response : one<'*'> {};
+
+struct UPPER_ALPHA : range<'A', 'Z'> {};
+
+using HYPHEN = one<'-'>;
+using UNDERSCORE = one<'_'>;
+
+struct mech_char : sor<UPPER_ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
+struct sasl_mech : rep_min_max<1, 20, mech_char> {};
+
+// auth-command    = "AUTH" SP sasl-mech [SP initial-response]
+//                   *(CRLF [base64]) [CRLF cancel-response]
+//                   CRLF
+//                   ;; <sasl-mech> is defined in RFC 4422
+
+struct auth : seq<TAOCPP_PEGTL_ISTRING("AUTH"), SP, sasl_mech,
+                  opt<seq<SP, initial_response>>,
+                  // star<CRLF, opt<base64>>,
+                  // opt<seq<CRLF, cancel_response>>,
+                  CRLF> {};
+// bad commands:
+
 struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
 struct bogus_cmd_long : seq<rep_min_max<4, 1000, not_one<'\r', '\n'>>, CRLF> {};
 
@@ -348,6 +397,7 @@ struct any_cmd : seq<sor<bogus_cmd_short,
                          starttls,
                          rcpt_to,
                          mail_from,
+                         auth,
                          bogus_cmd_long,
                          anything_else>,
                      discard> {};
@@ -819,6 +869,11 @@ struct action<starttls> {
 template <>
 struct action<quit> {
   static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.quit(); }
+};
+
+template <>
+struct action<auth> {
+  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.auth(); }
 };
 } // namespace RFC5321
 
