@@ -13,6 +13,7 @@ DEFINE_bool(rawdog,
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
 DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
 DEFINE_bool(use_size, true, "Use SIZE extension.");
+DEFINE_bool(use_smtputf8, true, "Use SMTPUTF8 extension.");
 DEFINE_bool(use_tls, true, "Use TLS extension.");
 
 DEFINE_string(sender, "", "FQDN of sending node.");
@@ -894,7 +895,9 @@ try_host:
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 
-  bool ext_smtputf8 = cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
+  bool ext_smtputf8
+      = FLAGS_use_smtputf8
+        && cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
 
   if (must_have_smtputf8 && !ext_smtputf8) {
     if (fd_in == fd_out)
