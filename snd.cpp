@@ -867,13 +867,13 @@ try_host:
     goto try_host;
   }
 
-  LOG(INFO) << "> EHLO " << sender.utf8();
-  cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
+  LOG(INFO) << "> EHLO " << sender.ascii();
+  cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
 
   CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
   if (!cnn.ehlo_ok) {
-    LOG(INFO) << "> HELO " << sender.utf8();
-    cnn.sock.out() << "HELO " << sender.utf8() << "\r\n" << std::flush;
+    LOG(INFO) << "> HELO " << sender.ascii();
+    cnn.sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)));
   }
 
@@ -885,8 +885,8 @@ try_host:
 
     cnn.sock.starttls_client();
 
-    LOG(INFO) << "> EHLO " << sender.utf8();
-    cnn.sock.out() << "EHLO " << sender.utf8() << "\r\n" << std::flush;
+    LOG(INFO) << "> EHLO " << sender.ascii();
+    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
 
