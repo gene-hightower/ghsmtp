@@ -1005,6 +1005,18 @@ try_host:
 
   in.discard();
 
+  std::string from = from_mbx;
+  if (!ext_smtputf8) {
+    from = from_mbx.local_part()
+           + (from_mbx.domain().empty() ? ""
+                                        : ("@" + from_mbx.domain().ascii()));
+  }
+  std::string to = to_mbx;
+  if (!ext_smtputf8) {
+    to = to_mbx.local_part()
+         + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
+  }
+
   Eml eml;
 
   Now date;
@@ -1014,9 +1026,9 @@ try_host:
           << sender.utf8() << '>';
   eml.add_hdr("Message-ID", mid_str.str());
   eml.add_hdr("Date", date.c_str());
-  std::string rfc5322_from = FLAGS_from_name + " <" + FLAGS_from + ">";
+  std::string rfc5322_from = FLAGS_from_name + " <" + from + ">";
   eml.add_hdr("From", rfc5322_from);
-  std::string rfc5322_to = FLAGS_to_name + " <" + FLAGS_to + ">";
+  std::string rfc5322_to = FLAGS_to_name + " <" + to + ">";
   eml.add_hdr("To"s, rfc5322_to);
   eml.add_hdr("Subject", FLAGS_subject);
   if (!FLAGS_keywords.empty())
@@ -1092,12 +1104,6 @@ try_host:
 
   auto param_str = param_stream.str();
 
-  std::string from = from_mbx;
-  if (!ext_smtputf8) {
-    from = from_mbx.local_part()
-           + (from_mbx.domain().empty() ? ""
-                                        : ("@" + from_mbx.domain().ascii()));
-  }
   LOG(INFO) << "> MAIL FROM:<" << from << '>' << param_str;
   cnn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n";
 
@@ -1105,11 +1111,6 @@ try_host:
     check_for_fail(in, cnn, "MAIL FROM");
   }
 
-  std::string to = to_mbx;
-  if (!ext_smtputf8) {
-    to = to_mbx.local_part()
-         + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
-  }
   LOG(INFO) << "> RCPT TO:<" << to << ">";
   cnn.sock.out() << "RCPT TO:<" << to << ">\r\n";
 
