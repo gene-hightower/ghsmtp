@@ -777,14 +777,16 @@ int main(int argc, char* argv[])
     FLAGS_sender = hostname.c_str();
   }
 
+  Domain sender(FLAGS_sender);
+
   if (FLAGS_from.empty()) {
-    const auto from = "test-it@"s + FLAGS_sender;
-    FLAGS_from = from.c_str();
+    const auto from = "test-it@"s + sender.ascii();
+    FLAGS_from = from;
   }
 
   if (FLAGS_to.empty()) {
-    const auto to = "test-it@"s + FLAGS_sender;
-    FLAGS_to = to.c_str();
+    const auto to = "test-it@"s + sender.ascii();
+    FLAGS_to = to;
   }
 
   { // Need to work with either namespace.
@@ -839,8 +841,6 @@ int main(int argc, char* argv[])
       }
     }
   }
-
-  Domain sender(FLAGS_sender);
 
 try_host:
   int fd_in = 0;
@@ -1092,14 +1092,27 @@ try_host:
 
   auto param_str = param_stream.str();
 
-  LOG(INFO) << "> MAIL FROM:<" << FLAGS_from << '>' << param_str;
-  cnn.sock.out() << "MAIL FROM:<" << FLAGS_from << '>' << param_str << "\r\n";
+  std::string from = from_mbx;
+  if (!ext_smtputf8) {
+    from = from_mbx.local_part()
+           + (from_mbx.domain().empty() ? ""
+                                        : ("@" + from_mbx.domain().ascii()));
+  }
+  LOG(INFO) << "> MAIL FROM:<" << from << '>' << param_str;
+  cnn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n";
+
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "MAIL FROM");
   }
 
-  LOG(INFO) << "> RCPT TO:<" << FLAGS_to << ">";
-  cnn.sock.out() << "RCPT TO:<" << FLAGS_to << ">\r\n";
+  std::string to = to_mbx;
+  if (!ext_smtputf8) {
+    to = to_mbx.local_part()
+         + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
+  }
+  LOG(INFO) << "> RCPT TO:<" << to << ">";
+  cnn.sock.out() << "RCPT TO:<" << to << ">\r\n";
+
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "RCPT TO");
   }
