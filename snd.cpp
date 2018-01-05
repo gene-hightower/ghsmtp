@@ -1100,8 +1100,7 @@ try_host:
     param_stream << " BODY=8BITMIME";
   }
 
-  if (must_have_smtputf8) {
-    CHECK(ext_smtputf8);
+  if (ext_smtputf8) {
     param_stream << " SMTPUTF8";
   }
 
