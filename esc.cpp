@@ -8,12 +8,12 @@ using namespace std::string_literals;
 
 std::string esc(std::string_view str)
 {
-  std::string ret;
   auto nesc = std::count_if(str.begin(), str.end(), [](unsigned char c) {
     return (!std::isprint(c)) || (c == '\\');
   });
   if (!nesc)
     return std::string(str);
+  std::string ret;
   ret.reserve(str.length() + nesc);
   for (auto c : str) {
     switch (c) {
