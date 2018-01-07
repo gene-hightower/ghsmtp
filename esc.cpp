@@ -17,20 +17,20 @@ std::string esc(std::string_view str)
     case '\b':
       ret += "\\b"s;
       break;
-    case '\t':
-      ret += "\\t"s;
+    case '\f':
+      ret += "\\f"s;
       break;
     case '\n':
       ret += "\\n"s;
       break;
-    case '\v':
-      ret += "\\v"s;
-      break;
-    case '\f':
-      ret += "\\f"s;
-      break;
     case '\r':
       ret += "\\r"s;
+      break;
+    case '\t':
+      ret += "\\t"s;
+      break;
+    case '\v':
+      ret += "\\v"s;
       break;
     case '\\':
       ret += "\\\\"s;
