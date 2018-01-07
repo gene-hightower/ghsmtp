@@ -107,8 +107,8 @@ POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := DNS IP4 IP6 SPF
 Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock SockBuffer TLS-OpenSSL esc hostname
-Sock-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL
-SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL
+Sock-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc
+SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 esc-test_STEMS := esc
 

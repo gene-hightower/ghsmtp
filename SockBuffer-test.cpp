@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <glog/logging.h>
+
 int main(int argc, char* argv[])
 {
   constexpr char infile[]{"input.txt"};
