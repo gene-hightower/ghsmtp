@@ -704,8 +704,8 @@ void Session::exit_()
   timespec time_used;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
 
-  LOG(INFO) << time_used.tv_sec << "." << std::setw(9) << std::setfill('0')
-            << time_used.tv_nsec;
+  LOG(INFO) << "CPU time " << time_used.tv_sec << "." << std::setw(9)
+            << std::setfill('0') << time_used.tv_nsec << " seconds";
 
   std::exit(EXIT_SUCCESS);
 }
