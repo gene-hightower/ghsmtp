@@ -53,6 +53,7 @@ public:
   void set_max_read(std::streamsize max) { iostream_->set_max_read(max); }
 
   void log_stats() { return iostream_->log_stats(); }
+  void log_totals() { return iostream_->log_totals(); }
 
 private:
   boost::iostreams::stream<SockBuffer> iostream_;

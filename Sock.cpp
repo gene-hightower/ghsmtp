@@ -1,5 +1,7 @@
 #include "Sock.hpp"
 
+#include <glog/logging.h>
+
 using namespace std::string_literals;
 
 Sock::Sock(int fd_in,

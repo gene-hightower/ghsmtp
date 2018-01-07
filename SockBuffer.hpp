@@ -10,8 +10,6 @@
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
 
-#include <glog/logging.h>
-
 // We must define this to account for args to Sockbuffer ctor.
 #define BOOST_IOSTREAMS_MAX_FORWARDING_ARITY 6
 
@@ -48,19 +46,7 @@ public:
     POSIX::set_nonblocking(fd_out_);
   }
   SockBuffer& operator=(const SockBuffer&) = delete;
-  SockBuffer(SockBuffer const& that)
-    : fd_in_(that.fd_in_)
-    , fd_out_(that.fd_out_)
-    , read_hook_(that.read_hook_)
-    , read_timeout_(that.read_timeout_)
-    , write_timeout_(that.write_timeout_)
-    , starttls_timeout_(that.starttls_timeout_)
-    , tls_(that.read_hook_)
-  {
-    CHECK(!that.maxed_out());
-    CHECK(!that.timed_out_);
-    CHECK(!that.tls_active_);
-  }
+  SockBuffer(SockBuffer const& that);
 
   bool input_ready(std::chrono::milliseconds wait) const
   {
@@ -75,39 +61,9 @@ public:
     return limit_read_ && (octets_read_ >= read_limit_);
   }
   bool timed_out() const { return timed_out_; }
-  std::streamsize read(char* s, std::streamsize n)
-  {
-    if (maxed_out()) {
-      LOG(ERROR) << "read attempted when"
-                 << " total of " << octets_read_ << " is over limit of "
-                 << read_limit_;
-      return static_cast<std::streamsize>(-1);
-    }
-    auto read = tls_active_ ? tls_.read(s, n, read_timeout_, timed_out_)
-                            : POSIX::read(fd_in_, s, n, read_hook_,
-                                          read_timeout_, timed_out_);
-    if (read != static_cast<std::streamsize>(-1)) {
-      octets_read_ += read;
-      total_octets_read_ += read;
-    }
-    if (maxed_out()) {
-      LOG(ERROR) << "read of " << read << " puts total of " << octets_read_
-                 << " over limit of " << read_limit_;
-      return static_cast<std::streamsize>(-1);
-    }
-    return read;
-  }
-  std::streamsize write(const char* s, std::streamsize n)
-  {
-    auto written
-        = tls_active_ ? tls_.write(s, n, write_timeout_, timed_out_)
-                      : POSIX::write(fd_out_, s, n, write_timeout_, timed_out_);
-    if (written != static_cast<std::streamsize>(-1)) {
-      octets_written_ += written;
-      total_octets_written_ += written;
-    }
-    return written;
-  }
+
+  std::streamsize read(char* s, std::streamsize n);
+  std::streamsize write(const char* s, std::streamsize n);
 
   void starttls_server()
   {
@@ -138,17 +94,8 @@ public:
     octets_written_ = 0;
   }
 
-  void log_stats() const
-  {
-    LOG(INFO) << "read_limit_==" << (read_limit_ ? "true" : "false");
-    LOG(INFO) << "octets_read_==" << octets_read_;
-    LOG(INFO) << "octets_written_==" << octets_written_;
-    LOG(INFO) << "total_octets_read_==" << total_octets_read_;
-    LOG(INFO) << "total_octets_written_==" << total_octets_written_;
-    if (tls()) {
-      LOG(INFO) << tls_info();
-    }
-  }
+  void log_stats() const;
+  void log_totals() const;
 
 private:
   int fd_in_;

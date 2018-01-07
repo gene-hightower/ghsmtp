@@ -699,6 +699,8 @@ void Session::starttls()
 
 void Session::exit_()
 {
+  sock_.log_totals();
+
   timespec time_used;
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
 

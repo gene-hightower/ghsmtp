@@ -30,7 +30,9 @@ msg_STEMS := msg \
 sasl_STEMS := sasl \
 	Base64 \
 	POSIX \
-	TLS-OpenSSL
+	SockBuffer \
+	TLS-OpenSSL \
+	esc
 
 smtp_STEMS := smtp \
 	CDB \
@@ -45,6 +47,7 @@ smtp_STEMS := smtp \
 	SPF \
 	Session \
 	Sock \
+	SockBuffer \
 	TLS-OpenSSL \
 	esc \
 	hostname
@@ -62,6 +65,7 @@ snd_STEMS := snd \
 	Pill \
 	SPF \
 	Sock \
+	SockBuffer \
 	TLS-OpenSSL \
 	esc \
 	hostname
@@ -102,9 +106,9 @@ Message-test_STEMS := DNS Domain IP4 IP6 Message Pill
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := DNS IP4 IP6 SPF
-Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock TLS-OpenSSL esc hostname
-Sock-test_STEMS := POSIX Sock TLS-OpenSSL
-SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
+Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock SockBuffer TLS-OpenSSL esc hostname
+Sock-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL
+SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 esc-test_STEMS := esc
 
