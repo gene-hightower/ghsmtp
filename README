@@ -1,15 +1,27 @@
 Gene Hightower's SMTP server.
 
-A program to receive Internet (RFC 5321) mail.
+A program to receive Internet (RFC 5321) mail.  This is a “personal
+domain” type program that sends all mail for all domains to a single
+users Maildir.
 
 Free software — AGPLv3 with OpenSSL exception.
 
-Written using Standard C++ — plus PEGTL, (at one time Ragel), OpenSSL,
-boost, ldns, spf2, regdom, TinyCDB, glog etc.  Compiles with recent
-GCC and Clang.
+Written using Standard C++ — plus PEGTL, (at one time Ragel, before
+that Bison), OpenSSL, boost, ldns, spf2, regdom, TinyCDB, glog etc.
+Compiles with recent GCC and Clang.
 
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
 
 I run it on the Fedora distribution of GNU/Linux/systemd — might also
 work on other platforms.
+
+Support for a some useful SMTP extensions:
+
+RFC 1870: Message Size Declaration
+RFC 2920: Command Pipelining
+RFC 3030: Transmission of Large and Binary MIME Messages
+RFC 3207: Secure SMTP over Transport Layer Security
+RFC 3463: Enhanced Mail System Status Codes
+RFC 6152: 8-bit MIME Transport
+RFC 6531: Internationalized Email
