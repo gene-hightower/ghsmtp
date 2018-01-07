@@ -993,7 +993,6 @@ try_host:
         LOG(ERROR) << "server doesn't support AUTH methods PLAIN or LOGIN";
         fail(in, cnn);
       }
-
     }
     else {
       LOG(ERROR) << "server doesn't support AUTH";

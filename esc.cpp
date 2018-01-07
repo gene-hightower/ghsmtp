@@ -6,13 +6,15 @@
 
 using namespace std::string_literals;
 
-std::string esc(std::string_view str)
+std::string esc(std::string_view str, bool multi_line)
 {
   auto nesc = std::count_if(str.begin(), str.end(), [](unsigned char c) {
     return (!std::isprint(c)) || (c == '\\');
   });
   if (!nesc)
     return std::string(str);
+  if (multi_line)
+    nesc += std::count(str.begin(), str.end(), '\n');
   std::string ret;
   ret.reserve(str.length() + nesc);
   for (auto c : str) {
@@ -28,6 +30,8 @@ std::string esc(std::string_view str)
       break;
     case '\n':
       ret += "\\n"s;
+      if (multi_line)
+        ret += '\n';
       break;
     case '\r':
       ret += "\\r"s;
