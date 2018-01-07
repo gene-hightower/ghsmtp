@@ -85,6 +85,7 @@ TESTS := \
 	SockBuffer-test \
 	TLD-test \
 	TLS-OpenSSL-test \
+	esc-test \
 	msg-test \
 	smtp-test \
 	snd-test
@@ -105,6 +106,7 @@ Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session S
 Sock-test_STEMS := POSIX Sock TLS-OpenSSL
 SockBuffer-test_STEMS := POSIX Sock TLS-OpenSSL
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
+esc-test_STEMS := esc
 
 msg-test_STEMS := $(filter-out msg,$(msg_STEMS))
 smtp-test_STEMS := $(filter-out smtp,$(smtp_STEMS))
