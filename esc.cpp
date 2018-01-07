@@ -1,5 +1,6 @@
 #include "esc.hpp"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -8,7 +9,12 @@ using namespace std::string_literals;
 std::string esc(std::string_view str)
 {
   std::string ret;
-  ret.reserve(str.length() + 2);
+  auto nesc = std::count_if(str.begin(), str.end(), [](unsigned char c) {
+    return (!std::isprint(c)) || (c == '\\');
+  });
+  if (!nesc)
+    return std::string(str);
+  ret.reserve(str.length() + nesc);
   for (auto c : str) {
     switch (c) {
     case '\a':
