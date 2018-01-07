@@ -960,7 +960,7 @@ try_host:
     auto auth = cnn.ehlo_params.find("AUTH");
     if (auth != cnn.ehlo_params.end()) {
 
-      // perfer plain I guess.
+      // Perfer PLAIN mechanism.
       if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
           != auth->second.end()) {
         LOG(INFO) << "> AUTH PLAIN";
@@ -974,6 +974,7 @@ try_host:
           fail(in, cnn);
         }
       }
+      // The LOGIN SASL mechanism is obsolete.
       else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
                != auth->second.end()) {
         LOG(INFO) << "> AUTH LOGIN";
@@ -992,6 +993,7 @@ try_host:
         LOG(ERROR) << "server doesn't support AUTH methods PLAIN or LOGIN";
         fail(in, cnn);
       }
+
     }
     else {
       LOG(ERROR) << "server doesn't support AUTH";
