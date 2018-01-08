@@ -10,6 +10,7 @@ DEFINE_bool(rawdog,
             "Send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots.");
 
+DEFINE_bool(use_8bitmime, true, "Use 8BITMIME extension to send mail.");
 DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
 DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
 DEFINE_bool(use_size, true, "Use SIZE extension.");
@@ -905,7 +906,9 @@ try_host:
     goto try_host;
   }
 
-  bool ext_8bitmime = cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
+  bool ext_8bitmime
+      = FLAGS_use_8bitmime
+        && cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
   bool ext_chunking = cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end();
   bool ext_binarymime
       = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
