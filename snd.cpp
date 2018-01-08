@@ -343,8 +343,8 @@ struct server_id : sor<domain, address_literal> {};
 //                    "220 " [ textstring ] CRLF )
 
 struct greeting
-: sor<seq<TAOCPP_PEGTL_ISTRING("220 "), server_id, opt<seq<SP, textstring>>, CRLF>,
-      seq<TAOCPP_PEGTL_ISTRING("220-"), server_id, opt<seq<SP, textstring>>, CRLF,
+: sor<seq<TAOCPP_PEGTL_ISTRING("220 "), server_id, opt<textstring>, CRLF>,
+      seq<TAOCPP_PEGTL_ISTRING("220-"), server_id, opt<textstring>, CRLF,
  star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
       seq<TAOCPP_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {};
 
@@ -691,7 +691,6 @@ public:
       data_ = file_.data();
       size_ = file_.size();
     }
-
     type_ = ::type(*this);
   }
 
@@ -862,6 +861,7 @@ try_host:
   // CRLF /only/
   istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
+    LOG(WARNING) << "greeting failed to parse";
     if (fd_in == fd_out)
       close(fd_in);
     receivers.erase(receivers.begin());
