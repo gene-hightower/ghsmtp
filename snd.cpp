@@ -686,11 +686,10 @@ public:
     : path_(path)
   {
     auto body_sz = boost::filesystem::file_size(path_);
-    if (body_sz) {
-      file_.open(path_);
-      data_ = file_.data();
-      size_ = file_.size();
-    }
+    CHECK(body_sz) << "no body";
+    file_.open(path_);
+    data_ = file_.data();
+    size_ = file_.size();
     type_ = ::type(*this);
   }
 
