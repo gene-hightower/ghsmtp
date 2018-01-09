@@ -4,7 +4,7 @@
 
 #include <sys/stat.h>
 
-void Message::open(std::string const& fqdn, size_t max_size, SpamStatus spam)
+void Message::open(std::string_view fqdn, size_t max_size, SpamStatus spam)
 {
   max_size_ = max_size;
 

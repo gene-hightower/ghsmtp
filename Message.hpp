@@ -20,7 +20,7 @@ public:
 
   enum class SpamStatus : bool { ham, spam };
 
-  void open(std::string const& fqdn, size_t max_size, SpamStatus spam);
+  void open(std::string_view fqdn, size_t max_size, SpamStatus spam);
 
   Pill const& id() const { return s_; }
   Now const& when() const { return then_; }
