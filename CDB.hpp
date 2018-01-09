@@ -13,6 +13,7 @@ public:
   CDB(std::string_view db);
   ~CDB();
   bool lookup(std::string_view key);
+  bool open() const { return fd_ != -1; }
 
 private:
   int fd_{-1};

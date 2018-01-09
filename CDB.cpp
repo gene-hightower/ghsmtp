@@ -14,7 +14,7 @@ CDB::CDB(std::string_view db)
   dbpath.append(db.begin(), db.end());
   dbpath.append(".cdb");
 
-  fd_ = open(dbpath.c_str(), O_RDONLY);
+  fd_ = ::open(dbpath.c_str(), O_RDONLY);
   if (fd_ == -1) {
     char err[256];
     strerror_r(errno, err, sizeof(err));

@@ -30,10 +30,6 @@ using namespace std::string_literals;
 namespace Config {
 constexpr auto max_unrecognized_cmds{20};
 
-constexpr char const* const accept_domains[] = {
-    "anyold.host",
-};
-
 // clang-format off
 constexpr char const* const bad_recipients[] = {
     "a",
@@ -789,21 +785,28 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   auto accepted_domain = false;
-  for (auto const& d : Config::accept_domains) {
-    if (recipient.domain() == d) {
-      accepted_domain = true;
-      break;
-    }
-  }
-
   if (recipient.domain().is_address_literal()) {
     if (recipient.domain() == sock_.us_address_literal()) {
       accepted_domain = true;
     }
   }
+  else {
+    CDB accept_domains("accept_domains");
+    if (accept_domains.open()) {
+      if (accept_domains.lookup(recipient.domain().ascii())
+          || accept_domains.lookup(recipient.domain().utf8())) {
+        accepted_domain = true;
+      }
+    }
+    else {
+      // If we have no list of domains to accept, take our own.
+      if (recipient.domain() == our_fqdn_) {
+        accepted_domain = true;
+      }
+    }
+  }
 
-  // Make sure the domain matches.
-  if ((!accepted_domain) && (recipient.domain() != our_fqdn_)) {
+  if (!accepted_domain) {
     out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for domain " << recipient.domain()
                  << " as it doesn't match " << our_fqdn_;

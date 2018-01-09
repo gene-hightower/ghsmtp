@@ -142,6 +142,7 @@ clean::
 	./cdb-gen < $< | cdb -c $@
 
 clean::
+	rm -f accept_domains.cdb
 	rm -f black.cdb
 	rm -f ip-black.cdb
 	rm -f ip-white.cdb
@@ -149,6 +150,7 @@ clean::
 	rm -f two-level-tlds.cdb
 	rm -f white.cdb cdb-gen
 
+accept_domains.cdb: accept_domains cdb-gen
 black.cdb: black cdb-gen
 ip-black.cdb: ip-black cdb-gen
 ip-white.cdb: ip-white cdb-gen
