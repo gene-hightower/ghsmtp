@@ -29,8 +29,7 @@ public:
 
   explicit Session(std::function<void(void)> read_hook = []() {},
                    int fd_in = STDIN_FILENO,
-                   int fd_out = STDOUT_FILENO,
-                   std::string fqdn = "");
+                   int fd_out = STDOUT_FILENO);
 
   void greeting();
   void ehlo(std::string_view client_identity);
@@ -87,7 +86,7 @@ private:
   std::ostream& out_() { return sock_.out(); }
   void log_lo_(char const* verb, std::string_view client_identity) const;
 
-  std::string_view server_id() const;
+  std::string_view server_id() const { return server_identity_.ascii(); }
 
   void reset_()
   {
@@ -113,10 +112,10 @@ private:
 
   size_t max_msg_size_;
 
-  Domain our_fqdn_;                   // who we identify as
-  Domain fcrdns_;                     // who they look-up as
-  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
+  Domain server_identity_;            // who we identify as
+  Domain client_fcrdns_;              // who they look-up as
   Domain client_identity_;            // from ehlo/helo
+  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 

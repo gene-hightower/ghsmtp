@@ -11,8 +11,6 @@ struct Session_test {
   {
     std::cout << "sizeof(Session)       == " << sizeof(Session) << '\n';
     std::cout << "sizeof(sock_)         == " << sizeof(Session::sock_) << '\n';
-    std::cout << "sizeof(our_fqdn_)     == " << sizeof(Session::our_fqdn_)
-              << '\n';
     std::cout << "sizeof(client_)       == " << sizeof(Session::client_)
               << '\n';
     std::cout << "sizeof(reverse_path_) == " << sizeof(Session::reverse_path_)
@@ -27,7 +25,7 @@ struct Session_test {
     PCHECK(fd_null >= 0) << " can't open /dev/null";
 
     auto read_hook = []() { std::cout << "Session-test read_hook\n"; };
-    Session sess(read_hook, STDIN_FILENO, fd_null, "example.com");
+    Session sess(read_hook, STDIN_FILENO, fd_null);
 
     LOG(ERROR) << "Expect: 3 invalid sender domains:";
     CHECK(!sess.verify_sender_domain_(Domain("com")));

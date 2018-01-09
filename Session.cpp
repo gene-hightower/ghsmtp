@@ -68,21 +68,23 @@ constexpr auto read_timeout = std::chrono::minutes(5);
 constexpr auto write_timeout = std::chrono::seconds(30);
 } // namespace Config
 
-Session::Session(std::function<void(void)> read_hook,
-                 int fd_in,
-                 int fd_out,
-                 std::string our_fqdn)
+Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
-  if (our_fqdn.empty()) {
-    our_fqdn = get_hostname();
-    if (our_fqdn.find('.') == std::string::npos) {
+  std::string our_id;
+  char const* server_id = getenv("GHSMTP_SERVER_ID");
+  if (server_id) {
+    our_id = server_id;
+  }
+  else {
+    our_id = get_hostname();
+    if (our_id.find('.') == std::string::npos) {
       if (sock_.us_c_str()[0]) {
-        our_fqdn = "["s + sock_.us_c_str() + "]"s;
+        our_id = "["s + sock_.us_c_str() + "]"s;
       }
     }
   }
-  our_fqdn_.set(our_fqdn.c_str());
+  server_identity_.set(our_id.c_str());
 
   max_msg_size(Config::max_msg_size_initial);
 }
@@ -101,21 +103,22 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
 
-    fcrdns_ = IP::fcrdns(sock_.them_c_str());
+    client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
 
-    if (!fcrdns_.empty()) {
-      client_ = fcrdns_.ascii() + " "s + sock_.them_address_literal();
+    if (!client_fcrdns_.empty()) {
+      client_ = client_fcrdns_.ascii() + " "s + sock_.them_address_literal();
 
       // check domain
-      char const* tld = tld_db_.get_registered_domain(fcrdns_.utf8().c_str());
+      char const* tld
+          = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
       CDB white("white");
       if (tld && white.lookup(tld)) {
         LOG(INFO) << "TLD domain " << tld << " whitelisted";
         fcrdns_whitelisted_ = true;
       }
       else {
-        if (white.lookup(fcrdns_.utf8().c_str())) {
-          LOG(INFO) << "domain " << fcrdns_ << " whitelisted";
+        if (white.lookup(client_fcrdns_.utf8().c_str())) {
+          LOG(INFO) << "domain " << client_fcrdns_ << " whitelisted";
           fcrdns_whitelisted_ = true;
         }
       }
@@ -173,7 +176,7 @@ void Session::greeting()
 void Session::log_lo_(char const* verb, std::string_view client_identity) const
 {
   if (sock_.has_peername()) {
-    if (fcrdns_ == client_identity_) {
+    if (client_fcrdns_ == client_identity_) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -183,20 +186,6 @@ void Session::log_lo_(char const* verb, std::string_view client_identity) const
   }
   else {
     LOG(INFO) << verb << " " << client_identity;
-  }
-}
-
-std::string_view Session::server_id() const
-{
-  char const* server_id = getenv("GHSMTP_SERVER_ID");
-  if (server_id) {
-    return server_id;
-  }
-  if (our_fqdn_.is_address_literal()) {
-    return IP::to_address(our_fqdn_.ascii());
-  }
-  else {
-    return our_fqdn_.ascii();
   }
 }
 
@@ -455,8 +444,8 @@ std::string Session::added_headers_(Message const& msg)
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
   }
-  headers << "\r\n        by " << our_fqdn_.utf8() << " with " << protocol_
-          << " id " << msg.id();
+  headers << "\r\n        by " << server_identity_.utf8() << " with "
+          << protocol_ << " id " << msg.id();
 
   if (forward_path_.size()) {
     auto len = 12;
@@ -496,18 +485,19 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 
   CDB white("white");
 
-  if (!fcrdns_.empty()) {
-    if (white.lookup(fcrdns_.utf8().c_str())) {
+  if (!client_fcrdns_.empty()) {
+    if (white.lookup(client_fcrdns_.utf8().c_str())) {
       status = Message::SpamStatus::ham;
     }
 
-    char const* tld = tld_db_.get_registered_domain(fcrdns_.utf8().c_str());
+    char const* tld
+        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
     if (tld && white.lookup(tld)) {
       status = Message::SpamStatus::ham;
     }
 
     // I will allow this as sort of the gold standard for naming.
-    if (client_identity_ == fcrdns_) {
+    if (client_identity_ == client_fcrdns_) {
       status = Message::SpamStatus::ham;
     }
   }
@@ -530,7 +520,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     alarm(5 * 60);
   }
 
-  msg.open(our_fqdn_.utf8(), max_msg_size(), status);
+  msg.open(server_id(), max_msg_size(), status);
   auto hdrs = added_headers_(msg);
   msg.write(hdrs.data(), hdrs.size());
 }
@@ -724,10 +714,10 @@ bool Session::verify_client_(Domain const& client_identity)
   }
 
   // Bogus clients claim to be us or some local host.
-  if ((client_identity == our_fqdn_) || (client_identity == "localhost")
+  if ((client_identity == server_identity_) || (client_identity == "localhost")
       || (client_identity == "localhost.localdomain")) {
 
-    if (our_fqdn_ != fcrdns_) {
+    if (server_identity_ != client_fcrdns_) {
       LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
       out_() << "550 5.7.1 liar\r\n" << std::flush;
@@ -804,7 +794,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
     else {
       // If we have no list of domains to accept, take our own.
-      if (recipient.domain() == our_fqdn_) {
+      if (recipient.domain() == server_identity_) {
         accepted_domain = true;
       }
     }
@@ -812,8 +802,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   if (!accepted_domain) {
     out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
-    LOG(WARNING) << "relay access denied for domain " << recipient.domain()
-                 << " as it doesn't match " << our_fqdn_;
+    LOG(WARNING) << "relay access denied for domain " << recipient.domain();
     return false;
   }
 
@@ -840,7 +829,7 @@ bool Session::verify_sender_(Mailbox const& sender)
   else {
     // If the reverse path domain matches the Forward-confirmed reverse
     // DNS of the sending IP address, we skip the uribl check.
-    if (sender.domain() != fcrdns_) {
+    if (sender.domain() != client_fcrdns_) {
       if (!verify_sender_domain_(sender.domain()))
         return false;
     }
@@ -958,13 +947,15 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
+  auto srvr_id = server_id();
+
   if (!sock_.has_peername() || ip_whitelisted_) {
     auto ip_addr = sock_.them_c_str();
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
     std::ostringstream received_spf;
-    received_spf << "Received-SPF: pass (" << server_id() << ": " << ip_addr
+    received_spf << "Received-SPF: pass (" << srvr_id << ": " << ip_addr
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
                  << "; helo=" << client_identity_ << ";";
@@ -972,7 +963,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  auto sid = std::string(server_id().data(), server_id().length());
+  auto sid = std::string(srvr_id.data(), srvr_id.length());
   SPF::Server spf_srv(sid.c_str());
   SPF::Request spf_req(spf_srv);
 
