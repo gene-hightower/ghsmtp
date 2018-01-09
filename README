@@ -16,7 +16,7 @@ accept mail and store it in that user's ~/Maildir.
 I run it on the Fedora distribution of GNU/Linux/systemd — might also
 work on other platforms.
 
-Support for a some useful SMTP extensions:
+Support for some useful SMTP extensions:
 
 RFC 1870: Message Size Declaration
 RFC 2920: Command Pipelining
