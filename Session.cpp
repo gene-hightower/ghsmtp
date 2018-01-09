@@ -1,3 +1,7 @@
+#include <gflags/gflags.h>
+
+DEFINE_string(server_id, "", "server name");
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -188,6 +192,9 @@ void Session::log_lo_(char const* verb, std::string_view client_identity) const
 
 std::string_view Session::server_id() const
 {
+  if (!FLAGS_server_id.empty()) {
+    return FLAGS_server_id.c_str();
+  }
   if (our_fqdn_.is_address_literal()) {
     return IP::to_address(our_fqdn_.ascii());
   }
