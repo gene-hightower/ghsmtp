@@ -394,9 +394,9 @@ struct ehlo_line
 //                    "250 " ehlo-line CRLF )
 
 struct ehlo_ok_rsp
-: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<seq<SP, ehlo_greet>>, CRLF>,
+: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF>,
 
-      seq<TAOCPP_PEGTL_ISTRING("250-"), server_id, opt<seq<SP, ehlo_greet>>, CRLF,
+      seq<TAOCPP_PEGTL_ISTRING("250-"), server_id, opt<ehlo_greet>, CRLF,
  star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
       seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>
       > {};
@@ -405,7 +405,7 @@ struct ehlo_rsp
   : sor<ehlo_ok_rsp, reply_lines> {};
 
 struct helo_ok_rsp
-  : seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<seq<SP, ehlo_greet>>, CRLF> {};
+  : seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF> {};
 
 struct auth_login_username
     : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
@@ -873,6 +873,7 @@ try_host:
 
   CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
   if (!cnn.ehlo_ok) {
+    LOG(WARNING) << "ehlo response did not parse";
     LOG(INFO) << "> HELO " << sender.ascii();
     cnn.sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)));

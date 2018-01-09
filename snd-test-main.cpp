@@ -22,6 +22,10 @@ int main()
   }
 
   const char* ehlo_rsp_list[]{
+      "250-HELLO, SAILOR!\r\n"
+      "250-NO-SOLICITING\r\n"
+      "250 8BITMIME\r\n",
+
       "250-digilicious.com at your service, localhost. [IPv6:::1]\r\n"
       "250-SIZE 15728640\r\n"
       "250-8BITMIME\r\n"
@@ -31,6 +35,7 @@ int main()
       "250-BINARYMIME\r\n"
       "250-CHUNKING\r\n"
       "250 SMTPUTF8\r\n",
+
       "500 5.5.1 command unrecognized: \"EHLO digilicious.com\\r\\n\"\r\n",
   };
 
