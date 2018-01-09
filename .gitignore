@@ -3,6 +3,7 @@
 *.d
 *.o
 *~
+accept_domains
 cdb-gen
 ghsmtp.private
 ghsmtp.txt

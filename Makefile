@@ -117,6 +117,7 @@ smtp-test_STEMS := $(filter-out smtp,$(smtp_STEMS))
 snd-test_STEMS := $(filter-out snd,$(snd_STEMS))
 
 databases := \
+	accept_domains.cdb \
 	black.cdb \
 	ip-black.cdb \
 	ip-white.cdb \
