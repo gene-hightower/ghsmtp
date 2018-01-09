@@ -12,7 +12,7 @@
 class TLS {
 public:
   static constexpr auto cert_path = STRINGIFY(SMTP_HOME) "/smtp.pem";
-  static constexpr auto key_path = STRINGIFY(SMTP_HOME) "/smtp.pem";
+  static constexpr auto key_path = STRINGIFY(SMTP_HOME) "/smtp.key";
 
   TLS(TLS const&) = delete;
   TLS& operator=(const TLS&) = delete;
