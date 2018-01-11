@@ -1008,13 +1008,6 @@ try_host:
     }
   }
 
-  if (FLAGS_nosend) {
-    LOG(INFO) << "> QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_SUCCESS);
-  }
-
   in.discard();
 
   std::string from = from_mbx;
@@ -1111,6 +1104,13 @@ try_host:
 
   if (ext_smtputf8) {
     param_stream << " SMTPUTF8";
+  }
+
+  if (FLAGS_nosend) {
+    LOG(INFO) << "> QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_SUCCESS);
   }
 
   auto param_str = param_stream.str();
