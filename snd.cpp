@@ -832,6 +832,11 @@ int main(int argc, char* argv[])
     // returns list of servers sorted by priority, low to high
     auto mxs = DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii());
 
+    // RFC 7505 null MX record
+    if ((mxs.size() == 1) && (mxs.front() == ".")) {
+      LOG(FATAL) << "domain does not accept mail";
+    }
+
     if (mxs.empty()) {
       receivers.push_back(connectable_host(to_mbx));
     }
