@@ -1056,8 +1056,8 @@ try_host:
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
-  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(), FLAGS_sender.c_str(),
-                     body_type);
+  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(),
+                     from_mbx.domain().ascii().c_str(), body_type);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
     auto header = name + ": "s + value;
     dks.header(header.c_str());
