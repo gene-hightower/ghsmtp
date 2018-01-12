@@ -23,7 +23,7 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
-#include <tao/pegtl/contrib/tracer.hpp>
+// #include <tao/pegtl/contrib/tracer.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -177,11 +177,15 @@ struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
 using dot = one<'.'>;
 using colon = one<':'>;
 
-// UTF-8 except NUL (0), LF (10) and CR (13).
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
 };
 
-struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
+// UTF-8 except NUL (0), LF (10) and CR (13).
+// struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
+// };
+
+// BINARYMIME allows any byte
+struct body : until<eof> {
 };
 
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
