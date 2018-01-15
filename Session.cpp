@@ -71,20 +71,22 @@ constexpr auto write_timeout = std::chrono::seconds(30);
 Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
-  std::string our_id;
-  char const* server_id = getenv("GHSMTP_SERVER_ID");
-  if (server_id) {
-    our_id = server_id;
-  }
-  else {
-    our_id = get_hostname();
-    if (our_id.find('.') == std::string::npos) {
-      if (sock_.us_c_str()[0]) {
-        our_id = "["s + sock_.us_c_str() + "]"s;
-      }
-    }
-  }
-  server_identity_.set(our_id.c_str());
+  const std::string our_id = [&] {
+    char const* const id_from_env = getenv("GHSMTP_SERVER_ID");
+    if (id_from_env)
+      return std::string(id_from_env);
+
+    auto const hostname = get_hostname();
+    if (hostname.find('.') != std::string::npos)
+      return hostname;
+
+    if (IP::is_routable(sock_.us_c_str()))
+      return "["s + sock_.us_c_str() + "]"s;
+
+    LOG(FATAL) << "Can't determine my server ID.";
+  }();
+
+  server_identity_.set(our_id);
 
   max_msg_size(Config::max_msg_size_initial);
 }
