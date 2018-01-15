@@ -30,68 +30,6 @@ TLS::~TLS()
   }
 }
 
-void TLS::starttls_client(int fd_in,
-                          int fd_out,
-                          std::chrono::milliseconds timeout)
-{
-  SSL_load_error_strings();
-  SSL_library_init();
-
-  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
-
-  const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
-  ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
-
-  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
-  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
-
-  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path) > 0)
-      << "Can't load certificate chain file \"" << cert_path << "\"";
-
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
-      << "Can't load private key file \"" << key_path << "\"";
-
-  CHECK(SSL_CTX_check_private_key(ctx_))
-      << "Private key does not match the public certificate";
-
-  ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
-  SSL_set_rfd(ssl_, fd_in);
-  SSL_set_wfd(ssl_, fd_out);
-
-  using namespace std::chrono;
-  time_point<system_clock> start = system_clock::now();
-
-  int rc;
-  while ((rc = SSL_connect(ssl_)) < 0) {
-
-    time_point<system_clock> now = system_clock::now();
-
-    CHECK(now < (start + timeout)) << "starttls timed out";
-
-    milliseconds time_left
-        = duration_cast<milliseconds>((start + timeout) - now);
-
-    switch (SSL_get_error(ssl_, rc)) {
-    case SSL_ERROR_WANT_READ:
-      CHECK(POSIX::input_ready(fd_in, time_left))
-          << "starttls timed out on input_ready";
-      continue; // try SSL_accept again
-
-    case SSL_ERROR_WANT_WRITE:
-      CHECK(POSIX::output_ready(fd_out, time_left))
-          << "starttls timed out on output_ready";
-      continue; // try SSL_accept again
-
-    case SSL_ERROR_SYSCALL:
-      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
-
-    default:
-      ssl_error();
-    }
-  }
-}
-
 struct session_context {
   int verify_depth{10};
   bool verbose_mode{true};
@@ -148,6 +86,80 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
     return 1;
 
   return preverify_ok;
+}
+
+void TLS::starttls_client(int fd_in,
+                          int fd_out,
+                          std::chrono::milliseconds timeout)
+{
+  SSL_load_error_strings();
+  SSL_library_init();
+
+  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
+
+  const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
+  ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
+
+  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
+
+  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path) > 0)
+      << "Can't load certificate chain file \"" << cert_path << "\"";
+
+  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_path, SSL_FILETYPE_PEM) > 0)
+      << "Can't load private key file \"" << key_path << "\"";
+
+  CHECK(SSL_CTX_check_private_key(ctx_))
+      << "Private key does not match the public certificate";
+
+  session_context context;
+  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
+
+  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                     verify_callback);
+
+  ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
+  SSL_set_rfd(ssl_, fd_in);
+  SSL_set_wfd(ssl_, fd_out);
+
+  if (session_context_index < 0) {
+    session_context_index
+        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+  }
+  SSL_set_ex_data(ssl_, session_context_index, &context);
+
+  using namespace std::chrono;
+  time_point<system_clock> start = system_clock::now();
+
+  int rc;
+  while ((rc = SSL_connect(ssl_)) < 0) {
+
+    time_point<system_clock> now = system_clock::now();
+
+    CHECK(now < (start + timeout)) << "starttls timed out";
+
+    milliseconds time_left
+        = duration_cast<milliseconds>((start + timeout) - now);
+
+    switch (SSL_get_error(ssl_, rc)) {
+    case SSL_ERROR_WANT_READ:
+      CHECK(POSIX::input_ready(fd_in, time_left))
+          << "starttls timed out on input_ready";
+      continue; // try SSL_accept again
+
+    case SSL_ERROR_WANT_WRITE:
+      CHECK(POSIX::output_ready(fd_out, time_left))
+          << "starttls timed out on output_ready";
+      continue; // try SSL_accept again
+
+    case SSL_ERROR_SYSCALL:
+      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+
+    default:
+      ssl_error();
+    }
+  }
 }
 
 void TLS::starttls_server(int fd_in,
