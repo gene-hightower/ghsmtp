@@ -52,6 +52,36 @@ struct action<dec_octet> {
   }
 };
 
+bool is_routable(std::string_view addr)
+{
+  memory_input<> in(addr.data(), addr.size(), "addr");
+  std::vector<std::string> a;
+  a.reserve(4);
+  auto ret = parse<ipv4_address, action>(in, a);
+  CHECK(ret);
+
+  // From RFC 1918:
+  // 10.0.0.0        -   10.255.255.255  (10/8 prefix)
+  // 172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+  // 192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+
+  if (a[3] == "10")
+    return false;
+
+  if (a[3] == "172") {
+    auto oct = atoi(a[2].c_str());
+    if ((16 <= oct) && (oct <= 31))
+      return false;
+    return true;
+  }
+
+  if ((a[3] == "192") && (a[2] == "168")) {
+    return false;
+  }
+
+  return true;
+}
+
 bool is_address(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "addr");

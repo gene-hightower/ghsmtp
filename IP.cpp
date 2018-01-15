@@ -6,6 +6,15 @@
 #include <glog/logging.h>
 
 namespace IP {
+bool is_routable(std::string_view addr)
+{
+  if (IP4::is_address(addr))
+    return IP4::is_routable(addr);
+  if (IP6::is_address(addr))
+    return IP6::is_routable(addr);
+  return false;
+}
+
 bool is_address(std::string_view addr)
 {
   return IP4::is_address(addr) || IP6::is_address(addr);
