@@ -430,8 +430,8 @@ bool Session::data_start()
 
 std::string Session::added_headers_(Message const& msg)
 {
-  // The headers Return-Path, Received, X-Original-To and Received-SPF
-  // are returned as a string.
+  // The headers Return-Path, Received-SPF, and Received are returned
+  // as a string.
 
   std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
@@ -682,7 +682,6 @@ void Session::starttls()
     sock_.starttls_server();
     reset_();
 
-    // Check the certs at this point.
     max_msg_size(Config::max_msg_size_bro);
 
     LOG(INFO) << "STARTTLS " << sock_.tls_info();
