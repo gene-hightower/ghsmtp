@@ -1,4 +1,5 @@
 #include "Domain.hpp"
+#include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
 
@@ -74,4 +75,11 @@ void Domain::clear()
   ascii_.clear();
   utf8_.clear();
   is_address_literal_ = false;
+}
+
+std::string Domain::address() const
+{
+  if (is_address_literal())
+    return std::string(IP::to_address(ascii_));
+  LOG(FATAL) << "domain name is not an address";
 }

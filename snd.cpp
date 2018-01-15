@@ -525,17 +525,13 @@ uint16_t get_port(char const* service)
   return ntohs(result_buf.s_port);
 }
 
-int conn(DNS::Resolver& res,
-         std::string const& node,
-         std::string const& service)
+int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
 {
   bool use_4 = !FLAGS_ip6;
   bool use_6 = !FLAGS_ip4;
 
   auto port = get_port(service.c_str());
   if (use_6) {
-    auto addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node);
-
     int fd = socket(AF_INET6, SOCK_STREAM, 0);
     PCHECK(fd >= 0) << "socket() failed";
 
@@ -551,6 +547,15 @@ int conn(DNS::Resolver& res,
       PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
     }
 
+    std::vector<std::string> addrs;
+    if (node.is_address_literal()) {
+      if (IP6::is_address(node.ascii())) {
+        addrs.push_back(node.address());
+      }
+    }
+    else {
+      addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node.ascii());
+    }
     for (auto addr : addrs) {
       sockaddr_in6 in6{};
       in6.sin6_family = AF_INET6;
@@ -570,8 +575,6 @@ int conn(DNS::Resolver& res,
     close(fd);
   }
   if (use_4) {
-    auto addrs = DNS::get_records<DNS::RR_type::A>(res, node);
-
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     PCHECK(fd >= 0) << "socket() failed";
 
@@ -587,6 +590,15 @@ int conn(DNS::Resolver& res,
       PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
     }
 
+    std::vector<std::string> addrs;
+    if (node.is_address_literal()) {
+      if (IP4::is_address_literal(node.ascii())) {
+        addrs.push_back(node.address());
+      }
+    }
+    else {
+      addrs = DNS::get_records<DNS::RR_type::A>(res, node.ascii());
+    }
     for (auto addr : addrs) {
       sockaddr_in in4{};
       in4.sin_family = AF_INET;
@@ -878,9 +890,9 @@ int main(int argc, char* argv[])
 
   DNS::Resolver res;
 
-  std::vector<std::string> receivers;
+  std::vector<Domain> receivers;
   if (!FLAGS_mx_host.empty()) {
-    receivers.push_back(connectable_host(FLAGS_mx_host));
+    receivers.push_back(Domain(FLAGS_mx_host));
   }
   else {
     // look up MX records for to_mbx.domain()
@@ -894,11 +906,11 @@ int main(int argc, char* argv[])
     }
 
     if (mxs.empty()) {
-      receivers.push_back(connectable_host(to_mbx));
+      receivers.push_back(to_mbx.domain());
     }
     else {
       for (auto mx : mxs) {
-        receivers.push_back(mx);
+        receivers.push_back(Domain(mx));
       }
     }
   }
@@ -953,7 +965,7 @@ try_host:
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
 
-  if (cnn.server_id != receivers[0]) {
+  if (receivers[0] != cnn.server_id) {
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 

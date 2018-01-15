@@ -56,6 +56,8 @@ public:
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
+  std::string address() const;
+
 private:
   std::string ascii_;
   std::string utf8_;
