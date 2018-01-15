@@ -45,7 +45,7 @@ int main(int argc, char const* argv[])
     // LOG(FATAL) << "should have thrown";
   }
   catch (std::exception const& ex) {
-    // std::cout << ex.what() << '\n';
+    std::cout << ex.what() << '\n';
   }
 
   try {
