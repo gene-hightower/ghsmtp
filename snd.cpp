@@ -2,44 +2,44 @@
 
 #include <gflags/gflags.h>
 
-DEFINE_bool(pipe, false, "Send to stdin/stdout");
+DEFINE_bool(pipe, false, "send to stdin/stdout");
 
-DEFINE_bool(nosend, false, "Don't actually send any mail.");
+DEFINE_bool(nosend, false, "don't actually send any mail");
 DEFINE_bool(rawdog,
             false,
-            "Send the body exactly as is, don't fix CRLF issues "
-            "or escape leading dots.");
+            "send the body exactly as is, don't fix CRLF issues "
+            "or escape leading dots");
 
-DEFINE_bool(use_8bitmime, true, "Use 8BITMIME extension to send mail.");
-DEFINE_bool(use_chunking, true, "Use CHUNKING extension to send mail.");
-DEFINE_bool(use_pipelining, true, "Use PIPELINING extension to send mail.");
-DEFINE_bool(use_size, true, "Use SIZE extension.");
-DEFINE_bool(use_smtputf8, true, "Use SMTPUTF8 extension.");
-DEFINE_bool(use_tls, true, "Use TLS extension.");
+DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension to send mail");
+DEFINE_bool(use_chunking, true, "use CHUNKING extension to send mail");
+DEFINE_bool(use_pipelining, true, "use PIPELINING extension to send mail");
+DEFINE_bool(use_size, true, "use SIZE extension");
+DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
+DEFINE_bool(use_tls, true, "use STARTTLS extension");
 
-DEFINE_string(sender, "", "FQDN of sending node.");
+DEFINE_string(sender, "", "FQDN of sending node");
 
-DEFINE_string(local_address, "", "Local address to bind.");
-DEFINE_string(mx_host, "localhost", "FQDN of receiving node.");
-DEFINE_string(service, "smtp-test", "Service name.");
+DEFINE_string(local_address, "", "local address to bind");
+DEFINE_string(mx_host, "localhost", "FQDN of receiving node");
+DEFINE_string(service, "smtp-test", "service name");
 
-DEFINE_string(from, "", "RFC5321 MAIL FROM address.");
-DEFINE_string(to, "", "RFC5321 RCPT TO address.");
+DEFINE_string(from, "", "RFC5321 MAIL FROM address");
+DEFINE_string(to, "", "RFC5321 RCPT TO address");
 
-DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From: name.");
-DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name.");
+DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From: name");
+DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name");
 
-DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject.");
-DEFINE_string(keywords, "", "RFC5322 Keywords: header.");
-DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header.");
+DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
+DEFINE_string(keywords, "", "RFC5322 Keywords: header");
+DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header");
 
-DEFINE_bool(ip4, false, "Use only IP version 4.");
-DEFINE_bool(ip6, false, "Use only IP version 6.");
+DEFINE_bool(ip4, false, "use only IP version 4");
+DEFINE_bool(ip6, false, "use only IP version 6");
 
-DEFINE_string(username, "", "AUTH username.");
-DEFINE_string(password, "", "AUTH password.");
+DEFINE_string(username, "", "AUTH username");
+DEFINE_string(password, "", "AUTH password");
 
-DEFINE_string(selector, "ghsmtp", "DKIM selector.");
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
 
 #include "Base64.hpp"
 #include "DKIM.hpp"
@@ -1030,14 +1030,20 @@ try_host:
   mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
           << sender.utf8() << '>';
   eml.add_hdr("Message-ID", mid_str.str());
+
   eml.add_hdr("Date", date.c_str());
+
   std::string rfc5322_from = FLAGS_from_name + " <" + from + ">";
   eml.add_hdr("From", rfc5322_from);
+
   std::string rfc5322_to = FLAGS_to_name + " <" + to + ">";
   eml.add_hdr("To"s, rfc5322_to);
+
   eml.add_hdr("Subject", FLAGS_subject);
+
   if (!FLAGS_keywords.empty())
     eml.add_hdr("Keywords", FLAGS_keywords);
+
   if (!FLAGS_in_reply_to.empty())
     eml.add_hdr("In-Reply-To", FLAGS_in_reply_to);
 
