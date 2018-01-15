@@ -117,7 +117,7 @@ void Session::greeting()
         fcrdns_whitelisted_ = true;
       }
       else {
-        if (white.lookup(client_fcrdns_.utf8().c_str())) {
+        if (white.lookup(client_fcrdns_.utf8())) {
           LOG(INFO) << "domain " << client_fcrdns_ << " whitelisted";
           fcrdns_whitelisted_ = true;
         }
@@ -486,7 +486,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
   CDB white("white");
 
   if (!client_fcrdns_.empty()) {
-    if (white.lookup(client_fcrdns_.utf8().c_str())) {
+    if (white.lookup(client_fcrdns_.utf8())) {
       status = Message::SpamStatus::ham;
     }
 
@@ -502,10 +502,10 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     }
   }
 
-  if (white.lookup(client_identity_.utf8().c_str())) {
+  if (white.lookup(client_identity_.utf8())) {
     status = Message::SpamStatus::ham;
   }
-  if (white.lookup(client_identity_.ascii().c_str())) {
+  if (white.lookup(client_identity_.ascii())) {
     status = Message::SpamStatus::ham;
   }
 
@@ -894,7 +894,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
     auto three_level = labels[labels.size() - 3] + "." + two_level;
 
     CDB three_tld("three-level-tlds");
-    if (three_tld.lookup(three_level.c_str())) {
+    if (three_tld.lookup(three_level)) {
       if (labels.size() > 3) {
         return verify_sender_domain_uribl_(labels[labels.size() - 4] + "."
                                            + three_level);
@@ -909,7 +909,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
   }
 
   CDB two_tld("two-level-tlds");
-  if (two_tld.lookup(two_level.c_str())) {
+  if (two_tld.lookup(two_level)) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
                                          + two_level);
