@@ -109,10 +109,6 @@ SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL
 esc-test_STEMS := esc
 
-msg-test_STEMS := $(filter-out msg,$(msg_STEMS))
-smtp-test_STEMS := $(filter-out smtp,$(smtp_STEMS))
-snd-test_STEMS := $(filter-out snd,$(snd_STEMS))
-
 databases := \
 	accept_domains.cdb \
 	black.cdb \
