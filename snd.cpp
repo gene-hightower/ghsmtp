@@ -1,6 +1,11 @@
 // Toy program to send email.
 
 #include <gflags/gflags.h>
+namespace gflags {
+// in case we didn't have one
+}
+
+DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
@@ -764,8 +769,54 @@ static bool validate_name(const char* flagname, std::string const& value)
 DEFINE_validator(from_name, &validate_name);
 DEFINE_validator(to_name, &validate_name);
 
-namespace gflags {
-// in case we didn't have one
+void selftest()
+{
+  auto read_hook = []() {};
+  static RFC5321::Connection cnn(0, 1, read_hook);
+
+  const char* greet_list[]{
+      "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
+      "220-AOL and its affiliated companies do not\r\n"
+      "220-authorize the use of its proprietary computers and computer\r\n"
+      "220-networks to accept, transmit, or distribute unsolicited bulk\r\n"
+      "220-e-mail sent from the internet.\r\n"
+      "220-Effective immediately:\r\n"
+      "220-AOL may no longer accept connections from IP addresses\r\n"
+      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"};
+
+  for (auto i : greet_list) {
+    memory_input<> in(i, i);
+    if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
+            in, cnn)) {
+      LOG(FATAL) << "Error parsing greeting \"" << i << "\"";
+    }
+  }
+
+  const char* ehlo_rsp_list[]{
+      "250-HELLO, SAILOR!\r\n"
+      "250-NO-SOLICITING\r\n"
+      "250 8BITMIME\r\n",
+
+      "250-digilicious.com at your service, localhost. [IPv6:::1]\r\n"
+      "250-SIZE 15728640\r\n"
+      "250-8BITMIME\r\n"
+      "250-STARTTLS\r\n"
+      "250-ENHANCEDSTATUSCODES\r\n"
+      "250-PIPELINING\r\n"
+      "250-BINARYMIME\r\n"
+      "250-CHUNKING\r\n"
+      "250 SMTPUTF8\r\n",
+
+      "500 5.5.1 command unrecognized: \"EHLO digilicious.com\\r\\n\"\r\n",
+  };
+
+  for (auto i : ehlo_rsp_list) {
+    memory_input<> in(i, i);
+    if (!parse<RFC5321::ehlo_rsp, RFC5321::action /*, tao::pegtl::tracer*/>(
+            in, cnn)) {
+      LOG(FATAL) << "Error parsing ehlo response \"" << i << "\"";
+    }
+  }
 }
 
 int main(int argc, char* argv[])
@@ -793,6 +844,11 @@ int main(int argc, char* argv[])
     using namespace gflags;
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
+  }
+
+  if (FLAGS_selftest) {
+    selftest();
+    return 0;
   }
 
   CHECK(!(FLAGS_ip4 && FLAGS_ip6)) << "Must use /some/ IP version.";

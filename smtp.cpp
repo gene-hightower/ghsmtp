@@ -2,6 +2,8 @@
 namespace gflags {
 };
 
+DEFINE_bool(selftest, false, "run a self test");
+
 #include <fstream>
 
 #include "Session.hpp"
@@ -885,6 +887,59 @@ void timeout(int signum)
   _exit(1);
 }
 
+void selftest()
+{
+  const char* good_list[]{
+      "anything\r\n"
+      ".\r\n", // end
+
+      "anything\r\n"
+      "..anything\r\n"
+      ".\r\n", // end
+
+      "anything\r\n"
+      "\nanything\r\n"
+      "\ranything\r\n"
+      "anything\r\n"
+      ".\r\n", // end
+  };
+
+  const char* bad_list[]{
+      ".anything\r\n",
+
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n"
+      "anything\r\n",
+
+      "anything",  // no CRLF
+      ".anything", // no CRLF
+
+      "",
+
+  };
+
+  for (auto i : good_list) {
+    std::string bfr(i);
+    std::istringstream data(bfr);
+    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
+    RFC5321::Ctx ctx;
+    if (!parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
+      LOG(FATAL) << "\"" << esc(i) << "\"";
+    }
+  }
+  for (auto i : bad_list) {
+    std::string bfr(i);
+    std::istringstream data(bfr);
+    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
+    RFC5321::Ctx ctx;
+    if (parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
+      LOG(FATAL) << "\"" << esc(i) << "\"";
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -893,6 +948,11 @@ int main(int argc, char* argv[])
     using namespace gflags;
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
+  }
+
+  if (FLAGS_selftest) {
+    selftest();
+    return 0;
   }
 
   // Set timeout signal handler to limit total run time.
