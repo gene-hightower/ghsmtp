@@ -21,6 +21,7 @@ msg_STEMS := msg \
 	DKIM \
 	DNS \
 	Domain \
+	IP \
 	IP4 \
 	IP6 \
 	SPF \
