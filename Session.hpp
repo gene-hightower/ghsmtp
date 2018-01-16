@@ -104,6 +104,7 @@ private:
   bool verify_sender_domain_(Domain const& sender);
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
+  void verify_ip_address_();
 
   void exit_() __attribute__((noreturn));
 

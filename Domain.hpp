@@ -52,6 +52,7 @@ public:
   }
 
   bool is_address_literal() const { return is_address_literal_; }
+  bool is_unicode() const { return utf8() != ascii(); }
 
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
