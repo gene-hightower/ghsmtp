@@ -97,81 +97,8 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 void Session::greeting()
 {
   if (sock_.has_peername()) {
-    CDB black("ip-black");
-    if (black.lookup(sock_.them_c_str())) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
-             sock_.them_c_str());
-      out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
-      std::exit(EXIT_SUCCESS);
-    }
-
-    client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
-
-    if (!client_fcrdns_.empty()) {
-      client_ = client_fcrdns_.ascii() + " "s + sock_.them_address_literal();
-
-      // check domain
-      char const* tld
-          = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
-      CDB white("white");
-      if (tld && white.lookup(tld)) {
-        LOG(INFO) << "TLD domain " << tld << " whitelisted";
-        fcrdns_whitelisted_ = true;
-      }
-      else {
-        if (white.lookup(client_fcrdns_.utf8())) {
-          LOG(INFO) << "domain " << client_fcrdns_ << " whitelisted";
-          fcrdns_whitelisted_ = true;
-        }
-      }
-    }
-    else {
-      client_ = "unknown "s + sock_.them_address_literal();
-    }
-
-    if ((sock_.them_address_literal() == "[127.0.0.1]")
-        || (sock_.them_address_literal() == "[IPv6:::1]")) {
-      ip_whitelisted_ = true;
-    }
-    else {
-      CDB white("ip-white");
-      if (white.lookup(sock_.them_c_str())) {
-        LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
-        ip_whitelisted_ = true;
-      }
-      else if (IP4::is_address(sock_.them_c_str())) {
-        using namespace DNS;
-
-        // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-        auto reversed = IP4::reverse(sock_.them_c_str());
-        DNS::Resolver res;
-        for (auto const& rbl : Config::rbls) {
-          if (has_record<RR_type::A>(res, reversed + rbl)) {
-            syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
-                   sock_.them_c_str(), rbl);
-            out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
-                   << std::flush;
-            std::exit(EXIT_SUCCESS);
-          }
-        }
-        // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
-        // blacklisted";
-      }
-    }
-
-    // Wait a bit of time for pre-greeting traffic.
-    if (!(ip_whitelisted_ || fcrdns_whitelisted_)) {
-      if (sock_.input_ready(Config::greeting_wait)) {
-        syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
-               sock_.them_c_str());
-        out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
-        std::exit(EXIT_SUCCESS);
-      }
-    }
-
-    LOG(INFO) << "connect from " << client_;
-  } // if (sock_.has_peername())
-
+    verify_ip_address_();
+  }
   out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
 }
 
@@ -213,7 +140,7 @@ void Session::ehlo(std::string_view client_identity)
   if (!verify_client_(client_identity_)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
            sock_.them_c_str());
-    exit_();
+    std::exit(EXIT_SUCCESS);
   }
 
   out_() << "250-" << server_id();
@@ -476,46 +403,50 @@ std::string Session::added_headers_(Message const& msg)
   return headers.str();
 }
 
+bool lookup_domain(CDB& cdb, Domain const& domain)
+{
+  if (!domain.empty()) {
+    if (cdb.lookup(domain.ascii())) {
+      return true;
+    }
+    if (domain.is_unicode() && cdb.lookup(domain.utf8())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
-  auto status = Message::SpamStatus::spam;
-
-  // Anything enciphered tastes a lot like ham.
-  if (sock_.tls()) {
-    status = Message::SpamStatus::ham;
-  }
-
-  CDB white("white");
-
-  if (!client_fcrdns_.empty()) {
-    if (white.lookup(client_fcrdns_.utf8())) {
-      status = Message::SpamStatus::ham;
-    }
-
-    char const* tld
-        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
-    if (tld && white.lookup(tld)) {
-      status = Message::SpamStatus::ham;
+  auto status = [&] {
+    if (sock_.tls()) { // Anything enciphered tastes a lot like ham.
+      return Message::SpamStatus::ham;
     }
 
     // I will allow this as sort of the gold standard for naming.
-    if (client_identity_ == client_fcrdns_) {
-      status = Message::SpamStatus::ham;
-    }
-  }
+    if (client_identity_ == client_fcrdns_)
+      return Message::SpamStatus::ham;
 
-  if (white.lookup(client_identity_.utf8())) {
-    status = Message::SpamStatus::ham;
-  }
-  if (white.lookup(client_identity_.ascii())) {
-    status = Message::SpamStatus::ham;
-  }
+    CDB white("white");
 
-  char const* tld_client
-      = tld_db_.get_registered_domain(client_identity_.utf8().c_str());
-  if (tld_client && white.lookup(tld_client)) {
-    status = Message::SpamStatus::ham;
-  }
+    if (lookup_domain(white, client_fcrdns_))
+      return Message::SpamStatus::ham;
+
+    char const* tld
+        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
+    if (tld && white.lookup(tld))
+      return Message::SpamStatus::ham;
+
+    if (lookup_domain(white, client_identity_))
+      return Message::SpamStatus::ham;
+
+    char const* tld_client
+        = tld_db_.get_registered_domain(client_identity_.utf8().c_str());
+    if (tld_client && white.lookup(tld_client))
+      return Message::SpamStatus::ham;
+
+    return Message::SpamStatus::spam;
+  }();
 
   // All sources of ham get a fresh 5 minute timeout per message.
   if (status == Message::SpamStatus::ham) {
@@ -524,7 +455,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 
   msg.open(server_id(), max_msg_size(), status);
   auto hdrs = added_headers_(msg);
-  msg.write(hdrs.data(), hdrs.size());
+  msg.write(hdrs);
 }
 
 void Session::data_msg_done(Message& msg)
@@ -706,6 +637,81 @@ void Session::exit_()
 // All of the verify_* functions send their own error messages back to
 // the client on failure, and return false.
 
+void Session::verify_ip_address_()
+{
+  CDB black("ip-black");
+  if (black.lookup(sock_.them_c_str())) {
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
+           sock_.them_c_str());
+    out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
+    std::exit(EXIT_SUCCESS);
+  }
+
+  client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
+
+  if (!client_fcrdns_.empty()) {
+    client_ = client_fcrdns_.ascii() + " "s + sock_.them_address_literal();
+
+    // check domain
+    char const* tld
+        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
+    CDB white("white");
+    if (tld && white.lookup(tld)) {
+      LOG(INFO) << "TLD domain " << tld << " whitelisted";
+      fcrdns_whitelisted_ = true;
+    }
+    else {
+      if (white.lookup(client_fcrdns_.utf8())) {
+        LOG(INFO) << "domain " << client_fcrdns_ << " whitelisted";
+        fcrdns_whitelisted_ = true;
+      }
+    }
+  }
+  else {
+    client_ = "unknown "s + sock_.them_address_literal();
+  }
+
+  if ((sock_.them_address_literal() == "[127.0.0.1]")
+      || (sock_.them_address_literal() == "[IPv6:::1]")) {
+    ip_whitelisted_ = true;
+  }
+  else {
+    CDB white("ip-white");
+    if (white.lookup(sock_.them_c_str())) {
+      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
+      ip_whitelisted_ = true;
+    }
+    else if (IP4::is_address(sock_.them_c_str())) {
+      using namespace DNS;
+
+      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+      auto reversed = IP4::reverse(sock_.them_c_str());
+      DNS::Resolver res;
+      for (auto const& rbl : Config::rbls) {
+        if (has_record<RR_type::A>(res, reversed + rbl)) {
+          syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
+                 sock_.them_c_str(), rbl);
+          out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
+                 << std::flush;
+          std::exit(EXIT_SUCCESS);
+        }
+      }
+      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
+      // blacklisted";
+    }
+  }
+
+  // Wait a bit of time for pre-greeting traffic.
+  if (!(ip_whitelisted_ || fcrdns_whitelisted_)) {
+    if (sock_.input_ready(Config::greeting_wait)) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
+             sock_.them_c_str());
+      out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
+      std::exit(EXIT_SUCCESS);
+    }
+  }
+}
+
 bool Session::verify_client_(Domain const& client_identity)
 // check the identity from the HELO/EHLO
 {
@@ -726,13 +732,9 @@ bool Session::verify_client_(Domain const& client_identity)
     }
   }
 
-  std::string cid_lc = client_identity.ascii();
-  std::transform(cid_lc.begin(), cid_lc.end(), cid_lc.begin(), ::tolower);
-
   std::vector<std::string> labels;
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
-
   if (labels.size() < 2) {
     // Sometimes we may went to look at mail from misconfigured
     // sending systems.
@@ -742,25 +744,17 @@ bool Session::verify_client_(Domain const& client_identity)
   }
 
   CDB black("black");
-  if (black.lookup(cid_lc)) {
+  if (lookup_domain(black, client_identity)) {
     LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << cid_lc;
+               << client_ << " claiming " << client_identity;
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
-  }
-  else if (client_identity.ascii() != client_identity.utf8()) {
-    if (black.lookup(client_identity.utf8())) {
-      LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity.utf8();
-      out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
-      return false;
-    }
   }
 
   char const* tld
       = tld_db_.get_registered_domain(client_identity.ascii().c_str());
   if (tld) {
-    if (!Domain::match(cid_lc, tld)) {
+    if (client_identity == tld) {
       if (black.lookup(tld)) {
         LOG(ERROR) << "blacklisted TLD " << tld;
         out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
