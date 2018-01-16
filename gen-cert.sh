@@ -6,9 +6,7 @@ mv smtp.pem smtp.pem-`date +%Y-%m-%d-%h:%m:%S.%N`
 
 CN=`hostname`
 
-openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:4096 -keyout smtp.key -out smtp.crt \
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:4096 -keyout smtp.key -out smtp.pem \
  -subj "/C=US/ST=CA/L=Los Angeles/CN=$CN"
-
-cat smtp.key smtp.crt > smtp.pem
 
 tlsa --port 25 --certificate smtp.crt $CN
