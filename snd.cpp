@@ -57,6 +57,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
+#include "fs.hpp"
 #include "hostname.hpp"
 #include "imemstream.hpp"
 
@@ -78,9 +79,6 @@ constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
 }
 
 #include <boost/algorithm/string/case_conv.hpp>
-
-#define BOOST_FILESYSTEM_NO_DEPRECATED
-#include <boost/filesystem.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
 
@@ -703,7 +701,7 @@ public:
   content(char const* path)
     : path_(path)
   {
-    auto body_sz = boost::filesystem::file_size(path_);
+    auto body_sz = fs::file_size(path_);
     CHECK(body_sz) << "no body";
     file_.open(path_);
     data_ = file_.data();
@@ -724,7 +722,7 @@ private:
 
   data_type type_;
 
-  boost::filesystem::path path_;
+  fs::path path_;
   boost::iostreams::mapped_file_source file_;
 };
 

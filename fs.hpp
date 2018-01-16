@@ -1,6 +1,10 @@
 #ifndef FS_DOT_HPP
 #define FS_DOT_HPP
 
+// Normally I would consider it rude to have a "using …" in a header
+// file, but in this case the whole point is to conditionally define a
+// short namespace that gives us a filesystem library.
+
 #if __has_include(<filesystem>)
 
 #include <filesystem>
