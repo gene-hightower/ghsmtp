@@ -129,7 +129,7 @@ $(TEST_MAILDIR):
 #	ragel -o smtp.cpp smtp.rl
 
 clean::
-	rm -rf stack.hh $(TEST_MAILDIR)
+	rm -rf $(TEST_MAILDIR)
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@
@@ -142,6 +142,9 @@ clean::
 	rm -f three-level-tlds.cdb
 	rm -f two-level-tlds.cdb
 	rm -f white.cdb cdb-gen
+
+real-clean::
+	rm -f two-level-tlds three-level-tlds public_suffix_list.dat
 
 accept_domains.cdb: accept_domains cdb-gen
 black.cdb: black cdb-gen
