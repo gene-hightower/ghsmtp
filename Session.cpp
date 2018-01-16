@@ -115,13 +115,15 @@ void set_home_dir()
   auto path = my_read_symlink(exe, ec).parent_path();
   CHECK(!ec.value()) << "can't read symlink: " << ec.message();
 
-  if (fs::is_directory(path) && (path.filename() == "bin")) {
-    // if ends in /bin, switch to /share
-    auto share = path;
-    share.replace_filename("share");
-    if (fs::exists(share) && fs::is_directory(share))
-      path = share;
-  }
+  // Maybe work from some installed location...
+
+  // if (fs::is_directory(path) && (path.filename() == "bin")) {
+  //   // if ends in /bin, switch to /share
+  //   auto share = path;
+  //   share.replace_filename("share");
+  //   if (fs::exists(share) && fs::is_directory(share))
+  //     path = share;
+  // }
 
   current_path(path);
 }
