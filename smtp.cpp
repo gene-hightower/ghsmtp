@@ -940,6 +940,44 @@ void selftest()
   }
 }
 
+void set_home_dir()
+{
+  auto exe = fs::path("/proc/self/exe");
+  CHECK(fs::exists(exe) && fs::is_symlink(exe))
+      << "can't find myself: is this not a Linux kernel?";
+
+  // The std::experimental::filesystem::read_symlink() as shipped with
+  // GCC 7.2.1 20170915 included with Fedora 27 is unusable when lstat
+  // returns st_size of zero, as happens with /proc/self/exe.
+
+  // This problem has been corrected in later versions, but my little
+  // loop should work on everything POSIX.
+
+  std::string p(64, '\0');
+  for (;;) {
+    ssize_t len = ::readlink(exe.c_str(), p.data(), p.size());
+    PCHECK(len > 0) << "readlink";
+    if (len < static_cast<ssize_t>(p.size()))
+      break;
+    CHECK_LT(p.size(), 4096) << "link too long";
+    p.resize(p.size() * 2);
+  }
+
+  auto path = fs::path(p).parent_path();
+
+  // Maybe work from some installed location...
+
+  // if (fs::is_directory(path) && (path.filename() == "bin")) {
+  //   // if ends in /bin, switch to /share
+  //   auto share = path;
+  //   share.replace_filename("share");
+  //   if (fs::exists(share) && fs::is_directory(share))
+  //     path = share;
+  // }
+
+  current_path(path);
+}
+
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -949,6 +987,8 @@ int main(int argc, char* argv[])
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
   }
+
+  set_home_dir();
 
   if (FLAGS_selftest) {
     selftest();
