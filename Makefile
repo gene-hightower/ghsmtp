@@ -1,7 +1,5 @@
 USES := ldns libglog libidn2 opendkim openssl
 
-CXXFLAGS += -DSMTP_HOME=$(shell pwd)
-
 LDLIBS += \
 	-lboost_filesystem \
 	-lboost_iostreams \

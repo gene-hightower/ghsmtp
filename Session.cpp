@@ -25,6 +25,9 @@
 
 #include <syslog.h>
 
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+
 using namespace std::string_literals;
 
 namespace Config {
@@ -68,9 +71,66 @@ constexpr auto read_timeout = std::chrono::minutes(5);
 constexpr auto write_timeout = std::chrono::seconds(30);
 } // namespace Config
 
+// The std::experimental::filesystem::read_symlink() as shipped with
+// GCC 7.2.1 20170915 included with Fedora 27 is unusable when lstat
+// returns st_size of zero, as happens with /proc/self/exe.
+
+// This problem has been corrected in later versions, but my version
+// should work everywhere POSIX.
+
+fs::path my_read_symlink(fs::path const& p, std::error_code& ec)
+{
+  fs::path result;
+  std::string buf(128, '\0');
+  do {
+    ssize_t len = ::readlink(p.c_str(), buf.data(), buf.size());
+    if (len == -1) {
+      ec.assign(errno, std::generic_category());
+      return result;
+    }
+    else if (len == static_cast<ssize_t>(buf.size())) {
+      if (buf.size() > 4096) {
+        ec.assign(ENAMETOOLONG, std::generic_category());
+        return result;
+      }
+      buf.resize(buf.size() * 2);
+    }
+    else {
+      buf.resize(len);
+      result.assign(buf);
+      ec.clear();
+      break;
+    }
+  } while (true);
+  return result;
+}
+
+void set_home_dir()
+{
+  auto exe = fs::path("/proc/self/exe");
+  CHECK(fs::exists(exe) && fs::is_symlink(exe))
+      << "can't find myself: is this not a Linux kernel?";
+
+  std::error_code ec;
+  auto path = my_read_symlink(exe, ec).parent_path();
+  CHECK(!ec.value()) << "can't read symlink: " << ec.message();
+
+  if (fs::is_directory(path) && (path.filename() == "bin")) {
+    // if ends in /bin, switch to /share
+    auto share = path;
+    share.replace_filename("share");
+    if (fs::exists(share) && fs::is_directory(share))
+      path = share;
+  }
+
+  current_path(path);
+}
+
 Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
+  set_home_dir();
+
   const std::string our_id = [&] {
     char const* const id_from_env = getenv("GHSMTP_SERVER_ID");
     if (id_from_env)

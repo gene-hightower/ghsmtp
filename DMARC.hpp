@@ -7,8 +7,6 @@
 
 #include <glog/logging.h>
 
-#include "stringify.h"
-
 namespace OpenDMARC {
 
 inline u_char* uc(char const* cp)
@@ -46,10 +44,8 @@ public:
   Lib()
   {
     lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
-    constexpr auto cert_path = STRINGIFY(SMTP_HOME) "/public_suffix_list.dat";
-    CHECK_LT(strlen(cert_path), MAXPATHLEN);
-    strncpy(reinterpret_cast<char*>(lib_.tld_source_file), cert_path,
-            MAXPATHLEN);
+    constexpr auto cert_fn = "public_suffix_list.dat";
+    strcpy(reinterpret_cast<char*>(lib_.tld_source_file), cert_fn);
     auto status = opendmarc_policy_library_init(&lib_);
     CHECK_EQ(status, DMARC_PARSE_OKAY)
         << opendmarc_policy_status_to_str(status);

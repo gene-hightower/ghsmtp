@@ -2,23 +2,21 @@
 
 #include <glog/logging.h>
 
-#include "stringify.h"
-
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 CDB::CDB(std::string_view db)
 {
-  std::string dbpath = STRINGIFY(SMTP_HOME) "/";
-  dbpath.append(db.begin(), db.end());
-  dbpath.append(".cdb");
+  std::string db_fn;
+  db_fn.append(db.begin(), db.end());
+  db_fn.append(".cdb");
 
-  fd_ = ::open(dbpath.c_str(), O_RDONLY);
+  fd_ = ::open(db_fn.c_str(), O_RDONLY);
   if (fd_ == -1) {
     char err[256];
     strerror_r(errno, err, sizeof(err));
-    LOG(WARNING) << "unable to open " << dbpath << ": " << err;
+    LOG(WARNING) << "unable to open " << db_fn << ": " << err;
   }
   else {
     cdb_init(&cdb_, fd_);

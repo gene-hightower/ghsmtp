@@ -7,12 +7,10 @@
 
 #include <openssl/ssl.h>
 
-#include "stringify.h"
-
 class TLS {
 public:
-  static constexpr auto cert_path = STRINGIFY(SMTP_HOME) "/smtp.pem";
-  static constexpr auto key_path = STRINGIFY(SMTP_HOME) "/smtp.key";
+  static constexpr auto cert_fn = "smtp.pem";
+  static constexpr auto key_fn = "smtp.key";
 
   TLS(TLS const&) = delete;
   TLS& operator=(const TLS&) = delete;
