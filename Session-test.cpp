@@ -21,6 +21,8 @@ struct Session_test {
     std::cout << "sizeof(binarymime_)   == " << sizeof(Session::binarymime_)
               << '\n';
 
+    setenv("GHSMTP_SERVER_ID", "example.com", 1);
+
     int fd_null = open("/dev/null", O_WRONLY);
     PCHECK(fd_null >= 0) << " can't open /dev/null";
 
