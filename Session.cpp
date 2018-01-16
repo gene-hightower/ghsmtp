@@ -418,7 +418,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
-  auto status = [&] {
+  auto const status = [&] {
     if (sock_.tls()) { // Anything enciphered tastes a lot like ham.
       return Message::SpamStatus::ham;
     }
