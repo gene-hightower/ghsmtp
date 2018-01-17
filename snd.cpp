@@ -9,6 +9,7 @@ DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
+DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(nosend, false, "don't actually send any mail");
 DEFINE_bool(rawdog,
             false,
@@ -1175,6 +1176,11 @@ try_host:
 
   if (ext_smtputf8) {
     param_stream << " SMTPUTF8";
+  }
+
+  if (FLAGS_badpipline) {
+    LOG(INFO) << "> NOOP NOOP";
+    cnn.sock.out() << "NOOP\r\nNOOP\r\n" << std::flush;
   }
 
   if (FLAGS_nosend) {
