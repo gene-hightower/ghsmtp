@@ -71,20 +71,21 @@ constexpr auto write_timeout = std::chrono::seconds(30);
 Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
-  const std::string our_id = [&] {
-    char const* const id_from_env = getenv("GHSMTP_SERVER_ID");
-    if (id_from_env)
-      return std::string(id_from_env);
+  auto const our_id{[&] {
+    auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
 
-    auto const hostname = get_hostname();
+    if (id_from_env)
+      return std::string{id_from_env};
+
+    auto const hostname{get_hostname()};
     if (hostname.find('.') != std::string::npos)
       return hostname;
 
     if (IP::is_routable(sock_.us_c_str()))
       return "["s + sock_.us_c_str() + "]";
 
-    LOG(FATAL) << "Can't determine my server ID.";
-  }();
+    LOG(FATAL) << "can't determine my server ID";
+  }()};
 
   server_identity_.set(our_id);
 
@@ -97,7 +98,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 void Session::greeting()
 {
   if (sock_.has_peername()) {
-    std::string error_msg;
+    auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
              error_msg.c_str());
@@ -134,7 +135,7 @@ void Session::last_in_group_(std::string_view verb)
 
 void Session::ehlo(std::string_view client_identity)
 {
-  constexpr auto verb{"EHLO"};
+  auto constexpr verb{"EHLO"};
 
   last_in_group_(verb);
   reset_();
@@ -142,7 +143,7 @@ void Session::ehlo(std::string_view client_identity)
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_.set(client_identity);
 
-  std::string error_msg;
+  auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
            sock_.them_c_str(), error_msg.c_str());
@@ -184,7 +185,7 @@ void Session::ehlo(std::string_view client_identity)
 
 void Session::helo(std::string_view client_identity)
 {
-  constexpr auto verb{"HELO"};
+  auto constexpr verb{"HELO"};
 
   last_in_group_(verb);
   reset_();
@@ -192,7 +193,7 @@ void Session::helo(std::string_view client_identity)
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
   client_identity_.set(client_identity);
 
-  std::string error_msg;
+  auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] HELO failed: %s",
            sock_.them_c_str(), error_msg.c_str());
@@ -213,7 +214,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  bool smtputf8{false};
+  auto smtputf8{bool{false}};
 
   // Take a look at the optional parameters:
   for (auto const& [name, val] : parameters) {
@@ -243,7 +244,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       }
       else {
         try {
-          auto sz = stoull(val);
+          auto const sz = stoull(val);
           if (sz > max_msg_size_) {
             out_() << "552 5.3.4 message size exceeds maximium size\r\n"
                    << std::flush;
@@ -277,7 +278,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
-  std::string const sender{reverse_path};
+  auto const sender{std::string{reverse_path}};
 
   for (auto bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
@@ -287,25 +288,24 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
-  std::ostringstream params;
+  auto params{std::ostringstream{}};
   for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
-  if (verify_sender_(reverse_path)) {
-    reverse_path_ = std::move(reverse_path);
-    forward_path_.clear();
-    out_() << "250 2.1.0 OK\r\n";
-    // No flush RFC-2920 section 3.1, this could be part of a command group.
-    LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
-  }
-  else {
+  if (!verify_sender_(reverse_path)) {
     LOG(ERROR) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
                << params.str();
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
            sock_.them_c_str());
     std::exit(EXIT_SUCCESS);
   }
+
+  reverse_path_ = std::move(reverse_path);
+  forward_path_.clear();
+  out_() << "250 2.1.0 OK\r\n";
+  // No flush RFC-2920 section 3.1, this could be part of a command group.
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
 }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
@@ -367,7 +367,7 @@ std::string Session::added_headers_(Message const& msg)
   // The headers Return-Path, Received-SPF, and Received are returned
   // as a string.
 
-  std::ostringstream headers;
+  auto headers{std::ostringstream{}};
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
   // Received-SPF:
   if (!received_spf_.empty()) {
@@ -384,10 +384,10 @@ std::string Session::added_headers_(Message const& msg)
           << protocol_ << " id " << msg.id();
 
   if (forward_path_.size()) {
-    auto len = 12;
+    auto len{12};
     headers << "\r\n        for ";
     for (size_t i = 0; i < forward_path_.size(); ++i) {
-      auto fwd = static_cast<std::string>(forward_path_[i]);
+      auto fwd{std::string{forward_path_[i]}};
       if (i) {
         headers << ',';
         ++len;
@@ -425,7 +425,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
-  auto const status = [&] {
+  auto const status{[&] {
     if (sock_.tls()) { // Anything enciphered tastes a lot like ham.
       return Message::SpamStatus::ham;
     }
@@ -434,26 +434,26 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     if (client_identity_ == client_fcrdns_)
       return Message::SpamStatus::ham;
 
-    CDB white("white");
+    auto white{CDB{"white"}};
 
     if (lookup_domain(white, client_fcrdns_))
       return Message::SpamStatus::ham;
 
-    char const* tld
-        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
+    auto const tld{
+        tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str())};
     if (tld && white.lookup(tld))
       return Message::SpamStatus::ham;
 
     if (lookup_domain(white, client_identity_))
       return Message::SpamStatus::ham;
 
-    char const* tld_client
-        = tld_db_.get_registered_domain(client_identity_.utf8().c_str());
+    auto const tld_client{
+        tld_db_.get_registered_domain(client_identity_.utf8().c_str())};
     if (tld_client && white.lookup(tld_client))
       return Message::SpamStatus::ham;
 
     return Message::SpamStatus::spam;
-  }();
+  }()};
 
   // All sources of ham get a fresh 5 minute timeout per message.
   if (status == Message::SpamStatus::ham) {
@@ -461,7 +461,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
   }
 
   msg.open(server_id(), max_msg_size(), status);
-  auto hdrs = added_headers_(msg);
+  auto const hdrs{added_headers_(msg)};
   msg.write(hdrs);
 }
 
@@ -571,7 +571,7 @@ void Session::error(std::string_view log_msg)
 
 void Session::cmd_unrecognized(std::string_view cmd)
 {
-  auto escaped = esc(cmd);
+  auto const escaped{esc(cmd)};
   LOG(ERROR) << "command unrecognized: \"" << escaped << "\"";
 
   if (++n_unrecognized_cmds_ >= Config::max_unrecognized_cmds) {
@@ -630,7 +630,7 @@ void Session::exit_()
 {
   sock_.log_totals();
 
-  timespec time_used;
+  auto time_used{timespec{}};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
 
   LOG(INFO) << "CPU time " << time_used.tv_sec << "." << std::setw(9)
@@ -646,7 +646,7 @@ void Session::exit_()
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
-  CDB black("ip-black");
+  auto black{CDB{"ip-black"}};
   if (black.lookup(sock_.them_c_str())) {
     error_msg = sock_.them_address_literal() + " blacklisted";
     out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
@@ -659,9 +659,9 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
 
     // check domain
-    char const* tld
-        = tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str());
-    CDB white("white");
+    auto const tld{
+        tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str())};
+    auto white{CDB{"white"}};
     if (tld && white.lookup(tld)) {
       LOG(INFO) << "TLD domain " << tld << " whitelisted";
       fcrdns_whitelisted_ = true;
@@ -682,7 +682,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     ip_whitelisted_ = true;
   }
   else {
-    CDB white("ip-white");
+    auto white{CDB{"ip-white"}};
     if (white.lookup(sock_.them_c_str())) {
       LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
       ip_whitelisted_ = true;
@@ -691,8 +691,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
       using namespace DNS;
 
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-      auto reversed = IP4::reverse(sock_.them_c_str());
-      DNS::Resolver res;
+      auto const reversed{IP4::reverse(sock_.them_c_str())};
+      auto const res{DNS::Resolver{}};
       for (auto rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           error_msg = sock_.them_address_literal() + " blocked by " + rbl;
@@ -738,7 +738,7 @@ bool Session::verify_client_(Domain const& client_identity,
     }
   }
 
-  std::vector<std::string> labels;
+  auto labels{std::vector<std::string>{}};
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
@@ -749,17 +749,17 @@ bool Session::verify_client_(Domain const& client_identity,
     return true;
   }
 
-  CDB black("black");
+  auto black{CDB{"black"}};
   if (lookup_domain(black, client_identity)) {
-    std::stringstream em;
+    auto em{std::stringstream{}};
     em << "blacklisted identity " << client_identity;
     error_msg = em.str();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
 
-  char const* tld
-      = tld_db_.get_registered_domain(client_identity.ascii().c_str());
+  auto const tld{
+      tld_db_.get_registered_domain(client_identity.ascii().c_str())};
   if (tld) {
     if (client_identity == tld) {
       if (black.lookup(tld)) {
@@ -780,27 +780,29 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return true;
   }
 
-  auto accepted_domain = false;
-  if (recipient.domain().is_address_literal()) {
-    if (recipient.domain() == sock_.us_address_literal()) {
-      accepted_domain = true;
-    }
-  }
-  else {
-    CDB accept_domains("accept_domains");
-    if (accept_domains.open()) {
-      if (accept_domains.lookup(recipient.domain().ascii())
-          || accept_domains.lookup(recipient.domain().utf8())) {
-        accepted_domain = true;
+  auto const accepted_domain{[&] {
+    if (recipient.domain().is_address_literal()) {
+      if (recipient.domain() == sock_.us_address_literal()) {
+        return true;
       }
     }
     else {
-      // If we have no list of domains to accept, take our own.
-      if (recipient.domain() == server_identity_) {
-        accepted_domain = true;
+      auto accept_domains{CDB{"accept_domains"}};
+      if (accept_domains.open()) {
+        if (accept_domains.lookup(recipient.domain().ascii())
+            || accept_domains.lookup(recipient.domain().utf8())) {
+          return true;
+        }
+      }
+      else {
+        // If we have no list of domains to accept, take our own.
+        if (recipient.domain() == server_identity_) {
+          return true;
+        }
       }
     }
-  }
+    return false;
+  }()};
 
   if (!accepted_domain) {
     out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
@@ -853,15 +855,15 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return true;
   }
 
-  std::string sndr_lc = sender.ascii();
+  auto sndr_lc{std::string{sender.ascii()}};
   std::transform(sndr_lc.begin(), sndr_lc.end(), sndr_lc.begin(), ::tolower);
 
   // Break sender domain into labels:
 
-  std::vector<std::string> labels;
+  auto labels{std::vector<std::string>{}};
   boost::algorithm::split(labels, sndr_lc, boost::algorithm::is_any_of("."));
 
-  CDB white("white");
+  auto white{CDB{"white"}};
   if (white.lookup(sndr_lc)) {
     LOG(INFO) << "sender \"" << sndr_lc << "\" whitelisted";
     return true;
@@ -880,7 +882,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return false;
   }
 
-  auto tld = tld_db_.get_registered_domain(sndr_lc.c_str());
+  auto tld{tld_db_.get_registered_domain(sndr_lc.c_str())};
   if (tld) {
     if (white.lookup(tld)) {
       LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
@@ -890,12 +892,12 @@ bool Session::verify_sender_domain_(Domain const& sender)
 
   // Based on <http://www.surbl.org/guidelines>
 
-  auto two_level = labels[labels.size() - 2] + "." + labels[labels.size() - 1];
+  auto two_level{labels[labels.size() - 2] + "." + labels[labels.size() - 1]};
 
   if (labels.size() > 2) {
-    auto three_level = labels[labels.size() - 3] + "." + two_level;
+    auto three_level{labels[labels.size() - 3] + "." + two_level};
 
-    CDB three_tld("three-level-tlds");
+    auto three_tld{CDB{"three-level-tlds"}};
     if (three_tld.lookup(three_level)) {
       if (labels.size() > 3) {
         return verify_sender_domain_uribl_(labels[labels.size() - 4] + "."
@@ -910,7 +912,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
     }
   }
 
-  CDB two_tld("two-level-tlds");
+  auto two_tld{CDB{"two-level-tlds"}};
   if (two_tld.lookup(two_level)) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
@@ -933,7 +935,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
 
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
-  DNS::Resolver res;
+  auto res{DNS::Resolver{}};
   for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
@@ -949,7 +951,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  auto srvr_id = server_id();
+  auto const srvr_id{server_id()};
 
   if (!sock_.has_peername() || ip_whitelisted_) {
     auto ip_addr = sock_.them_c_str();
@@ -965,9 +967,9 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  auto sid = std::string(srvr_id.data(), srvr_id.length());
-  SPF::Server spf_srv(sid.c_str());
-  SPF::Request spf_req(spf_srv);
+  auto const sid{std::string(srvr_id.data(), srvr_id.length())};
+  auto const spf_srv{SPF::Server{sid.c_str()}};
+  auto spf_req{SPF::Request{spf_srv}};
 
   if (IP4::is_address(sock_.them_c_str())) {
     spf_req.set_ipv4_str(sock_.them_c_str());
@@ -982,11 +984,11 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   spf_req.set_helo_dom(client_identity_.ascii().c_str());
 
-  auto from = static_cast<std::string>(sender);
+  auto const from{static_cast<std::string>(sender)};
 
   spf_req.set_env_from(from.c_str());
 
-  SPF::Response spf_res(spf_req);
+  auto const spf_res{SPF::Response{spf_req}};
 
   if (spf_res.result() == SPF::Result::FAIL) {
     // Error code from RFC 7372, section 3.2.  Also:

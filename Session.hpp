@@ -72,7 +72,7 @@ public:
   void max_msg_size(size_t max)
   {
     max_msg_size_ = max;
-    auto overhead = max / 10;
+    auto const overhead = max / 10;
     sock_.set_max_read(max_msg_size() + overhead);
   }
 
