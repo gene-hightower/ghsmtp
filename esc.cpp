@@ -57,5 +57,11 @@ std::string esc(std::string_view str, bool multi_line)
       }
     }
   }
+  if (multi_line) {
+    int last = ret.length() - 1;
+    if ((-1 != last) && ('\n' == ret.at(last))) {
+      ret.erase(last, 1);
+    }
+  }
   return ret;
 }
