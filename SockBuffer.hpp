@@ -33,18 +33,8 @@ public:
              std::chrono::milliseconds write_timeout
              = Config::default_write_timeout,
              std::chrono::milliseconds starttls_timeout
-             = Config::default_starttls_timeout)
-    : fd_in_(fd_in)
-    , fd_out_(fd_out)
-    , read_hook_(read_hook)
-    , read_timeout_(read_timeout)
-    , write_timeout_(write_timeout)
-    , starttls_timeout_(starttls_timeout)
-    , tls_(read_hook_)
-  {
-    POSIX::set_nonblocking(fd_in_);
-    POSIX::set_nonblocking(fd_out_);
-  }
+             = Config::default_starttls_timeout);
+
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(SockBuffer const& that);
 
@@ -116,6 +106,7 @@ private:
   bool timed_out_{false};
   bool tls_active_{false};
   bool limit_read_{false};
+  bool log_data_{false};
 
   TLS tls_;
 };

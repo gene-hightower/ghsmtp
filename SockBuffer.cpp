@@ -8,6 +8,25 @@
 
 DEFINE_bool(log_data, false, "log all protocol data");
 
+SockBuffer::SockBuffer(int fd_in,
+                       int fd_out,
+                       std::function<void(void)> read_hook,
+                       std::chrono::milliseconds read_timeout,
+                       std::chrono::milliseconds write_timeout,
+                       std::chrono::milliseconds starttls_timeout)
+  : fd_in_(fd_in)
+  , fd_out_(fd_out)
+  , read_hook_(read_hook)
+  , read_timeout_(read_timeout)
+  , write_timeout_(write_timeout)
+  , starttls_timeout_(starttls_timeout)
+  , tls_(read_hook_)
+{
+  POSIX::set_nonblocking(fd_in_);
+  POSIX::set_nonblocking(fd_out_);
+  log_data_ = (FLAGS_log_data || (getenv("GHSMTP_LOG_DATA") != nullptr));
+}
+
 SockBuffer::SockBuffer(SockBuffer const& that)
   : fd_in_(that.fd_in_)
   , fd_out_(that.fd_out_)
@@ -15,11 +34,14 @@ SockBuffer::SockBuffer(SockBuffer const& that)
   , read_timeout_(that.read_timeout_)
   , write_timeout_(that.write_timeout_)
   , starttls_timeout_(that.starttls_timeout_)
+  , limit_read_(that.limit_read_)
+  , log_data_(that.log_data_)
   , tls_(that.read_hook_)
 {
-  CHECK(!that.maxed_out());
   CHECK(!that.timed_out_);
   CHECK(!that.tls_active_);
+  CHECK(!that.limit_read_);
+  CHECK(!that.maxed_out());
 }
 
 std::streamsize SockBuffer::read(char* s, std::streamsize n)
@@ -43,7 +65,7 @@ std::streamsize SockBuffer::read(char* s, std::streamsize n)
     return static_cast<std::streamsize>(-1);
   }
 
-  if (FLAGS_log_data) {
+  if (log_data_) {
     auto str = std::string(s, static_cast<size_t>(read));
     LOG(INFO) << "< «" << esc(str, true) << "»";
   }
@@ -61,7 +83,7 @@ std::streamsize SockBuffer::write(const char* s, std::streamsize n)
     total_octets_written_ += written;
   }
 
-  if (FLAGS_log_data) {
+  if (log_data_) {
     auto str = std::string(s, static_cast<size_t>(written));
     LOG(INFO) << "> «" << esc(str, true) << "»";
   }
