@@ -133,7 +133,7 @@ public:
       return Advice::NONE;
 
     case DMARC_FROM_DOMAIN_ABSENT:
-      LOG(FATAL) << "No From: domain";
+      LOG(FATAL) << "no From: domain";
 
     case DMARC_POLICY_ABSENT:
       return Advice::NONE;

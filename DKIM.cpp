@@ -126,7 +126,7 @@ void Verify::foreach_sig(
 
     auto bh = dkim_sig_getbh(sigs[i]);
     if (bh != DKIM_SIGBH_MATCH) {
-      LOG(INFO) << "Body hash mismatch for domain " << dom;
+      LOG(INFO) << "body hash mismatch for domain " << dom;
     }
 
     unsigned int bits;
