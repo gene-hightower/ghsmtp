@@ -630,8 +630,8 @@ public:
   void foreach_hdr(std::function<void(std::string const& name,
                                       std::string const& value)> func)
   {
-    for (auto const& h : hdrs_) {
-      func(h.first, h.second);
+    for (auto const& [name, value] : hdrs_) {
+      func(name, value);
     }
   }
 
@@ -640,8 +640,8 @@ private:
 
   friend std::ostream& operator<<(std::ostream& os, Eml const& eml)
   {
-    for (auto const& h : eml.hdrs_) {
-      os << h.first << ": " << h.second << "\r\n";
+    for (auto const& [name, value] : eml.hdrs_) {
+      os << name << ": " << value << "\r\n";
     }
     return os << "\r\n"; // end of headers
   }
@@ -903,7 +903,7 @@ int main(int argc, char* argv[])
       receivers.push_back(to_mbx.domain());
     }
     else {
-      for (auto mx : mxs) {
+      for (auto const& mx : mxs) {
         receivers.push_back(Domain(mx));
       }
     }
