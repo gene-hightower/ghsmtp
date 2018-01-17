@@ -20,7 +20,7 @@ public:
 
   enum class SpamStatus : bool { ham, spam };
 
-  void open(std::string_view fqdn, size_t max_size, SpamStatus spam);
+  void open(std::string_view fqdn, std::streamsize max_size, SpamStatus spam);
 
   Pill const& id() const { return s_; }
   Now const& when() const { return then_; }
@@ -32,8 +32,8 @@ public:
   }
 
   bool size_error() const { return size_error_; }
-  size_t size() const { return size_; }
-  size_t size_left() const { return max_size_ - size_; }
+  std::streamsize size() const { return size_; }
+  std::streamsize size_left() const { return max_size_ - size_; }
 
   void save()
   {
@@ -51,8 +51,8 @@ private:
   Now then_;
 
   std::ofstream ofs_;
-  size_t size_{0};
-  size_t max_size_{0};
+  std::streamsize size_{0};
+  std::streamsize max_size_{0};
 
   fs::path tmpfn_;
   fs::path newfn_;

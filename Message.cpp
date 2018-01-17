@@ -4,37 +4,39 @@
 
 #include <sys/stat.h>
 
-void Message::open(std::string_view fqdn, size_t max_size, SpamStatus spam)
+void Message::open(std::string_view fqdn,
+                   std::streamsize max_size,
+                   SpamStatus spam)
 {
   max_size_ = max_size;
 
-  fs::path maildir;
+  auto maildir{[&] {
+    auto const maildir_ev{getenv("MAILDIR")};
+    if (maildir_ev) {
+      return fs::path(maildir_ev);
+    }
 
-  char const* ev = getenv("MAILDIR");
-  if (ev) {
-    maildir = ev;
-  }
-  else {
-    ev = getenv("HOME");
-    if (ev) {
-      CHECK(strcmp(ev, "/root")) << "should not run as root";
-      maildir = ev;
+    auto homedir{fs::path{}};
+    auto const homedir_ev{getenv("HOME")};
+    if (homedir_ev) {
+      CHECK(strcmp(homedir_ev, "/root")) << "should not run as root";
+      homedir = homedir_ev;
     }
     else {
       errno = 0; // See GETPWNAM(3)
       passwd* pw;
       PCHECK(pw = getpwuid(getuid()));
-      maildir = pw->pw_dir;
+      homedir = pw->pw_dir;
     }
-    maildir /= "Maildir";
-  }
+    return homedir / "Maildir";
+  }()};
 
   if (spam == SpamStatus::spam) {
     maildir /= ".Junk";
   }
 
   // Unique name, see: <https://cr.yp.to/proto/maildir.html>
-  std::ostringstream uniq;
+  auto uniq{std::ostringstream{}};
   uniq << then_.sec() << '.' << 'R' << s_ << '.' << fqdn;
 
   tmpfn_ = maildir;
