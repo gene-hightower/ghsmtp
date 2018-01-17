@@ -367,6 +367,7 @@ get_records<RR_type::value_t::A>(Resolver const& res, std::string addr);
 template std::vector<std::string>
 get_records<RR_type::value_t::AAAA>(Resolver const& res, std::string addr);
 template std::vector<std::string>
+// returns list of servers sorted by priority, low to high
 get_records<RR_type::value_t::MX>(Resolver const& res, std::string addr);
 template std::vector<std::string>
 get_records<RR_type::value_t::PTR>(Resolver const& res, std::string addr);
