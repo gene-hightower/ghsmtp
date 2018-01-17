@@ -1019,7 +1019,7 @@ int main(int argc, char* argv[])
 
   istream_input<eol::crlf> in(ctx->session.in(), Config::bfr_size, "session");
 
-  int ret = 0;
+  auto ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
   }
