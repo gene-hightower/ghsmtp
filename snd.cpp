@@ -705,22 +705,17 @@ public:
     auto body_sz = fs::file_size(path_);
     CHECK(body_sz) << "no body";
     file_.open(path_);
-    data_ = file_.data();
-    size_ = file_.size();
     type_ = ::type(*this);
   }
 
-  char const* data() const { return data_; }
-  size_t size() const { return size_; }
+  char const* data() const { return file_.data(); }
+  size_t size() const { return file_.size(); }
   data_type type() const { return type_; }
 
   bool empty() const { return size() == 0; }
   operator std::string_view() const { return std::string_view(data(), size()); }
 
 private:
-  char const* data_{nullptr};
-  size_t size_{0};
-
   data_type type_;
 
   fs::path path_;
