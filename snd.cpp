@@ -766,7 +766,7 @@ static bool validate_name(const char* flagname, std::string const& value)
 {
   memory_input<> name_in(value.c_str(), "name");
   if (!parse<RFC5322::display_name_only, RFC5322::inaction>(name_in)) {
-    LOG(ERROR) << "Bad name syntax " << value;
+    LOG(ERROR) << "bad name syntax " << value;
     return false;
   }
   return true;
@@ -864,7 +864,7 @@ int main(int argc, char* argv[])
   Mailbox from_mbx;
   memory_input<> from_in(FLAGS_from, "from");
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(from_in, from_mbx)) {
-    LOG(FATAL) << "Bad From: address syntax <" << FLAGS_from << ">";
+    LOG(FATAL) << "bad From: address syntax <" << FLAGS_from << ">";
   }
   LOG(INFO) << "from_mbx == " << from_mbx;
 
@@ -874,7 +874,7 @@ int main(int argc, char* argv[])
   Mailbox to_mbx;
   memory_input<> to_in(FLAGS_to, "to");
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(to_in, to_mbx)) {
-    LOG(FATAL) << "Bad To: address syntax <" << FLAGS_to << ">";
+    LOG(FATAL) << "bad To: address syntax <" << FLAGS_to << ">";
   }
   LOG(INFO) << "to_mbx == " << to_mbx;
 
