@@ -81,7 +81,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
       return hostname;
 
     if (IP::is_routable(sock_.us_c_str()))
-      return "["s + sock_.us_c_str() + "]"s;
+      return "["s + sock_.us_c_str() + "]";
 
     LOG(FATAL) << "Can't determine my server ID.";
   }();
@@ -97,7 +97,12 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 void Session::greeting()
 {
   if (sock_.has_peername()) {
-    verify_ip_address_();
+    std::string error_msg;
+    if (!verify_ip_address_(error_msg)) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
+             error_msg.c_str());
+      std::exit(EXIT_SUCCESS);
+    }
   }
   out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
 }
@@ -137,9 +142,10 @@ void Session::ehlo(std::string_view client_identity)
   protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_.set(client_identity);
 
-  if (!verify_client_(client_identity_)) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
-           sock_.them_c_str());
+  std::string error_msg;
+  if (!verify_client_(client_identity_, error_msg)) {
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
+           sock_.them_c_str(), error_msg.c_str());
     std::exit(EXIT_SUCCESS);
   }
 
@@ -186,10 +192,11 @@ void Session::helo(std::string_view client_identity)
   protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
   client_identity_.set(client_identity);
 
-  if (!verify_client_(client_identity_)) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_client_ fail",
-           sock_.them_c_str());
-    exit_();
+  std::string error_msg;
+  if (!verify_client_(client_identity_, error_msg)) {
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] HELO failed: %s",
+           sock_.them_c_str(), error_msg.c_str());
+    std::exit(EXIT_SUCCESS);
   }
 
   out_() << "250 " << server_id() << "\r\n" << std::flush;
@@ -637,20 +644,19 @@ void Session::exit_()
 // All of the verify_* functions send their own error messages back to
 // the client on failure, and return false.
 
-void Session::verify_ip_address_()
+bool Session::verify_ip_address_(std::string& error_msg)
 {
   CDB black("ip-black");
   if (black.lookup(sock_.them_c_str())) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blacklisted",
-           sock_.them_c_str());
+    error_msg = sock_.them_address_literal() + " blacklisted";
     out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
-    std::exit(EXIT_SUCCESS);
+    return false;
   }
 
   client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
 
   if (!client_fcrdns_.empty()) {
-    client_ = client_fcrdns_.ascii() + " "s + sock_.them_address_literal();
+    client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
 
     // check domain
     char const* tld
@@ -689,11 +695,10 @@ void Session::verify_ip_address_()
       DNS::Resolver res;
       for (auto const& rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] blocked by %s",
-                 sock_.them_c_str(), rbl);
+          error_msg = sock_.them_address_literal() + " blocked by " + rbl;
           out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
                  << std::flush;
-          std::exit(EXIT_SUCCESS);
+          return false;
         }
       }
       // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
@@ -704,15 +709,17 @@ void Session::verify_ip_address_()
   // Wait a bit of time for pre-greeting traffic.
   if (!(ip_whitelisted_ || fcrdns_whitelisted_)) {
     if (sock_.input_ready(Config::greeting_wait)) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
-             sock_.them_c_str());
+      error_msg = sock_.them_address_literal() + " input before greeting";
       out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
-      std::exit(EXIT_SUCCESS);
+      return false;
     }
   }
+
+  return true;
 }
 
-bool Session::verify_client_(Domain const& client_identity)
+bool Session::verify_client_(Domain const& client_identity,
+                             std::string& error_msg)
 // check the identity from the HELO/EHLO
 {
   if (!sock_.has_peername() || ip_whitelisted_ || fcrdns_whitelisted_
@@ -725,8 +732,7 @@ bool Session::verify_client_(Domain const& client_identity)
       || (client_identity == "localhost.localdomain")) {
 
     if (server_identity_ != client_fcrdns_) {
-      LOG(ERROR) << "liar: client" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
+      error_msg = "liar";
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
     }
@@ -745,8 +751,9 @@ bool Session::verify_client_(Domain const& client_identity)
 
   CDB black("black");
   if (lookup_domain(black, client_identity)) {
-    LOG(ERROR) << "blacklisted identity" << (sock_.has_peername() ? " " : "")
-               << client_ << " claiming " << client_identity;
+    std::stringstream em;
+    em << "blacklisted identity " << client_identity;
+    error_msg = em.str();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -756,7 +763,7 @@ bool Session::verify_client_(Domain const& client_identity)
   if (tld) {
     if (client_identity == tld) {
       if (black.lookup(tld)) {
-        LOG(ERROR) << "blacklisted TLD " << tld;
+        error_msg = "blacklisted TLD "s + tld;
         out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
         return false;
       }

@@ -98,13 +98,13 @@ private:
     reverse_path_verified_ = false;
   }
 
-  bool verify_client_(Domain const& client_identity);
+  bool verify_ip_address_(std::string& error_msg);
+  bool verify_client_(Domain const& client_identity, std::string& error_msg);
   bool verify_recipient_(Mailbox const& recipient);
   bool verify_sender_(Mailbox const& sender);
   bool verify_sender_domain_(Domain const& sender);
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
-  void verify_ip_address_();
 
   void exit_() __attribute__((noreturn));
 
