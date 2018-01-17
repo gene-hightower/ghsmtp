@@ -31,7 +31,7 @@ namespace Config {
 constexpr auto max_unrecognized_cmds{20};
 
 // clang-format off
-constexpr auto bad_recipients = {
+constexpr char const* const bad_recipients[]{
     "a",
     "ene",
     "h.gene",
@@ -46,14 +46,14 @@ constexpr auto bad_recipients = {
 };
 // clang-format on
 
-constexpr char const* const bad_senders[] = {};
+constexpr char const* const bad_senders[]{};
 
-constexpr auto rbls = {
+constexpr char const* const rbls[]{
     "zen.spamhaus.org",
     "b.barracudacentral.org",
 };
 
-constexpr auto uribls = {
+constexpr char const* const uribls[]{
     "dbl.spamhaus.org",
     "black.uribl.com",
     "multi.surbl.org",
@@ -216,7 +216,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   bool smtputf8{false};
 
   // Take a look at the optional parameters:
-  for (auto [name, val] : parameters) {
+  for (auto const& [name, val] : parameters) {
     if (iequal(name, "BODY")) {
       if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...
@@ -288,7 +288,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   std::ostringstream params;
-  for (auto [name, value] : parameters) {
+  for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
@@ -318,7 +318,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto [name, value] : parameters) {
+  for (auto const& [name, value] : parameters) {
     LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
