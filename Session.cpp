@@ -31,7 +31,7 @@ namespace Config {
 constexpr auto max_unrecognized_cmds{20};
 
 // clang-format off
-constexpr char const* const bad_recipients[] = {
+constexpr auto bad_recipients = {
     "a",
     "ene",
     "h.gene",
@@ -48,12 +48,12 @@ constexpr char const* const bad_recipients[] = {
 
 constexpr char const* const bad_senders[] = {};
 
-constexpr char const* const rbls[] = {
+constexpr auto rbls = {
     "zen.spamhaus.org",
     "b.barracudacentral.org",
 };
 
-constexpr char const* const uribls[] = {
+constexpr auto uribls = {
     "dbl.spamhaus.org",
     "black.uribl.com",
     "multi.surbl.org",
