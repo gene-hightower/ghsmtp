@@ -1091,10 +1091,9 @@ try_host:
   Eml eml;
 
   Now date;
-  Pill red, blue;
+  Pill pill;
   std::stringstream mid_str;
-  mid_str << '<' << date.sec() << '.' << red << '.' << blue << '@'
-          << sender.utf8() << '>';
+  mid_str << '<' << date.sec() << '.' << pill << '@' << sender.utf8() << '>';
   eml.add_hdr("Message-ID", mid_str.str());
 
   eml.add_hdr("Date", date.c_str());
