@@ -2,7 +2,7 @@ Gene Hightower's SMTP server.
 
 A program to receive Internet (RFC 5321) mail.  This is a “personal
 domain” type program that sends all mail for all domains to a single
-users ~/Maildir.
+user's ~/Maildir.
 
 Free software — AGPLv3 with OpenSSL exception.
 
