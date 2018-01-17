@@ -1745,10 +1745,10 @@ int main(int argc, char* argv[])
   }
 
   for (auto i = 1; i < argc; ++i) {
-    auto fn = argv[i];
-    fs::path name(fn);
-    boost::iostreams::mapped_file_source f(name);
-    memory_input<> in(f.data(), f.size(), fn);
+    auto fn{argv[i]};
+    auto name{fs::path(fn)};
+    auto f{boost::iostreams::mapped_file_source(name)};
+    auto in{memory_input<>(f.data(), f.size(), fn)};
     LOG(INFO) << "### " << fn;
     try {
       RFC5322::Ctx ctx;
