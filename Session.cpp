@@ -134,7 +134,7 @@ void Session::last_in_group_(std::string_view verb)
 
 void Session::ehlo(std::string_view client_identity)
 {
-  constexpr auto verb = "EHLO";
+  constexpr auto verb{"EHLO"};
 
   last_in_group_(verb);
   reset_();
@@ -184,7 +184,7 @@ void Session::ehlo(std::string_view client_identity)
 
 void Session::helo(std::string_view client_identity)
 {
-  constexpr auto verb = "HELO";
+  constexpr auto verb{"HELO"};
 
   last_in_group_(verb);
   reset_();
@@ -213,10 +213,10 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  bool smtputf8 = false;
+  bool smtputf8{false};
 
   // Take a look at the optional parameters:
-  for (auto const& [name, val] : parameters) {
+  for (auto [name, val] : parameters) {
     if (iequal(name, "BODY")) {
       if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...
@@ -277,9 +277,9 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
-  auto sender = static_cast<std::string>(reverse_path);
+  std::string const sender{reverse_path};
 
-  for (auto const& bad_sender : Config::bad_senders) {
+  for (auto bad_sender : Config::bad_senders) {
     if (sender == bad_sender) {
       out_() << "550 5.1.8 bad sender\r\n" << std::flush;
       LOG(WARNING) << "bad sender " << sender;
@@ -288,7 +288,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   std::ostringstream params;
-  for (auto const& [name, value] : parameters) {
+  for (auto [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
@@ -318,7 +318,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto const& [name, value] : parameters) {
+  for (auto [name, value] : parameters) {
     LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
@@ -401,7 +401,7 @@ std::string Session::added_headers_(Message const& msg)
     }
   }
 
-  std::string tls_info{sock_.tls_info()};
+  const std::string tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     headers << "\r\n        (" << tls_info << ')';
   }
@@ -693,7 +693,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
       auto reversed = IP4::reverse(sock_.them_c_str());
       DNS::Resolver res;
-      for (auto const& rbl : Config::rbls) {
+      for (auto rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
           error_msg = sock_.them_address_literal() + " blocked by " + rbl;
           out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
@@ -809,7 +809,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  for (auto const& bad_recipient : Config::bad_recipients) {
+  for (auto bad_recipient : Config::bad_recipients) {
     if (0 == recipient.local_part().compare(bad_recipient)) {
       out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
@@ -934,7 +934,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
   DNS::Resolver res;
-  for (auto const& uribl : Config::uribls) {
+  for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
