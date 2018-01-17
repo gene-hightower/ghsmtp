@@ -47,7 +47,7 @@ struct Ctx {
   std::pair<std::string, std::string> param;
   std::unordered_map<std::string, std::string> parameters;
 
-  size_t chunk_size;
+  std::streamsize chunk_size;
   bool chunk_first{true};
   bool chunk_last{false};
   bool bdat_error{false};
@@ -505,7 +505,7 @@ template <>
 struct action<magic_postmaster> {
   static void apply0(Ctx& ctx)
   {
-    ctx.mb_loc = std::string("Postmaster");
+    ctx.mb_loc = std::string{"Postmaster"};
     ctx.mb_dom.clear();
   }
 };
@@ -515,8 +515,8 @@ struct action<helo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto beg = in.begin() + 5; // +5 for the length of "HELO "
-    auto end = in.end() - 2;   // -2 for the CRLF
+    auto const beg = in.begin() + 5; // +5 for the length of "HELO "
+    auto const end = in.end() - 2;   // -2 for the CRLF
     ctx.session.helo(std::string_view(beg, end - beg));
     ctx.bdat_rset();
   }
@@ -527,8 +527,8 @@ struct action<ehlo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto beg = in.begin() + 5; // +5 for the length of "EHLO "
-    auto end = in.end() - 2;   // -2 for the CRLF
+    auto const beg = in.begin() + 5; // +5 for the length of "EHLO "
+    auto const end = in.end() - 2;   // -2 for the CRLF
     ctx.session.ehlo(std::string_view(beg, end - beg));
     ctx.bdat_rset();
   }
@@ -563,7 +563,7 @@ struct action<chunk_size> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    ctx.chunk_size = std::strtoul(in.string().c_str(), nullptr, 10);
+    ctx.chunk_size = std::strtoull(in.string().c_str(), nullptr, 10);
   }
 };
 
@@ -583,10 +583,8 @@ void bdat_act(Ctx& ctx)
       LOG(ERROR) << "bdat_start() returned error!";
 
       // seek over BDAT data
-      auto pos = ctx.session.in().tellg();
-      pos += ctx.chunk_size;
+      auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
       ctx.session.in().seekg(pos, ctx.session.in().beg);
-
       return;
     }
 
@@ -600,10 +598,8 @@ void bdat_act(Ctx& ctx)
     ctx.session.bdat_error(*ctx.msg);
 
     // seek over BDAT data
-    auto pos = ctx.session.in().tellg();
-    pos += ctx.chunk_size;
+    auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
     ctx.session.in().seekg(pos, ctx.session.in().beg);
-
     return;
   }
   else if (ctx.chunk_size > ctx.msg->size_left()) {
@@ -614,27 +610,25 @@ void bdat_act(Ctx& ctx)
     ctx.msg.reset();
 
     // seek over BDAT data
-    auto pos = ctx.session.in().tellg();
-    pos += ctx.chunk_size;
+    auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
     ctx.session.in().seekg(pos, ctx.session.in().beg);
-
     return;
   }
 
   // First off, for every BDAT, we /must/ read the data, if there is any.
-  std::string bfr;
+  auto bfr{std::string{}};
 
-  std::streamsize to_xfer = ctx.chunk_size;
+  auto to_xfer{std::streamsize{ctx.chunk_size}};
 
   while (to_xfer) {
-    auto xfer_sz = std::min(to_xfer, Config::max_xfer_size);
+    auto const xfer_sz{std::min(to_xfer, Config::max_xfer_size)};
     bfr.resize(xfer_sz);
 
     ctx.session.in().read(&bfr[0], xfer_sz);
     CHECK(ctx.session.in()) << "read failed";
 
     if (!ctx.hdr_end) {
-      auto e = bfr.find("\r\n\r\n");
+      auto const e{bfr.find("\r\n\r\n")};
       if (ctx.hdr.size() < Config::max_hdr_size) {
         ctx.hdr += bfr.substr(0, e);
         if (e == std::string::npos) {
@@ -726,7 +720,7 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    size_t len = in.end() - in.begin();
+    auto const len{in.end() - in.begin()};
     if (ctx.msg) {
       ctx.msg->write(in.begin(), len);
     }
@@ -743,14 +737,16 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    size_t len = in.end() - in.begin() - 1;
+    auto const len{std::streamsize{in.end() - in.begin() - 1}};
     if (ctx.msg) {
       ctx.msg->write(in.begin() + 1, len);
     }
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
       if (ctx.hdr.size() < Config::max_hdr_size) {
-        auto hlen = std::min(len, Config::max_hdr_size - ctx.hdr.size());
+        auto const max_left{Config::max_hdr_size
+                            - static_cast<std::streamsize>(ctx.hdr.size())};
+        auto const hlen{std::min(len, max_left)};
         std::copy_n(in.begin() + 1, hlen, std::back_inserter(ctx.hdr));
       }
     }
@@ -768,7 +764,7 @@ struct data_action<anything_else> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
-    size_t len = in.end() - in.begin();
+    auto const len{std::streamsize{in.end() - in.begin()}};
     CHECK(len);
     if (ctx.msg) {
       ctx.msg->write(in.begin(), len);
@@ -789,8 +785,8 @@ struct action<data> {
     if (ctx.session.data_start()) {
       ctx.new_msg();
 
-      istream_input<eol::crlf> data_in(ctx.session.in(), Config::bfr_size,
-                                       "data");
+      auto data_in{
+          istream_input<eol::crlf>(ctx.session.in(), Config::bfr_size, "data")};
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
                 in, data_in, ctx)) {
@@ -825,8 +821,8 @@ struct action<rset> {
 template <typename Input>
 std::string_view get_string(Input const& in)
 {
-  auto beg = in.begin() + 4;
-  auto len = in.end() - beg;
+  auto const beg = in.begin() + 4;
+  auto const len = in.end() - beg;
   auto str = std::string_view(beg, len);
   if (str.front() == ' ')
     str.remove_prefix(1);
@@ -838,7 +834,7 @@ struct action<noop> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto str = get_string(in);
+    auto const str = get_string(in);
     ctx.session.noop(str);
   }
 };
@@ -848,7 +844,7 @@ struct action<vrfy> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto str = get_string(in);
+    auto const str = get_string(in);
     ctx.session.vrfy(str);
   }
 };
@@ -858,7 +854,7 @@ struct action<help> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto str = get_string(in);
+    auto const str = get_string(in);
     ctx.session.help(str);
   }
 };
@@ -921,19 +917,19 @@ void selftest()
   };
 
   for (auto i : good_list) {
-    std::string bfr(i);
-    std::istringstream data(bfr);
-    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
-    RFC5321::Ctx ctx;
+    auto const bfr{std::string{i}};
+    auto data{std::istringstream{bfr}};
+    auto in{istream_input<eol::crlf>{data, Config::bfr_size, "data"}};
+    auto ctx{RFC5321::Ctx{}};
     if (!parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
       LOG(FATAL) << "\"" << esc(i) << "\"";
     }
   }
   for (auto i : bad_list) {
-    std::string bfr(i);
-    std::istringstream data(bfr);
-    istream_input<eol::crlf> in(data, Config::bfr_size, "data");
-    RFC5321::Ctx ctx;
+    auto const bfr{std::string{i}};
+    auto data{std::istringstream{bfr}};
+    auto in{istream_input<eol::crlf>{data, Config::bfr_size, "data"}};
+    auto ctx{RFC5321::Ctx{}};
     if (parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
       LOG(FATAL) << "\"" << esc(i) << "\"";
     }
@@ -942,7 +938,7 @@ void selftest()
 
 void set_home_dir()
 {
-  auto exe = fs::path("/proc/self/exe");
+  auto const exe{fs::path("/proc/self/exe")};
   CHECK(fs::exists(exe) && fs::is_symlink(exe))
       << "can't find myself: is this not a Linux kernel?";
 
@@ -953,9 +949,9 @@ void set_home_dir()
   // This problem has been corrected in later versions, but my little
   // loop should work on everything POSIX.
 
-  std::string p(64, '\0');
+  auto p{std::string{64, '\0'}};
   for (;;) {
-    ssize_t len = ::readlink(exe.c_str(), p.data(), p.size());
+    auto const len{::readlink(exe.c_str(), p.data(), p.size())};
     PCHECK(len > 0) << "readlink";
     if (len < static_cast<ssize_t>(p.size()))
       break;
@@ -963,7 +959,7 @@ void set_home_dir()
     p.resize(p.size() * 2);
   }
 
-  auto path = fs::path(p).parent_path();
+  auto const path = fs::path(p).parent_path();
 
   // Maybe work from some installed location...
 
@@ -1009,7 +1005,7 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   std::unique_ptr<RFC5321::Ctx> ctx;
-  auto read_hook = [&ctx]() { ctx->session.flush(); };
+  auto const read_hook{[&ctx]() { ctx->session.flush(); }};
   ctx = std::make_unique<RFC5321::Ctx>(read_hook);
 
   // Don't wait for STARTTLS to fail if no cert.
@@ -1017,8 +1013,8 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  istream_input<eol::crlf> in(ctx->session.in(), Config::bfr_size, "session");
-
+  auto in{
+      istream_input<eol::crlf>{ctx->session.in(), Config::bfr_size, "session"}};
   auto ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
