@@ -40,7 +40,7 @@ static int session_context_index = -1;
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 {
-  auto cert = X509_STORE_CTX_get_current_cert(ctx);
+  auto const cert = X509_STORE_CTX_get_current_cert(ctx);
   auto err = X509_STORE_CTX_get_error(ctx);
 
   auto ssl = reinterpret_cast<SSL*>(
@@ -51,7 +51,7 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
   auto mydata = reinterpret_cast<session_context*>(
       SSL_get_ex_data(ssl, session_context_index));
 
-  auto depth = X509_STORE_CTX_get_error_depth(ctx);
+  auto const depth = X509_STORE_CTX_get_error_depth(ctx);
 
   // auto max_depth = SSL_get_verify_depth(ssl) - 1;
 
@@ -130,7 +130,7 @@ void TLS::starttls_client(int fd_in,
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   using namespace std::chrono;
-  time_point<system_clock> start = system_clock::now();
+  auto start = system_clock::now();
 
   int rc;
   while ((rc = SSL_connect(ssl_)) < 0) {
@@ -170,7 +170,7 @@ void TLS::starttls_server(int fd_in,
 
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
-  const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_server_method());
+  auto method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
   SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
@@ -255,7 +255,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
   // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
 
-  session_context context;
+  auto context{session_context{}};
   SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
 
   SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
@@ -272,7 +272,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   using namespace std::chrono;
-  time_point<system_clock> start = system_clock::now();
+  auto start = system_clock::now();
 
   int rc;
   while ((rc = SSL_accept(ssl_)) < 0) {
@@ -316,9 +316,9 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
 std::string TLS::info() const
 {
-  std::ostringstream info;
+  auto info{std::ostringstream{}};
 
-  SSL_CIPHER const* const c = SSL_get_current_cipher(ssl_);
+  auto const c = SSL_get_current_cipher(ssl_);
   if (c) {
     info << "version=" << SSL_CIPHER_get_version(c);
     info << " cipher=" << SSL_CIPHER_get_name(c);
