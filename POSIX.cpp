@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <sys/select.h>
 
+using namespace std::chrono;
+
 void POSIX::set_nonblocking(int fd)
 {
   int flags;
@@ -14,14 +16,14 @@ void POSIX::set_nonblocking(int fd)
   }
 }
 
-bool POSIX::input_ready(int fd_in, std::chrono::milliseconds wait)
+bool POSIX::input_ready(int fd_in, milliseconds wait)
 {
   fd_set fds;
   FD_ZERO(&fds);
   FD_SET(fd_in, &fds);
 
   struct timeval tv;
-  tv.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(wait).count();
+  tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
   int puts;
@@ -30,14 +32,14 @@ bool POSIX::input_ready(int fd_in, std::chrono::milliseconds wait)
   return 0 != puts;
 }
 
-bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
+bool POSIX::output_ready(int fd_out, milliseconds wait)
 {
   fd_set fds;
   FD_ZERO(&fds);
   FD_SET(fd_out, &fds);
 
   struct timeval tv;
-  tv.tv_sec = std::chrono::duration_cast<std::chrono::seconds>(wait).count();
+  tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
   int puts;
@@ -46,19 +48,18 @@ bool POSIX::output_ready(int fd_out, std::chrono::milliseconds wait)
   return 0 != puts;
 }
 
-std::streamsize
-POSIX::io_fd_(char const* fnm,
-              std::function<ssize_t(int, void*, size_t)> io_fnc,
-              std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
-              std::function<void(void)> read_hook,
-              int fd,
-              char* s,
-              std::streamsize n,
-              std::chrono::milliseconds timeout,
-              bool& t_o)
+std::streamsize POSIX::io_fd_(char const* fnm,
+                              time_point<system_clock> start,
+                              std::function<ssize_t(int, void*, size_t)> io_fnc,
+                              std::function<bool(int, milliseconds)> rdy_fnc,
+                              std::function<void(void)> read_hook,
+                              int fd,
+                              char* s,
+                              std::streamsize n,
+                              milliseconds timeout,
+                              bool& t_o)
 {
-  using namespace std::chrono;
-  time_point<system_clock> start = system_clock::now();
+  auto end_time = start + timeout;
 
   ssize_t n_ret;
   while ((n_ret = io_fnc(fd, static_cast<void*>(s), static_cast<size_t>(n)))
@@ -76,9 +77,8 @@ POSIX::io_fd_(char const* fnm,
         << "Error from POSIX " << fnm << " system call";
 
     time_point<system_clock> now = system_clock::now();
-    if (now < (start + timeout)) {
-      milliseconds time_left
-          = duration_cast<milliseconds>((start + timeout) - now);
+    if (now < end_time) {
+      milliseconds time_left = duration_cast<milliseconds>(end_time - now);
       if (*fnm == 'r') {
         read_hook();
       }
@@ -99,7 +99,7 @@ POSIX::io_fd_(char const* fnm,
   // not a short write.
 
   while ((*fnm == 'w') && n_ret && (n_ret < n)) {
-    auto next_n = io_fd_(fnm, io_fnc, rdy_fnc, read_hook, fd, s + n_ret,
+    auto next_n = io_fd_(fnm, start, io_fnc, rdy_fnc, read_hook, fd, s + n_ret,
                          n - n_ret, timeout, t_o);
     if (next_n == -1)
       break;
