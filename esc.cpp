@@ -8,9 +8,9 @@ using namespace std::string_literals;
 
 std::string esc(std::string_view str, bool multi_line)
 {
-  auto nesc = std::count_if(str.begin(), str.end(), [](unsigned char c) {
+  auto nesc{std::count_if(str.begin(), str.end(), [](unsigned char c) {
     return (!std::isprint(c)) || (c == '\\');
-  });
+  })};
   if (!nesc)
     return std::string(str);
   if (multi_line)
