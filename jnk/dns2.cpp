@@ -49,9 +49,9 @@ void do_dotted_quad(char const* addr)
 
   for (auto ptr : ptrs) {
     // chop off the trailing '.'
-    int last = ptr.length() - 1;
-    if ((-1 != last) && ('.' == ptr.at(last))) {
-      ptr.erase(last, 1);
+    auto length = ptr.length();
+    if (length && ('.' == ptr.at(length - 1))) {
+      ptr.erase(length - 1, 1);
     }
     auto addrs = DNS::get_records<DNS::RR_type::A>(res, ptr);
     for (auto const& a : addrs) {
