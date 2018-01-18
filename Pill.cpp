@@ -6,23 +6,21 @@
 
 Pill::Pill()
 {
-  std::random_device rd;
-  std::uniform_int_distribution<decltype(s_)> uni_dist;
+  auto rd{std::random_device{}};
+  auto uni_dist{std::uniform_int_distribution<decltype(s_)>{}};
 
   s_ = uni_dist(rd);
 
-  auto resp = b32_ndigits_;
+  auto resp{b32_ndigits_};
   b32_str_[resp] = '\0';
 
   // <http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt>
 
-  static constexpr const char* const b32_charset
-      = "ybndrfg8ejkmcpqxot1uwisza345h769";
+  char constexpr b32_charset[]{"ybndrfg8ejkmcpqxot1uwisza345h769"};
 
-  const unsigned char* os = reinterpret_cast<const unsigned char*>(&s_);
-  const unsigned char* osp = os + sizeof(s_);
-
-  unsigned long x = 0;
+  auto const os = reinterpret_cast<const unsigned char*>(&s_);
+  auto osp = os + sizeof(s_);
+  auto x{0ul};
 
   switch ((osp - os) % 5) { // Duff's device
   case 0:

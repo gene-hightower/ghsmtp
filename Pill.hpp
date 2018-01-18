@@ -16,7 +16,7 @@ public:
 private:
   unsigned long long s_;
 
-  static constexpr size_t b32_ndigits_ = ((sizeof(s_) * CHAR_BIT) + 4) / 5;
+  auto static constexpr b32_ndigits_ = ((sizeof(s_) * CHAR_BIT) + 4) / 5;
   char b32_str_[b32_ndigits_ + 1];
 
   friend std::ostream& operator<<(std::ostream& s, Pill const& p)
