@@ -40,7 +40,9 @@ public:
 
   bool input_ready(std::chrono::milliseconds wait) const
   {
-    return tls_active_ ? tls_.pending() : POSIX::input_ready(fd_in_, wait);
+    if (tls_active_ && tls_.pending())
+      return true;
+    return POSIX::input_ready(fd_in_, wait);
   }
   bool output_ready(std::chrono::milliseconds wait) const
   {
