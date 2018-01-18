@@ -787,7 +787,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
     else {
       auto accept_domains{CDB{"accept_domains"}};
-      if (accept_domains.open()) {
+      if (accept_domains.is_open()) {
         if (accept_domains.lookup(recipient.domain().ascii())
             || accept_domains.lookup(recipient.domain().utf8())) {
           return true;

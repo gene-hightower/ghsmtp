@@ -25,16 +25,17 @@ CDB::CDB(std::string_view db)
 
 CDB::~CDB()
 {
-  if (fd_ != -1) {
+  if (is_open()) {
     close(fd_);
     cdb_free(&cdb_);
   }
 }
 
-bool CDB::lookup(std::string_view key)
+auto CDB::lookup(std::string_view key) -> bool
 {
-  if (fd_ == -1)
+  if (!is_open())
     return false;
+
   CHECK_LT(key.length(), std::numeric_limits<unsigned int>::max());
   if (cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length()))
       > 0) {
