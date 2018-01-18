@@ -24,7 +24,7 @@ public:
   void set_domain(std::string domain)
   {
     boost::to_lower(domain);
-    domain_.set(domain.c_str());
+    domain_.set(domain);
   }
   void clear()
   {
