@@ -1610,7 +1610,7 @@ struct action<message> {
 
     // LOG(INFO) << "Message-ID: " << ctx.message_id;
     LOG(INFO) << "Final DMARC advice for " << from_domain << ": "
-              << Advice_to_string(ctx.dmp.get_policy());
+              << Advice_to_string(ctx.dmp.get_advice());
 
     if (ctx.msg_errors.size()) {
       for (auto e : ctx.msg_errors) {

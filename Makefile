@@ -17,6 +17,7 @@ PROGRAMS := msg smtp sasl snd
 msg_STEMS := msg \
 	CDB \
 	DKIM \
+	DMARC \
 	DNS \
 	Domain \
 	IP \

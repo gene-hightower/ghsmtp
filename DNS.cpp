@@ -123,18 +123,18 @@ Rrlist<type>::Rrlist(Query<type> const& q)
 template <RR_type::value_t type>
 Rrlist<type>::~Rrlist()
 {
-  if (!empty()) // since we don't assert success in the ctr()
+  if (!is_empty()) // since we don't assert success in the ctr()
     ldns_rr_list_deep_free(rrlst_);
 }
 
 template <RR_type::value_t type>
-bool Rrlist<type>::empty() const
+auto Rrlist<type>::is_empty() const -> bool
 {
   return nullptr == rrlst_;
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::value_t::MX>::get() const
+auto Rrlist<RR_type::value_t::MX>::get() const -> std::vector<std::string>
 {
   std::vector<std::string> hosts;
   std::vector<uint16_t> priorities;
@@ -182,7 +182,7 @@ std::vector<std::string> Rrlist<RR_type::value_t::MX>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::value_t::TXT>::get() const
+auto Rrlist<RR_type::value_t::TXT>::get() const -> std::vector<std::string>
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -206,7 +206,7 @@ std::vector<std::string> Rrlist<RR_type::value_t::TXT>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::value_t::PTR>::get() const
+auto Rrlist<RR_type::value_t::PTR>::get() const -> std::vector<std::string>
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -232,7 +232,7 @@ std::vector<std::string> Rrlist<RR_type::value_t::PTR>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::value_t::A>::get() const
+auto Rrlist<RR_type::value_t::A>::get() const -> std::vector<std::string>
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -258,7 +258,7 @@ std::vector<std::string> Rrlist<RR_type::value_t::A>::get() const
 }
 
 template <>
-std::vector<std::string> Rrlist<RR_type::value_t::AAAA>::get() const
+auto Rrlist<RR_type::value_t::AAAA>::get() const -> std::vector<std::string>
 {
   std::vector<std::string> ret;
   if (rrlst_) {
@@ -285,7 +285,7 @@ std::vector<std::string> Rrlist<RR_type::value_t::AAAA>::get() const
 }
 
 template <RR_type::value_t T>
-std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
+auto Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const -> std::string
 {
   auto sz = ldns_rdf_size(rdf);
 
@@ -329,7 +329,7 @@ std::string Rrlist<T>::rr_name_str(ldns_rdf const* rdf) const
 }
 
 template <RR_type::value_t type>
-std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
+auto Rrlist<type>::rr_str(ldns_rdf const* rdf) const -> std::string
 {
   CHECK_NOTNULL(rdf);
 
@@ -340,16 +340,17 @@ std::string Rrlist<type>::rr_str(ldns_rdf const* rdf) const
 }
 
 template <RR_type::value_t type>
-bool has_record(Resolver const& res, std::string addr)
+auto has_record(Resolver const& res, std::string addr) -> bool
 {
   Domain dom(addr);
   Query<type> q(res, dom);
   Rrlist<type> rrlst(q);
-  return !rrlst.empty();
+  return !rrlst.is_empty();
 }
 
 template <RR_type::value_t type>
-std::vector<std::string> get_records(Resolver const& res, std::string addr)
+auto get_records(Resolver const& res, std::string addr)
+    -> std::vector<std::string>
 {
   Domain dom(addr);
   Query<type> q(res, dom);
@@ -357,28 +358,37 @@ std::vector<std::string> get_records(Resolver const& res, std::string addr)
   return rrlst.get();
 }
 
-template bool has_record<RR_type::value_t::A>(Resolver const& res,
-                                              std::string addr);
-template bool has_record<RR_type::value_t::AAAA>(Resolver const& res,
-                                                 std::string addr);
+template auto has_record<RR_type::value_t::A>(Resolver const& res,
+                                              std::string addr) -> bool;
+template auto has_record<RR_type::value_t::AAAA>(Resolver const& res,
+                                                 std::string addr) -> bool;
 
-template std::vector<std::string>
-get_records<RR_type::value_t::A>(Resolver const& res, std::string addr);
-template std::vector<std::string>
-get_records<RR_type::value_t::AAAA>(Resolver const& res, std::string addr);
-template std::vector<std::string>
+template auto get_records<RR_type::value_t::A>(Resolver const& res,
+                                               std::string addr)
+    -> std::vector<std::string>;
+
+template auto get_records<RR_type::value_t::AAAA>(Resolver const& res,
+                                                  std::string addr)
+    -> std::vector<std::string>;
+
 // returns list of servers sorted by priority, low to high
-get_records<RR_type::value_t::MX>(Resolver const& res, std::string addr);
-template std::vector<std::string>
-get_records<RR_type::value_t::PTR>(Resolver const& res, std::string addr);
+template auto get_records<RR_type::value_t::MX>(Resolver const& res,
+                                                std::string addr)
+    -> std::vector<std::string>;
+
+template auto get_records<RR_type::value_t::PTR>(Resolver const& res,
+                                                 std::string addr)
+    -> std::vector<std::string>;
+
 } // namespace DNS
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type::value_t const& value)
+auto operator<<(std::ostream& os, DNS::RR_type::value_t const& value)
+    -> std::ostream&
 {
   return os << DNS::RR_type::c_str(value);
 }
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type const& value)
+auto operator<<(std::ostream& os, DNS::RR_type const& value) -> std::ostream&
 {
   return os << value.c_str();
 }

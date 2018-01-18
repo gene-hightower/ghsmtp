@@ -56,11 +56,11 @@ public:
     return "** unknown **";
   }
 
-  constexpr char const* c_str() const { return c_str(value_); }
-  constexpr explicit operator char const*() const { return c_str(); }
+  constexpr auto c_str() const -> char const* { return c_str(value_); }
+  constexpr auto value() const -> value_t { return value_; }
 
-  constexpr operator value_t() const { return value_; }
-  constexpr value_t value() const { return value_; }
+  constexpr explicit operator char const*() const { return c_str(); }
+  constexpr operator value_t() const { return value(); }
 
 private:
   value_t value_{NONE};
@@ -103,8 +103,8 @@ public:
   static constexpr auto NOTZONE  = value_t::NOTZONE;
   static constexpr auto INTERNAL = value_t::INTERNAL;
 
-  constexpr operator value_t() const { return value_; }
-  constexpr value_t value() const { return value_; }
+  constexpr auto value() const -> value_t { return value_; }
+  constexpr operator value_t() const { return value(); }
 
 private:
   value_t value_{NOERROR};
@@ -114,12 +114,13 @@ private:
 
 } // namespace DNS
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type::value_t const& value);
-std::ostream& operator<<(std::ostream& os, DNS::RR_type const& value);
+auto operator<<(std::ostream& os, DNS::RR_type::value_t const& value)
+    -> std::ostream&;
+auto operator<<(std::ostream& os, DNS::RR_type const& value) -> std::ostream&;
 
-std::ostream& operator<<(std::ostream& os,
-                         DNS::Pkt_rcode::value_t const& value);
-std::ostream& operator<<(std::ostream& os, DNS::Pkt_rcode const& value);
+auto operator<<(std::ostream& os, DNS::Pkt_rcode::value_t const& value)
+    -> std::ostream&;
+auto operator<<(std::ostream& os, DNS::Pkt_rcode const& value) -> std::ostream&;
 
 namespace DNS {
 
@@ -174,7 +175,7 @@ public:
   Query(Resolver const& res, Domain const& dom);
   ~Query();
 
-  Pkt_rcode get_rcode() const;
+  auto get_rcode() const -> Pkt_rcode;
 
 private:
   ldns_pkt* p_{nullptr};
@@ -190,22 +191,23 @@ public:
 
   explicit Rrlist(Query<type> const& q);
   ~Rrlist();
-  bool empty() const;
 
-  std::vector<std::string> get() const;
+  auto is_empty() const -> bool;
+  auto get() const -> std::vector<std::string>;
 
 private:
   ldns_rr_list* rrlst_{nullptr};
 
-  std::string rr_name_str(ldns_rdf const* rdf) const;
-  std::string rr_str(ldns_rdf const* rdf) const;
+  auto rr_name_str(ldns_rdf const* rdf) const -> std::string;
+  auto rr_str(ldns_rdf const* rdf) const -> std::string;
 };
 
 template <RR_type::value_t type>
-bool has_record(Resolver const& res, std::string addr);
+auto has_record(Resolver const& res, std::string addr) -> bool;
 
 template <RR_type::value_t type>
-std::vector<std::string> get_records(Resolver const& res, std::string addr);
+auto get_records(Resolver const& res, std::string addr)
+    -> std::vector<std::string>;
 
 } // namespace DNS
 
