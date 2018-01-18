@@ -54,10 +54,10 @@ struct action<dec_octet> {
 
 bool is_routable(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "addr");
-  std::vector<std::string> a;
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  auto a{std::vector<std::string>{}};
   a.reserve(4);
-  auto ret = parse<ipv4_address, action>(in, a);
+  auto const ret = parse<ipv4_address, action>(in, a);
   CHECK(ret);
 
   // From RFC 1918:
@@ -84,13 +84,13 @@ bool is_routable(std::string_view addr)
 
 bool is_address(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "addr");
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   return parse<ipv4_address>(in);
 }
 
 bool is_address_literal(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "addr");
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   return parse<ipv4_address_lit>(in);
 }
 
@@ -108,13 +108,13 @@ std::string_view to_address(std::string_view addr)
 
 std::string reverse(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "addr");
-  std::vector<std::string> a;
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  auto a{std::vector<std::string>{}};
   a.reserve(4);
-  auto ret = parse<ipv4_address, action>(in, a);
+  auto const ret = parse<ipv4_address, action>(in, a);
   CHECK(ret);
 
-  std::ostringstream reverse;
+  auto reverse{std::ostringstream{}};
   reverse << a[3] << '.' << a[2] << '.' << a[1] << '.' << a[0] << '.';
 
   return reverse.str();
@@ -126,16 +126,16 @@ std::string fcrdns(char const* addr)
 
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
-  auto reversed = reverse(addr);
+  auto const reversed{reverse(addr)};
 
   // The reverse part, check PTR records.
-  DNS::Resolver res;
-  auto ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
+  auto res{DNS::Resolver{}};
+  auto const ptrs = get_records<RR_type::PTR>(res, reversed + "in-addr.arpa");
 
-  auto ptr = std::find_if(
+  auto const ptr = std::find_if(
       ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
         // The forward part, check each PTR for matching A record.
-        std::vector<std::string> addrs = get_records<RR_type::A>(res, s);
+        auto const addrs = get_records<RR_type::A>(res, s);
         return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
       });
 
