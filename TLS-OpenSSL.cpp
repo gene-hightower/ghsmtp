@@ -97,7 +97,7 @@ void TLS::starttls_client(int fd_in,
 
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
-  const SSL_METHOD* method = CHECK_NOTNULL(SSLv23_client_method());
+  auto method = CHECK_NOTNULL(SSLv23_client_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
   SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
@@ -135,12 +135,11 @@ void TLS::starttls_client(int fd_in,
   int rc;
   while ((rc = SSL_connect(ssl_)) < 0) {
 
-    time_point<system_clock> now = system_clock::now();
+    auto now = system_clock::now();
 
     CHECK(now < (start + timeout)) << "starttls timed out";
 
-    milliseconds time_left
-        = duration_cast<milliseconds>((start + timeout) - now);
+    auto time_left = duration_cast<milliseconds>((start + timeout) - now);
 
     switch (SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
@@ -235,8 +234,9 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 -----END DH PARAMETERS-----
 )";
 
-  BIO* bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
-  DH* dh = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
+  auto bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
+  auto dh
+      = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
   auto ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
 
@@ -337,23 +337,24 @@ std::streamsize TLS::io_tls_(char const* fnm,
                              std::function<int(SSL*, void*, int)> io_fnc,
                              char* s,
                              std::streamsize n,
-                             std::chrono::milliseconds wait,
+                             std::chrono::milliseconds timeout,
                              bool& t_o)
 {
   using namespace std::chrono;
-  time_point<system_clock> start = system_clock::now();
+  auto start = system_clock::now();
+  auto end_time = start + timeout;
 
   int n_ret;
   while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
          < 0) {
     time_point<system_clock> now = system_clock::now();
-    if (now > (start + wait)) {
+    if (now > end_time) {
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
     }
 
-    milliseconds time_left = duration_cast<milliseconds>((start + wait) - now);
+    auto time_left = duration_cast<milliseconds>(end_time - now);
 
     switch (SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {
