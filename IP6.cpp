@@ -71,7 +71,7 @@ struct ipv6_address_only : seq<ipv6_address, eof> {
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {
 };
 
-bool is_private(std::string_view addr) { return false; }
+bool is_private(std::string_view addr) { return false; } // Lie!
 
 bool is_address(std::string_view addr)
 {
