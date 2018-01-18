@@ -124,7 +124,7 @@ std::string reverse(std::string_view addr)
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   auto a{std::vector<std::string>{}};
   a.reserve(4);
-  CHECK(parse<ipv4_address, action>(in, a));
+  CHECK((parse<ipv4_address, action>(in, a)));
 
   auto reverse{std::ostringstream{}};
   reverse << a[3] << '.' << a[2] << '.' << a[1] << '.' << a[0] << '.';
