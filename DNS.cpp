@@ -120,12 +120,12 @@ Rrlist<type>::Rrlist(Query<type> const& q)
 template <RR_type::value_t type>
 Rrlist<type>::~Rrlist()
 {
-  if (!is_empty()) // since we don't assert success in the ctr()
+  if (!empty()) // since we don't assert success in the ctr()
     ldns_rr_list_deep_free(rrlst_);
 }
 
 template <RR_type::value_t type>
-auto Rrlist<type>::is_empty() const -> bool
+auto Rrlist<type>::empty() const -> bool
 {
   return nullptr == rrlst_;
 }
@@ -342,7 +342,7 @@ auto has_record(Resolver const& res, std::string addr) -> bool
   Domain dom(addr);
   Query<type> q(res, dom);
   Rrlist<type> rrlst(q);
-  return !rrlst.is_empty();
+  return !rrlst.empty();
 }
 
 template <RR_type::value_t type>

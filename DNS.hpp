@@ -28,7 +28,7 @@ public:
     TXT   = 16,
   };
 
-  RR_type(value_t value)
+  constexpr RR_type(value_t value)
     : value_(value)
   {
   }
@@ -85,7 +85,7 @@ public:
     INTERNAL = 666,
   };
 
-  Pkt_rcode(value_t value)
+  constexpr Pkt_rcode(value_t value)
     : value_(value)
   {
   }
@@ -104,6 +104,7 @@ public:
   static constexpr auto INTERNAL = value_t::INTERNAL;
 
   constexpr auto value() const -> value_t { return value_; }
+
   constexpr operator value_t() const { return value_; }
 
 private:
@@ -192,7 +193,7 @@ public:
   explicit Rrlist(Query<type> const& q);
   ~Rrlist();
 
-  auto is_empty() const -> bool;
+  auto empty() const -> bool;
   auto get() const -> std::vector<std::string>;
 
 private:
