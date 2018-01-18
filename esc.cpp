@@ -58,8 +58,8 @@ std::string esc(std::string_view str, bool multi_line)
     }
   }
   if (multi_line) {
-    int last = ret.length() - 1;
-    if ((-1 != last) && ('\n' == ret.at(last))) {
+    auto last = ret.length();
+    if (last && ('\n' == ret.at(last - 1))) {
       ret.erase(last, 1);
     }
   }
