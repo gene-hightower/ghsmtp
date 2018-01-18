@@ -71,31 +71,24 @@ struct ipv6_address_only : seq<ipv6_address, eof> {
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {
 };
 
-bool is_routable(std::string_view addr) { return true; }
+bool is_private(std::string_view addr) { return false; }
 
 bool is_address(std::string_view addr)
 {
   auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
-  if (parse<IP6::ipv6_address_only>(in)) {
-    return true;
-  }
-  return false;
+  return parse<IP6::ipv6_address_only>(in);
 }
 
 bool is_address_literal(std::string_view addr)
 {
   auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
-  if (parse<IP6::ipv6_address_literal_only>(in)) {
-    return true;
-  }
-  return false;
+  return parse<IP6::ipv6_address_literal_only>(in);
 }
 
 std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
   auto ss{std::stringstream{}};
-  //    [IPv6:             ]
   ss << lit_pfx << addr << lit_sfx;
   return ss.str();
 }
@@ -146,7 +139,7 @@ std::string fcrdns(std::string_view addr)
   auto const ptr = std::find_if(
       ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
         // The forward part, check each PTR for matching AAAA record.
-        std::vector<std::string> addrs = get_records<RR_type::AAAA>(res, s);
+        auto addrs = get_records<RR_type::AAAA>(res, s);
         return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
       });
 

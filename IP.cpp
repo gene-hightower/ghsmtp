@@ -6,12 +6,12 @@
 #include <glog/logging.h>
 
 namespace IP {
-bool is_routable(std::string_view addr)
+bool is_private(std::string_view addr)
 {
   if (IP4::is_address(addr))
-    return IP4::is_routable(addr);
+    return IP4::is_private(addr);
   if (IP6::is_address(addr))
-    return IP6::is_routable(addr);
+    return IP6::is_private(addr);
   return false;
 }
 

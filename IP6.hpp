@@ -5,7 +5,7 @@
 #include <string_view>
 
 namespace IP6 {
-bool is_routable(std::string_view addr);
+bool is_private(std::string_view addr);
 bool is_address(std::string_view addr);
 bool is_address_literal(std::string_view addr);
 std::string to_address_literal(std::string_view addr);

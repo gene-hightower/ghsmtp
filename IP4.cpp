@@ -60,34 +60,34 @@ struct action<dec_octet> {
   }
 };
 
-bool is_routable(std::string_view addr)
+bool is_private(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   auto a{std::vector<std::string>{}};
   a.reserve(4);
-  auto const ret = parse<ipv4_address, action>(in, a);
-  CHECK(ret);
+
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  CHECK((parse<ipv4_address, action>(in, a)));
 
   // From RFC 1918:
   // 10.0.0.0        -   10.255.255.255  (10/8 prefix)
   // 172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
   // 192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
 
-  if (a[3] == "10")
-    return false;
+  if (a[0] == "10")
+    return true;
 
-  if (a[3] == "172") {
-    auto oct = atoi(a[2].c_str());
+  if (a[0] == "172") {
+    auto oct = atoi(a[1].c_str());
     if ((16 <= oct) && (oct <= 31))
-      return false;
+      return true;
+    return false;
+  }
+
+  if ((a[0] == "192") && (a[1] == "168")) {
     return true;
   }
 
-  if ((a[3] == "192") && (a[2] == "168")) {
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 bool is_address(std::string_view addr)
@@ -107,7 +107,6 @@ std::string to_address_literal(std::string_view addr)
   CHECK(is_address(addr));
   CHECK(is_address(addr));
   auto ss{std::stringstream{}};
-  //    [                  ]
   ss << lit_pfx << addr << lit_sfx;
   return ss.str();
 }
@@ -121,9 +120,10 @@ std::string_view to_address(std::string_view addr)
 
 std::string reverse(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   auto a{std::vector<std::string>{}};
   a.reserve(4);
+
+  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   CHECK((parse<ipv4_address, action>(in, a)));
 
   auto reverse{std::ostringstream{}};

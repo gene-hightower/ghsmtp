@@ -73,4 +73,16 @@ int main(int argc, char const* argv[])
 
   CHECK_EQ(to_address_literal(addr), addr_lit);
   CHECK_EQ(to_address(addr_lit), addr);
+
+  CHECK(!is_private("1.2.3.4"));
+  CHECK(!is_private("127.0.0.1"));
+
+  CHECK(is_private("10.0.0.1"));
+
+  CHECK(!is_private("172.15.0.1"));
+  CHECK(is_private("172.16.0.1"));
+  CHECK(is_private("172.31.255.255"));
+  CHECK(!is_private("172.32.0.1"));
+
+  CHECK(is_private("192.168.0.1"));
 }
