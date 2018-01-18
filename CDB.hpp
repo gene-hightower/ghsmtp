@@ -14,14 +14,14 @@ public:
   ~CDB();
 
   auto lookup(std::string_view key) -> bool;
-  auto inline is_open() const -> bool;
+  auto constexpr is_open() const -> bool;
 
 private:
   int fd_{-1};
   struct cdb cdb_;
 };
 
-auto inline CDB::is_open() const -> bool
+auto constexpr CDB::is_open() const -> bool
 {
   return fd_ != -1;
 }

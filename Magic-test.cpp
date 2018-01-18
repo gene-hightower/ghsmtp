@@ -7,12 +7,12 @@
 
 int main(int argc, char* argv[])
 {
-  Magic magic;
+  auto magic{Magic{}};
 
-  size_t width = 0;
+  auto width = 0ul;
   for (auto arg = 1; arg < argc; ++arg) {
-    auto idx = arg - 1;
-    auto len = strlen(argv[idx]);
+    auto const idx = arg - 1;
+    auto const len = strlen(argv[idx]);
     width = std::max(width, len);
   }
 

@@ -11,8 +11,8 @@ public:
   Magic();
   ~Magic();
 
-  std::string buffer(std::string_view bfr) const;
-  std::string file(char const* path) const;
+  auto buffer(std::string_view bfr) const -> std::string;
+  auto file(char const* path) const -> std::string;
 
 private:
   magic_t magic_; // This library is *not* thread safe!
