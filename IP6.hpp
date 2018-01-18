@@ -5,13 +5,13 @@
 #include <string_view>
 
 namespace IP6 {
-bool is_private(std::string_view addr);
-bool is_address(std::string_view addr);
-bool is_address_literal(std::string_view addr);
-std::string to_address_literal(std::string_view addr);
-std::string_view to_address(std::string_view addr);
-std::string reverse(std::string_view addr);
-std::string fcrdns(std::string_view addr);
+auto is_private(std::string_view addr) -> bool;
+auto is_address(std::string_view addr) -> bool;
+auto is_address_literal(std::string_view addr) -> bool;
+auto to_address_literal(std::string_view addr) -> std::string;
+auto as_address(std::string_view addr) -> std::string_view;
+auto reverse(std::string_view addr) -> std::string;
+auto fcrdns(std::string_view addr) -> std::string;
 } // namespace IP6
 
 #endif // IP4_DOT_HPP

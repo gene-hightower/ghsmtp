@@ -80,6 +80,6 @@ void Domain::clear()
 std::string Domain::address() const
 {
   if (is_address_literal())
-    return std::string(IP::to_address(ascii_));
+    return std::string(IP::as_address(ascii_));
   LOG(FATAL) << "domain name is not an address";
 }

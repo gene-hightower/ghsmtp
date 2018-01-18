@@ -6,7 +6,7 @@
 #include <glog/logging.h>
 
 namespace IP {
-bool is_private(std::string_view addr)
+auto is_private(std::string_view addr) -> bool
 {
   if (IP4::is_address(addr))
     return IP4::is_private(addr);
@@ -15,17 +15,17 @@ bool is_private(std::string_view addr)
   return false;
 }
 
-bool is_address(std::string_view addr)
+auto is_address(std::string_view addr) -> bool
 {
   return IP4::is_address(addr) || IP6::is_address(addr);
 }
 
-bool is_address_literal(std::string_view addr)
+auto is_address_literal(std::string_view addr) -> bool
 {
   return IP4::is_address_literal(addr) || IP6::is_address_literal(addr);
 }
 
-std::string to_address_literal(std::string_view addr)
+auto to_address_literal(std::string_view addr) -> std::string
 {
   if (IP4::is_address(addr))
     return IP4::to_address_literal(addr);
@@ -34,16 +34,16 @@ std::string to_address_literal(std::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string_view to_address(std::string_view addr)
+auto as_address(std::string_view addr) -> std::string_view
 {
   if (IP4::is_address_literal(addr))
-    return IP4::to_address(addr);
+    return IP4::as_address(addr);
   if (IP6::is_address_literal(addr))
-    return IP6::to_address(addr);
+    return IP6::as_address(addr);
   LOG(FATAL) << "not a valid IP address literal " << addr;
 }
 
-std::string reverse(std::string_view addr)
+auto reverse(std::string_view addr) -> std::string
 {
   if (IP4::is_address(addr))
     return IP4::reverse(addr);
@@ -52,7 +52,7 @@ std::string reverse(std::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string fcrdns(std::string_view addr)
+auto fcrdns(std::string_view addr) -> std::string
 {
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 

@@ -754,9 +754,9 @@ void check_for_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
 std::string connectable_host(Domain const& dom)
 {
   if (IP4::is_address_literal(dom.ascii()))
-    return std::string(IP4::to_address(dom.ascii()));
+    return std::string(IP4::as_address(dom.ascii()));
   if (IP6::is_address_literal(dom.ascii()))
-    return std::string(IP6::to_address(dom.ascii()));
+    return std::string(IP6::as_address(dom.ascii()));
   return dom.ascii();
 }
 

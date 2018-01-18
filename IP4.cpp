@@ -60,7 +60,7 @@ struct action<dec_octet> {
   }
 };
 
-bool is_private(std::string_view addr)
+auto is_private(std::string_view addr) -> bool
 {
   auto a{std::vector<std::string>{}};
   a.reserve(4);
@@ -90,19 +90,19 @@ bool is_private(std::string_view addr)
   return false;
 }
 
-bool is_address(std::string_view addr)
+auto is_address(std::string_view addr) -> bool
 {
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   return parse<ipv4_address>(in);
 }
 
-bool is_address_literal(std::string_view addr)
+auto is_address_literal(std::string_view addr) -> bool
 {
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   return parse<ipv4_address_lit>(in);
 }
 
-std::string to_address_literal(std::string_view addr)
+auto to_address_literal(std::string_view addr) -> std::string
 {
   CHECK(is_address(addr));
   CHECK(is_address(addr));
@@ -111,14 +111,14 @@ std::string to_address_literal(std::string_view addr)
   return ss.str();
 }
 
-std::string_view to_address(std::string_view addr)
+auto as_address(std::string_view addr) -> std::string_view
 {
   CHECK(is_address_literal(addr));
   return std::string_view(addr.begin() + lit_pfx_sz,
                           addr.length() - lit_add_sz);
 }
 
-std::string reverse(std::string_view addr)
+auto reverse(std::string_view addr) -> std::string
 {
   auto a{std::vector<std::string>{}};
   a.reserve(4);
@@ -132,7 +132,7 @@ std::string reverse(std::string_view addr)
   return reverse.str();
 }
 
-std::string fcrdns(std::string_view addr)
+auto fcrdns(std::string_view addr) -> std::string
 {
   using namespace DNS;
 
