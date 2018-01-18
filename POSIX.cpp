@@ -18,11 +18,11 @@ void POSIX::set_nonblocking(int fd)
 
 bool POSIX::input_ready(int fd_in, milliseconds wait)
 {
-  fd_set fds;
+  auto fds{fd_set{}};
   FD_ZERO(&fds);
   FD_SET(fd_in, &fds);
 
-  struct timeval tv;
+  auto tv{(struct timeval){}};
   tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
@@ -34,11 +34,11 @@ bool POSIX::input_ready(int fd_in, milliseconds wait)
 
 bool POSIX::output_ready(int fd_out, milliseconds wait)
 {
-  fd_set fds;
+  auto fds{fd_set{}};
   FD_ZERO(&fds);
   FD_SET(fd_out, &fds);
 
-  struct timeval tv;
+  auto tv{(struct timeval){}};
   tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
@@ -76,9 +76,9 @@ std::streamsize POSIX::io_fd_(char const* fnm,
     PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
         << "Error from POSIX " << fnm << " system call";
 
-    time_point<system_clock> now = system_clock::now();
+    auto now = system_clock::now();
     if (now < end_time) {
-      milliseconds time_left = duration_cast<milliseconds>(end_time - now);
+      auto time_left = duration_cast<milliseconds>(end_time - now);
       if (*fnm == 'r') {
         read_hook();
       }
