@@ -57,12 +57,15 @@ struct ipv6_address_literal
   : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
 };
 
+struct ipv6_address_only : seq<ipv6_address, eof> {};
+struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
+
 bool is_routable(std::string_view addr) { return true; }
 
 bool is_address(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "ip6");
-  if (parse<IP6::ipv6_address>(in)) {
+  if (parse<IP6::ipv6_address_only>(in)) {
     return true;
   }
   return false;
@@ -71,7 +74,7 @@ bool is_address(std::string_view addr)
 bool is_address_literal(std::string_view addr)
 {
   memory_input<> in(addr.data(), addr.size(), "ip6");
-  if (parse<IP6::ipv6_address_literal>(in)) {
+  if (parse<IP6::ipv6_address_literal_only>(in)) {
     return true;
   }
   return false;
