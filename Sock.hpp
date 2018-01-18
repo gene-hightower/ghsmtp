@@ -68,8 +68,8 @@ private:
     struct sockaddr_storage addr_storage;
   };
 
-  sa us_addr_{0};
-  sa them_addr_{0};
+  sa us_addr_{};
+  sa them_addr_{};
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
