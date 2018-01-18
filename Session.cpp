@@ -73,7 +73,6 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 {
   auto const our_id{[&] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
-
     if (id_from_env)
       return std::string{id_from_env};
 
@@ -82,7 +81,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
       return hostname;
 
     if (IP::is_routable(sock_.us_c_str()))
-      return "["s + sock_.us_c_str() + "]";
+      return IP::to_address_literal(sock_.us_c_str());
 
     LOG(FATAL) << "can't determine my server ID";
   }()};
