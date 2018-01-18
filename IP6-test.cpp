@@ -18,7 +18,7 @@ int main(int argc, char const* argv[])
   CHECK(is_address_literal(addr_lit));
 
   CHECK_EQ(to_address_literal(addr), addr_lit);
-  CHECK_EQ(to_address(addr_lit), addr);
+  CHECK_EQ(as_address(addr_lit), addr);
 
   // This is going to break someday.  I added this test Jan 17th 2018.
 

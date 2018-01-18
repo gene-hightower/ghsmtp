@@ -72,7 +72,7 @@ int main(int argc, char const* argv[])
   CHECK(is_address_literal(addr_lit));
 
   CHECK_EQ(to_address_literal(addr), addr_lit);
-  CHECK_EQ(to_address(addr_lit), addr);
+  CHECK_EQ(as_address(addr_lit), addr);
 
   CHECK(!is_private("1.2.3.4"));
   CHECK(!is_private("127.0.0.1"));
