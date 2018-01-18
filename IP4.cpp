@@ -14,6 +14,14 @@ using namespace tao::pegtl::abnf;
 
 namespace IP4 {
 
+constexpr char lit_pfx[] = "[";
+constexpr auto lit_pfx_sz{sizeof(lit_pfx) - 1};
+
+constexpr char lit_sfx[] = "]";
+constexpr auto lit_sfx_sz{sizeof(lit_sfx) - 1};
+
+constexpr auto lit_add_sz{lit_pfx_sz + lit_sfx_sz};
+
 using dot = one<'.'>;
 
 // clang-format off
@@ -97,13 +105,18 @@ bool is_address_literal(std::string_view addr)
 std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
-  return "["s + std::string(addr.data(), addr.size()) + "]"s;
+  CHECK(is_address(addr));
+  auto ss{std::stringstream{}};
+  //    [                  ]
+  ss << lit_pfx << addr << lit_sfx;
+  return ss.str();
 }
 
 std::string_view to_address(std::string_view addr)
 {
   CHECK(is_address_literal(addr));
-  return std::string_view(addr.begin() + 1, addr.length() - 2);
+  return std::string_view(addr.begin() + lit_pfx_sz,
+                          addr.length() - lit_add_sz);
 }
 
 std::string reverse(std::string_view addr)
@@ -111,8 +124,7 @@ std::string reverse(std::string_view addr)
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   auto a{std::vector<std::string>{}};
   a.reserve(4);
-  auto const ret = parse<ipv4_address, action>(in, a);
-  CHECK(ret);
+  CHECK(parse<ipv4_address, action>(in, a));
 
   auto reverse{std::ostringstream{}};
   reverse << a[3] << '.' << a[2] << '.' << a[1] << '.' << a[0] << '.';

@@ -17,6 +17,14 @@ using namespace std::string_literals;
 
 namespace IP6 {
 
+constexpr char lit_pfx[] = "[IPv6:";
+constexpr auto lit_pfx_sz{sizeof(lit_pfx) - 1};
+
+constexpr char lit_sfx[] = "]";
+constexpr auto lit_sfx_sz{sizeof(lit_sfx) - 1};
+
+constexpr auto lit_add_sz{lit_pfx_sz + lit_sfx_sz};
+
 using dot = one<'.'>;
 using colon = one<':'>;
 
@@ -53,8 +61,9 @@ struct ipv6_address : sor<seq<                                          rep<6, h
                           seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 // clang-format on
 
-struct ipv6_address_literal
-  : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
+struct ipv6_address_literal : seq<TAOCPP_PEGTL_ISTRING(lit_pfx),
+                                  ipv6_address,
+                                  TAOCPP_PEGTL_ISTRING(lit_sfx)> {
 };
 
 struct ipv6_address_only : seq<ipv6_address, eof> {
@@ -84,13 +93,18 @@ bool is_address_literal(std::string_view addr)
 
 std::string to_address_literal(std::string_view addr)
 {
-  return "[IPv6:"s + std::string(addr.data(), addr.size()) + "]"s;
+  CHECK(is_address(addr));
+  auto ss{std::stringstream{}};
+  //    [IPv6:             ]
+  ss << lit_pfx << addr << lit_sfx;
+  return ss.str();
 }
 
 std::string_view to_address(std::string_view addr)
 {
   CHECK(is_address_literal(addr));
-  return std::string_view(addr.begin() + 6, addr.length() - 7);
+  return std::string_view(addr.begin() + lit_pfx_sz,
+                          addr.length() - lit_add_sz);
 }
 
 std::string reverse(std::string_view addr_str)
@@ -102,9 +116,7 @@ std::string reverse(std::string_view addr_str)
   auto const addr_void{reinterpret_cast<void*>(&addr)};
   auto const addr_uint{reinterpret_cast<uint8_t const*>(&addr)};
 
-  if (1 != inet_pton(AF_INET6, addr_str.data(), addr_void)) {
-    return "";
-  }
+  CHECK_EQ(1, inet_pton(AF_INET6, addr_str.data(), addr_void));
 
   auto q{std::string{}};
 
