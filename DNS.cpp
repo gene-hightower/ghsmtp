@@ -97,18 +97,15 @@ Query<type>::Query(Resolver const& res, DNS::Domain const& dom)
 template <RR_type::value_t type>
 Query<type>::~Query()
 {
-  if (p_) {
+  if (p_)
     ldns_pkt_free(p_);
-  }
 }
 
 template <RR_type::value_t type>
-Pkt_rcode Query<type>::get_rcode() const
+auto Query<type>::get_rcode() const -> Pkt_rcode
 {
-  if (p_) {
-    return static_cast<Pkt_rcode>(ldns_pkt_get_rcode(p_));
-  }
-  return Pkt_rcode::INTERNAL;
+  return p_ ? static_cast<Pkt_rcode::value_t>(ldns_pkt_get_rcode(p_))
+            : Pkt_rcode::INTERNAL;
 }
 
 template <RR_type::value_t type>

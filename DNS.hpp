@@ -60,7 +60,7 @@ public:
   constexpr auto value() const -> value_t { return value_; }
 
   constexpr explicit operator char const*() const { return c_str(); }
-  constexpr operator value_t() const { return value(); }
+  constexpr operator value_t() const { return value_; }
 
 private:
   value_t value_{NONE};
@@ -104,7 +104,7 @@ public:
   static constexpr auto INTERNAL = value_t::INTERNAL;
 
   constexpr auto value() const -> value_t { return value_; }
-  constexpr operator value_t() const { return value(); }
+  constexpr operator value_t() const { return value_; }
 
 private:
   value_t value_{NOERROR};
