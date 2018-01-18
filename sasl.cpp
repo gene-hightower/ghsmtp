@@ -185,25 +185,25 @@ constexpr char const* defined_params[]{
 
 int main()
 {
-  auto fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  auto const fd{socket(AF_UNIX, SOCK_STREAM, 0)};
   PCHECK(fd >= 0) << "socket failed";
 
-  sockaddr_un addr{};
+  auto addr{sockaddr_un{}};
   addr.sun_family = AF_UNIX;
-  auto socket_path = "/var/spool/postfix/private/auth";
+  auto socket_path{"/var/spool/postfix/private/auth"};
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
       << "connect to " << socket_path << " failed";
 
-  boost::iostreams::stream<SockBuffer> ios(fd, fd);
+  auto ios{boost::iostreams::stream<SockBuffer>{fd, fd}};
 
   ios << "VERSION\t1\t1\n"
       << "CPID\t" << getpid() << "\n"
       << std::flush;
 
-  dovecot::Context ctx;
-  istream_input<eol::lf> in(ios, 4 * 1024, "sasl");
+  auto ctx{dovecot::Context{}};
+  auto in{istream_input<eol::lf>{ios, 4 * 1024, "sasl"}};
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }
@@ -212,12 +212,12 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  std::stringstream tok;
+  auto tok{std::stringstream{}};
   tok << '\0' << test::username << '\0' << test::password;
-  auto init = Base64::enc(tok.str());
+  auto init{Base64::enc(tok.str())};
 
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
-    uint32_t id = 0x12345678;
+    auto id{uint32_t{0x12345678}};
 
     ios << "AUTH\t" << id << "\tPLAIN"
         << "\tservice=SMTP"
