@@ -57,14 +57,16 @@ struct ipv6_address_literal
   : seq<one<'['>, TAOCPP_PEGTL_ISTRING("IPv6:"), ipv6_address, one<']'>> {
 };
 
-struct ipv6_address_only : seq<ipv6_address, eof> {};
-struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
+struct ipv6_address_only : seq<ipv6_address, eof> {
+};
+struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {
+};
 
 bool is_routable(std::string_view addr) { return true; }
 
 bool is_address(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "ip6");
+  auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
   if (parse<IP6::ipv6_address_only>(in)) {
     return true;
   }
@@ -73,7 +75,7 @@ bool is_address(std::string_view addr)
 
 bool is_address_literal(std::string_view addr)
 {
-  memory_input<> in(addr.data(), addr.size(), "ip6");
+  auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
   if (parse<IP6::ipv6_address_literal_only>(in)) {
     return true;
   }
@@ -93,43 +95,43 @@ std::string_view to_address(std::string_view addr)
 
 std::string reverse(std::string_view addr_str)
 {
-  in6_addr addr;
+  auto addr{in6_addr{}};
 
   static_assert(sizeof(addr) == 16, "in6_addr is the wrong size");
 
-  if (1
-      != inet_pton(AF_INET6, addr_str.data(), reinterpret_cast<void*>(&addr))) {
+  auto const addr_void{reinterpret_cast<void*>(&addr)};
+  auto const addr_uint{reinterpret_cast<uint8_t const*>(&addr)};
+
+  if (1 != inet_pton(AF_INET6, addr_str.data(), addr_void)) {
     return "";
   }
 
-  auto uaddr = reinterpret_cast<uint8_t const*>(&addr);
-
-  std::string q;
+  auto q{std::string{}};
 
   for (auto n = NS_IN6ADDRSZ - 1; n >= 0; n--) {
-    static const char nibblechar[] = "0123456789abcdef";
-    q += nibblechar[uaddr[n] & 0xf];
+    constexpr char nibblechar[] = "0123456789abcdef";
+    q += nibblechar[addr_uint[n] & 0xf];
     q += '.';
-    q += nibblechar[(uaddr[n] >> 4) & 0xf];
+    q += nibblechar[(addr_uint[n] >> 4) & 0xf];
     q += '.';
   }
 
   return q;
 }
 
-std::string fcrdns(char const* addr)
+std::string fcrdns(std::string_view addr)
 {
   using namespace DNS;
 
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
-  auto reversed = reverse(addr);
+  auto const reversed{reverse(addr)};
 
   // The reverse part, check PTR records.
-  DNS::Resolver res;
-  auto ptrs = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
+  auto res{Resolver{}};
+  auto const ptrs = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
 
-  auto ptr = std::find_if(
+  auto const ptr = std::find_if(
       ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
         // The forward part, check each PTR for matching AAAA record.
         std::vector<std::string> addrs = get_records<RR_type::AAAA>(res, s);

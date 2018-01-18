@@ -52,7 +52,7 @@ std::string reverse(std::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::string fcrdns(char const* addr)
+std::string fcrdns(std::string_view addr)
 {
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 

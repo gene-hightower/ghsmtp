@@ -120,7 +120,7 @@ std::string reverse(std::string_view addr)
   return reverse.str();
 }
 
-std::string fcrdns(char const* addr)
+std::string fcrdns(std::string_view addr)
 {
   using namespace DNS;
 

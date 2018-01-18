@@ -1,11 +1,13 @@
 #include "IP6.hpp"
 
-#include <glog/logging.h>
+#include "Domain.hpp"
 
-using namespace IP6;
+#include <glog/logging.h>
 
 int main(int argc, char const* argv[])
 {
+  using namespace IP6;
+
   CHECK(is_address("::1"));
   CHECK(is_address_literal("[IPv6:::1]"));
 
@@ -17,4 +19,11 @@ int main(int argc, char const* argv[])
 
   CHECK_EQ(to_address_literal(addr), addr_lit);
   CHECK_EQ(to_address(addr_lit), addr);
+
+  // This is going to break someday.  I added this test Jan 17th 2018.
+
+  auto const gmail_com{"2607:f8b0:4000:815::2005"};
+  auto const gmail_com_rev{fcrdns(gmail_com)};
+  CHECK(Domain::match(gmail_com_rev, "dfw28s04-in-x05.1e100.net."))
+      << gmail_com_rev;
 }

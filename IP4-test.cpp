@@ -1,13 +1,13 @@
 #include "IP4.hpp"
 
+#include "Domain.hpp"
+
 #include <glog/logging.h>
-
-using namespace std::string_literals;
-
-using namespace IP4;
 
 int main(int argc, char const* argv[])
 {
+  using namespace IP4;
+
   CHECK(is_address_literal("[69.0.0.0]"));
   CHECK(!is_address_literal("69.0.0.0]"));
   CHECK(!is_address_literal("[69.0.0.0"));
@@ -60,11 +60,13 @@ int main(int argc, char const* argv[])
   CHECK(!is_address("1.1.1.300"));
   CHECK(!is_address("1.1.1.1000"));
 
-  std::string rev{reverse("1.2.3.4"s)};
-  CHECK_EQ(0, rev.compare("4.3.2.1."s));
+  auto const rev{reverse("1.2.3.4")};
+  CHECK_EQ(0, rev.compare("4.3.2.1."));
 
-  auto addr = "108.83.36.113"s;
-  auto addr_lit = "[108.83.36.113]"s;
+  auto const addr = "108.83.36.113";
+  auto const addr_lit = "[108.83.36.113]";
+
+  CHECK(Domain::match(fcrdns(addr), "digilicious.com"));
 
   CHECK(is_address(addr));
   CHECK(is_address_literal(addr_lit));
