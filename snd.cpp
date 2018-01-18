@@ -501,18 +501,18 @@ struct action<reply_code> {
 };
 } // namespace RFC5321
 
-uint16_t get_port(char const* service)
+uint16_t get_port(char const* const service)
 {
-  char* ep;
-  auto service_no = strtoul(service, &ep, 10);
-  if (*ep == '\0') {
+  auto ep{(char*){}};
+  auto const service_no{strtoul(service, &ep, 10)};
+  if (ep && (*ep == '\0')) {
     CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());
     return static_cast<uint16_t>(service_no);
   }
 
-  servent result_buf;
-  servent* result_ptr;
-  std::vector<char> str_buf(1024);
+  auto result_buf{servent{}};
+  auto result_ptr{(servent*){}};
+  auto str_buf{std::vector<char>(1024)};
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
          == ERANGE) {
@@ -526,16 +526,16 @@ uint16_t get_port(char const* service)
 
 int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
 {
-  bool use_4 = !FLAGS_ip6;
-  bool use_6 = !FLAGS_ip4;
+  auto const use_4{!FLAGS_ip6};
+  auto const use_6{!FLAGS_ip4};
 
-  auto port = get_port(service.c_str());
+  auto const port{get_port(service.c_str())};
   if (use_6) {
-    int fd = socket(AF_INET6, SOCK_STREAM, 0);
+    auto const fd{socket(AF_INET6, SOCK_STREAM, 0)};
     PCHECK(fd >= 0) << "socket() failed";
 
     if (!FLAGS_local_address.empty()) {
-      sockaddr_in6 loc{};
+      auto loc{sockaddr_in6{}};
       loc.sin6_family = AF_INET6;
       if (1
           != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
@@ -546,7 +546,7 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
       PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
     }
 
-    std::vector<std::string> addrs;
+    auto addrs{std::vector<std::string>{}};
     if (node.is_address_literal()) {
       if (IP6::is_address(node.ascii())) {
         addrs.push_back(node.address());
@@ -555,8 +555,8 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
     else {
       addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node.ascii());
     }
-    for (auto addr : addrs) {
-      sockaddr_in6 in6{};
+    for (auto const& addr : addrs) {
+      auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
       in6.sin6_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
@@ -574,11 +574,11 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
     close(fd);
   }
   if (use_4) {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    auto fd{socket(AF_INET, SOCK_STREAM, 0)};
     PCHECK(fd >= 0) << "socket() failed";
 
     if (!FLAGS_local_address.empty()) {
-      sockaddr_in loc{};
+      auto loc{sockaddr_in{}};
       loc.sin_family = AF_INET;
       if (1
           != inet_pton(AF_INET, FLAGS_local_address.c_str(),
@@ -589,7 +589,7 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
       PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
     }
 
-    std::vector<std::string> addrs;
+    auto addrs{std::vector<std::string>{}};
     if (node.is_address_literal()) {
       if (IP4::is_address_literal(node.ascii())) {
         addrs.push_back(node.address());
@@ -599,7 +599,7 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
       addrs = DNS::get_records<DNS::RR_type::A>(res, node.ascii());
     }
     for (auto addr : addrs) {
-      sockaddr_in in4{};
+      auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
       in4.sin_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
@@ -626,6 +626,10 @@ public:
   {
     hdrs_.push_back(std::make_pair(name, value));
   }
+  // void add_hdr(std::string&& name, std::string&& value)
+  // {
+  //   hdrs_.emplace_back(std::make_pair(name, value));
+  // }
 
   void foreach_hdr(std::function<void(std::string const& name,
                                       std::string const& value)> func)
@@ -686,12 +690,17 @@ enum class data_type {
 
 data_type type(std::string_view d)
 {
-  memory_input<> in(d.data(), d.size(), "data");
-  if (parse<RFC5322::body_ascii>(in)) {
-    return data_type::ascii;
+  {
+    auto in{memory_input<>{d.data(), d.size(), "data"}};
+    if (parse<RFC5322::body_ascii>(in)) {
+      return data_type::ascii;
+    }
   }
-  if (parse<RFC5322::body_utf8>(in)) {
-    return data_type::utf8;
+  {
+    auto in{memory_input<>{d.data(), d.size(), "data"}};
+    if (parse<RFC5322::body_utf8>(in)) {
+      return data_type::utf8;
+    }
   }
   // anything else is
   return data_type::binary;
@@ -702,7 +711,7 @@ public:
   content(char const* path)
     : path_(path)
   {
-    auto body_sz = fs::file_size(path_);
+    auto const body_sz{fs::file_size(path_)};
     CHECK(body_sz) << "no body";
     file_.open(path_);
     type_ = ::type(*this);
@@ -717,7 +726,6 @@ public:
 
 private:
   data_type type_;
-
   fs::path path_;
   boost::iostreams::mapped_file_source file_;
 };
@@ -777,8 +785,8 @@ DEFINE_validator(to_name, &validate_name);
 
 void selftest()
 {
-  auto read_hook = []() {};
-  static RFC5321::Connection cnn(0, 1, read_hook);
+  auto const read_hook{[]() {}};
+  auto cnn{RFC5321::Connection(0, 1, read_hook)};
 
   const char* greet_list[]{
       "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
@@ -791,7 +799,7 @@ void selftest()
       "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"};
 
   for (auto i : greet_list) {
-    memory_input<> in(i, i);
+    auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
             in, cnn)) {
       LOG(FATAL) << "Error parsing greeting \"" << i << "\"";
@@ -817,7 +825,7 @@ void selftest()
   };
 
   for (auto i : ehlo_rsp_list) {
-    memory_input<> in(i, i);
+    auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::ehlo_rsp, RFC5321::action /*, tao::pegtl::tracer*/>(
             in, cnn)) {
       LOG(FATAL) << "Error parsing ehlo response \"" << i << "\"";
@@ -830,20 +838,16 @@ int main(int argc, char* argv[])
   std::ios::sync_with_stdio(false);
 
   if (FLAGS_sender.empty()) {
-    const auto hostname = get_hostname();
-    FLAGS_sender = hostname.c_str();
+    FLAGS_sender = get_hostname();
   }
 
-  Domain sender(FLAGS_sender);
+  auto const sender{Domain{FLAGS_sender}};
 
   if (FLAGS_from.empty()) {
-    const auto from = "test-it@"s + sender.ascii();
-    FLAGS_from = from;
+    FLAGS_from = "test-it@"s + sender.ascii();
   }
-
   if (FLAGS_to.empty()) {
-    const auto to = "test-it@"s + sender.ascii();
-    FLAGS_to = to;
+    FLAGS_to = "test-it@"s + sender.ascii();
   }
 
   { // Need to work with either namespace.
@@ -861,38 +865,39 @@ int main(int argc, char* argv[])
 
   // parse FLAGS_from and FLAGS_to as addr_spec
 
-  Mailbox from_mbx;
-  memory_input<> from_in(FLAGS_from, "from");
+  auto from_mbx{Mailbox{}};
+  auto from_in{memory_input<>{FLAGS_from, "from"}};
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(from_in, from_mbx)) {
     LOG(FATAL) << "bad From: address syntax <" << FLAGS_from << ">";
   }
   LOG(INFO) << "from_mbx == " << from_mbx;
 
-  memory_input<> local_from(from_mbx.local_part(), "from.local");
-  bool must_have_smtputf8 = !parse<chars::ascii_only>(local_from);
+  auto local_from{memory_input<>{from_mbx.local_part(), "from.local"}};
+  auto must_have_smtputf8{!parse<chars::ascii_only>(local_from)};
 
-  Mailbox to_mbx;
-  memory_input<> to_in(FLAGS_to, "to");
+  auto to_mbx{Mailbox{}};
+  auto to_in{memory_input<>{FLAGS_to, "to"}};
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(to_in, to_mbx)) {
     LOG(FATAL) << "bad To: address syntax <" << FLAGS_to << ">";
   }
   LOG(INFO) << "to_mbx == " << to_mbx;
 
-  memory_input<> local_in(to_mbx.local_part(), "to.local");
+  auto local_in{memory_input<>{to_mbx.local_part(), "to.local"}};
+
   must_have_smtputf8
       = must_have_smtputf8 || !parse<chars::ascii_only>(local_in);
 
-  DNS::Resolver res;
+  auto res{DNS::Resolver{}};
+  auto receivers{std::vector<Domain>{}};
 
-  std::vector<Domain> receivers;
   if (!FLAGS_mx_host.empty()) {
     receivers.push_back(Domain(FLAGS_mx_host));
   }
   else {
     // look up MX records for to_mbx.domain()
-
     // returns list of servers sorted by priority, low to high
-    auto mxs = DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii());
+    auto const mxs{
+        DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii())};
 
     // RFC 7505 null MX record
     if ((mxs.size() == 1) && (mxs.front() == ".")) {
@@ -910,8 +915,8 @@ int main(int argc, char* argv[])
   }
 
 try_host:
-  int fd_in = 0;
-  int fd_out = 1;
+  auto fd_in{0};
+  auto fd_out{1};
 
   if (!FLAGS_pipe) {
     CHECK(!receivers.empty()) << "no more hosts to try";
@@ -922,11 +927,11 @@ try_host:
     fd_out = fd;
   }
 
-  auto read_hook = []() {};
-  RFC5321::Connection cnn(fd_in, fd_out, read_hook);
+  auto const read_hook{[]() {}};
+  auto cnn{RFC5321::Connection(fd_in, fd_out, read_hook)};
 
   // CRLF /only/
-  istream_input<eol::crlf> in(cnn.sock.in(), Config::bfr_size, "session");
+  auto in{istream_input<eol::crlf>{cnn.sock.in(), Config::bfr_size, "session"}};
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
     LOG(WARNING) << "greeting failed to parse";
     if (fd_in == fd_out)
@@ -963,9 +968,9 @@ try_host:
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 
-  bool ext_smtputf8
-      = FLAGS_use_smtputf8
-        && cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end();
+  auto const ext_smtputf8{
+      FLAGS_use_smtputf8
+      && (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())};
 
   if (must_have_smtputf8 && !ext_smtputf8) {
     if (fd_in == fd_out)
@@ -974,15 +979,15 @@ try_host:
     goto try_host;
   }
 
-  bool ext_8bitmime
-      = FLAGS_use_8bitmime
-        && cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end();
-  bool ext_chunking = cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end();
-  bool ext_binarymime
-      = cnn.ehlo_params.find("BINARYMIME") != cnn.ehlo_params.end();
-  bool ext_pipelining
-      = FLAGS_use_pipelining
-        && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end());
+  auto const ext_8bitmime{
+      FLAGS_use_8bitmime
+      && (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())};
+  auto ext_chunking{cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()};
+  auto const ext_binarymime{cnn.ehlo_params.find("BINARYMIME")
+                            != cnn.ehlo_params.end()};
+  auto ext_pipelining{
+      FLAGS_use_pipelining
+      && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end())};
 
   if (ext_binarymime && !ext_chunking) {
     LOG(WARNING)
@@ -999,24 +1004,24 @@ try_host:
     exit(EXIT_FAILURE);
   }
 
-  std::vector<content> bodies;
+  auto bodies{std::vector<content>{}};
 
   if (argc == 1) {
-    bodies.emplace_back("body.txt");
+    bodies.push_back("body.txt");
   }
   for (int a = 1; a < argc; ++a) {
-    bodies.emplace_back(argv[a]);
+    bodies.push_back(argv[a]);
   }
 
   CHECK_EQ(bodies.size(), 1) << "only one body part for now";
 
-  auto max_msg_size = 0u;
-  bool ext_size = cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end();
+  auto max_msg_size{0u};
+  auto const ext_size{cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
-      char* ep;
+      auto ep{(char*){}};
       max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
-      if (*ep != '\0') {
+      if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in SIZE argument: "
                      << cnn.ehlo_params["SIZE"][0];
       }
@@ -1027,14 +1032,14 @@ try_host:
   }
 
   if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
-    auto auth = cnn.ehlo_params.find("AUTH");
+    auto const auth = cnn.ehlo_params.find("AUTH");
     if (auth != cnn.ehlo_params.end()) {
 
       // Perfer PLAIN mechanism.
       if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
           != auth->second.end()) {
         LOG(INFO) << "> AUTH PLAIN";
-        std::stringstream tok;
+        auto tok{std::stringstream{}};
         tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
         cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
                        << std::flush;
@@ -1072,34 +1077,29 @@ try_host:
 
   in.discard();
 
-  std::string from = from_mbx;
+  auto from{static_cast<std::string>(from_mbx)};
   if (!ext_smtputf8) {
     from = from_mbx.local_part()
            + (from_mbx.domain().empty() ? ""
                                         : ("@" + from_mbx.domain().ascii()));
   }
-  std::string to = to_mbx;
+  auto to{static_cast<std::string>(to_mbx)};
   if (!ext_smtputf8) {
     to = to_mbx.local_part()
          + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
   }
 
-  Eml eml;
+  auto eml{Eml{}};
+  auto const date{Now{}};
+  auto const pill{Pill{}};
 
-  Now date;
-  Pill pill;
-  std::stringstream mid_str;
+  auto mid_str{std::stringstream{}};
   mid_str << '<' << date.sec() << '.' << pill << '@' << sender.utf8() << '>';
   eml.add_hdr("Message-ID", mid_str.str());
 
   eml.add_hdr("Date", date.c_str());
-
-  std::string rfc5322_from = FLAGS_from_name + " <" + from + ">";
-  eml.add_hdr("From", rfc5322_from);
-
-  std::string rfc5322_to = FLAGS_to_name + " <" + to + ">";
-  eml.add_hdr("To"s, rfc5322_to);
-
+  eml.add_hdr("From", FLAGS_from_name + " <" + from + ">");
+  eml.add_hdr("To", FLAGS_to_name + " <" + to + ">");
   eml.add_hdr("Subject", FLAGS_subject);
 
   if (!FLAGS_keywords.empty())
@@ -1111,13 +1111,13 @@ try_host:
   eml.add_hdr("MIME-Version", "1.0");
   eml.add_hdr("Content-Language", "en-US");
 
-  Magic magic; // to ID buffer contents
+  auto magic{Magic{}}; // to ID buffer contents
 
   eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
 
-  auto body_type = (bodies[0].type() == data_type::binary)
-                       ? OpenDKIM::Sign::body_type::binary
-                       : OpenDKIM::Sign::body_type::text;
+  auto const body_type = (bodies[0].type() == data_type::binary)
+                             ? OpenDKIM::Sign::body_type::binary
+                             : OpenDKIM::Sign::body_type::text;
 
   auto key_file = FLAGS_selector + ".private";
   std::ifstream keyfs(key_file.c_str());
