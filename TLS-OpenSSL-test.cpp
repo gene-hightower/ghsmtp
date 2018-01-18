@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[])
 {
-  auto read_hook = []() {};
+  auto const read_hook = []() {};
   TLS tls(read_hook);
 
   std::cout << "sizeof(TLS) == " << sizeof(TLS) << '\n';
