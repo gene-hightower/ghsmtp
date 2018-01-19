@@ -213,59 +213,11 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  auto smtputf8{bool{false}};
-
-  // Take a look at the optional parameters:
-  for (auto const& [name, val] : parameters) {
-    if (iequal(name, "BODY")) {
-      if (iequal(val, "8BITMIME")) {
-        // everything is cool, this is our default...
-      }
-      else if (iequal(val, "7BIT")) {
-        // nothing to see here, move along...
-      }
-      else if (iequal(val, "BINARYMIME")) {
-        binarymime_ = true;
-      }
-      else {
-        LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
-      }
-    }
-    else if (iequal(name, "SMTPUTF8")) {
-      if (!val.empty()) {
-        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
-      }
-      smtputf8 = true;
-    }
-    else if (iequal(name, "SIZE")) {
-      if (val.empty()) {
-        LOG(WARNING) << "SIZE parameter has no value.";
-      }
-      else {
-        try {
-          auto const sz = stoull(val);
-          if (sz > max_msg_size_) {
-            out_() << "552 5.3.4 message size exceeds maximium size\r\n"
-                   << std::flush;
-            LOG(WARNING) << "SIZE parameter too large: " << sz;
-            return;
-          }
-        }
-        catch (std::invalid_argument const& e) {
-          LOG(WARNING) << "SIZE parameter has invalid value: " << val;
-        }
-        catch (std::out_of_range const& e) {
-          LOG(WARNING) << "SIZE parameter has out-of-range value: " << val;
-        }
-        // I guess we just ignore bad size parameters.
-      }
-    }
-    else {
-      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "=" << val;
-    }
+  if (!verify_from_params_(parameters)) {
+    return;
   }
 
-  if (smtputf8) {
+  if (smtputf8_) {
     protocol_ = sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
   }
   else {
@@ -999,5 +951,60 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   LOG(INFO) << spf_res.header_comment();
   received_spf_ = spf_res.received_spf();
+  return true;
+}
+
+bool Session::verify_from_params_(parameters_t const& parameters)
+{
+  // Take a look at the optional parameters:
+  for (auto const& [name, val] : parameters) {
+    if (iequal(name, "BODY")) {
+      if (iequal(val, "8BITMIME")) {
+        // everything is cool, this is our default...
+      }
+      else if (iequal(val, "7BIT")) {
+        // nothing to see here, move along...
+      }
+      else if (iequal(val, "BINARYMIME")) {
+        binarymime_ = true;
+      }
+      else {
+        LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
+      }
+    }
+    else if (iequal(name, "SMTPUTF8")) {
+      if (!val.empty()) {
+        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
+      }
+      smtputf8_ = true;
+    }
+    else if (iequal(name, "SIZE")) {
+      if (val.empty()) {
+        LOG(WARNING) << "SIZE parameter has no value.";
+      }
+      else {
+        try {
+          auto const sz = stoull(val);
+          if (sz > max_msg_size_) {
+            out_() << "552 5.3.4 message size exceeds maximium size\r\n"
+                   << std::flush;
+            LOG(ERROR) << "SIZE parameter too large: " << sz;
+            return false;
+          }
+        }
+        catch (std::invalid_argument const& e) {
+          LOG(WARNING) << "SIZE parameter has invalid value: " << val;
+        }
+        catch (std::out_of_range const& e) {
+          LOG(WARNING) << "SIZE parameter has out-of-range value: " << val;
+        }
+        // I guess we just ignore bad size parameters.
+      }
+    }
+    else {
+      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "=" << val;
+    }
+  }
+
   return true;
 }

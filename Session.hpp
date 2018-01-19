@@ -105,6 +105,7 @@ private:
   bool verify_sender_domain_(Domain const& sender);
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
+  bool verify_from_params_(parameters_t const& parameters);
 
   void exit_() __attribute__((noreturn));
 
@@ -132,6 +133,7 @@ private:
 
   bool binarymime_{false};
   bool extensions_{false};
+  bool smtputf8_{false};
   bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
   bool reverse_path_verified_{false};
