@@ -957,7 +957,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    std::ostringstream received_spf;
+    auto received_spf{std::ostringstream{}}; 
     received_spf << "Received-SPF: pass (" << srvr_id << ": " << ip_addr
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
