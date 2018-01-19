@@ -21,9 +21,6 @@ private:
   struct cdb cdb_;
 };
 
-auto constexpr CDB::is_open() const -> bool
-{
-  return fd_ != -1;
-}
+auto constexpr CDB::is_open() const -> bool { return fd_ != -1; }
 
 #endif // CDB_DOT_HPP
