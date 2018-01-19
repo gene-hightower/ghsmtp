@@ -4,6 +4,6 @@
 #include <string>
 #include <string_view>
 
-auto esc(std::string_view str, bool multi_line = false) -> std::string;
+std::string esc(std::string_view str, bool multi_line = false);
 
 #endif // ESC_DOT_HPP
