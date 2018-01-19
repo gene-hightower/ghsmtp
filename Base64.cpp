@@ -12,7 +12,7 @@ constexpr char const CHARSET[]{
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
 
 namespace {
-auto CHARSET_find(unsigned char ch) -> unsigned char
+auto CHARSET_find(unsigned char ch)
 {
   return static_cast<unsigned char>(
       std::find(std::begin(CHARSET), std::end(CHARSET), ch)
@@ -20,7 +20,7 @@ auto CHARSET_find(unsigned char ch) -> unsigned char
 }
 } // namespace
 
-auto enc(std::string_view text, std::string::size_type wrap) -> std::string
+std::string enc(std::string_view text, std::string::size_type wrap)
 {
   unsigned char group_8bit[3];
   unsigned char group_6bit[4];
@@ -95,12 +95,12 @@ auto enc(std::string_view text, std::string::size_type wrap) -> std::string
   return enc_text;
 }
 
-constexpr auto is_base64char(char ch) -> bool
+bool is_base64char(char ch)
 {
   return std::isalnum(ch) || ch == '+' || ch == '/';
 }
 
-auto dec(std::string_view text) -> std::string
+std::string dec(std::string_view text)
 {
   auto input_size = text.length();
   auto max_size = (input_size / 4) * 3;
