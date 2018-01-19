@@ -15,26 +15,26 @@ public:
   Domain(std::string_view dom) { set(dom); }
   Domain& operator=(std::string_view s) { return set(s), *this; }
 
-  auto set(std::string_view dom) -> void;
+  void set(std::string_view dom);
 
-  inline auto clear() -> void;
-  inline auto empty() const -> bool;
+  inline void clear();
+  bool empty() const { return ascii_.empty() && utf8_.empty(); }
 
-  constexpr static auto match(std::string_view a, std::string_view b) -> bool;
+  constexpr static bool match(std::string_view a, std::string_view b);
 
-  inline auto operator==(std::string_view rhs) const -> bool;
-  inline auto operator!=(std::string_view rhs) const -> bool;
+  bool operator==(std::string_view rhs) const { return match(ascii_, rhs); }
+  bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
 
-  inline auto operator==(Domain const& rhs) const -> bool;
-  inline auto operator!=(Domain const& rhs) const -> bool;
+  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
+  bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
 
-  inline auto is_address_literal() const -> bool;
-  inline auto is_unicode() const -> bool;
+  bool is_address_literal() const { return is_address_literal_; }
+  bool is_unicode() const { return utf8() != ascii(); }
 
-  inline auto ascii() const -> std::string const&;
-  inline auto utf8() const -> std::string const&;
+  std::string const& ascii() const { return ascii_; }
+  std::string const& utf8() const { return utf8_; }
 
-  inline auto address() const -> std::string;
+  inline std::string address() const;
 
 private:
   std::string ascii_;
@@ -43,19 +43,14 @@ private:
   bool is_address_literal_{false};
 };
 
-inline auto Domain::clear() -> void
+inline void Domain::clear()
 {
   ascii_.clear();
   utf8_.clear();
   is_address_literal_ = false;
 }
 
-inline auto Domain::empty() const -> bool
-{
-  return ascii_.empty() && utf8_.empty();
-}
-
-constexpr auto Domain::match(std::string_view a, std::string_view b) -> bool
+constexpr bool Domain::match(std::string_view a, std::string_view b)
 {
   if ((0 != a.length()) && ('.' == a.back())) {
     a.remove_suffix(1);
@@ -66,45 +61,14 @@ constexpr auto Domain::match(std::string_view a, std::string_view b) -> bool
   return iequal(a, b);
 }
 
-inline auto Domain::operator==(std::string_view rhs) const -> bool
-{
-  return match(ascii_, rhs);
-}
-
-inline auto Domain::operator!=(std::string_view rhs) const -> bool
-{
-  return !(*this == rhs);
-}
-
-inline auto Domain::operator==(Domain const& rhs) const -> bool
-{
-  return match(ascii_, rhs.ascii_);
-}
-
-inline auto Domain::operator!=(Domain const& rhs) const -> bool
-{
-  return !(*this == rhs);
-}
-
-inline auto Domain::is_address_literal() const -> bool
-{
-  return is_address_literal_;
-}
-
-inline auto Domain::is_unicode() const -> bool { return utf8() != ascii(); }
-
-inline auto Domain::ascii() const -> std::string const& { return ascii_; }
-
-inline auto Domain::utf8() const -> std::string const& { return utf8_; }
-
-inline auto Domain::address() const -> std::string
+inline std::string Domain::address() const
 {
   if (is_address_literal())
     return std::string(IP::as_address(ascii_));
   throw std::runtime_error("domain is not an address");
 }
 
-inline auto operator<<(std::ostream& os, Domain const& dom) -> std::ostream&
+inline std::ostream& operator<<(std::ostream& os, Domain const& dom)
 {
   if (dom.is_unicode())
     return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
