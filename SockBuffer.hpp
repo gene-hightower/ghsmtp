@@ -40,9 +40,7 @@ public:
 
   bool input_ready(std::chrono::milliseconds wait) const
   {
-    if (tls_active_ && tls_.pending())
-      return true;
-    return POSIX::input_ready(fd_in_, wait);
+    return (tls_active_ && tls_.pending()) || POSIX::input_ready(fd_in_, wait);
   }
   bool output_ready(std::chrono::milliseconds wait) const
   {
@@ -68,20 +66,12 @@ public:
     tls_active_ = true;
   }
   bool tls() const { return tls_active_; }
-  std::string tls_info() const
-  {
-    if (tls()) {
-      return tls_.info();
-    }
-    return "";
-  }
+  std::string tls_info() const { return tls() ? tls_.info() : ""; }
 
   void set_max_read(std::streamsize max)
   {
     limit_read_ = true;
-
     read_limit_ = max;
-
     octets_read_ = 0;
     octets_written_ = 0;
   }
