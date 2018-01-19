@@ -90,10 +90,12 @@ private:
 
   void reset_()
   {
+    client_identity_.clear();
     reverse_path_.clear();
     forward_path_.clear();
+    received_spf_.clear();
     binarymime_ = false;
-    extensions_ = false;
+    smtputf8_ = false;
     reverse_path_verified_ = false;
   }
 
