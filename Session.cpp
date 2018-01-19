@@ -277,16 +277,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     }
   }
 
-  auto const sender{std::string{reverse_path}};
-
-  for (auto bad_sender : Config::bad_senders) {
-    if (sender == bad_sender) {
-      out_() << "550 5.1.8 bad sender\r\n" << std::flush;
-      LOG(WARNING) << "bad sender " << sender;
-      return;
-    }
-  }
-
   auto params{std::ostringstream{}};
   for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
@@ -823,6 +813,16 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
 bool Session::verify_sender_(Mailbox const& sender)
 {
+  auto const sender_str{std::string{sender}};
+
+  for (auto bad_sender : Config::bad_senders) {
+    if (sender_str == bad_sender) {
+      out_() << "550 5.1.8 bad sender\r\n" << std::flush;
+      LOG(WARNING) << "bad sender " << sender;
+      return false;
+    }
+  }
+
   if (sender.domain().is_address_literal()) {
     if (sender.domain() != sock_.them_address_literal()) {
       LOG(WARNING) << "sender domain " << sender.domain() << " does not match "
