@@ -7,16 +7,13 @@
 #include <string>
 #include <string_view>
 
-#include <glog/logging.h>
-
 #include "iequal.hpp"
 
 class Domain {
 public:
   Domain() = default;
-  inline Domain(std::string_view dom);
-
-  inline auto operator=(std::string_view s) -> Domain&;
+  Domain(std::string_view dom) { set(dom); }
+  Domain& operator=(std::string_view s) { return set(s), *this; }
 
   auto set(std::string_view dom) -> void;
 
@@ -45,14 +42,6 @@ private:
 
   bool is_address_literal_{false};
 };
-
-inline Domain::Domain(std::string_view dom) { set(dom); }
-
-inline auto Domain::operator=(std::string_view s) -> Domain&
-{
-  set(s);
-  return *this;
-}
 
 inline auto Domain::clear() -> void
 {
@@ -112,7 +101,7 @@ inline auto Domain::address() const -> std::string
 {
   if (is_address_literal())
     return std::string(IP::as_address(ascii_));
-  LOG(FATAL) << "domain name is not an address";
+  throw std::runtime_error("domain is not an address");
 }
 
 inline auto operator<<(std::ostream& os, Domain const& dom) -> std::ostream&
