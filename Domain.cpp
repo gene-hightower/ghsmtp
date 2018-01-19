@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "Domain.hpp"
 #include "IP.hpp"
 #include "IP4.hpp"
@@ -68,4 +70,7 @@ void Domain::set(std::string_view dom)
   }
   utf8_ = ptr;
   idn2_free(ptr);
+
+  lc_.resize(ascii_.length());
+  std::transform(ascii_.begin(), ascii_.end(), lc_.begin(), ::tolower);
 }

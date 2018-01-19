@@ -18,25 +18,27 @@ public:
   void set(std::string_view dom);
 
   inline void clear();
-  bool empty() const { return ascii_.empty() && utf8_.empty(); }
+  bool empty() const { return lc_.empty(); }
 
   constexpr static bool match(std::string_view a, std::string_view b);
 
-  bool operator==(std::string_view rhs) const { return match(ascii_, rhs); }
+  bool operator==(std::string_view rhs) const { return match(lc_, rhs); }
   bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
 
-  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
+  bool operator==(Domain const& rhs) const { return lc_ == rhs.lc_; }
   bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
 
   bool is_address_literal() const { return is_address_literal_; }
   bool is_unicode() const { return utf8() != ascii(); }
 
+  std::string const& lc() const { return lc_; }
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
   inline std::string address() const;
 
 private:
+  std::string lc_;
   std::string ascii_;
   std::string utf8_;
 
@@ -45,6 +47,7 @@ private:
 
 inline void Domain::clear()
 {
+  lc_.clear();
   ascii_.clear();
   utf8_.clear();
   is_address_literal_ = false;

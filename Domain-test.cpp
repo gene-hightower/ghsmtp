@@ -9,7 +9,6 @@ int main(int argc, char const* argv[])
   std::string d{"example.com."};
 
   CHECK(Domain::match(d, "EXAMPLE.COM"));
-  CHECK(Domain::match(d, "example.com"));
   CHECK(Domain::match(d, "example.com."));
 
   CHECK(!Domain::match(d, "example.co"));
@@ -63,4 +62,8 @@ int main(int argc, char const* argv[])
   catch (std::exception const& ex) {
     LOG(FATAL) << "should not throw " << ex.what();
   }
+
+  Domain mixed_case{"ExAmPle.COM"};
+  CHECK_EQ(mixed_case.lc(), "example.com");
+  ;
 }
