@@ -16,7 +16,7 @@ Pill::Pill()
 
   // <http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt>
 
-  char constexpr b32_charset[]{"ybndrfg8ejkmcpqxot1uwisza345h769"};
+  constexpr char b32_charset[]{"ybndrfg8ejkmcpqxot1uwisza345h769"};
 
   auto const os = reinterpret_cast<const unsigned char*>(&s_);
   auto osp = os + sizeof(s_);
