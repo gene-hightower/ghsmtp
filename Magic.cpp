@@ -12,13 +12,13 @@ Magic::Magic()
 
 Magic::~Magic() { magic_close(magic_); }
 
-auto Magic::buffer(std::string_view bfr) const -> std::string
+std::string Magic::buffer(std::string_view bfr) const
 {
   auto data = reinterpret_cast<void const*>(bfr.data());
   return CHECK_NOTNULL(magic_buffer(magic_, data, bfr.size()));
 }
 
-auto Magic::file(char const* path) const -> std::string
+std::string Magic::file(char const* path) const
 {
   return CHECK_NOTNULL(magic_file(magic_, path));
 }
