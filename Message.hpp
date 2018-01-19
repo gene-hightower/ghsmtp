@@ -16,8 +16,6 @@
 
 class Message {
 public:
-  Message() = default;
-
   enum class SpamStatus : bool { ham, spam };
 
   void open(std::string_view fqdn, std::streamsize max_size, SpamStatus spam);

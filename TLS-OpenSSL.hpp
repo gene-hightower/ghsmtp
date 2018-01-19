@@ -9,9 +9,6 @@
 
 class TLS {
 public:
-  static constexpr auto cert_fn = "smtp.pem";
-  static constexpr auto key_fn = "smtp.key";
-
   TLS(TLS const&) = delete;
   TLS& operator=(const TLS&) = delete;
 
@@ -40,6 +37,9 @@ public:
   }
 
   std::string info() const;
+
+  static constexpr auto cert_fn = "smtp.pem";
+  static constexpr auto key_fn = "smtp.key";
 
 private:
   std::streamsize io_tls_(char const* fnm,

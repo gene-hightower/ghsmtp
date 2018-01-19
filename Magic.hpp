@@ -8,6 +8,9 @@ typedef struct magic_set* magic_t;
 
 class Magic {
 public:
+  Magic(Magic const&) = delete;
+  Magic operator=(Magic const&) = delete;
+
   Magic();
   ~Magic();
 

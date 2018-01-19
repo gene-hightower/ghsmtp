@@ -10,6 +10,7 @@
 class Pill {
 public:
   Pill();
+
   bool operator==(Pill const& that) const { return this->s_ == that.s_; }
   bool operator!=(Pill const& that) const { return !(*this == that); }
 

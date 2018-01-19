@@ -13,6 +13,9 @@ enum class Advice;
 auto constexpr Advice_to_string(Advice adv) -> char const*;
 
 class Lib {
+  Lib(Lib const&) = delete;
+  Lib& operator=(Lib const&) = delete;
+
 public:
   Lib();
   ~Lib();
@@ -23,6 +26,10 @@ private:
 
 class Policy {
 public:
+  Policy() = default;
+  Policy(Policy const&) = delete;
+  Policy& operator=(Policy const&) = delete;
+
   ~Policy();
 
   auto init(char const* ip) -> void;
