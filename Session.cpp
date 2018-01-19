@@ -104,7 +104,7 @@ void Session::greeting()
       std::exit(EXIT_SUCCESS);
     }
   }
-  out_() << "220 " << server_id() << " ESMTP - ghsmtp\r\n" << std::flush;
+  out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
 }
 
 void Session::log_lo_(char const* verb, std::string_view client_identity) const
@@ -149,7 +149,7 @@ void Session::ehlo(std::string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out_() << "250-" << server_id();
+  out_() << "250-" << server_id_();
   if (sock_.has_peername()) {
     out_() << " at your service, " << client_;
   }
@@ -199,7 +199,7 @@ void Session::helo(std::string_view client_identity)
     std::exit(EXIT_SUCCESS);
   }
 
-  out_() << "250 " << server_id() << "\r\n" << std::flush;
+  out_() << "250 " << server_id_() << "\r\n" << std::flush;
 
   log_lo_(verb, client_identity);
 }
@@ -459,7 +459,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     alarm(5 * 60);
   }
 
-  msg.open(server_id(), max_msg_size(), status);
+  msg.open(server_id_(), max_msg_size(), status);
   auto const hdrs{added_headers_(msg)};
   msg.write(hdrs);
 }
@@ -950,7 +950,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  auto const srvr_id{server_id()};
+  auto const srvr_id{server_id_()};
 
   if (!sock_.has_peername() || ip_whitelisted_) {
     auto ip_addr = sock_.them_c_str();

@@ -86,7 +86,7 @@ private:
   std::ostream& out_() { return sock_.out(); }
   void log_lo_(char const* verb, std::string_view client_identity) const;
 
-  std::string_view server_id() const { return server_identity_.ascii(); }
+  std::string_view server_id_() const { return server_identity_.ascii(); }
 
   void reset_()
   {
