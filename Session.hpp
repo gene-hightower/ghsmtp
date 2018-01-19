@@ -92,7 +92,6 @@ private:
   {
     reverse_path_.clear();
     forward_path_.clear();
-    protocol_ = "";
     binarymime_ = false;
     extensions_ = false;
     reverse_path_verified_ = false;
@@ -106,6 +105,8 @@ private:
   bool verify_sender_domain_uribl_(std::string const& sender);
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
+
+  char const* protocol_();
 
   void exit_() __attribute__((noreturn));
 
@@ -122,8 +123,6 @@ private:
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
 
   std::string received_spf_; // from libspf2
-
-  char const* protocol_{""};
 
   std::random_device rd_;
 

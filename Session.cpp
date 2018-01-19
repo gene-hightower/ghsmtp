@@ -91,6 +91,21 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   max_msg_size(Config::max_msg_size_initial);
 }
 
+char const* Session::protocol_()
+{
+  if (smtputf8_) {
+    return sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
+  }
+  else {
+    if (extensions_) {
+      return sock_.tls() ? "ESMTPS" : "ESMTP";
+    }
+    else {
+      return sock_.tls() ? "SMTPS" : "SMTP";
+    }
+  }
+}
+
 // Error codes from connection establishment are 220 or 554, according
 // to RFC 5321.  That's it.
 
@@ -139,7 +154,6 @@ void Session::ehlo(std::string_view client_identity)
   last_in_group_(verb);
   reset_();
   extensions_ = true;
-  protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
   client_identity_.set(client_identity);
 
   auto error_msg{std::string{}};
@@ -189,7 +203,6 @@ void Session::helo(std::string_view client_identity)
   last_in_group_(verb);
   reset_();
   extensions_ = false;
-  protocol_ = sock_.tls() ? "ESMTPS" : "SMTP"; // there is no SMTPS
   client_identity_.set(client_identity);
 
   auto error_msg{std::string{}};
@@ -215,18 +228,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   if (!verify_from_params_(parameters)) {
     return;
-  }
-
-  if (smtputf8_) {
-    protocol_ = sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
-  }
-  else {
-    if (extensions_) {
-      protocol_ = sock_.tls() ? "ESMTPS" : "ESMTP";
-    }
-    else {
-      protocol_ = sock_.tls() ? "SMTPS" : "SMTP";
-    }
   }
 
   auto params{std::ostringstream{}};
@@ -322,7 +323,7 @@ std::string Session::added_headers_(Message const& msg)
     headers << " (" << client_ << ')';
   }
   headers << "\r\n        by " << server_identity_.utf8() << " with "
-          << protocol_ << " id " << msg.id();
+          << protocol_() << " id " << msg.id();
 
   if (forward_path_.size()) {
     auto len{12};
@@ -909,7 +910,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    auto received_spf{std::ostringstream{}}; 
+    auto received_spf{std::ostringstream{}};
     received_spf << "Received-SPF: pass (" << srvr_id << ": " << ip_addr
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
