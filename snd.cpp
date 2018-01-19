@@ -60,6 +60,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "Sock.hpp"
 #include "fs.hpp"
 #include "imemstream.hpp"
+#include "osutil.hpp"
 
 #include <fstream>
 #include <iostream>
