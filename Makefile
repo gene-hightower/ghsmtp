@@ -32,7 +32,8 @@ sasl_STEMS := sasl \
 	POSIX \
 	SockBuffer \
 	TLS-OpenSSL \
-	esc
+	esc \
+	osutil
 
 smtp_STEMS := smtp \
 	CDB \
