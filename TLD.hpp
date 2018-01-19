@@ -23,6 +23,11 @@ public:
     return getRegisteredDomain(dom, tree_);
   }
 
+  char const* get_registered_domain(std::string const& dom) const
+  {
+    return get_registered_domain(dom.c_str());
+  }
+
 private:
   void* tree_;
 };
