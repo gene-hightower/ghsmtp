@@ -1,6 +1,10 @@
 #include "osutil.hpp"
 
-#include "fs.hpp"
+#include <gflags/gflags.h>
+namespace gflags {
+};
+
+DEFINE_string(config_dir, "", "path to support/config files");
 
 #include <sys/utsname.h>
 #include <unistd.h>
@@ -9,14 +13,35 @@
 
 namespace osutil {
 
-std::string get_hostname()
+fs::path get_config_dir()
 {
-  utsname un;
-  PCHECK(uname(&un) == 0);
-  return std::string(un.nodename);
+  static fs::path path;
+
+  static bool configured{false};
+  if (!configured) {
+    if (!FLAGS_config_dir.empty()) {
+      path = FLAGS_config_dir;
+    }
+    else {
+      path = osutil::get_home_dir();
+
+      // Maybe work from some installed location...
+
+      // if ends in /bin, switch to /share or /etc
+      // if (fs::is_directory(path) && (path.filename() == "bin")) {
+      //   auto share = path;
+      //   share.replace_filename("share");
+      //   if (fs::exists(share) && fs::is_directory(share))
+      //   path = share;
+      // }
+    }
+    configured = true;
+  }
+
+  return path;
 }
 
-void set_home_dir()
+fs::path get_home_dir()
 {
   auto const exe{fs::path("/proc/self/exe")};
   CHECK(fs::exists(exe) && fs::is_symlink(exe))
@@ -39,19 +64,14 @@ void set_home_dir()
     p.resize(p.size() * 2);
   }
 
-  auto const path = fs::path(p).parent_path();
+  return fs::path(p).parent_path();
+}
 
-  // Maybe work from some installed location...
-
-  // if (fs::is_directory(path) && (path.filename() == "bin")) {
-  //   // if ends in /bin, switch to /share
-  //   auto share = path;
-  //   share.replace_filename("share");
-  //   if (fs::exists(share) && fs::is_directory(share))
-  //     path = share;
-  // }
-
-  current_path(path);
+std::string get_hostname()
+{
+  utsname un;
+  PCHECK(uname(&un) == 0);
+  return std::string(un.nodename);
 }
 
 } // namespace osutil

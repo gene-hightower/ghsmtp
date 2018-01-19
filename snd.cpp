@@ -59,7 +59,6 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "Pill.hpp"
 #include "Sock.hpp"
 #include "fs.hpp"
-#include "osutil.hpp"
 #include "imemstream.hpp"
 
 #include <fstream>
@@ -836,8 +835,6 @@ void selftest()
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
-
-  osutil::set_home_dir();
 
   if (FLAGS_sender.empty()) {
     FLAGS_sender = osutil::get_hostname();

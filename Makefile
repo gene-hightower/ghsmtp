@@ -92,7 +92,7 @@ TESTS := \
 	esc-test
 
 Base64-test_STEMS := Base64
-CDB-test_STEMS := CDB
+CDB-test_STEMS := CDB osutil
 DNS-test_STEMS := DNS
 Domain-test_STEMS := DNS Domain IP IP4 IP6
 IP4-test_STEMS := DNS IP4

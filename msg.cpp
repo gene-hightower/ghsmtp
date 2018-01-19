@@ -1739,8 +1739,6 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  osutil::set_home_dir();
-
   if (FLAGS_selftest) {
     selftest();
     return 0;

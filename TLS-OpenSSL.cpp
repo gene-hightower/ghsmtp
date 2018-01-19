@@ -14,6 +14,7 @@
 
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
+#include "osutil.hpp"
 
 TLS::TLS(std::function<void(void)> read_hook)
   : read_hook_(read_hook)
@@ -43,12 +44,12 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
   auto const cert = X509_STORE_CTX_get_current_cert(ctx);
   auto err = X509_STORE_CTX_get_error(ctx);
 
-  auto ssl = reinterpret_cast<SSL*>(
+  auto const ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
 
   CHECK_GE(session_context_index, 0);
 
-  auto mydata = reinterpret_cast<session_context*>(
+  auto const mydata = reinterpret_cast<session_context*>(
       SSL_get_ex_data(ssl, session_context_index));
 
   auto const depth = X509_STORE_CTX_get_error_depth(ctx);
@@ -97,18 +98,28 @@ void TLS::starttls_client(int fd_in,
 
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
-  auto method = CHECK_NOTNULL(SSLv23_client_method());
+  auto const method = CHECK_NOTNULL(SSLv23_client_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
   SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
   CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
 
-  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_fn) > 0)
-      << "Can't load certificate chain file \"" << cert_fn << "\"";
+  auto const config_path = osutil::get_config_dir();
 
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_fn, SSL_FILETYPE_PEM) > 0)
-      << "Can't load private key file \"" << key_fn << "\"";
+  auto const cert_path = config_path / cert_fn;
+  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
+  auto cert_path_str = cert_path.string();
+  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path_str.c_str()) > 0)
+      << "Can't load certificate chain file \"" << cert_path << "\"";
+
+  auto const key_path = config_path / key_fn;
+  CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
+  auto const key_path_str = key_path.string();
+  CHECK(
+      SSL_CTX_use_PrivateKey_file(ctx_, key_path_str.c_str(), SSL_FILETYPE_PEM)
+      > 0)
+      << "Can't load private key file \"" << key_path_str << "\"";
 
   CHECK(SSL_CTX_check_private_key(ctx_))
       << "Private key does not match the public certificate";
@@ -170,7 +181,7 @@ void TLS::starttls_server(int fd_in,
 
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
-  auto method = CHECK_NOTNULL(SSLv23_server_method());
+  auto const method = CHECK_NOTNULL(SSLv23_server_method());
   ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
 
   SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
@@ -208,10 +219,20 @@ void TLS::starttls_server(int fd_in,
   // CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
   //     << "Can't set cipher list to " << cipher_list;
 
-  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_fn) > 0)
-      << "Can't load certificate chain file \"" << cert_fn << "\"";
+  auto const config_path = osutil::get_config_dir();
 
-  CHECK(SSL_CTX_use_PrivateKey_file(ctx_, key_fn, SSL_FILETYPE_PEM) > 0)
+  auto const cert_path = config_path / cert_fn;
+  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
+  auto const cert_path_str = cert_path.string();
+  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path_str.c_str()) > 0)
+      << "Can't load certificate chain file \"" << cert_path << "\"";
+
+  auto const key_path = config_path / key_fn;
+  CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
+  auto const key_path_str = key_path.string();
+  CHECK(
+      SSL_CTX_use_PrivateKey_file(ctx_, key_path_str.c_str(), SSL_FILETYPE_PEM)
+      > 0)
       << "Can't load private key file \"" << key_fn << "\"";
 
   CHECK(SSL_CTX_check_private_key(ctx_))
@@ -234,11 +255,12 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 -----END DH PARAMETERS-----
 )";
 
-  auto bio = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
-  auto dh
+  auto const bio
+      = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
+  auto const dh
       = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
-  auto ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
+  auto const ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -272,7 +294,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   using namespace std::chrono;
-  auto start = system_clock::now();
+  auto const start = system_clock::now();
 
   int rc;
   while ((rc = SSL_accept(ssl_)) < 0) {
@@ -341,8 +363,8 @@ std::streamsize TLS::io_tls_(char const* fnm,
                              bool& t_o)
 {
   using namespace std::chrono;
-  auto start = system_clock::now();
-  auto end_time = start + timeout;
+  auto const start = system_clock::now();
+  auto const end_time = start + timeout;
 
   int n_ret;
   while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
@@ -354,7 +376,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
       return static_cast<std::streamsize>(-1);
     }
 
-    auto time_left = duration_cast<milliseconds>(end_time - now);
+    auto const time_left = duration_cast<milliseconds>(end_time - now);
 
     switch (SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {

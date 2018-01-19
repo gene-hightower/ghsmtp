@@ -947,8 +947,6 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  osutil::set_home_dir();
-
   if (FLAGS_selftest) {
     selftest();
     return 0;
@@ -972,7 +970,9 @@ int main(int argc, char* argv[])
   ctx = std::make_unique<RFC5321::Ctx>(read_hook);
 
   // Don't wait for STARTTLS to fail if no cert.
-  CHECK(fs::exists(TLS::cert_fn)) << "can't find cert file " << TLS::cert_fn;
+  auto const config_path = osutil::get_config_dir();
+  auto const cert_path = config_path / TLS::cert_fn;
+  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
 
   ctx->session.greeting();
 
