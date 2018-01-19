@@ -1,5 +1,8 @@
 #include "osutil.hpp"
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 #include <gflags/gflags.h>
 namespace gflags {
 };
@@ -71,7 +74,17 @@ std::string get_hostname()
 {
   utsname un;
   PCHECK(uname(&un) == 0);
-  return std::string(un.nodename);
+
+  auto node = std::string(un.nodename);
+
+  auto labels{std::vector<std::string>{}};
+  boost::algorithm::split(labels, node,
+                          boost::algorithm::is_any_of("."));
+  if (labels.size() < 2) {
+    node += ".digilicious.com";
+  }
+
+  return node;
 }
 
 } // namespace osutil
