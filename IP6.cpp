@@ -63,21 +63,21 @@ struct ipv6_address_only : seq<ipv6_address, eof> {
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {
 };
 
-auto is_private(std::string_view addr) -> bool { return false; } // Lie!
+bool is_private(std::string_view addr) { return false; } // Lie!
 
-auto is_address(std::string_view addr) -> bool
+bool is_address(std::string_view addr)
 {
   auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
   return parse<IP6::ipv6_address_only>(in);
 }
 
-auto is_address_literal(std::string_view addr) -> bool
+bool is_address_literal(std::string_view addr)
 {
   auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
   return parse<IP6::ipv6_address_literal_only>(in);
 }
 
-auto to_address_literal(std::string_view addr) -> std::string
+std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
   auto ss{std::stringstream{}};
@@ -85,7 +85,7 @@ auto to_address_literal(std::string_view addr) -> std::string
   return ss.str();
 }
 
-auto reverse(std::string_view addr_str) -> std::string
+std::string reverse(std::string_view addr_str)
 {
   auto addr{in6_addr{}};
 
@@ -109,7 +109,7 @@ auto reverse(std::string_view addr_str) -> std::string
   return q;
 }
 
-auto fcrdns(std::string_view addr) -> std::string
+std::string fcrdns(std::string_view addr)
 {
   using namespace DNS;
 
