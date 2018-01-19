@@ -12,6 +12,9 @@ typedef int DKIM_STAT;
 namespace OpenDKIM {
 
 class Lib {
+  Lib(Lib const&) = delete;
+  Lib& operator=(Lib const&) = delete;
+
 public:
   auto header(std::string_view header) -> void;
   auto eoh() -> void;

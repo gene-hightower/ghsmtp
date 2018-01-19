@@ -10,6 +10,9 @@ extern "C" {
 
 class CDB {
 public:
+  CDB(CDB const&) = delete;
+  CDB& operator=(CDB const&) = delete;
+
   CDB(std::string_view db);
   ~CDB();
 
