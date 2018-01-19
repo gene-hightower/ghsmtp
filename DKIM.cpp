@@ -12,12 +12,12 @@ using _Bool = bool; // Not nice to use _Bool in a public interface.
 
 namespace {
 // Not nice to use "unsigned char" for character data.
-auto constexpr uc(char const* cp) -> u_char*
+constexpr u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>(cp));
 }
 
-auto constexpr c(unsigned char* ucp) -> char const*
+constexpr char const* c(unsigned char* ucp)
 {
   return reinterpret_cast<char const*>(ucp);
 }
@@ -39,7 +39,7 @@ Lib::~Lib()
   dkim_close(lib_);
 }
 
-auto Lib::header(std::string_view header) -> void
+void Lib::header(std::string_view header)
 {
   if (header.size() && header.back() == '\n')
     header.remove_suffix(1);
@@ -54,7 +54,7 @@ auto Lib::header(std::string_view header) -> void
   // header.length());
 }
 
-auto Lib::eoh() -> void
+void Lib::eoh()
 {
   status_ = dkim_eoh(dkim_);
   switch (status_) {
@@ -69,21 +69,21 @@ auto Lib::eoh() -> void
   }
 }
 
-auto Lib::body(std::string_view body) -> void
+void Lib::body(std::string_view body)
 {
   CHECK_EQ((status_ = dkim_body(dkim_, uc(body.data()), body.length())),
            DKIM_STAT_OK)
       << "dkim_body error: " << dkim_getresultstr(status_);
 }
 
-auto Lib::chunk(std::string_view chunk) -> void
+void Lib::chunk(std::string_view chunk)
 {
   CHECK_EQ((status_ = dkim_chunk(dkim_, uc(chunk.data()), chunk.length())),
            DKIM_STAT_OK)
       << "dkim_chunk error: " << dkim_getresultstr(status_);
 }
 
-auto Lib::eom() -> void
+void Lib::eom()
 {
   status_ = dkim_eom(dkim_, nullptr);
 
@@ -99,8 +99,8 @@ auto Lib::eom() -> void
   }
 }
 
-auto Verify::foreach_sig(
-    std::function<void(char const* domain, bool passed)> func) -> void
+void Verify::foreach_sig(
+    std::function<void(char const* domain, bool passed)> func)
 {
   auto nsigs{0};
   auto sigs{(DKIM_SIGINFO**){}};
@@ -157,7 +157,7 @@ Verify::Verify()
   dkim_ = CHECK_NOTNULL(dkim_verify(lib_, id_v, nullptr, &status_));
 }
 
-auto Verify::check() -> bool
+bool Verify::check()
 {
   auto nsigs{0};
   auto sigs{(DKIM_SIGINFO**){}};
@@ -187,14 +187,14 @@ auto Verify::check() -> bool
   }
 
   if (nsigs) {
-    auto sig = dkim_getsignature(dkim_);
+    auto sig{dkim_getsignature(dkim_)};
     if (sig) {
 
       LOG(INFO) << "dkim_getsignature domain == " << dkim_sig_getdomain(sig);
 
-      auto msglen{ssize_t{}};
-      auto canonlen{ssize_t{}};
-      auto signlen{ssize_t{}};
+      ssize_t msglen;
+      ssize_t canonlen;
+      ssize_t signlen;
 
       status_ = dkim_sig_getcanonlen(dkim_, sig, &msglen, &canonlen, &signlen);
 
@@ -229,7 +229,7 @@ auto Verify::check() -> bool
   return false;
 }
 
-auto Verify::sig_syntax(std::string_view sig) -> bool
+bool Verify::sig_syntax(std::string_view sig)
 {
   return dkim_sig_syntax(dkim_, uc(sig.data()), sig.length()) == DKIM_STAT_OK;
 }
@@ -246,7 +246,7 @@ Sign::Sign(char const* secretkey,
       DKIM_SIGN_RSASHA256, -1, &status_));
 }
 
-auto Sign::getsighdr() -> std::string
+std::string Sign::getsighdr()
 {
   auto const initial{strlen(DKIM_SIGNHEADER) + 2};
   auto buf{(unsigned char*){}};

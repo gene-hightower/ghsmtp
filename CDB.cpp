@@ -31,7 +31,7 @@ CDB::~CDB()
   }
 }
 
-auto CDB::lookup(std::string_view key) -> bool
+bool CDB::lookup(std::string_view key)
 {
   if (!is_open())
     return false;

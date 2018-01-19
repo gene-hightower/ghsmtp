@@ -10,7 +10,7 @@
 namespace OpenDMARC {
 
 enum class Advice;
-auto constexpr Advice_to_string(Advice adv) -> char const*;
+constexpr char const* Advice_to_string(Advice adv);
 
 class Lib {
   Lib(Lib const&) = delete;
@@ -32,17 +32,17 @@ public:
 
   ~Policy();
 
-  auto init(char const* ip) -> void;
-  auto store_from_domain(char const* from_domain) -> bool;
-  auto store_dkim(char const* d_equal_domain,
+  void init(char const* ip);
+  bool store_from_domain(char const* from_domain);
+  bool store_dkim(char const* d_equal_domain,
                   int dkim_result,
-                  char const* human_result) -> bool;
-  auto store_spf(char const* domain,
+                  char const* human_result);
+  bool store_spf(char const* domain,
                  int result,
                  int origin,
-                 char const* human_readable) -> bool;
-  auto query_dmarc(char const* domain) -> bool;
-  auto get_advice() -> Advice;
+                 char const* human_readable);
+  bool query_dmarc(char const* domain);
+  Advice get_advice();
 
 private:
   DMARC_POLICY_T* pctx_{nullptr};

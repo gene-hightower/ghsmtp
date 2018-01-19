@@ -16,11 +16,11 @@ class Lib {
   Lib& operator=(Lib const&) = delete;
 
 public:
-  auto header(std::string_view header) -> void;
-  auto eoh() -> void;
-  auto body(std::string_view body) -> void;
-  auto chunk(std::string_view chunk) -> void;
-  auto eom() -> void;
+  void header(std::string_view header);
+  void eoh();
+  void body(std::string_view body);
+  void chunk(std::string_view chunk);
+  void eom();
 
 protected:
   Lib();
@@ -35,10 +35,9 @@ class Verify : public Lib {
 public:
   Verify();
 
-  auto check() -> bool;
-  auto sig_syntax(std::string_view sig) -> bool;
-  auto foreach_sig(std::function<void(char const* domain, bool passed)> func)
-      -> void;
+  bool check();
+  bool sig_syntax(std::string_view sig);
+  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
 };
 
 class Sign : public Lib {
@@ -53,7 +52,7 @@ public:
        char const* domain,
        body_type typ = body_type::text);
 
-  auto getsighdr() -> std::string;
+  std::string getsighdr();
 };
 } // namespace OpenDKIM
 

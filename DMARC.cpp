@@ -1,6 +1,6 @@
 #include "DMARC.hpp"
 
-auto constexpr uc(char const* cp) -> u_char*
+constexpr u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
 }
@@ -25,13 +25,13 @@ Policy::~Policy()
   }
 }
 
-auto Policy::init(char const* ip) -> void
+void Policy::init(char const* ip)
 {
   auto const is_ipv6 = IP6::is_address(ip);
   pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip), is_ipv6));
 }
 
-auto Policy::store_from_domain(char const* from_domain) -> bool
+bool Policy::store_from_domain(char const* from_domain)
 {
   auto const status
       = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
@@ -43,9 +43,9 @@ auto Policy::store_from_domain(char const* from_domain) -> bool
   return true;
 }
 
-auto Policy::store_dkim(char const* d_equal_domain,
+bool Policy::store_dkim(char const* d_equal_domain,
                         int dkim_result,
-                        char const* human_result) -> bool
+                        char const* human_result)
 {
   auto const status = opendmarc_policy_store_dkim(
       pctx_, uc(d_equal_domain), dkim_result, uc(human_result));
@@ -57,10 +57,10 @@ auto Policy::store_dkim(char const* d_equal_domain,
   return true;
 }
 
-auto Policy::store_spf(char const* domain,
+bool Policy::store_spf(char const* domain,
                        int result,
                        int origin,
-                       char const* human_readable) -> bool
+                       char const* human_readable)
 {
   auto const status = opendmarc_policy_store_spf(pctx_, uc(domain), result,
                                                  origin, uc(human_readable));
@@ -72,7 +72,7 @@ auto Policy::store_spf(char const* domain,
   return true;
 }
 
-auto Policy::query_dmarc(char const* domain) -> bool
+bool Policy::query_dmarc(char const* domain)
 {
   auto const status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
   if (status != DMARC_PARSE_OKAY) {
@@ -82,7 +82,7 @@ auto Policy::query_dmarc(char const* domain) -> bool
   return true;
 }
 
-auto Policy::get_advice() -> Advice
+Advice Policy::get_advice()
 {
   auto const status = opendmarc_get_policy_to_enforce(pctx_);
 
