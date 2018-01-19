@@ -106,8 +106,6 @@ private:
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
 
-  char const* protocol_();
-
   void exit_() __attribute__((noreturn));
 
 private:
