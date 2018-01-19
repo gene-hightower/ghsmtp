@@ -16,8 +16,8 @@
 #include "SPF.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
-#include "hostname.hpp"
 #include "iequal.hpp"
+#include "osutil.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
@@ -76,7 +76,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
     if (id_from_env)
       return std::string{id_from_env};
 
-    auto const hostname{get_hostname()};
+    auto const hostname{osutil::get_hostname()};
     if (hostname.find('.') != std::string::npos)
       return hostname;
 

@@ -1,5 +1,7 @@
 #include "DMARC.hpp"
 
+#include "fs.hpp"
+
 constexpr u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>((cp)));
@@ -10,6 +12,8 @@ Lib::Lib()
 {
   lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
   auto constexpr cert_fn = "public_suffix_list.dat";
+  auto const cert_p = fs::path(cert_fn);
+  CHECK(fs::exists(cert_p));
   strcpy(reinterpret_cast<char*>(lib_.tld_source_file), cert_fn);
   auto const status = opendmarc_policy_library_init(&lib_);
   CHECK_EQ(status, DMARC_PARSE_OKAY) << opendmarc_policy_status_to_str(status);

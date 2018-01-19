@@ -23,7 +23,7 @@ DEFINE_bool(selftest, false, "run a self test");
 #include "Mailbox.hpp"
 #include "SPF.hpp"
 #include "esc.hpp"
-#include "hostname.hpp"
+#include "osutil.hpp"
 
 #include "fs.hpp"
 
@@ -1295,7 +1295,7 @@ struct action<received_spf> {
 
     // Do a fresh check now:
 
-    auto node = get_hostname();
+    auto node = osutil::get_hostname();
 
     SPF::Server spf_srv(node.c_str());
     SPF::Request spf_req(spf_srv);
@@ -1738,6 +1738,8 @@ int main(int argc, char* argv[])
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
   }
+
+  osutil::set_home_dir();
 
   if (FLAGS_selftest) {
     selftest();
