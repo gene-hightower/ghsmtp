@@ -103,7 +103,17 @@ void Session::greeting()
              error_msg.c_str());
       std::exit(EXIT_SUCCESS);
     }
+
+    // Wait a bit of time for pre-greeting traffic.
+    if (!(ip_whitelisted_ || fcrdns_whitelisted_)
+        && sock_.input_ready(Config::greeting_wait)) {
+      out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
+             sock_.them_c_str());
+      std::exit(EXIT_SUCCESS);
+    }
   }
+
   out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
 }
 
@@ -348,7 +358,7 @@ std::string Session::added_headers_(Message const& msg)
 bool lookup_domain(CDB& cdb, Domain const& domain)
 {
   if (!domain.empty()) {
-    if (cdb.lookup(domain.ascii())) {
+    if (cdb.lookup(domain.lc())) {
       return true;
     }
     if (domain.is_unicode() && cdb.lookup(domain.utf8())) {
@@ -369,22 +379,15 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     if (client_identity_ == client_fcrdns_)
       return Message::SpamStatus::ham;
 
+    if (fcrdns_whitelisted_)
+      return Message::SpamStatus::ham;
+
     auto white{CDB{"white"}};
-
-    if (lookup_domain(white, client_fcrdns_))
-      return Message::SpamStatus::ham;
-
-    auto const tld{
-        tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str())};
-    if (tld && white.lookup(tld))
-      return Message::SpamStatus::ham;
-
     if (lookup_domain(white, client_identity_))
       return Message::SpamStatus::ham;
 
-    auto const tld_client{
-        tld_db_.get_registered_domain(client_identity_.utf8().c_str())};
-    if (tld_client && white.lookup(tld_client))
+    auto tld{tld_db_.get_registered_domain(client_identity_.lc())};
+    if (tld && white.lookup(tld))
       return Message::SpamStatus::ham;
 
     return Message::SpamStatus::spam;
@@ -589,23 +592,14 @@ bool Session::verify_ip_address_(std::string& error_msg)
   }
 
   client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
-
   if (!client_fcrdns_.empty()) {
     client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
 
-    // check domain
-    auto const tld{
-        tld_db_.get_registered_domain(client_fcrdns_.utf8().c_str())};
+    auto const tld{tld_db_.get_registered_domain(client_fcrdns_.lc())};
     auto white{CDB{"white"}};
     if (tld && white.lookup(tld)) {
-      LOG(INFO) << "TLD domain " << tld << " whitelisted";
+      LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
       fcrdns_whitelisted_ = true;
-    }
-    else {
-      if (white.lookup(client_fcrdns_.utf8())) {
-        LOG(INFO) << "domain " << client_fcrdns_ << " whitelisted";
-        fcrdns_whitelisted_ = true;
-      }
     }
   }
   else {
@@ -638,15 +632,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
       }
       // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
       // blacklisted";
-    }
-  }
-
-  // Wait a bit of time for pre-greeting traffic.
-  if (!(ip_whitelisted_ || fcrdns_whitelisted_)) {
-    if (sock_.input_ready(Config::greeting_wait)) {
-      error_msg = sock_.them_address_literal() + " input before greeting";
-      out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
-      return false;
     }
   }
 
@@ -693,8 +678,7 @@ bool Session::verify_client_(Domain const& client_identity,
     return false;
   }
 
-  auto const tld{
-      tld_db_.get_registered_domain(client_identity.ascii().c_str())};
+  auto const tld{tld_db_.get_registered_domain(client_identity.lc())};
   if (tld) {
     if (client_identity == tld) {
       if (black.lookup(tld)) {
@@ -800,39 +784,31 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return true;
   }
 
-  auto sndr_lc{std::string{sender.ascii()}};
-  std::transform(sndr_lc.begin(), sndr_lc.end(), sndr_lc.begin(), ::tolower);
-
-  // Break sender domain into labels:
-
-  auto labels{std::vector<std::string>{}};
-  boost::algorithm::split(labels, sndr_lc, boost::algorithm::is_any_of("."));
-
   auto white{CDB{"white"}};
-  if (white.lookup(sndr_lc)) {
-    LOG(INFO) << "sender \"" << sndr_lc << "\" whitelisted";
+  if (white.lookup(sender.lc())) {
+    LOG(INFO) << "sender \"" << sender.lc() << "\" whitelisted";
     return true;
   }
-  else if (sender.ascii() != sender.utf8()) {
-    if (white.lookup(sender.utf8())) {
-      LOG(INFO) << "sender \"" << sender.utf8() << "\" whitelisted";
-      return true;
-    }
-  }
 
-  if (labels.size() < 2) { // This is not a valid domain.
-    out_() << "550 5.7.1 invalid sender domain " << sndr_lc << "\r\n"
-           << std::flush;
-    LOG(ERROR) << "sender \"" << sndr_lc << "\" invalid syntax";
-    return false;
-  }
-
-  auto tld{tld_db_.get_registered_domain(sndr_lc.c_str())};
+  auto tld{tld_db_.get_registered_domain(sender.lc())};
   if (tld) {
     if (white.lookup(tld)) {
       LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
       return true;
     }
+  }
+
+  // Break sender domain into labels:
+
+  auto labels{std::vector<std::string>{}};
+  boost::algorithm::split(labels, sender.lc(),
+                          boost::algorithm::is_any_of("."));
+
+  if (labels.size() < 2) { // This is not a valid domain.
+    out_() << "550 5.7.1 invalid sender domain " << sender << "\r\n"
+           << std::flush;
+    LOG(ERROR) << "sender \"" << sender << "\" invalid syntax";
+    return false;
   }
 
   // Based on <http://www.surbl.org/guidelines>
