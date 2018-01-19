@@ -77,12 +77,12 @@ std::string get_hostname()
 
   auto node = std::string(un.nodename);
 
-  auto labels{std::vector<std::string>{}};
-  boost::algorithm::split(labels, node,
-                          boost::algorithm::is_any_of("."));
-  if (labels.size() < 2) {
-    node += ".digilicious.com";
-  }
+  // auto labels{std::vector<std::string>{}};
+  // boost::algorithm::split(labels, node,
+  //                         boost::algorithm::is_any_of("."));
+  // if (labels.size() < 2) {
+  //   node += ".digilicious.com";
+  // }
 
   return node;
 }
