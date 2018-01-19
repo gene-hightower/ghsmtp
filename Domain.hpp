@@ -79,7 +79,7 @@ constexpr auto Domain::match(std::string_view a, std::string_view b) -> bool
 
 inline auto Domain::operator==(std::string_view rhs) const -> bool
 {
-  return match(ascii_, rhs) || (utf8_ == rhs));
+  return (match(ascii_, rhs) || (utf8_ == rhs));
 }
 
 inline auto Domain::operator!=(std::string_view rhs) const -> bool
