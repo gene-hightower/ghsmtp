@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "CDB.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
 #include "IP.hpp"
@@ -382,12 +381,11 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     if (fcrdns_whitelisted_)
       return Message::SpamStatus::ham;
 
-    auto white{CDB{"white"}};
-    if (lookup_domain(white, client_identity_))
+    if (lookup_domain(white_, client_identity_))
       return Message::SpamStatus::ham;
 
     auto tld{tld_db_.get_registered_domain(client_identity_.lc())};
-    if (tld && white.lookup(tld))
+    if (tld && white_.lookup(tld))
       return Message::SpamStatus::ham;
 
     return Message::SpamStatus::spam;
@@ -584,8 +582,7 @@ void Session::exit_()
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
-  auto black{CDB{"ip-black"}};
-  if (black.lookup(sock_.them_c_str())) {
+  if (black_.lookup(sock_.them_c_str())) {
     error_msg = sock_.them_address_literal() + " blacklisted";
     out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
     return false;
@@ -596,8 +593,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
 
     auto const tld{tld_db_.get_registered_domain(client_fcrdns_.lc())};
-    auto white{CDB{"white"}};
-    if (tld && white.lookup(tld)) {
+    if (tld && white_.lookup(tld)) {
       LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
       fcrdns_whitelisted_ = true;
     }
@@ -611,8 +607,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     ip_whitelisted_ = true;
   }
   else {
-    auto white{CDB{"ip-white"}};
-    if (white.lookup(sock_.them_c_str())) {
+    if (white_.lookup(sock_.them_c_str())) {
       LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
       ip_whitelisted_ = true;
     }
@@ -669,8 +664,7 @@ bool Session::verify_client_(Domain const& client_identity,
     return true;
   }
 
-  auto black{CDB{"black"}};
-  if (lookup_domain(black, client_identity)) {
+  if (lookup_domain(black_, client_identity)) {
     auto em{std::stringstream{}};
     em << "blacklisted identity " << client_identity;
     error_msg = em.str();
@@ -681,7 +675,7 @@ bool Session::verify_client_(Domain const& client_identity,
   auto const tld{tld_db_.get_registered_domain(client_identity.lc())};
   if (tld) {
     if (client_identity == tld) {
-      if (black.lookup(tld)) {
+      if (black_.lookup(tld)) {
         error_msg = "blacklisted TLD "s + tld;
         out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
         return false;
@@ -706,10 +700,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       }
     }
     else {
-      auto accept_domains{CDB{"accept_domains"}};
-      if (accept_domains.is_open()) {
-        if (accept_domains.lookup(recipient.domain().ascii())
-            || accept_domains.lookup(recipient.domain().utf8())) {
+      if (accept_domains_.is_open()) {
+        if (accept_domains_.lookup(recipient.domain().ascii())
+            || accept_domains_.lookup(recipient.domain().utf8())) {
           return true;
         }
       }
@@ -784,15 +777,14 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return true;
   }
 
-  auto white{CDB{"white"}};
-  if (white.lookup(sender.lc())) {
+  if (white_.lookup(sender.lc())) {
     LOG(INFO) << "sender \"" << sender.lc() << "\" whitelisted";
     return true;
   }
 
   auto tld{tld_db_.get_registered_domain(sender.lc())};
   if (tld) {
-    if (white.lookup(tld)) {
+    if (white_.lookup(tld)) {
       LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
       return true;
     }
@@ -818,8 +810,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
   if (labels.size() > 2) {
     auto three_level{labels[labels.size() - 3] + "." + two_level};
 
-    auto three_tld{CDB{"three-level-tlds"}};
-    if (three_tld.lookup(three_level)) {
+    if (three_tld_.lookup(three_level)) {
       if (labels.size() > 3) {
         return verify_sender_domain_uribl_(labels[labels.size() - 4] + "."
                                            + three_level);
@@ -833,8 +824,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
     }
   }
 
-  auto two_tld{CDB{"two-level-tlds"}};
-  if (two_tld.lookup(two_level)) {
+  if (two_tld_.lookup(two_level)) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
                                          + two_level);
