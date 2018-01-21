@@ -1,4 +1,5 @@
-// Toy program to send email.
+// Toy program to send email.  This is used to test my SMTP server,
+// mostly.  It's overgrown a bit.
 
 #include <gflags/gflags.h>
 namespace gflags {
@@ -264,6 +265,7 @@ struct Connection {
 
   std::string reply_code;
 
+  bool greeting_ok{false};
   bool ehlo_ok{false};
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
@@ -347,7 +349,7 @@ struct server_id : sor<domain, address_literal> {};
 //                 *( "220-" [ textstring ] CRLF )
 //                    "220 " [ textstring ] CRLF )
 
-struct greeting
+struct greeting_ok
 : sor<seq<TAOCPP_PEGTL_ISTRING("220 "), server_id, opt<textstring>, CRLF>,
       seq<TAOCPP_PEGTL_ISTRING("220-"), server_id, opt<textstring>, CRLF,
  star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
@@ -364,6 +366,9 @@ struct reply_code
 struct reply_lines
 : seq<star<seq<reply_code, one<'-'>, opt<textstring>, CRLF>>,
            seq<reply_code, opt<seq<SP, textstring>>, CRLF>> {};
+
+struct greeting
+  : sor<greeting_ok, reply_lines> {};
 
 // ehlo-greet     = 1*(%d0-9 / %d11-12 / %d14-127)
 //                    ; string of any characters other than CR or LF
@@ -433,10 +438,11 @@ struct action<server_id> {
 };
 
 template <>
-struct action<greeting> {
+struct action<greeting_ok> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
+    cnn.greeting_ok = true;
     LOG(INFO) << "< " << in.string();
   }
 };
@@ -626,15 +632,11 @@ public:
   {
     hdrs_.push_back(std::make_pair(name, value));
   }
-  // void add_hdr(std::string&& name, std::string&& value)
-  // {
-  //   hdrs_.emplace_back(std::make_pair(name, value));
-  // }
 
   void foreach_hdr(std::function<void(std::string const& name,
                                       std::string const& value)> func)
   {
-    for (auto const& [name, value] : hdrs_) {
+    for (auto const & [ name, value ] : hdrs_) {
       func(name, value);
     }
   }
@@ -644,7 +646,7 @@ private:
 
   friend std::ostream& operator<<(std::ostream& os, Eml const& eml)
   {
-    for (auto const& [name, value] : eml.hdrs_) {
+    for (auto const & [ name, value ] : eml.hdrs_) {
       os << name << ": " << value << "\r\n";
     }
     return os << "\r\n"; // end of headers
@@ -786,7 +788,6 @@ DEFINE_validator(to_name, &validate_name);
 void selftest()
 {
   auto const read_hook{[]() {}};
-  auto cnn{RFC5321::Connection(0, 1, read_hook)};
 
   const char* greet_list[]{
       "220-mtaig-aak03.mx.aol.com ESMTP Internet Inbound\r\n"
@@ -796,13 +797,23 @@ void selftest()
       "220-e-mail sent from the internet.\r\n"
       "220-Effective immediately:\r\n"
       "220-AOL may no longer accept connections from IP addresses\r\n"
-      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n"};
+      "220 which no do not have reverse-DNS (PTR records) assigned.\r\n",
+
+      "421 mtaig-maa02.mx.aol.com Service unavailable - try again later\r\n",
+  };
 
   for (auto i : greet_list) {
+    auto cnn{RFC5321::Connection(0, 1, read_hook)};
     auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
             in, cnn)) {
       LOG(FATAL) << "Error parsing greeting \"" << i << "\"";
+    }
+    if (cnn.greeting_ok) {
+      LOG(WARNING) << "greeting ok";
+    }
+    else {
+      LOG(WARNING) << "greeting was not in the affirmative";
     }
   }
 
@@ -825,10 +836,17 @@ void selftest()
   };
 
   for (auto i : ehlo_rsp_list) {
+    auto cnn{RFC5321::Connection(0, 1, read_hook)};
     auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::ehlo_rsp, RFC5321::action /*, tao::pegtl::tracer*/>(
             in, cnn)) {
       LOG(FATAL) << "Error parsing ehlo response \"" << i << "\"";
+    }
+    if (cnn.ehlo_ok) {
+      LOG(WARNING) << "ehlo ok";
+    }
+    else {
+      LOG(WARNING) << "ehlo response was not in the affirmative";
     }
   }
 }
@@ -932,8 +950,9 @@ try_host:
 
   // CRLF /only/
   auto in{istream_input<eol::crlf>{cnn.sock.in(), Config::bfr_size, "session"}};
-  if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
-    LOG(WARNING) << "greeting failed to parse";
+  CHECK((parse<RFC5321::greeting, RFC5321::action>(in, cnn)));
+  if (!cnn.greeting_ok) {
+    LOG(WARNING) << "greeting was not in the affirmative";
     if (fd_in == fd_out)
       close(fd_in);
     receivers.erase(receivers.begin());
@@ -945,7 +964,7 @@ try_host:
 
   CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
   if (!cnn.ehlo_ok) {
-    LOG(WARNING) << "ehlo response did not parse";
+    LOG(WARNING) << "ehlo response was not in the affirmative";
     LOG(INFO) << "> HELO " << sender.ascii();
     cnn.sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)));
