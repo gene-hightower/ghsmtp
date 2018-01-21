@@ -384,8 +384,16 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     if (lookup_domain(white_, client_identity_))
       return Message::SpamStatus::ham;
 
-    auto tld{tld_db_.get_registered_domain(client_identity_.lc())};
-    if (tld && white_.lookup(tld))
+    auto tld_id{tld_db_.get_registered_domain(client_identity_.lc())};
+    if (tld_id && white_.lookup(tld_id))
+      return Message::SpamStatus::ham;
+
+    auto rp_dom = reverse_path_.domain();
+    if (lookup_domain(white_, rp_dom))
+      return Message::SpamStatus::ham;
+
+    auto tld_rp{tld_db_.get_registered_domain(rp_dom.lc())};
+    if (tld_rp && white_.lookup(tld_rp))
       return Message::SpamStatus::ham;
 
     return Message::SpamStatus::spam;
