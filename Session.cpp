@@ -29,24 +29,6 @@ using namespace std::string_literals;
 namespace Config {
 constexpr auto max_unrecognized_cmds{20};
 
-// clang-format off
-constexpr char const* const bad_recipients[]{
-    "a",
-    "ene",
-    "h.gene",
-    "jay",
-    "lizard",
-    "mixmaster",
-    "nobody",
-    "oq6_2nbq",
-    "sales",
-    "truthfinder",
-    "zk4k7g",
-};
-// clang-format on
-
-constexpr char const* const bad_senders[]{};
-
 constexpr char const* const rbls[]{
     "zen.spamhaus.org",
     "b.barracudacentral.org",
@@ -744,12 +726,10 @@ bool Session::verify_sender_(Mailbox const& sender)
 {
   auto const sender_str{std::string{sender}};
 
-  for (auto bad_sender : Config::bad_senders) {
-    if (sender_str == bad_sender) {
-      out_() << "550 5.1.8 bad sender\r\n" << std::flush;
-      LOG(WARNING) << "bad sender " << sender;
-      return false;
-    }
+  if (bad_senders_.lookup(sender_str)) {
+    out_() << "550 5.1.8 bad sender\r\n" << std::flush;
+    LOG(WARNING) << "bad sender " << sender;
+    return false;
   }
 
   if (sender.domain().is_address_literal()) {

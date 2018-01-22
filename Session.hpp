@@ -135,6 +135,9 @@ private:
   // Local addresses we reject.
   CDB bad_recipients_{"bad_recipients"};
 
+  // Addresses we don't accept mail from.
+  CDB bad_senders_{"bad_senders"};
+
   // White and black lists for domains and IP addresses.
   CDB white_{"white"};
   CDB black_{"black"};

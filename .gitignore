@@ -4,6 +4,7 @@
 *.o
 *~
 accept_domains
+bad_recipients
 cdb-gen
 ghsmtp.private
 ghsmtp.txt
