@@ -23,9 +23,8 @@ DEFINE_bool(selftest, false, "run a self test");
 #include "Mailbox.hpp"
 #include "SPF.hpp"
 #include "esc.hpp"
-#include "osutil.hpp"
-
 #include "fs.hpp"
+#include "osutil.hpp"
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
