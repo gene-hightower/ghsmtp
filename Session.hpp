@@ -129,24 +129,9 @@ private:
 
   TLD tld_db_;
 
-  // Domains we accept mail for.
-  CDB accept_domains_{"accept_domains"};
-
-  // Local addresses we reject.
-  CDB bad_recipients_{"bad_recipients"};
-
-  // Addresses we don't accept mail from.
-  CDB bad_senders_{"bad_senders"};
-
-  // White and black lists for domains and IP addresses.
+  // White and black lists for domains.
   CDB white_{"white"};
   CDB black_{"black"};
-  CDB ip_white_{"ip-white"};
-  CDB ip_black_{"ip-black"};
-
-  // Based on <http://www.surbl.org/guidelines>
-  CDB three_tld_{"three-level-tlds"};
-  CDB two_tld_{"two-level-tlds"};
 
   int n_unrecognized_cmds_{0};
 

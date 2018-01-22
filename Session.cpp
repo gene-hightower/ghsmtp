@@ -572,8 +572,9 @@ void Session::exit_()
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
-  if (black_.lookup(sock_.them_c_str())) {
-    error_msg = sock_.them_address_literal() + " blacklisted";
+  CDB ip_black{"ip-black"};
+  if (ip_black.lookup(sock_.them_c_str())) {
+    error_msg = "blacklisted";
     out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
     return false;
   }
@@ -597,7 +598,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     ip_whitelisted_ = true;
   }
   else {
-    if (white_.lookup(sock_.them_c_str())) {
+    CDB ip_white{"ip-white"};
+    if (ip_white.lookup(sock_.them_c_str())) {
       LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
       ip_whitelisted_ = true;
     }
@@ -609,7 +611,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       auto const res{DNS::Resolver{}};
       for (auto rbl : Config::rbls) {
         if (has_record<RR_type::A>(res, reversed + rbl)) {
-          error_msg = sock_.them_address_literal() + " blocked by " + rbl;
+          error_msg = "blocked by "s + rbl;
           out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
                  << std::flush;
           return false;
@@ -656,8 +658,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (lookup_domain(black_, client_identity)) {
     auto em{std::stringstream{}};
-    em << "blacklisted identity " << client_identity;
-    error_msg = em.str();
+    error_msg = "blacklisted identity "s + client_identity.lc();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -690,9 +691,11 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       }
     }
     else {
-      if (accept_domains_.is_open()) {
-        if (accept_domains_.lookup(recipient.domain().ascii())
-            || accept_domains_.lookup(recipient.domain().utf8())) {
+      // Domains we accept mail for.
+      CDB accept_domains{"accept_domains"};
+      if (accept_domains.is_open()) {
+        if (accept_domains.lookup(recipient.domain().ascii())
+            || accept_domains.lookup(recipient.domain().utf8())) {
           return true;
         }
       }
@@ -713,7 +716,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  if (bad_recipients_.lookup(recipient.local_part())) {
+  CDB bad_recipients{"bad_recipients"};
+  if (bad_recipients.lookup(recipient.local_part())) {
     out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
     LOG(WARNING) << "bad recipient " << recipient;
     return false;
@@ -725,8 +729,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 bool Session::verify_sender_(Mailbox const& sender)
 {
   auto const sender_str{std::string{sender}};
-
-  if (bad_senders_.lookup(sender_str)) {
+  CDB bad_senders{"bad_senders"};  // Addresses we don't accept mail from.
+  if (bad_senders.lookup(sender_str)) {
     out_() << "550 5.1.8 bad sender\r\n" << std::flush;
     LOG(WARNING) << "bad sender " << sender;
     return false;
@@ -796,7 +800,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
   if (labels.size() > 2) {
     auto three_level{labels[labels.size() - 3] + "." + two_level};
 
-    if (three_tld_.lookup(three_level)) {
+    CDB three_tld{"three-level-tlds"};
+    if (three_tld.lookup(three_level)) {
       if (labels.size() > 3) {
         return verify_sender_domain_uribl_(labels[labels.size() - 4] + "."
                                            + three_level);
@@ -810,7 +815,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
     }
   }
 
-  if (two_tld_.lookup(two_level)) {
+  CDB two_tld{"two-level-tlds"};
+  if (two_tld.lookup(two_level)) {
     if (labels.size() > 2) {
       return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
                                          + two_level);
