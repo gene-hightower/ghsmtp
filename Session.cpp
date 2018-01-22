@@ -302,7 +302,7 @@ std::string Session::added_headers_(Message const& msg)
 {
   // The headers Return-Path, Received-SPF, and Received are returned
   // as a string.
-  char const* const protocol{[&]() {
+  auto const protocol{[&]() {
     if (smtputf8_)
       return sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
     else if (extensions_)
@@ -731,12 +731,10 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  for (auto bad_recipient : Config::bad_recipients) {
-    if (0 == recipient.local_part().compare(bad_recipient)) {
-      out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
-      LOG(WARNING) << "bad recipient " << recipient;
-      return false;
-    }
+  if (bad_recipients_.lookup(recipient.local_part())) {
+    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
+    LOG(WARNING) << "bad recipient " << recipient;
+    return false;
   }
 
   return true;

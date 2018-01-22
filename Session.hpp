@@ -132,6 +132,9 @@ private:
   // Domains we accept mail for.
   CDB accept_domains_{"accept_domains"};
 
+  // Local addresses we reject.
+  CDB bad_recipients_{"bad_recipients"};
+
   // White and black lists for domains and IP addresses.
   CDB white_{"white"};
   CDB black_{"black"};
