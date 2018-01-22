@@ -148,7 +148,7 @@ void Verify::foreach_sig(
     auto const passed
         = ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
 
-    func(reinterpret_cast<char const*>(dom), passed);
+    func(c(dom), passed);
   }
 }
 
