@@ -6,6 +6,9 @@
 
 int main(int argc, char* argv[])
 {
+  CDB no_db("no database");
+  CHECK(!no_db.lookup("foo"));
+
   CDB cdb2("two-level-tlds");
 
   CHECK(cdb2.lookup("0.bg"));
