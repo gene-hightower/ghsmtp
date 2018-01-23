@@ -40,9 +40,6 @@ bool CDB::lookup(std::string_view key)
     return false;
 
   CHECK_LT(key.length(), std::numeric_limits<unsigned int>::max());
-  if (cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length()))
-      > 0) {
-    return true;
-  }
-  return false;
+  return cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length()))
+         > 0;
 }
