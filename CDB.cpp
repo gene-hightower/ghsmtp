@@ -18,7 +18,7 @@ CDB::CDB(std::string_view db)
   fd_ = ::open(db_fn.c_str(), O_RDONLY);
   if (fd_ == -1) {
     char err[256]{};
-    auto msg = strerror_r(errno, err, sizeof(err));
+    auto const msg = strerror_r(errno, err, sizeof(err));
     LOG(WARNING) << "unable to open " << db_fn << ": " << msg;
   }
   else {
