@@ -1,9 +1,10 @@
-#include <algorithm>
-
 #include "Domain.hpp"
+
 #include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
+
+#include <algorithm>
 
 #include <idn2.h>
 #include <uninorm.h>
