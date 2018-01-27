@@ -13,7 +13,7 @@ class Domain {
 public:
   Domain() = default;
   Domain(std::string_view dom) { set(dom); }
-  Domain& operator=(std::string_view s) { return set(s), *this; }
+  Domain& operator=(std::string_view s) { set(s); return *this; }
 
   void set(std::string_view dom);
 

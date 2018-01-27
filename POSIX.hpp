@@ -6,9 +6,7 @@
 
 #include <unistd.h>
 
-namespace {
-void null_hook(void) {}
-} // namespace
+constexpr void null_hook(void) {}
 
 class POSIX {
 public:

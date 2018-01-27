@@ -10,19 +10,21 @@ using _Bool = bool; // Not nice to use _Bool in a public interface.
 
 #include <glog/logging.h>
 
+namespace {
 // Not nice to use "unsigned char" for character data.
-constexpr u_char* uc(char const* cp)
+u_char* uc(char const* cp)
 {
   return reinterpret_cast<u_char*>(const_cast<char*>(cp));
 }
 
-constexpr char const* c(unsigned char* ucp)
+char const* c(unsigned char* ucp)
 {
   return reinterpret_cast<char const*>(ucp);
 }
 
 constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
 constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
+} // namespace
 
 namespace OpenDKIM {
 
