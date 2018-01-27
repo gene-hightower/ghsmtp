@@ -25,7 +25,7 @@ public:
   bool operator==(std::string_view rhs) const { return match(lc_, rhs); }
   bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
 
-  bool operator==(Domain const& rhs) const { return lc_ == rhs.lc_; }
+  bool operator==(Domain const& rhs) const { return match(lc_, rhs.lc_); }
   bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
 
   bool is_address_literal() const { return is_address_literal_; }
