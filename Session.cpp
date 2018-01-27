@@ -72,7 +72,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   max_msg_size(Config::max_msg_size_initial);
 }
 
-// Error codes from connection establishment are 220 or 554, according
+// Return codes from connection establishment are 220 or 554, according
 // to RFC 5321.  That's it.
 
 void Session::greeting()
