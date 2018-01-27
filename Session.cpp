@@ -352,9 +352,9 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
   auto const status{[&] {
-    if (sock_.tls()) { // Anything enciphered tastes a lot like ham.
+    // Anything enciphered tastes a lot like ham.
+    if (sock_.tls())
       return Message::SpamStatus::ham;
-    }
 
     // I will allow this as sort of the gold standard for naming.
     if (client_identity_ == client_fcrdns_)
