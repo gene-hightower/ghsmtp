@@ -190,7 +190,7 @@ int main()
 
   auto addr{sockaddr_un{}};
   addr.sun_family = AF_UNIX;
-  auto socket_path{"/var/spool/postfix/private/auth"};
+  auto const socket_path{"/var/spool/postfix/private/auth"};
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
@@ -214,7 +214,7 @@ int main()
 
   auto tok{std::stringstream{}};
   tok << '\0' << test::username << '\0' << test::password;
-  auto init{Base64::enc(tok.str())};
+  auto const init{Base64::enc(tok.str())};
 
   if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
     auto id{uint32_t{0x12345678}};
