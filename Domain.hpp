@@ -20,7 +20,7 @@ public:
   inline void clear();
   bool empty() const { return lc_.empty(); }
 
-  constexpr static bool match(std::string_view a, std::string_view b);
+  static bool match(std::string_view a, std::string_view b);
 
   bool operator==(std::string_view rhs) const { return match(lc_, rhs); }
   bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
@@ -53,7 +53,7 @@ inline void Domain::clear()
   is_address_literal_ = false;
 }
 
-constexpr bool Domain::match(std::string_view a, std::string_view b)
+bool Domain::match(std::string_view a, std::string_view b)
 {
   if ((0 != a.length()) && ('.' == a.back())) {
     a.remove_suffix(1);
