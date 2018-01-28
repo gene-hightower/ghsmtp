@@ -221,7 +221,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   reverse_path_ = std::move(reverse_path);
   forward_path_.clear();
-  out_() << "250 2.1.0 OK\r\n";
+  out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
 }
@@ -247,7 +247,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     }
     else {
       forward_path_.push_back(std::move(forward_path));
-      out_() << "250 2.1.5 OK\r\n";
+      out_() << "250 2.1.5 RCPT TO OK\r\n";
       // No flush RFC-2920 section 3.1, this could be part of a command group.
       LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
     }
@@ -441,7 +441,7 @@ void Session::bdat_error(Message& msg)
 {
   msg.trash();
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
-  LOG(WARNING) << "DATA error";
+  LOG(WARNING) << "BDAT error";
 }
 
 void Session::rset()
