@@ -626,7 +626,23 @@ void bdat_act(Ctx& ctx)
     bfr.resize(xfer_sz);
 
     ctx.session.in().read(&bfr[0], xfer_sz);
-    CHECK(ctx.session.in()) << "read failed";
+
+    if (!ctx.session.in()) {
+      if (ctx.session.in().eof())
+        LOG(ERROR) << "EOF in BDAT";
+
+      LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
+                 << ctx.session.in().gcount();
+
+      if (ctx.msg->size())
+        LOG(ERROR) << "after " << ctx.msg->size() << " octets total";
+
+      ctx.session.bdat_error(*ctx.msg);
+
+      ctx.bdat_error = true;
+      ctx.msg.reset();
+      return;
+    }
 
     if (!ctx.hdr_end) {
       auto const e{bfr.find("\r\n\r\n")};
@@ -642,7 +658,7 @@ void bdat_act(Ctx& ctx)
       }
     }
 
-    ctx.msg->write(&bfr[0], xfer_sz);
+    CHECK(ctx.msg->write(&bfr[0], xfer_sz)) << "error writing message data";
 
     to_xfer -= xfer_sz;
   }
@@ -709,7 +725,7 @@ struct data_action<data_blank> {
   {
     constexpr char CRLF[]{'\r', '\n'};
     if (ctx.msg) {
-      ctx.msg->write(CRLF, sizeof(CRLF));
+      CHECK(ctx.msg->write(CRLF, sizeof(CRLF))) << "error writing message data";
     }
     ctx.hdr.append(CRLF, sizeof(CRLF));
     ctx.hdr_end = true;
@@ -723,7 +739,7 @@ struct data_action<data_plain> {
   {
     auto const len{in.end() - in.begin()};
     if (ctx.msg) {
-      ctx.msg->write(in.begin(), len);
+      CHECK(ctx.msg->write(in.begin(), len)) << "error writing message data";
     }
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::max_hdr_size) {
@@ -740,7 +756,8 @@ struct data_action<data_dot> {
   {
     auto const len{std::streamsize{in.end() - in.begin() - 1}};
     if (ctx.msg) {
-      ctx.msg->write(in.begin() + 1, len);
+      CHECK(ctx.msg->write(in.begin() + 1, len))
+          << "error writing message data";
     }
     if (!ctx.hdr_end) {
       LOG(WARNING) << "suspicious encoding used in header";
@@ -768,7 +785,7 @@ struct data_action<anything_else> {
     auto const len{std::streamsize{in.end() - in.begin()}};
     CHECK(len);
     if (ctx.msg) {
-      ctx.msg->write(in.begin(), len);
+      CHECK(ctx.msg->write(in.begin(), len)) << "error writing message data";
     }
     if (!ctx.hdr_end) {
       if (ctx.hdr.size() < Config::max_hdr_size) {
