@@ -31,10 +31,15 @@ public:
 
   bool size_error() const { return size_error_; }
   std::streamsize size() const { return size_; }
-  std::streamsize size_left() const { return max_size_ - size_; }
+  std::streamsize max_size() const { return max_size_; }
+  std::streamsize size_left() const { return max_size() - size(); }
 
   void save()
   {
+    if (size_error()) {
+      // This should have been caught by the read size limit code.
+      LOG(ERROR) << "message size error: " << size() << " exceeds " << max_size();
+    }
     ofs_.close();
     PCHECK(rename(tmpfn_.c_str(), newfn_.c_str()) == 0);
   }
