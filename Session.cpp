@@ -146,7 +146,7 @@ void Session::ehlo(std::string_view client_identity)
   out_() << "\r\n";
 
   // RFC 1870
-  out_() << "250-SIZE " << max_msg_size_ << "\r\n";
+  out_() << "250-SIZE " << max_msg_size() << "\r\n";
   // RFC 6152
   out_() << "250-8BITMIME\r\n";
 
@@ -937,7 +937,7 @@ bool Session::verify_from_params_(parameters_t const& parameters)
       else {
         try {
           auto const sz = stoull(val);
-          if (sz > max_msg_size_) {
+          if (sz > max_msg_size()) {
             out_() << "552 5.3.4 message size exceeds maximium size\r\n"
                    << std::flush;
             LOG(ERROR) << "SIZE parameter too large: " << sz;
