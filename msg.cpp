@@ -24,6 +24,7 @@ DEFINE_bool(selftest, false, "run a self test");
 #include "SPF.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
+#include "iequal.hpp"
 #include "osutil.hpp"
 
 #include <tao/pegtl.hpp>
@@ -91,12 +92,9 @@ constexpr char const* defined_fields[]{
 
 bool is_defined_field(std::string_view value)
 {
-  auto first = std::begin(defined_fields);
-  auto last = std::end(defined_fields);
-  for (; first != last; ++first) {
-    if (0 == strcasecmp(*first, value.data())) { // US-ASCII
+  for (auto const& defined_field : defined_fields) {
+    if (iequal(value, defined_field))
       return true;
-    }
   }
   return false;
 }
@@ -1219,7 +1217,7 @@ struct action<return_path_retarded> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Return-Path: is retarded";
+    LOG(INFO) << "Return-Path: is retarded: " << esc(in.string());
     header(in, ctx);
     ctx.mb_list.clear();
   }
@@ -1344,8 +1342,8 @@ struct action<received_spf> {
 
     if (ctx.spf_info.find("client-ip") != ctx.spf_info.end()) {
       ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
-      LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
-                << ctx.spf_result;
+      // LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
+      //           << ctx.spf_result;
     }
 
     // Google sometimes doesn't put in anything but client-ip
@@ -1550,20 +1548,20 @@ struct action<message> {
 
     if (ctx.from_list.empty()) {
       // RFC-5322 says message must have a 'From:' header.
-      LOG(ERROR) << "No 'From:' header";
+      LOG(ERROR) << "no RFC5322.From header";
       return;
     }
 
     if (ctx.from_list.size() > 1) {
 
-      LOG(INFO) << ctx.from_list.size() << " RFC5322.From addresses";
+      LOG(INFO) << ctx.from_list.size() << "multiple RFC5322.From addresses";
       for (auto& f : ctx.from_list) {
         LOG(INFO) << f;
       }
 
       if (ctx.sender.empty()) {
         // Must have 'Sender:' says RFC-5322 section 3.6.2.
-        LOG(ERROR) << "No 'Sender:' header with multiple From: mailboxes";
+        LOG(ERROR) << "no RFC5322.Sender header with multiple RFC5322.From mailboxes";
         return;
       }
 
@@ -1597,8 +1595,8 @@ struct action<message> {
     ctx.dmp.store_from_domain(from_domain.ascii().c_str());
 
     ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
-      LOG(INFO) << "DKIM check for " << domain
-                << (passed ? " passed" : " failed");
+      // LOG(INFO) << "DKIM check for " << domain
+      //           << (passed ? " passed" : " failed");
 
       int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                           : DMARC_POLICY_DKIM_OUTCOME_FAIL;
@@ -1608,8 +1606,8 @@ struct action<message> {
     ctx.dmp.query_dmarc(from_domain.ascii().c_str());
 
     // LOG(INFO) << "Message-ID: " << ctx.message_id;
-    LOG(INFO) << "Final DMARC advice for " << from_domain << ": "
-              << Advice_to_string(ctx.dmp.get_advice());
+    // LOG(INFO) << "Final DMARC advice for " << from_domain << ": "
+    //           << Advice_to_string(ctx.dmp.get_advice());
 
     if (ctx.msg_errors.size()) {
       for (auto e : ctx.msg_errors) {
@@ -1624,7 +1622,7 @@ struct action<obs_mbox_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Obsolete mailbox list";
+    LOG(INFO) << "obsolete mailbox list: " << esc(in.string());
   }
 };
 
@@ -1633,7 +1631,7 @@ struct action<obs_addr_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Obsolete address list";
+    LOG(INFO) << "obsolete address list: " << esc(in.string());
   }
 };
 
@@ -1642,10 +1640,14 @@ struct action<obs_group_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Obsolete group list";
+    LOG(INFO) << "obsolete group list: " << esc(in.string());
   }
 };
 } // namespace RFC5322
+
+void display(RFC5322::Ctx const& ctx)
+{
+}
 
 void selftest()
 {
@@ -1748,12 +1750,13 @@ int main(int argc, char* argv[])
     auto name{fs::path(fn)};
     auto f{boost::iostreams::mapped_file_source(name)};
     auto in{memory_input<>(f.data(), f.size(), fn)};
-    LOG(INFO) << "### " << fn;
+    // LOG(INFO) << "### " << fn;
     try {
       RFC5322::Ctx ctx;
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
         LOG(ERROR) << "parse returned false";
       }
+      display(ctx);
     }
     catch (parse_error const& e) {
       std::cerr << e.what();
