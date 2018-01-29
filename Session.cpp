@@ -425,14 +425,14 @@ bool Session::bdat_start()
 
 void Session::bdat_msg(Message& msg, size_t n)
 {
-  out_() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
+  out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
 }
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
   msg.save();
-  out_() << "250 2.0.0 OK " << n << " octets received\r\n" << std::flush;
+  out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
@@ -449,7 +449,7 @@ void Session::bdat_error(Message& msg)
 void Session::rset()
 {
   reset_();
-  out_() << "250 2.0.0 OK\r\n";
+  out_() << "250 2.1.5 RSET OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RSET";
 }
@@ -457,7 +457,7 @@ void Session::rset()
 void Session::noop(std::string_view str)
 {
   last_in_group_("NOOP");
-  out_() << "250 2.0.0 OK\r\n" << std::flush;
+  out_() << "250 2.0.0 NOOP OK\r\n" << std::flush;
   LOG(INFO) << "NOOP" << (str.length() ? " " : "") << str;
 }
 
@@ -470,9 +470,7 @@ void Session::vrfy(std::string_view str)
 
 void Session::help(std::string_view str)
 {
-  out_() << "214 2.0.0 see https://digilicious.com/smtp.html and "
-            "https://tools.ietf.org/html/rfc5321\r\n"
-         << std::flush;
+  out_() << "214 2.0.0 see https://digilicious.com/smtp.html\r\n" << std::flush;
   LOG(INFO) << "HELP" << (str.length() ? " " : "") << str;
 }
 
@@ -546,7 +544,7 @@ void Session::starttls()
     LOG(WARNING) << "STARTTLS issued with TLS already active";
   }
   else {
-    out_() << "220 2.0.0 go for TLS\r\n" << std::flush;
+    out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
     sock_.starttls_server();
     reset_();
 
