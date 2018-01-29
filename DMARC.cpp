@@ -99,6 +99,7 @@ Advice Policy::get_advice()
 
   case DMARC_FROM_DOMAIN_ABSENT:
     LOG(WARNING) << "no From: domain";
+    return Advice::NONE;
 
   case DMARC_POLICY_ABSENT:
     return Advice::NONE;
