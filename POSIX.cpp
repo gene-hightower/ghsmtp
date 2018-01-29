@@ -22,7 +22,7 @@ bool POSIX::input_ready(int fd_in, milliseconds wait)
   FD_ZERO(&fds);
   FD_SET(fd_in, &fds);
 
-  auto tv{(struct timeval){}};
+  auto tv{timeval{}};
   tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
@@ -38,7 +38,7 @@ bool POSIX::output_ready(int fd_out, milliseconds wait)
   FD_ZERO(&fds);
   FD_SET(fd_out, &fds);
 
-  auto tv{(struct timeval){}};
+  auto tv{timeval{}};
   tv.tv_sec = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
