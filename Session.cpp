@@ -134,8 +134,10 @@ void Session::ehlo(std::string_view client_identity)
 
   auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
-           sock_.them_c_str(), error_msg.c_str());
+    if (sock_.has_peername()) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
+             sock_.them_c_str(), error_msg.c_str());
+    }
     std::exit(EXIT_SUCCESS);
   }
 
@@ -183,8 +185,10 @@ void Session::helo(std::string_view client_identity)
 
   auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] HELO failed: %s",
-           sock_.them_c_str(), error_msg.c_str());
+    if (sock_.has_peername()) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] HELO failed: %s",
+             sock_.them_c_str(), error_msg.c_str());
+    }
     std::exit(EXIT_SUCCESS);
   }
 
@@ -212,10 +216,12 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   if (!verify_sender_(reverse_path)) {
-    LOG(ERROR) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
-               << params.str();
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
-           sock_.them_c_str());
+    LOG(WARNING) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
+                 << params.str();
+    if (sock_.has_peername()) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
+             sock_.them_c_str());
+    }
     std::exit(EXIT_SUCCESS);
   }
 
@@ -484,9 +490,11 @@ void Session::quit()
 
 void Session::auth()
 {
-  syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] auth", sock_.them_c_str());
+  if (sock_.has_peername()) {
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] auth", sock_.them_c_str());
+  }
   out_() << "454 4.7.0 authentication failure\r\n" << std::flush;
-  exit_();
+  std::exit(EXIT_SUCCESS);
 }
 
 void Session::error(std::string_view log_msg)
