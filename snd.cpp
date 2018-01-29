@@ -1231,8 +1231,8 @@ try_host:
 
     for (auto const& body : bodies) {
       cnn.sock.out().write(body.data(), body.size());
+      CHECK(cnn.sock.out().good());
     }
-    CHECK(cnn.sock.out().good());
 
     cnn.sock.out() << std::flush;
     CHECK(cnn.sock.out().good());
