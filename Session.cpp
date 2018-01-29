@@ -394,7 +394,7 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 void Session::data_msg_done(Message& msg)
 {
   msg.save();
-  out_() << "250 2.0.0 OK\r\n" << std::flush;
+  out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
 }
