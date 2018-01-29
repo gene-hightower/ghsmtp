@@ -769,7 +769,7 @@ struct data_action<data_dot> {
 
 template <>
 struct data_action<not_data_end> {
-  static void apply0(Ctx& ctx) { ctx.session.bare_lf(); }
+  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.bare_lf(); }
 };
 
 template <>
