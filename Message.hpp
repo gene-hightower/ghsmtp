@@ -38,7 +38,8 @@ public:
   {
     if (size_error()) {
       // This should have been caught by the read size limit code.
-      LOG(ERROR) << "message size error: " << size() << " exceeds " << max_size();
+      LOG(WARNING) << "message size error: " << size() << " exceeds "
+                   << max_size();
     }
     ofs_.close();
     PCHECK(rename(tmpfn_.c_str(), newfn_.c_str()) == 0);

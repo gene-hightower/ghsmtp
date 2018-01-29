@@ -1269,8 +1269,8 @@ try_host:
 
     for (auto const& body : bodies) {
       auto lineno = 0;
-      std::string line;
-      imemstream isbody(body.data(), body.size());
+      auto line{std::string{}};
+      auto isbody{imemstream{body.data(), body.size()}};
       while (std::getline(isbody, line)) {
         ++lineno;
         if (!cnn.sock.out().good()) {

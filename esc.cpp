@@ -6,14 +6,14 @@
 
 using namespace std::string_literals;
 
-std::string esc(std::string_view str, bool multi_line)
+std::string esc(std::string_view str, esc_line_option line_option)
 {
   auto nesc{std::count_if(str.begin(), str.end(), [](unsigned char c) {
     return (!std::isprint(c)) || (c == '\\');
   })};
   if (!nesc)
     return std::string(str);
-  if (multi_line)
+  if (line_option == esc_line_option::multi)
     nesc += std::count(str.begin(), str.end(), '\n');
   std::string ret;
   ret.reserve(str.length() + nesc);
@@ -30,7 +30,7 @@ std::string esc(std::string_view str, bool multi_line)
       break;
     case '\n':
       ret += "\\n"s;
-      if (multi_line)
+      if (line_option == esc_line_option::multi)
         ret += '\n';
       break;
     case '\r':
@@ -57,7 +57,7 @@ std::string esc(std::string_view str, bool multi_line)
       }
     }
   }
-  if (multi_line) {
+  if (line_option == esc_line_option::multi) {
     auto length = ret.length();
     if (length && ('\n' == ret.at(length - 1))) {
       ret.erase(length - 1, 1);

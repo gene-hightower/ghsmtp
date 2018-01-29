@@ -1561,7 +1561,8 @@ struct action<message> {
 
       if (ctx.sender.empty()) {
         // Must have 'Sender:' says RFC-5322 section 3.6.2.
-        LOG(ERROR) << "no RFC5322.Sender header with multiple RFC5322.From mailboxes";
+        LOG(ERROR)
+            << "no RFC5322.Sender header with multiple RFC5322.From mailboxes";
         return;
       }
 
@@ -1645,9 +1646,7 @@ struct action<obs_group_list> {
 };
 } // namespace RFC5322
 
-void display(RFC5322::Ctx const& ctx)
-{
-}
+void display(RFC5322::Ctx const& ctx) {}
 
 void selftest()
 {

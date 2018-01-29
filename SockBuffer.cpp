@@ -67,7 +67,7 @@ std::streamsize SockBuffer::read(char* s, std::streamsize n)
 
   if (log_data_) {
     auto str = std::string(s, static_cast<size_t>(read));
-    LOG(INFO) << "< «" << esc(str, true) << "»";
+    LOG(INFO) << "< «" << esc(str, esc_line_option::multi) << "»";
   }
 
   return read;
@@ -85,7 +85,7 @@ std::streamsize SockBuffer::write(const char* s, std::streamsize n)
 
   if (log_data_) {
     auto str = std::string(s, static_cast<size_t>(written));
-    LOG(INFO) << "> «" << esc(str, true) << "»";
+    LOG(INFO) << "> «" << esc(str, esc_line_option::multi) << "»";
   }
 
   return written;

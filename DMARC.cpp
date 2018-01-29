@@ -42,8 +42,8 @@ bool Policy::store_from_domain(char const* from_domain)
   auto const status
       = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
   if (status != DMARC_PARSE_OKAY) {
-    LOG(ERROR) << "from_domain == " << from_domain;
-    LOG(ERROR) << opendmarc_policy_status_to_str(status);
+    LOG(WARNING) << "from_domain == " << from_domain;
+    LOG(WARNING) << opendmarc_policy_status_to_str(status);
     return false;
   }
   return true;
@@ -56,8 +56,8 @@ bool Policy::store_dkim(char const* d_equal_domain,
   auto const status = opendmarc_policy_store_dkim(
       pctx_, uc(d_equal_domain), dkim_result, uc(human_result));
   if (status != DMARC_PARSE_OKAY) {
-    LOG(ERROR) << "d_equal_domain == " << d_equal_domain;
-    LOG(ERROR) << opendmarc_policy_status_to_str(status);
+    LOG(WARNING) << "d_equal_domain == " << d_equal_domain;
+    LOG(WARNING) << opendmarc_policy_status_to_str(status);
     return false;
   }
   return true;
@@ -71,8 +71,8 @@ bool Policy::store_spf(char const* domain,
   auto const status = opendmarc_policy_store_spf(pctx_, uc(domain), result,
                                                  origin, uc(human_readable));
   if (status != DMARC_PARSE_OKAY) {
-    LOG(ERROR) << "domain == " << domain;
-    LOG(ERROR) << opendmarc_policy_status_to_str(status);
+    LOG(WARNING) << "domain == " << domain;
+    LOG(WARNING) << opendmarc_policy_status_to_str(status);
     return false;
   }
   return true;
@@ -82,7 +82,7 @@ bool Policy::query_dmarc(char const* domain)
 {
   auto const status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
   if (status != DMARC_PARSE_OKAY) {
-    LOG(ERROR) << domain << ": " << opendmarc_policy_status_to_str(status);
+    LOG(WARNING) << domain << ": " << opendmarc_policy_status_to_str(status);
     return false;
   }
   return true;
@@ -94,11 +94,11 @@ Advice Policy::get_advice()
 
   switch (status) {
   case DMARC_PARSE_ERROR_NULL_CTX:
-    LOG(ERROR) << "NULL pctx value";
+    LOG(WARNING) << "NULL pctx value";
     return Advice::NONE;
 
   case DMARC_FROM_DOMAIN_ABSENT:
-    LOG(FATAL) << "no From: domain";
+    LOG(WARNING) << "no From: domain";
 
   case DMARC_POLICY_ABSENT:
     return Advice::NONE;

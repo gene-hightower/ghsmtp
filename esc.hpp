@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
-std::string esc(std::string_view str, bool multi_line = false);
+enum class esc_line_option : bool { single, multi };
+std::string esc(std::string_view str,
+                esc_line_option line_option = esc_line_option::single);
 
 #endif // ESC_DOT_HPP

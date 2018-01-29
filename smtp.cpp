@@ -634,11 +634,7 @@ void bdat_act(Ctx& ctx)
       LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
                  << ctx.session.in().gcount();
 
-      if (ctx.msg->size())
-        LOG(ERROR) << "after " << ctx.msg->size() << " octets total";
-
       ctx.session.bdat_error(*ctx.msg);
-
       ctx.bdat_error = true;
       ctx.msg.reset();
       return;
@@ -1010,7 +1006,7 @@ int main(int argc, char* argv[])
     ctx->session.time_out();
   }
   else {
-    ctx->session.error("syntax error from parser");
+    ctx->session.error("session end without QUIT command from client");
   }
 
   return ret;

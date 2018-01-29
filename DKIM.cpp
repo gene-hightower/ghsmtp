@@ -17,10 +17,7 @@ u_char* uc(char const* cp)
   return reinterpret_cast<u_char*>(const_cast<char*>(cp));
 }
 
-char const* c(unsigned char* ucp)
-{
-  return reinterpret_cast<char const*>(ucp);
-}
+char const* c(unsigned char* ucp) { return reinterpret_cast<char const*>(ucp); }
 
 constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
 constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
@@ -64,7 +61,7 @@ void Lib::eoh()
     break;
 
   default:
-    LOG(ERROR) << "dkim_eoh error: " << dkim_getresultstr(status_);
+    LOG(WARNING) << "dkim_eoh error: " << dkim_getresultstr(status_);
     break;
   }
 }
@@ -94,7 +91,7 @@ void Lib::eom()
     break;
 
   default:
-    LOG(ERROR) << "dkim_eom error: " << dkim_getresultstr(status_);
+    LOG(WARNING) << "dkim_eom error: " << dkim_getresultstr(status_);
     break;
   }
 }

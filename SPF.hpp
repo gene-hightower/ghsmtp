@@ -78,11 +78,11 @@ private:
   }
   static void log_warning_(const char* file, int line, char const* errmsg)
   {
-    LOG(ERROR) << file << ":" << line << " " << errmsg;
+    LOG(WARNING) << file << ":" << line << " " << errmsg;
   }
   static void log_info_(const char* file, int line, char const* errmsg)
   {
-    LOG(WARNING) << file << ":" << line << " " << errmsg;
+    LOG(INFO) << file << ":" << line << " " << errmsg;
   }
 
   friend class Request;

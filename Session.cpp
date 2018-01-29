@@ -261,17 +261,17 @@ bool Session::data_start()
 
   if (binarymime_) {
     out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
-    LOG(ERROR) << "DATA does not support BINARYMIME";
+    LOG(WARNING) << "DATA does not support BINARYMIME";
     return false;
   }
   if (!reverse_path_verified_) {
     out_() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
-    LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
+    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
     out_() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
-    LOG(ERROR) << "no valid recipients";
+    LOG(WARNING) << "no valid recipients";
     return false;
   }
   out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
@@ -402,6 +402,7 @@ void Session::data_msg_done(Message& msg)
 void Session::data_size_error(Message& msg)
 {
   msg.trash();
+  out_().clear(); // clear possible eof from input side
   out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "DATA size error";
 }
@@ -410,12 +411,12 @@ bool Session::bdat_start()
 {
   if (!reverse_path_verified_) {
     out_() << "503 5.5.1 need 'MAIL FROM' before 'BDAT'\r\n" << std::flush;
-    LOG(ERROR) << "need 'MAIL FROM' before 'DATA'";
+    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
     return false;
   }
   if (forward_path_.empty()) {
     out_() << "503 5.5.1 need 'RCPT TO' before 'BDAT'\r\n" << std::flush;
-    LOG(ERROR) << "no valid recipients";
+    LOG(WARNING) << "no valid recipients";
     return false;
   }
 
@@ -440,6 +441,7 @@ void Session::bdat_msg_last(Message& msg, size_t n)
 void Session::bdat_error(Message& msg)
 {
   msg.trash();
+  out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
   LOG(WARNING) << "BDAT error";
 }
@@ -492,19 +494,20 @@ void Session::auth()
 void Session::error(std::string_view log_msg)
 {
   out_() << "421 4.3.5 system error\r\n" << std::flush;
-  LOG(ERROR) << log_msg;
+  LOG(WARNING) << log_msg;
 }
 
 void Session::cmd_unrecognized(std::string_view cmd)
 {
   auto const escaped{esc(cmd)};
-  LOG(ERROR) << "command unrecognized: \"" << escaped << "\"";
+  LOG(WARNING) << "command unrecognized: \"" << escaped << "\"";
 
   if (++n_unrecognized_cmds_ >= Config::max_unrecognized_cmds) {
     out_() << "500 5.5.1 command unrecognized: \"" << escaped
            << "\" exceeds limit\r\n"
            << std::flush;
-    LOG(ERROR) << n_unrecognized_cmds_ << " unrecognized commands is too many";
+    LOG(WARNING) << n_unrecognized_cmds_
+                 << " unrecognized commands is too many";
     exit_();
   }
 
@@ -516,21 +519,22 @@ void Session::bare_lf()
 {
   // Error code used by Office 365.
   out_() << "554 5.6.11 bare LF\r\n" << std::flush;
-  LOG(ERROR) << "bare LF";
+  LOG(WARNING) << "bare LF";
   exit_();
 }
 
 void Session::max_out()
 {
   out_() << "552 5.3.4 message size exceeds maximium size\r\n" << std::flush;
-  LOG(ERROR) << "message size maxed out";
+  LOG(WARNING) << "message size maxed out";
   exit_();
 }
 
 void Session::time_out()
 {
   out_() << "421 4.4.2 time-out\r\n" << std::flush;
-  LOG(ERROR) << "time-out" << (sock_.has_peername() ? " from " : "") << client_;
+  LOG(WARNING) << "time-out" << (sock_.has_peername() ? " from " : "")
+               << client_;
   exit_();
 }
 
@@ -539,7 +543,7 @@ void Session::starttls()
   last_in_group_("STARTTLS");
   if (sock_.tls()) {
     out_() << "554 5.5.1 TLS already active\r\n" << std::flush;
-    LOG(ERROR) << "STARTTLS issued with TLS already active";
+    LOG(WARNING) << "STARTTLS issued with TLS already active";
   }
   else {
     out_() << "220 2.0.0 go for TLS\r\n" << std::flush;
@@ -729,7 +733,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 bool Session::verify_sender_(Mailbox const& sender)
 {
   auto const sender_str{std::string{sender}};
-  CDB bad_senders{"bad_senders"};  // Addresses we don't accept mail from.
+  CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     out_() << "550 5.1.8 bad sender\r\n" << std::flush;
     LOG(WARNING) << "bad sender " << sender;
@@ -789,7 +793,7 @@ bool Session::verify_sender_domain_(Domain const& sender)
   if (labels.size() < 2) { // This is not a valid domain.
     out_() << "550 5.7.1 invalid sender domain " << sender << "\r\n"
            << std::flush;
-    LOG(ERROR) << "sender \"" << sender << "\" invalid syntax";
+    LOG(WARNING) << "sender \"" << sender << "\" invalid syntax";
     return false;
   }
 
@@ -808,8 +812,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
       }
       else {
         out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
-        LOG(ERROR) << "sender \"" << sender
-                   << "\" blocked by exact match on three-level-tlds list";
+        LOG(WARNING) << "sender \"" << sender
+                     << "\" blocked by exact match on three-level-tlds list";
         return false;
       }
     }
@@ -823,8 +827,8 @@ bool Session::verify_sender_domain_(Domain const& sender)
     }
     else {
       out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
-      LOG(ERROR) << "sender \"" << sender
-                 << "\" blocked by exact match on two-level-tlds list";
+      LOG(WARNING) << "sender \"" << sender
+                   << "\" blocked by exact match on two-level-tlds list";
       return false;
     }
   }
@@ -843,7 +847,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
-      LOG(ERROR) << sender << " blocked by " << uribl;
+      LOG(WARNING) << sender << " blocked by " << uribl;
       return false;
     }
   }
@@ -897,7 +901,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     // Error code from RFC 7372, section 3.2.  Also:
     // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
     out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
-    LOG(ERROR) << spf_res.header_comment();
+    LOG(WARNING) << spf_res.header_comment();
     return false;
   }
 
@@ -940,7 +944,7 @@ bool Session::verify_from_params_(parameters_t const& parameters)
           if (sz > max_msg_size()) {
             out_() << "552 5.3.4 message size exceeds maximium size\r\n"
                    << std::flush;
-            LOG(ERROR) << "SIZE parameter too large: " << sz;
+            LOG(WARNING) << "SIZE parameter too large: " << sz;
             return false;
           }
         }
