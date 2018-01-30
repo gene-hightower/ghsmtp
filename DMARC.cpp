@@ -16,7 +16,8 @@ Lib::Lib()
   auto const path = osutil::get_config_dir() / "public_suffix_list.dat";
   CHECK(fs::exists(path)) << "can't find " << path;
   auto native = path.string();
-  strcpy(reinterpret_cast<char*>(lib_.tld_source_file), native.c_str());
+  strncpy(reinterpret_cast<char*>(lib_.tld_source_file), native.c_str(),
+          PATH_MAX);
   auto const status = opendmarc_policy_library_init(&lib_);
   CHECK_EQ(status, DMARC_PARSE_OKAY) << opendmarc_policy_status_to_str(status);
 }

@@ -848,6 +848,9 @@ bool Session::verify_sender_domain_(Domain const& sender)
 
 bool Session::verify_sender_domain_uribl_(std::string const& sender)
 {
+  if (!sock_.has_peername())    // short circuit
+    return true;
+
   auto res{DNS::Resolver{}};
   for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
