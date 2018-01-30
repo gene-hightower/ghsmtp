@@ -667,21 +667,21 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    auto em{std::stringstream{}};
     error_msg = "blacklisted identity "s + client_identity.lc();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
 
   auto const tld{tld_db_.get_registered_domain(client_identity.lc())};
-  if (tld) {
-    if (client_identity == tld) {
-      if (black_.lookup(tld)) {
-        error_msg = "blacklisted TLD "s + tld;
-        out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
-        return false;
-      }
-    }
+  if (!tld) {
+    error_msg = "client "s + client_identity.lc() + " has to TLD";
+    out_() << "550 4.7.1 blacklisted: no TLD\r\n" << std::flush;
+    return false;
+  }
+  if (black_.lookup(tld)) {
+    error_msg = "blacklisted TLD "s + tld;
+    out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
+    return false;
   }
 
   return true;
@@ -783,11 +783,13 @@ bool Session::verify_sender_domain_(Domain const& sender)
   }
 
   auto tld{tld_db_.get_registered_domain(sender.lc())};
-  if (tld) {
-    if (white_.lookup(tld)) {
-      LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
-      return true;
-    }
+  if (!tld) {
+    LOG(WARNING) << "sender " << sender << " has no TLD";
+    return false;
+  }
+  if (white_.lookup(tld)) {
+    LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
+    return true;
   }
 
   // Break sender domain into labels:
