@@ -215,14 +215,14 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
-  if (!verify_sender_(reverse_path)) {
-    LOG(WARNING) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
-                 << params.str();
-    if (sock_.has_peername()) {
+  if (sock_.has_peername()) {
+    if (!verify_sender_(reverse_path)) {
+      LOG(WARNING) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
+                   << params.str();
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
              sock_.them_c_str());
+      std::exit(EXIT_SUCCESS);
     }
-    std::exit(EXIT_SUCCESS);
   }
 
   reverse_path_ = std::move(reverse_path);
