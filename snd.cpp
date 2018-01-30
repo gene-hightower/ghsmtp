@@ -26,6 +26,8 @@ DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
 
+DEFINE_bool(starttls_1st, false, "inappropriately STARTTLS before EHLO");
+
 // To force it, set if you have UTF8 in the local part of any RFC5321
 // address.
 DEFINE_bool(force_smtputf8, false, "force SMTPUTF8 extension");
@@ -1039,6 +1041,23 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   }
 }
 
+template <typename Input>
+void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
+{
+  LOG(INFO) << "> STARTTLS";
+  cnn.sock.out() << "STARTTLS\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+  cnn.sock.starttls_client();
+
+  if (!FLAGS_starttls_1st) {
+    // Skip the 2nd EHLO since we're about to try our 1st.
+    LOG(INFO) << "> EHLO " << sender.ascii();
+    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+  }
+}
+
 bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
@@ -1060,6 +1079,10 @@ bool snd(int fd_in,
   if (!cnn.greeting_ok) {
     LOG(WARNING) << "greeting was not in the affirmative, skipping";
     return false;
+  }
+
+  if (FLAGS_starttls_1st) {
+    starttls(in, cnn, sender);
   }
 
   // try EHLO/HELO
@@ -1120,16 +1143,8 @@ bool snd(int fd_in,
     return false;
   }
 
-  if (ext_starttls) {
-    LOG(INFO) << "> STARTTLS";
-    cnn.sock.out() << "STARTTLS\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
-    cnn.sock.starttls_client();
-
-    LOG(INFO) << "> EHLO " << sender.ascii();
-    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
-    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+  if (!FLAGS_starttls_1st && ext_starttls) {
+    starttls(in, cnn, sender);
   }
 
   if (receiver != cnn.server_id) {
