@@ -19,12 +19,16 @@ DEFINE_bool(rawdog,
             "or escape leading dots");
 
 DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension to send mail");
+DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
 DEFINE_bool(use_chunking, true, "use CHUNKING extension to send mail");
 DEFINE_bool(use_pipelining, true, "use PIPELINING extension to send mail");
 DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
-DEFINE_bool(force_smtputf8, false, "force SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
+
+// To force it, set if you have UTF8 in the local part of any RFC5321
+// address.
+DEFINE_bool(force_smtputf8, false, "force SMTPUTF8 extension");
 
 DEFINE_string(sender, "", "FQDN of sending node");
 
@@ -927,6 +931,114 @@ auto parse_mailboxes()
   return std::make_tuple(from_mbx, to_mbx);
 }
 
+auto create_eml(Domain const& sender,
+                std::string const& from,
+                std::string const& to,
+                std::vector<content> const& bodies,
+                bool ext_smtputf8)
+{
+  auto eml{Eml{}};
+  auto const date{Now{}};
+  auto const pill{Pill{}};
+
+  auto mid_str{std::stringstream{}};
+  mid_str << '<' << date.sec() << '.' << pill << '@' << sender.utf8() << '>';
+  eml.add_hdr("Message-ID", mid_str.str());
+
+  eml.add_hdr("Date", date.c_str());
+  eml.add_hdr("From", FLAGS_from_name + " <" + from + ">");
+  eml.add_hdr("To", FLAGS_to_name + " <" + to + ">");
+  eml.add_hdr("Subject", FLAGS_subject);
+
+  if (!FLAGS_keywords.empty())
+    eml.add_hdr("Keywords", FLAGS_keywords);
+
+  if (!FLAGS_in_reply_to.empty())
+    eml.add_hdr("In-Reply-To", FLAGS_in_reply_to);
+
+  eml.add_hdr("MIME-Version", "1.0");
+  eml.add_hdr("Content-Language", "en-US");
+
+  auto magic{Magic{}}; // to ID buffer contents
+
+  eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
+
+  return eml;
+}
+
+void sign_eml(Eml& eml,
+              Mailbox const& from_mbx,
+              std::vector<content> const& bodies)
+{
+  auto const body_type = (bodies[0].type() == data_type::binary)
+                             ? OpenDKIM::Sign::body_type::binary
+                             : OpenDKIM::Sign::body_type::text;
+
+  auto key_file = FLAGS_selector + ".private";
+  std::ifstream keyfs(key_file.c_str());
+  CHECK(keyfs.good()) << "can't access " << key_file;
+  std::string key(std::istreambuf_iterator<char>{keyfs}, {});
+  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(),
+                     from_mbx.domain().ascii().c_str(), body_type);
+  eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
+    auto header = name + ": "s + value;
+    dks.header(header.c_str());
+  });
+  dks.eoh();
+  for (auto const& body : bodies) {
+    dks.body(body);
+  }
+  dks.eom();
+  eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
+}
+
+template <typename Input>
+void do_auth(Input& in, RFC5321::Connection& cnn)
+{
+  if (FLAGS_username.empty() && FLAGS_password.empty())
+    return;
+
+  auto const auth = cnn.ehlo_params.find("AUTH");
+  if (auth == cnn.ehlo_params.end()) {
+    LOG(ERROR) << "server doesn't support AUTH";
+    fail(in, cnn);
+  }
+
+  // Perfer PLAIN mechanism.
+  if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
+      != auth->second.end()) {
+    LOG(INFO) << "> AUTH PLAIN";
+    auto tok{std::stringstream{}};
+    tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
+    cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
+                   << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    if (cnn.reply_code != "235") {
+      LOG(ERROR) << "AUTH PLAIN returned " << cnn.reply_code;
+      fail(in, cnn);
+    }
+  }
+  // The LOGIN SASL mechanism is obsolete.
+  else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
+           != auth->second.end()) {
+    LOG(INFO) << "> AUTH LOGIN";
+    cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
+    CHECK((parse<RFC5321::auth_login_username>(in)));
+    cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::auth_login_password>(in)));
+    cnn.sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    if (cnn.reply_code != "235") {
+      LOG(ERROR) << "AUTH LOGIN returned " << cnn.reply_code;
+      fail(in, cnn);
+    }
+  }
+  else {
+    LOG(ERROR) << "server doesn't support AUTH methods PLAIN or LOGIN";
+    fail(in, cnn);
+  }
+}
+
 bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
@@ -975,14 +1087,40 @@ bool snd(int fd_in,
     // Hello worked
   }
 
-  if (FLAGS_force_smtputf8
-      && (cnn.ehlo_params.find("SMTPUTF8") == cnn.ehlo_params.end())) {
+  // Check extensions
+
+  auto const ext_8bitmime{
+      FLAGS_use_8bitmime
+      && (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())};
+
+  auto const ext_binarymime{FLAGS_use_binarymime
+                            && cnn.ehlo_params.find("BINARYMIME")
+                                   != cnn.ehlo_params.end()};
+  auto ext_chunking{FLAGS_use_chunking
+                    && cnn.ehlo_params.find("CHUNKING")
+                           != cnn.ehlo_params.end()};
+
+  auto ext_pipelining{
+      FLAGS_use_pipelining
+      && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end())};
+
+  auto const ext_size{FLAGS_use_size
+                      && cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()};
+
+  auto const ext_smtputf8{
+      FLAGS_use_smtputf8
+      && (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())};
+
+  auto const ext_starttls{
+      FLAGS_use_tls
+      && (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end())};
+
+  if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "no SMTPUTF8, skipping";
     return false;
   }
 
-  if (FLAGS_use_tls
-      && (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end())) {
+  if (ext_starttls) {
     LOG(INFO) << "> STARTTLS";
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -998,24 +1136,10 @@ bool snd(int fd_in,
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 
-  auto const ext_smtputf8{
-      FLAGS_use_smtputf8
-      && (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())};
-
   if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "does not support SMTPUTF8";
     return false;
   }
-
-  auto const ext_8bitmime{
-      FLAGS_use_8bitmime
-      && (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())};
-  auto ext_chunking{cnn.ehlo_params.find("CHUNKING") != cnn.ehlo_params.end()};
-  auto const ext_binarymime{cnn.ehlo_params.find("BINARYMIME")
-                            != cnn.ehlo_params.end()};
-  auto ext_pipelining{
-      FLAGS_use_pipelining
-      && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end())};
 
   if (ext_binarymime && !ext_chunking) {
     LOG(WARNING)
@@ -1033,7 +1157,6 @@ bool snd(int fd_in,
   }
 
   auto max_msg_size{0u};
-  auto const ext_size{cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
       auto ep{(char*){}};
@@ -1048,49 +1171,7 @@ bool snd(int fd_in,
     max_msg_size = Config::max_msg_size;
   }
 
-  if ((!FLAGS_username.empty()) && (!FLAGS_password.empty())) {
-    auto const auth = cnn.ehlo_params.find("AUTH");
-    if (auth != cnn.ehlo_params.end()) {
-
-      // Perfer PLAIN mechanism.
-      if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
-          != auth->second.end()) {
-        LOG(INFO) << "> AUTH PLAIN";
-        auto tok{std::stringstream{}};
-        tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
-        cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
-                       << std::flush;
-        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-        if (cnn.reply_code != "235") {
-          LOG(ERROR) << "AUTH PLAIN returned " << cnn.reply_code;
-          fail(in, cnn);
-        }
-      }
-      // The LOGIN SASL mechanism is obsolete.
-      else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
-               != auth->second.end()) {
-        LOG(INFO) << "> AUTH LOGIN";
-        cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
-        CHECK((parse<RFC5321::auth_login_username>(in)));
-        cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
-        CHECK((parse<RFC5321::auth_login_password>(in)));
-        cnn.sock.out() << Base64::enc(FLAGS_password) << "\r\n" << std::flush;
-        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-        if (cnn.reply_code != "235") {
-          LOG(ERROR) << "AUTH LOGIN returned " << cnn.reply_code;
-          fail(in, cnn);
-        }
-      }
-      else {
-        LOG(ERROR) << "server doesn't support AUTH methods PLAIN or LOGIN";
-        fail(in, cnn);
-      }
-    }
-    else {
-      LOG(ERROR) << "server doesn't support AUTH";
-      fail(in, cnn);
-    }
-  }
+  do_auth(in, cnn);
 
   in.discard();
 
@@ -1106,53 +1187,11 @@ bool snd(int fd_in,
          + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
   }
 
-  auto eml{Eml{}};
-  auto const date{Now{}};
-  auto const pill{Pill{}};
+  auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
-  auto mid_str{std::stringstream{}};
-  mid_str << '<' << date.sec() << '.' << pill << '@' << sender.utf8() << '>';
-  eml.add_hdr("Message-ID", mid_str.str());
+  sign_eml(eml, from_mbx, bodies);
 
-  eml.add_hdr("Date", date.c_str());
-  eml.add_hdr("From", FLAGS_from_name + " <" + from + ">");
-  eml.add_hdr("To", FLAGS_to_name + " <" + to + ">");
-  eml.add_hdr("Subject", FLAGS_subject);
-
-  if (!FLAGS_keywords.empty())
-    eml.add_hdr("Keywords", FLAGS_keywords);
-
-  if (!FLAGS_in_reply_to.empty())
-    eml.add_hdr("In-Reply-To", FLAGS_in_reply_to);
-
-  eml.add_hdr("MIME-Version", "1.0");
-  eml.add_hdr("Content-Language", "en-US");
-
-  auto magic{Magic{}}; // to ID buffer contents
-
-  eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
-
-  auto const body_type = (bodies[0].type() == data_type::binary)
-                             ? OpenDKIM::Sign::body_type::binary
-                             : OpenDKIM::Sign::body_type::text;
-
-  auto key_file = FLAGS_selector + ".private";
-  std::ifstream keyfs(key_file.c_str());
-  CHECK(keyfs.good()) << "can't access " << key_file;
-  std::string key(std::istreambuf_iterator<char>{keyfs}, {});
-  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(),
-                     from_mbx.domain().ascii().c_str(), body_type);
-  eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
-    auto header = name + ": "s + value;
-    dks.header(header.c_str());
-  });
-  dks.eoh();
-  for (auto const& body : bodies) {
-    dks.body(body);
-  }
-  dks.eom();
-  eml.add_hdr("DKIM-Signature"s, dks.getsighdr());
-
+  // Get the header as one big string
   std::stringstream hdr_stream;
   hdr_stream << eml;
   auto hdr_str = hdr_stream.str();
@@ -1165,7 +1204,7 @@ bool snd(int fd_in,
   for (auto const& body : bodies)
     total_size += body.size();
 
-  if (FLAGS_use_size && (total_size > max_msg_size)) {
+  if (ext_size && (total_size > max_msg_size)) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
     LOG(INFO) << "> QUIT";
@@ -1175,14 +1214,14 @@ bool snd(int fd_in,
   }
 
   std::stringstream param_stream;
-  if (FLAGS_huge_size) {
+  if (FLAGS_huge_size && ext_size) {
     param_stream << " SIZE=" << max_msg_size * 2;
   }
-  else if (FLAGS_use_size && ext_size) {
+  else if (ext_size) {
     param_stream << " SIZE=" << total_size;
   }
 
-  if (ext_binarymime && FLAGS_use_chunking) {
+  if (ext_binarymime) {
     param_stream << " BODY=BINARYMIME";
   }
   else if (ext_8bitmime) {
@@ -1221,7 +1260,7 @@ bool snd(int fd_in,
     check_for_fail(in, cnn, "RCPT TO");
   }
 
-  if (FLAGS_use_chunking && ext_chunking) {
+  if (ext_chunking) {
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "> " << bdat_stream.str();
@@ -1339,16 +1378,14 @@ int main(int argc, char* argv[])
   }
 
   auto bodies{std::vector<content>{}};
-  if (argc == 1) {
-    bodies.push_back("body.txt");
-  }
-  for (int a = 1; a < argc; ++a) {
+  for (int a = 1; a < argc; ++a)
     bodies.push_back(argv[a]);
-  }
+
+  if (argc == 1)
+    bodies.push_back("body.txt");
 
   CHECK_EQ(bodies.size(), 1) << "only one body part for now";
-
-  CHECK(!(FLAGS_ip4 && FLAGS_ip6)) << "Must use /some/ IP version.";
+  CHECK(!(FLAGS_ip4 && FLAGS_ip6)) << "must use /some/ IP version";
 
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
@@ -1356,10 +1393,10 @@ int main(int argc, char* argv[])
   auto && [ from_mbx, to_mbx ] = parse_mailboxes();
 
   if (FLAGS_pipe) {
-    if (snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"), from_mbx,
-            to_mbx, bodies))
-      return EXIT_SUCCESS;
-    return EXIT_FAILURE;
+    return snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"),
+               from_mbx, to_mbx, bodies)
+               ? EXIT_SUCCESS
+               : EXIT_FAILURE;
   }
 
   auto res{DNS::Resolver{}};
