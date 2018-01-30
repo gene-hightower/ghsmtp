@@ -29,6 +29,9 @@ struct Session_test {
     auto read_hook = []() { std::cout << "Session-test read_hook\n"; };
     Session sess(read_hook, STDIN_FILENO, fd_null);
 
+    auto sender{Domain{"example.er"}};
+    sess.verify_sender_domain_(sender);
+
     LOG(ERROR) << "Expect: 3 invalid sender domains:";
     CHECK(!sess.verify_sender_domain_(Domain("com")));
     CHECK(!sess.verify_sender_domain_(Domain("zzux.com")));
