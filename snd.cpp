@@ -10,6 +10,7 @@ DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
+DEFINE_bool(huge_size, false, "attempt with huge size");
 DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(nosend, false, "don't actually send any mail");
 DEFINE_bool(rawdog,
@@ -1177,7 +1178,10 @@ try_host:
   }
 
   std::stringstream param_stream;
-  if (FLAGS_use_size && ext_size) {
+  if (FLAGS_huge_size) {
+    param_stream << " SIZE=" << max_msg_size * 2;
+  }
+  else if (FLAGS_use_size && ext_size) {
     param_stream << " SIZE=" << total_size;
   }
 
