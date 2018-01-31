@@ -80,7 +80,7 @@ void Session::greeting()
   if (sock_.has_peername()) {
     auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
-      LOG(WARNING) << "verify ip failed: " << error_msg;
+      // LOG(WARNING) << "verify ip failed: " << error_msg;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
              error_msg.c_str());
       std::exit(EXIT_SUCCESS);
