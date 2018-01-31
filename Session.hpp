@@ -101,11 +101,12 @@ private:
   }
 
   bool verify_ip_address_(std::string& error_msg);
+  void verify_client_();
   bool verify_client_(Domain const& client_identity, std::string& error_msg);
   bool verify_recipient_(Mailbox const& recipient);
-  bool verify_sender_(Mailbox const& sender);
-  bool verify_sender_domain_(Domain const& sender);
-  bool verify_sender_domain_uribl_(std::string const& sender);
+  bool verify_sender_(Mailbox const& sender, std::string& error_msg);
+  bool verify_sender_domain_(Domain const& sender, std::string& error_msg);
+  bool verify_sender_domain_uribl_(std::string const& sender, std::string& error_msg);
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
 

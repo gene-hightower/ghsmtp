@@ -80,6 +80,7 @@ void Session::greeting()
   if (sock_.has_peername()) {
     auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
+      LOG(WARNING) << "verify ip failed: " << error_msg;
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
              error_msg.c_str());
       std::exit(EXIT_SUCCESS);
@@ -123,6 +124,19 @@ void Session::last_in_group_(std::string_view verb)
   }
 }
 
+void Session::verify_client_()
+{
+  auto error_msg{std::string{}};
+  if (!verify_client_(client_identity_, error_msg)) {
+    LOG(WARNING) << "verify client failed: " << error_msg;
+    if (sock_.has_peername()) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
+             sock_.them_c_str(), error_msg.c_str());
+    }
+    std::exit(EXIT_SUCCESS);
+  }
+}
+
 void Session::ehlo(std::string_view client_identity)
 {
   auto constexpr verb{"EHLO"};
@@ -132,14 +146,7 @@ void Session::ehlo(std::string_view client_identity)
   extensions_ = true;
   client_identity_.set(client_identity);
 
-  auto error_msg{std::string{}};
-  if (!verify_client_(client_identity_, error_msg)) {
-    if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
-             sock_.them_c_str(), error_msg.c_str());
-    }
-    std::exit(EXIT_SUCCESS);
-  }
+  verify_client_();
 
   out_() << "250-" << server_id_();
   if (sock_.has_peername()) {
@@ -183,14 +190,7 @@ void Session::helo(std::string_view client_identity)
   extensions_ = false;
   client_identity_.set(client_identity);
 
-  auto error_msg{std::string{}};
-  if (!verify_client_(client_identity_, error_msg)) {
-    if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] HELO failed: %s",
-             sock_.them_c_str(), error_msg.c_str());
-    }
-    std::exit(EXIT_SUCCESS);
-  }
+  verify_client_();
 
   out_() << "250 " << server_id_() << "\r\n" << std::flush;
 
@@ -211,16 +211,17 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   auto params{std::ostringstream{}};
-  for (auto const& [name, value] : parameters) {
+  for (auto const & [ name, value ] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
-  if (!verify_sender_(reverse_path)) {
-    LOG(WARNING) << "** Failed! ** MAIL FROM:<" << reverse_path << ">"
-                 << params.str();
+  auto error_msg{std::string{}};
+  if (!verify_sender_(reverse_path, error_msg)) {
+    LOG(WARNING) << "verify sender " << reverse_path << params.str()
+                 << " failed: " << error_msg;
     if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] verify_sender_ fail",
-             sock_.them_c_str());
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
+             error_msg.c_str());
     }
     std::exit(EXIT_SUCCESS);
   }
@@ -242,7 +243,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto const& [name, value] : parameters) {
+  for (auto const & [ name, value ] : parameters) {
     LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
@@ -584,8 +585,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
 {
   CDB ip_black{"ip-black"};
   if (ip_black.lookup(sock_.them_c_str())) {
-    error_msg = "blacklisted";
-    out_() << "554 5.7.1 on my personal blacklist\r\n" << std::flush;
+    error_msg = "IP on static blacklist";
+    out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
     return false;
   }
 
@@ -593,10 +594,27 @@ bool Session::verify_ip_address_(std::string& error_msg)
   if (!client_fcrdns_.empty()) {
     client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
 
-    auto const tld{tld_db_.get_registered_domain(client_fcrdns_.lc())};
-    if (tld && white_.lookup(tld)) {
-      LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+    if (black_.lookup(client_fcrdns_.lc())) {
+      error_msg = "FCrDNS "s + client_fcrdns_.lc() + " on static blacklist"s;
+      out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+      return false;
+    }
+    if (white_.lookup(client_fcrdns_.lc())) {
+      LOG(INFO) << "FCrDNS domain " << client_fcrdns_.lc() << " whitelisted";
       fcrdns_whitelisted_ = true;
+    }
+
+    auto const tld{tld_db_.get_registered_domain(client_fcrdns_.lc())};
+    if (tld) {
+      if (black_.lookup(tld)) {
+        error_msg = "FCrDNS domain "s + tld + " on static blacklist"s;
+        out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+        return false;
+      }
+      if (white_.lookup(tld)) {
+        LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+        fcrdns_whitelisted_ = true;
+      }
     }
   }
   else {
@@ -635,9 +653,9 @@ bool Session::verify_ip_address_(std::string& error_msg)
   return true;
 }
 
+// check the identity from HELO/EHLO
 bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
-// check the identity from the HELO/EHLO
 {
   if (!sock_.has_peername() || ip_whitelisted_ || fcrdns_whitelisted_
       || client_identity.is_address_literal()) {
@@ -649,17 +667,17 @@ bool Session::verify_client_(Domain const& client_identity,
       || (client_identity == "localhost.localdomain")) {
 
     if (server_identity_ != client_fcrdns_) {
-      error_msg = "liar";
+      error_msg = "liar, claimed to be us";
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
     }
   }
 
   auto labels{std::vector<std::string>{}};
-  boost::algorithm::split(labels, client_identity.ascii(),
+  boost::algorithm::split(labels, client_identity.lc(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    // Sometimes we may went to look at mail from misconfigured
+    // Sometimes we may want to look at mail from misconfigured
     // sending systems.
     LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
                  << client_ << " claiming " << client_identity;
@@ -667,19 +685,20 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = "blacklisted identity "s + client_identity.lc();
+    error_msg = "claimed blacklisted identity";
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
 
   auto const tld{tld_db_.get_registered_domain(client_identity.lc())};
   if (!tld) {
-    error_msg = "client "s + client_identity.lc() + " has to TLD";
-    out_() << "550 4.7.1 blacklisted: no TLD\r\n" << std::flush;
-    return false;
+    // Sometimes we may want to look at mail from misconfigured
+    // sending systems.
+    LOG(WARNING) << "claimed identity has to TLD";
+    return true;
   }
   if (black_.lookup(tld)) {
-    error_msg = "blacklisted TLD "s + tld;
+    error_msg = "claimed identity has blacklisted TLD "s + tld;
     out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
     return false;
   }
@@ -687,6 +706,7 @@ bool Session::verify_client_(Domain const& client_identity,
   return true;
 }
 
+// check recipient from RCPT TO
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
   if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
@@ -736,13 +756,14 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   return true;
 }
 
-bool Session::verify_sender_(Mailbox const& sender)
+// the sender is the RFC5321 MAIL FROM:
+bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
   auto const sender_str{std::string{sender}};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     out_() << "550 5.1.8 bad sender\r\n" << std::flush;
-    LOG(WARNING) << "bad sender " << sender;
+    error_msg = "bad sender";
     return false;
   }
 
@@ -751,23 +772,27 @@ bool Session::verify_sender_(Mailbox const& sender)
       LOG(WARNING) << "sender domain " << sender.domain() << " does not match "
                    << sock_.them_address_literal();
     }
+    return true;
   }
-  else {
-    // If the reverse path domain matches the Forward-confirmed reverse
-    // DNS of the sending IP address, we skip the uribl check.
-    if (sender.domain() != client_fcrdns_) {
-      if (!verify_sender_domain_(sender.domain()))
-        return false;
-    }
 
-    if (!verify_sender_spf_(sender))
+  // If the reverse path domain matches the Forward-confirmed reverse
+  // DNS of the sending IP address, we skip the uribl check.
+  if (sender.domain() != client_fcrdns_) {
+    if (!verify_sender_domain_(sender.domain(), error_msg))
       return false;
+  }
+
+  if (!verify_sender_spf_(sender)) {
+    error_msg = "failed SPF check";
+    return false;
   }
 
   return reverse_path_verified_ = true;
 }
 
-bool Session::verify_sender_domain_(Domain const& sender)
+// this sender is the RFC5321 MAIL FROM: domain part
+bool Session::verify_sender_domain_(Domain const& sender,
+                                    std::string& error_msg)
 {
   if (sender.empty()) {
     // MAIL FROM:<>
@@ -780,16 +805,6 @@ bool Session::verify_sender_domain_(Domain const& sender)
     return true;
   }
 
-  auto tld{tld_db_.get_registered_domain(sender.lc())};
-  if (!tld) {
-    LOG(WARNING) << "sender " << sender << " has no TLD";
-    return false;
-  }
-  if (white_.lookup(tld)) {
-    LOG(INFO) << "sender TLD \"" << tld << "\" whitelisted";
-    return true;
-  }
-
   // Break sender domain into labels:
 
   auto labels{std::vector<std::string>{}};
@@ -799,8 +814,18 @@ bool Session::verify_sender_domain_(Domain const& sender)
   if (labels.size() < 2) { // This is not a valid domain.
     out_() << "550 5.7.1 invalid sender domain " << sender << "\r\n"
            << std::flush;
-    LOG(WARNING) << "sender \"" << sender << "\" invalid syntax";
+    error_msg = "invalid syntax";
     return false;
+  }
+
+  auto reg_dom{tld_db_.get_registered_domain(sender.lc())};
+  if (!reg_dom) {
+    error_msg = "no registered domain";
+    return false;
+  }
+  if (white_.lookup(reg_dom)) {
+    LOG(INFO) << "sender registered domain \"" << reg_dom << "\" whitelisted";
+    return true;
   }
 
   // Based on <http://www.surbl.org/guidelines>
@@ -811,44 +836,45 @@ bool Session::verify_sender_domain_(Domain const& sender)
     auto three_level{labels[labels.size() - 3] + "." + two_level};
 
     CDB three_tld{"three-level-tlds"};
-    if (three_tld.lookup(three_level)) {
+    if (three_tld.lookup(reg_dom)) {
       if (labels.size() > 3) {
-        return verify_sender_domain_uribl_(labels[labels.size() - 4] + "."
-                                           + three_level);
+        return verify_sender_domain_uribl_(
+            labels[labels.size() - 4] + "." + three_level, error_msg);
       }
       else {
         out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
-        LOG(WARNING) << "sender \"" << sender
-                     << "\" blocked by exact match on three-level-tlds list";
+        error_msg = "blocked by exact match on three-level-tlds list";
         return false;
       }
     }
   }
 
   CDB two_tld{"two-level-tlds"};
-  if (two_tld.lookup(two_level)) {
+  if (two_tld.lookup(reg_dom)) {
     if (labels.size() > 2) {
-      return verify_sender_domain_uribl_(labels[labels.size() - 3] + "."
-                                         + two_level);
+      return verify_sender_domain_uribl_(
+          labels[labels.size() - 3] + "." + two_level, error_msg);
     }
     else {
       out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
-      LOG(WARNING) << "sender \"" << sender
-                   << "\" blocked by exact match on two-level-tlds list";
+      error_msg = "blocked by exact match on two-level-tlds list";
       return false;
     }
   }
 
-  if (two_level.compare(tld)) {
-    LOG(INFO) << "two level '" << two_level << "' != TLD '" << tld << "'";
+  if (two_level.compare(reg_dom)) {
+    LOG(INFO) << "two level '" << two_level << "' != registered domain '"
+              << reg_dom << "'";
   }
 
-  return verify_sender_domain_uribl_(tld);
+  return verify_sender_domain_uribl_(two_level, error_msg);
 }
 
-bool Session::verify_sender_domain_uribl_(std::string const& sender)
+// check sender domain on dynamic URI black lists
+bool Session::verify_sender_domain_uribl_(std::string const& sender,
+                                          std::string& error_msg)
 {
-  if (!sock_.has_peername())    // short circuit
+  if (!sock_.has_peername()) // short circuit
     return true;
 
   auto res{DNS::Resolver{}};
@@ -856,7 +882,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender)
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
-      LOG(WARNING) << sender << " blocked by " << uribl;
+      error_msg = "blocked by "s + uribl;
       return false;
     }
   }
@@ -922,7 +948,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 bool Session::verify_from_params_(parameters_t const& parameters)
 {
   // Take a look at the optional parameters:
-  for (auto const& [name, val] : parameters) {
+  for (auto const & [ name, val ] : parameters) {
     if (iequal(name, "BODY")) {
       if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...

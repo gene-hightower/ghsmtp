@@ -30,12 +30,12 @@ struct Session_test {
     Session sess(read_hook, STDIN_FILENO, fd_null);
 
     auto sender{Domain{"example.er"}};
-    sess.verify_sender_domain_(sender);
+    auto error_msg{std::string{}};
+    sess.verify_sender_domain_(sender, error_msg);
 
-    LOG(ERROR) << "Expect: 3 invalid sender domains:";
-    CHECK(!sess.verify_sender_domain_(Domain("com")));
-    CHECK(!sess.verify_sender_domain_(Domain("zzux.com")));
-    CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar")));
+    CHECK(!sess.verify_sender_domain_(Domain("com"), error_msg));
+    CHECK(!sess.verify_sender_domain_(Domain("zzux.com"), error_msg));
+    CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar"), error_msg));
   }
 };
 
