@@ -61,6 +61,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
     if (hostname.find('.') != std::string::npos)
       return hostname;
 
+    // FIXME we might not have an IP address
     if (!IP::is_private(sock_.us_c_str()))
       return IP::to_address_literal(sock_.us_c_str());
 
@@ -77,10 +78,12 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 
 void Session::greeting()
 {
+  CHECK(state_ == xact_step::helo);
+
   if (sock_.has_peername()) {
     auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
-      // LOG(WARNING) << "verify ip failed: " << error_msg;
+      // no glog message at this point
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
              error_msg.c_str());
       std::exit(EXIT_SUCCESS);
@@ -90,6 +93,7 @@ void Session::greeting()
     if (!(ip_whitelisted_ || fcrdns_whitelisted_)
         && sock_.input_ready(Config::greeting_wait)) {
       out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
+      // no glog message at this point
       syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
              sock_.them_c_str());
       std::exit(EXIT_SUCCESS);
@@ -124,19 +128,6 @@ void Session::last_in_group_(std::string_view verb)
   }
 }
 
-void Session::verify_client_()
-{
-  auto error_msg{std::string{}};
-  if (!verify_client_(client_identity_, error_msg)) {
-    LOG(WARNING) << "verify client failed: " << error_msg;
-    if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
-             sock_.them_c_str(), error_msg.c_str());
-    }
-    std::exit(EXIT_SUCCESS);
-  }
-}
-
 void Session::ehlo(std::string_view client_identity)
 {
   auto constexpr verb{"EHLO"};
@@ -144,9 +135,11 @@ void Session::ehlo(std::string_view client_identity)
   last_in_group_(verb);
   reset_();
   extensions_ = true;
-  client_identity_.set(client_identity);
 
-  verify_client_();
+  if (client_identity_ != client_identity) {
+    client_identity_.set(client_identity);
+    verify_client_();
+  }
 
   out_() << "250-" << server_id_();
   if (sock_.has_peername()) {
@@ -179,6 +172,8 @@ void Session::ehlo(std::string_view client_identity)
   out_() << "250 SMTPUTF8\r\n" << std::flush;
 
   log_lo_(verb, client_identity);
+
+  state_ = xact_step::mail;
 }
 
 void Session::helo(std::string_view client_identity)
@@ -187,21 +182,34 @@ void Session::helo(std::string_view client_identity)
 
   last_in_group_(verb);
   reset_();
-  extensions_ = false;
-  client_identity_.set(client_identity);
 
-  verify_client_();
+  if (client_identity_ != client_identity) {
+    client_identity_.set(client_identity);
+    verify_client_();
+  }
 
   out_() << "250 " << server_id_() << "\r\n" << std::flush;
 
   log_lo_(verb, client_identity);
+
+  state_ = xact_step::mail;
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
-  if (client_identity_.empty()) {
-    out_() << "503 5.5.1 'MAIL FROM' before 'HELO' or 'EHLO'\r\n" << std::flush;
+  switch (state_) {
+  case xact_step::helo:
+    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
     LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  case xact_step::mail:
+    break;
+  case xact_step::rcpt:
+  case xact_step::data:
+  case xact_step::bdat:
+    out_() << "503 5.5.1 nested MAIL command" << std::flush;
+    LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
@@ -211,7 +219,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   auto params{std::ostringstream{}};
-  for (auto const & [ name, value ] : parameters) {
+  for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
@@ -231,59 +239,97 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
+
+  state_ = xact_step::rcpt;
 }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
-  if (!reverse_path_verified_) {
-    out_() << "503 5.5.1 'RCPT TO' before 'MAIL FROM'\r\n" << std::flush;
+  switch (state_) {
+  case xact_step::helo:
+    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  case xact_step::mail:
+    out_() << "503 5.5.1 must send MAIL FROM before RCPT TO\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  case xact_step::rcpt:
+  case xact_step::data:
+    break;
+  case xact_step::bdat:
+    out_() << "503 5.5.1 sequence error" << std::flush;
+    LOG(WARNING) << "'RCPT TO' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
 
   // Take a look at the optional parameters, we don't accept any:
-  for (auto const & [ name, value ] : parameters) {
+  for (auto const& [name, value] : parameters) {
     LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
   }
 
-  if (verify_recipient_(forward_path)) {
-    if (forward_path_.size() >= Config::max_recipients_per_message) {
-      out_() << "452 4.5.3 Too many recipients\r\n" << std::flush;
-      LOG(WARNING) << "too many recipients <" << forward_path << ">";
-    }
-    else {
-      forward_path_.push_back(std::move(forward_path));
-      out_() << "250 2.1.5 RCPT TO OK\r\n";
-      // No flush RFC-2920 section 3.1, this could be part of a command group.
-      LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
-    }
+  if (!verify_recipient_(forward_path))
+    return;
+
+  if (forward_path_.size() >= Config::max_recipients_per_message) {
+    out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
+    LOG(WARNING) << "too many recipients <" << forward_path << ">";
+    return;
   }
-  // We're lenient on most bad recipients, no else/exit here.
+
+  // no check for dups, postfix doesn't
+  forward_path_.push_back(std::move(forward_path));
+  out_() << "250 2.1.5 RCPT TO OK\r\n";
+  // No flush RFC-2920 section 3.1, this could be part of a command group.
+  LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
+
+  state_ = xact_step::data;
 }
 
 bool Session::data_start()
 {
   last_in_group_("DATA");
 
+  switch (state_) {
+  case xact_step::helo:
+    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::mail:
+    out_() << "503 5.5.1 must send MAIL FROM before DATA\r\n" << std::flush;
+    LOG(WARNING) << "'DATA' before 'MAIL FROM'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::rcpt:
+    out_() << "503 5.5.1 must send RCPT TO before DATA\r\n" << std::flush;
+    LOG(WARNING) << "'DATA' before 'RCPT TO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::data:
+    break;
+  case xact_step::bdat:
+    out_() << "503 5.5.1 sequence error" << std::flush;
+    LOG(WARNING) << "'DATA' during BDAT transfer"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  }
+
   if (binarymime_) {
     out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
     LOG(WARNING) << "DATA does not support BINARYMIME";
     return false;
   }
-  if (!reverse_path_verified_) {
-    out_() << "503 5.5.1 need 'MAIL FROM' before 'DATA'\r\n" << std::flush;
-    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
-    return false;
-  }
-  if (forward_path_.empty()) {
-    out_() << "503 5.5.1 need 'RCPT TO' before 'DATA'\r\n" << std::flush;
-    LOG(WARNING) << "no valid recipients";
-    return false;
-  }
+  CHECK(!reverse_path_.empty());
+  CHECK(!forward_path_.empty());
+
   out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
 
   LOG(INFO) << "DATA";
+
   return true;
 }
 
@@ -358,6 +404,8 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 {
+  CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
+
   auto const status{[&] {
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls())
@@ -403,6 +451,8 @@ void Session::data_msg_done(Message& msg)
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
+
+  state_ = xact_step::mail;
 }
 
 void Session::data_size_error()
@@ -414,36 +464,59 @@ void Session::data_size_error()
 
 bool Session::bdat_start()
 {
-  if (!reverse_path_verified_) {
-    out_() << "503 5.5.1 need 'MAIL FROM' before 'BDAT'\r\n" << std::flush;
-    LOG(WARNING) << "need 'MAIL FROM' before 'DATA'";
+  last_in_group_("DATA");
+
+  switch (state_) {
+  case xact_step::helo:
+    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
     return false;
-  }
-  if (forward_path_.empty()) {
-    out_() << "503 5.5.1 need 'RCPT TO' before 'BDAT'\r\n" << std::flush;
-    LOG(WARNING) << "no valid recipients";
+  case xact_step::mail:
+    out_() << "503 5.5.1 must send MAIL FROM before BDAT\r\n" << std::flush;
+    LOG(WARNING) << "'BDAT' before 'MAIL FROM'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
     return false;
+  case xact_step::rcpt:
+    out_() << "503 5.5.1 must send RCPT TO before BDAT\r\n" << std::flush;
+    LOG(WARNING) << "'BDAT' before 'RCPT TO'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::data:
+  case xact_step::bdat:
+    break;
   }
 
+  CHECK(!forward_path_.empty());
+
+  state_ = xact_step::bdat;
   return true;
 }
 
 void Session::bdat_msg(size_t n)
 {
+  CHECK(state_ == xact_step::bdat);
+
   out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
 }
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
+  CHECK(state_ == xact_step::bdat);
+
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
+
+  state_ = xact_step::mail;
 }
 
 void Session::bdat_error()
 {
+  CHECK(state_ == xact_step::bdat);
+
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
   LOG(WARNING) << "BDAT error";
@@ -455,6 +528,8 @@ void Session::rset()
   out_() << "250 2.1.5 RSET OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RSET";
+
+  state_ = xact_step::mail;
 }
 
 void Session::noop(std::string_view str)
@@ -650,6 +725,19 @@ bool Session::verify_ip_address_(std::string& error_msg)
 }
 
 // check the identity from HELO/EHLO
+void Session::verify_client_()
+{
+  auto error_msg{std::string{}};
+  if (!verify_client_(client_identity_, error_msg)) {
+    LOG(WARNING) << "verify client failed: " << error_msg;
+    if (sock_.has_peername()) {
+      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
+             sock_.them_c_str(), error_msg.c_str());
+    }
+    std::exit(EXIT_SUCCESS);
+  }
+}
+
 bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
 {
@@ -785,7 +873,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     return false;
   }
 
-  return reverse_path_verified_ = true;
+  return true;
 }
 
 // this sender is the RFC5321 MAIL FROM: domain part
@@ -951,7 +1039,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 bool Session::verify_from_params_(parameters_t const& parameters)
 {
   // Take a look at the optional parameters:
-  for (auto const & [ name, val ] : parameters) {
+  for (auto const& [name, val] : parameters) {
     if (iequal(name, "BODY")) {
       if (iequal(val, "8BITMIME")) {
         // everything is cool, this is our default...

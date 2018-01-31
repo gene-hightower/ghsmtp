@@ -89,15 +89,23 @@ private:
 
   std::string_view server_id_() const { return server_identity_.ascii(); }
 
+  // clear per transaction data, preserve per connection data
   void reset_()
   {
-    client_identity_.clear();
+    // RSET does not force another EHLO/HELO, one piece of transaction
+    // data saved is client_identity_:
+
+    // client_identity_.clear();
+
     reverse_path_.clear();
     forward_path_.clear();
     received_spf_.clear();
+
+    state_ = xact_step::mail;
+
     binarymime_ = false;
+    extensions_ = false;
     smtputf8_ = false;
-    reverse_path_verified_ = false;
   }
 
   bool verify_ip_address_(std::string& error_msg);
@@ -106,7 +114,8 @@ private:
   bool verify_recipient_(Mailbox const& recipient);
   bool verify_sender_(Mailbox const& sender, std::string& error_msg);
   bool verify_sender_domain_(Domain const& sender, std::string& error_msg);
-  bool verify_sender_domain_uribl_(std::string const& sender, std::string& error_msg);
+  bool verify_sender_domain_uribl_(std::string const& sender,
+                                   std::string& error_msg);
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
 
@@ -115,17 +124,18 @@ private:
 private:
   Sock sock_;
 
-  size_t max_msg_size_;
+  // per connection/session
+  Domain server_identity_; // who we identify as
+  Domain client_fcrdns_;   // who they look-up as
+  std::string client_;     // (fcrdns_ [sock_.them_c_str()])
 
-  Domain server_identity_;            // who we identify as
-  Domain client_fcrdns_;              // who they look-up as
+  // per transaction
   Domain client_identity_;            // from ehlo/helo
-  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
+  std::string received_spf_;          // from libspf2
 
-  std::string received_spf_; // from libspf2
-
+  // per connection
   std::random_device rd_;
 
   TLD tld_db_;
@@ -134,14 +144,29 @@ private:
   CDB white_{"white"};
   CDB black_{"black"};
 
+  size_t max_msg_size_;
+
   int n_unrecognized_cmds_{0};
+
+  // RFC 5321 section 3.3. Mail Transactions
+  enum class xact_step : int8_t {
+    helo,
+    mail,
+    rcpt,
+    data,
+    bdat, // RFC 3030
+  };
+
+  // per transaction
+  xact_step state_ = xact_step::helo;
 
   bool binarymime_{false};
   bool extensions_{false};
   bool smtputf8_{false};
+
+  // per connection
   bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
-  bool reverse_path_verified_{false};
 };
 
 #endif // SESSION_DOT_HPP
