@@ -323,7 +323,8 @@ bool Session::data_start()
     LOG(WARNING) << "DATA does not support BINARYMIME";
     return false;
   }
-  CHECK(!reverse_path_.empty());
+  // for bounce messages
+  // CHECK(!reverse_path_.empty());
   CHECK(!forward_path_.empty());
 
   out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
