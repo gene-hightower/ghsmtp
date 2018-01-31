@@ -208,7 +208,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   case xact_step::rcpt:
   case xact_step::data:
   case xact_step::bdat:
-    out_() << "503 5.5.1 nested MAIL command" << std::flush;
+    out_() << "503 5.5.1 nested MAIL command\r\n" << std::flush;
     LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -248,7 +248,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
-    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'RCPT TO' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::mail:
@@ -296,17 +296,17 @@ bool Session::data_start()
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
-    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'DATA' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::mail:
-    out_() << "503 5.5.1 must send MAIL FROM before DATA\r\n" << std::flush;
+    out_() << "503 5.5.1 must send 'MAIL FROM' before DATA\r\n" << std::flush;
     LOG(WARNING) << "'DATA' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::rcpt:
-    out_() << "503 5.5.1 must send RCPT TO before DATA\r\n" << std::flush;
-    LOG(WARNING) << "'DATA' before 'RCPT TO'"
+    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
+    LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::data:
@@ -470,17 +470,17 @@ bool Session::bdat_start()
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
-    LOG(WARNING) << "'RCPT TO' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'BDAT' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::mail:
-    out_() << "503 5.5.1 must send MAIL FROM before BDAT\r\n" << std::flush;
+    out_() << "503 5.5.1 must send 'MAIL FROM' before BDAT\r\n" << std::flush;
     LOG(WARNING) << "'BDAT' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::rcpt:
-    out_() << "503 5.5.1 must send RCPT TO before BDAT\r\n" << std::flush;
-    LOG(WARNING) << "'BDAT' before 'RCPT TO'"
+    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
+    LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::data:
@@ -863,7 +863,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
   if (sender.domain() == client_fcrdns_) {
-    LOG(INFO) << "MAIL FROM: domain matches senders FCrDNS";
+    LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
   else if (!verify_sender_domain_(sender.domain(), error_msg)) {
     return false;
