@@ -760,10 +760,8 @@ bool Session::verify_sender_(Mailbox const& sender)
         return false;
     }
 
-    if (sock_.has_peername()) {
-      if (!verify_sender_spf_(sender))
-        return false;
-    }
+    if (!verify_sender_spf_(sender))
+      return false;
   }
 
   return reverse_path_verified_ = true;
