@@ -837,9 +837,11 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
     CDB three_tld{"three-level-tlds"};
     if (three_tld.lookup(reg_dom)) {
+      LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
-        return verify_sender_domain_uribl_(
-            labels[labels.size() - 4] + "." + three_level, error_msg);
+        auto look_up = labels[labels.size() - 4] + "." + three_level;
+        LOG(INFO) << "looking up " << look_up;
+        return verify_sender_domain_uribl_(look_up, error_msg);
       }
       else {
         out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
@@ -851,9 +853,11 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
   CDB two_tld{"two-level-tlds"};
   if (two_tld.lookup(reg_dom)) {
+    LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
-      return verify_sender_domain_uribl_(
-          labels[labels.size() - 3] + "." + two_level, error_msg);
+      auto look_up = labels[labels.size() - 3] + "." + two_level;
+      LOG(INFO) << "looking up " << look_up;
+      return verify_sender_domain_uribl_(look_up, error_msg);
     }
     else {
       out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
@@ -867,6 +871,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
               << reg_dom << "'";
   }
 
+  LOG(INFO) << "looking up " << two_level;
   return verify_sender_domain_uribl_(two_level, error_msg);
 }
 
