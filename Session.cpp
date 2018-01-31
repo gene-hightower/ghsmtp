@@ -777,9 +777,11 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
-  if (sender.domain() != client_fcrdns_) {
-    if (!verify_sender_domain_(sender.domain(), error_msg))
-      return false;
+  if (sender.domain() == client_fcrdns_) {
+    LOG(INFO) << "MAIL FROM: domain matches senders FCrDNS";
+  }
+  else if (!verify_sender_domain_(sender.domain(), error_msg)) {
+    return false;
   }
 
   if (!verify_sender_spf_(sender)) {
