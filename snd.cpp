@@ -644,7 +644,7 @@ public:
   void foreach_hdr(std::function<void(std::string const& name,
                                       std::string const& value)> func)
   {
-    for (auto const & [ name, value ] : hdrs_) {
+    for (auto const& [name, value] : hdrs_) {
       func(name, value);
     }
   }
@@ -654,7 +654,7 @@ private:
 
   friend std::ostream& operator<<(std::ostream& os, Eml const& eml)
   {
-    for (auto const & [ name, value ] : eml.hdrs_) {
+    for (auto const& [name, value] : eml.hdrs_) {
       os << name << ": " << value << "\r\n";
     }
     return os << "\r\n"; // end of headers
@@ -1116,14 +1116,14 @@ bool snd(int fd_in,
       FLAGS_use_8bitmime
       && (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())};
 
-  auto const ext_binarymime{FLAGS_use_binarymime
+  auto const ext_chunking{FLAGS_use_chunking
+                          && cnn.ehlo_params.find("CHUNKING")
+                                 != cnn.ehlo_params.end()};
+
+  auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking
                             && cnn.ehlo_params.find("BINARYMIME")
                                    != cnn.ehlo_params.end()};
-  auto ext_chunking{FLAGS_use_chunking
-                    && cnn.ehlo_params.find("CHUNKING")
-                           != cnn.ehlo_params.end()};
-
-  auto ext_pipelining{
+  auto const ext_pipelining{
       FLAGS_use_pipelining
       && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end())};
 
@@ -1154,12 +1154,6 @@ bool snd(int fd_in,
   if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "does not support SMTPUTF8";
     return false;
-  }
-
-  if (ext_binarymime && !ext_chunking) {
-    LOG(WARNING)
-        << "BINARYMIME implies CHUNKING, see RFC-3030 section 3 item 3.";
-    ext_chunking = true;
   }
 
   if (ext_smtputf8 && !ext_8bitmime) {
