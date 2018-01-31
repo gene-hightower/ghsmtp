@@ -89,7 +89,7 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
   return preverify_ok;
 }
 
-void TLS::starttls_client(int fd_in,
+bool TLS::starttls_client(int fd_in,
                           int fd_out,
                           std::chrono::milliseconds timeout)
 {
@@ -164,15 +164,17 @@ void TLS::starttls_client(int fd_in,
       continue; // try SSL_accept again
 
     case SSL_ERROR_SYSCALL:
-      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+      LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
 
     default:
       ssl_error();
+      return false;
     }
   }
+  return true;
 }
 
-void TLS::starttls_server(int fd_in,
+bool TLS::starttls_server(int fd_in,
                           int fd_out,
                           std::chrono::milliseconds timeout)
 {
@@ -318,10 +320,11 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
       continue; // try SSL_accept again
 
     case SSL_ERROR_SYSCALL:
-      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+      LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
 
     default:
       ssl_error();
+      return false;
     }
   }
 
@@ -334,6 +337,8 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
       LOG(WARNING) << "client certificate failed to verify";
     }
   }
+
+  return true;
 }
 
 std::string TLS::info() const
@@ -401,10 +406,11 @@ std::streamsize TLS::io_tls_(char const* fnm,
     }
 
     case SSL_ERROR_SYSCALL:
-      LOG(FATAL) << "errno == " << errno << ": " << strerror(errno);
+      LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
 
     default:
       ssl_error();
+      return static_cast<std::streamsize>(-1);      
     }
   }
 
@@ -432,6 +438,6 @@ void TLS::ssl_error()
 {
   unsigned long er;
   while (0 != (er = ERR_get_error()))
-    LOG(ERROR) << ERR_error_string(er, nullptr);
-  LOG(FATAL) << "fatal OpenSSL error";
+    LOG(WARNING) << ERR_error_string(er, nullptr);
+  LOG(WARNING) << "fatal OpenSSL error";
 }

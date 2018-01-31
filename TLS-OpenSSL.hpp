@@ -15,9 +15,9 @@ public:
   TLS(std::function<void(void)> read_hook);
   ~TLS();
 
-  void
+  bool
   starttls_client(int fd_in, int fd_out, std::chrono::milliseconds timeout);
-  void
+  bool
   starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);
 
   bool pending() const { return SSL_pending(ssl_) > 0; }
@@ -49,7 +49,7 @@ private:
                           std::chrono::milliseconds wait,
                           bool& t_o);
 
-  static void ssl_error() __attribute__((noreturn));
+  static void ssl_error();
 
 private:
   SSL_CTX* ctx_{nullptr};

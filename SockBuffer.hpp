@@ -55,15 +55,13 @@ public:
   std::streamsize read(char* s, std::streamsize n);
   std::streamsize write(const char* s, std::streamsize n);
 
-  void starttls_server()
+  bool starttls_server()
   {
-    tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
-    tls_active_ = true;
+    return tls_active_ = tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
   }
-  void starttls_client()
+  bool starttls_client()
   {
-    tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
-    tls_active_ = true;
+    return tls_active_ = tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
   }
   bool tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }
