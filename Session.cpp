@@ -400,15 +400,13 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
 
 void Session::data_msg_done(Message& msg)
 {
-  msg.save();
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
 }
 
-void Session::data_size_error(Message& msg)
+void Session::data_size_error()
 {
-  msg.trash();
   out_().clear(); // clear possible eof from input side
   out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "DATA size error";
@@ -430,7 +428,7 @@ bool Session::bdat_start()
   return true;
 }
 
-void Session::bdat_msg(Message& msg, size_t n)
+void Session::bdat_msg(size_t n)
 {
   out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
@@ -438,16 +436,14 @@ void Session::bdat_msg(Message& msg, size_t n)
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
-  msg.save();
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
             << msg.id();
 }
 
-void Session::bdat_error(Message& msg)
+void Session::bdat_error()
 {
-  msg.trash();
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
   LOG(WARNING) << "BDAT error";

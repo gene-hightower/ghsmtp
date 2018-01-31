@@ -592,23 +592,31 @@ void bdat_act(Ctx& ctx)
     ctx.new_msg();
   }
 
-  if (ctx.bdat_error) { // If we've already failed...
+  if (ctx.bdat_error || !ctx.msg) { // If we've already failed...
     LOG(ERROR) << "BDAT continuing data error, skiping " << ctx.chunk_size
                << " octets";
 
-    ctx.session.bdat_error(*ctx.msg);
+    if (ctx.msg) {
+      ctx.msg->trash();
+      ctx.msg.reset();
+    }
+    ctx.session.bdat_error();
 
     // seek over BDAT data
     auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
     ctx.session.in().seekg(pos, ctx.session.in().beg);
     return;
   }
-  else if (ctx.chunk_size > ctx.msg->size_left()) {
+
+  if (ctx.chunk_size > ctx.msg->size_left()) {
     LOG(ERROR) << "BDAT size error, skiping " << ctx.chunk_size << " octets";
 
-    ctx.session.data_size_error(*ctx.msg);
+    ctx.session.data_size_error();
     ctx.bdat_error = true;
-    ctx.msg.reset();
+    if (ctx.msg) {
+      ctx.msg->trash();
+      ctx.msg.reset();
+    }
 
     // seek over BDAT data
     auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
@@ -634,9 +642,12 @@ void bdat_act(Ctx& ctx)
       LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
                  << ctx.session.in().gcount();
 
-      ctx.session.bdat_error(*ctx.msg);
+      ctx.session.bdat_error();
       ctx.bdat_error = true;
-      ctx.msg.reset();
+      if (ctx.msg) {
+        ctx.msg->trash();
+        ctx.msg.reset();
+      }
       return;
     }
 
@@ -661,9 +672,12 @@ void bdat_act(Ctx& ctx)
 
   if (ctx.msg->size_error()) {
     LOG(ERROR) << "message size error after " << ctx.msg->size() << " octets";
-    ctx.session.data_size_error(*ctx.msg);
+    ctx.session.data_size_error();
     ctx.bdat_error = true;
-    ctx.msg.reset();
+    if (ctx.msg) {
+      ctx.msg->trash();
+      ctx.msg.reset();
+    }
     return;
   }
 
@@ -671,12 +685,14 @@ void bdat_act(Ctx& ctx)
     if (!ctx.hdr_end) {
       LOG(WARNING) << "may not have all headers in this email";
     }
+    CHECK(ctx.msg);
+    ctx.msg->save();
     ctx.session.bdat_msg_last(*ctx.msg, ctx.chunk_size);
     ctx.msg.reset();
     ctx.chunk_first = true;
   }
   else {
-    ctx.session.bdat_msg(*ctx.msg, ctx.chunk_size);
+    ctx.session.bdat_msg(ctx.chunk_size);
   }
 }
 
@@ -701,13 +717,18 @@ struct data_action<data_end> {
   {
     if (ctx.msg) {
       if (ctx.msg->size_error()) {
-        ctx.session.data_size_error(*ctx.msg);
-        ctx.msg.reset();
+        ctx.session.data_size_error();
+        if (ctx.msg) {
+          ctx.msg->trash();
+          ctx.msg.reset();
+        }
       }
       else {
         if (!ctx.hdr_end) {
           LOG(WARNING) << "may not have all headers in this email";
         }
+        CHECK(ctx.msg);
+        ctx.msg->save();
         ctx.session.data_msg_done(*ctx.msg);
         ctx.msg.reset();
       }
@@ -974,7 +995,7 @@ int main(int argc, char* argv[])
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
   alarm(2 * 60); // initial alarm
 
-  close(2); // hackage to stop glog from spewing
+  // close(2); // hackage to stop glog from spewing
 
   google::InitGoogleLogging(argv[0]);
 

@@ -41,12 +41,12 @@ public:
   bool data_start();
   void data_msg(Message& msg);
   void data_msg_done(Message& msg);
-  void data_size_error(Message& msg);
+  void data_size_error();
 
   bool bdat_start();
-  void bdat_msg(Message& msg, size_t n);
+  void bdat_msg(size_t n);
   void bdat_msg_last(Message& msg, size_t n);
-  void bdat_error(Message& msg);
+  void bdat_error();
 
   void rset();
   void noop(std::string_view str);
