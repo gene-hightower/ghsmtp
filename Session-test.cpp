@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+using namespace std::string_literals;
+
 struct Session_test {
   static void test()
   {
@@ -20,7 +22,7 @@ struct Session_test {
     std::cout << "sizeof(binarymime_)   == " << sizeof(Session::binarymime_)
               << '\n';
 
-    setenv("GHSMTP_SERVER_ID", "example.com", 1);
+    setenv("GHSMTP_SERVER_ID", "digilicious.com", 1);
 
     int fd_null = open("/dev/null", O_WRONLY);
     PCHECK(fd_null >= 0) << " can't open /dev/null";
@@ -30,11 +32,34 @@ struct Session_test {
 
     auto sender{Domain{"example.er"}};
     auto error_msg{std::string{}};
-    sess.verify_sender_domain_(sender, error_msg);
+    CHECK(!sess.verify_sender_domain_(sender, error_msg));
+
+    // bogus
+    CHECK(!sess.verify_sender_domain_(
+        Domain("invalid-domain-has-only-one-lable"), error_msg));
+
+    // white listed
+    CHECK(sess.verify_sender_domain_(Domain("lots.of.lables.digilicious.com"),
+                                     error_msg));
+    CHECK(sess.verify_sender_domain_(Domain("whitelisted.digilicious.com"),
+                                     error_msg));
+    CHECK(sess.verify_sender_domain_(
+        Domain("reg-domain-is-whitelisted.digilicious.com"), error_msg));
+
+    // bounce address
+    CHECK(sess.verify_sender_domain_(Domain(""), error_msg));
 
     CHECK(!sess.verify_sender_domain_(Domain("com"), error_msg));
     CHECK(!sess.verify_sender_domain_(Domain("zzux.com"), error_msg));
     CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar"), error_msg));
+
+    // SPF
+    auto mb{Mailbox{"foo"s, "digilicious.com"s}};
+    CHECK(sess.verify_sender_spf_(mb));
+
+    // IP address
+    // auto error_msg{std::string{}};
+    // CHECK(!sess.verify_ip_address_("blacklisted.digilicious.com"s));
   }
 };
 
