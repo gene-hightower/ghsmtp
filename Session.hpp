@@ -69,12 +69,7 @@ public:
   void last_in_group_(std::string_view verb);
 
   size_t max_msg_size() const { return max_msg_size_; }
-  void max_msg_size(size_t max)
-  {
-    max_msg_size_ = max;
-    auto const overhead = max / 10;
-    sock_.set_max_read(max_msg_size() + overhead);
-  }
+  inline void max_msg_size(size_t max);
 
   void log_stats() { sock_.log_stats(); }
 
@@ -89,23 +84,7 @@ private:
   std::string_view server_id_() const { return server_identity_.ascii(); }
 
   // clear per transaction data, preserve per connection data
-  void reset_()
-  {
-    // RSET does not force another EHLO/HELO, one piece of transaction
-    // data saved is client_identity_:
-
-    // client_identity_.clear();
-
-    reverse_path_.clear();
-    forward_path_.clear();
-    received_spf_.clear();
-
-    state_ = xact_step::mail;
-
-    binarymime_ = false;
-    extensions_ = false;
-    smtputf8_ = false;
-  }
+  inline void reset_();
 
   bool verify_ip_address_(std::string& error_msg);
   void verify_client_();
@@ -164,5 +143,30 @@ private:
   bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
 };
+
+inline void Session::reset_()
+{
+  // RSET does not force another EHLO/HELO, one piece of transaction
+  // data saved is client_identity_:
+
+  // client_identity_.clear();
+
+  reverse_path_.clear();
+  forward_path_.clear();
+  received_spf_.clear();
+
+  state_ = xact_step::mail;
+
+  binarymime_ = false;
+  extensions_ = false;
+  smtputf8_ = false;
+}
+
+inline void Session::max_msg_size(size_t max)
+{
+  max_msg_size_ = max;
+  auto const overhead = max / 10;
+  sock_.set_max_read(max_msg_size() + overhead);
+}
 
 #endif // SESSION_DOT_HPP
