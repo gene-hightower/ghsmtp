@@ -18,6 +18,8 @@ DEFINE_bool(rawdog,
             "send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots");
 
+DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO) to send mail");
+
 DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension to send mail");
 DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
 DEFINE_bool(use_chunking, true, "use CHUNKING extension to send mail");
@@ -1087,27 +1089,30 @@ bool snd(int fd_in,
 
   // try EHLO/HELO
 
-  LOG(INFO) << "> EHLO " << sender.ascii();
-  cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+  if (FLAGS_use_esmtp) {
+    LOG(INFO) << "> EHLO " << sender.ascii();
+    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
 
-  CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
-  if (!cnn.ehlo_ok) {
+    CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
+    if (!cnn.ehlo_ok) {
 
-    if (FLAGS_force_smtputf8) {
-      LOG(WARNING) << "ehlo response was not in the affirmative, skipping";
-      return false;
+      if (FLAGS_force_smtputf8) {
+        LOG(WARNING) << "ehlo response was not in the affirmative, skipping";
+        return false;
+      }
+
+      LOG(WARNING) << "ehlo response was not in the affirmative, trying HELO";
+      FLAGS_use_esmtp = false;
     }
+  }
 
-    LOG(WARNING) << "ehlo response was not in the affirmative, trying HELO";
-
+  if (!FLAGS_use_esmtp) {
     LOG(INFO) << "> HELO " << sender.ascii();
     cnn.sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)) {
-      LOG(WARNING) << "HELO didn't work either, skipping";
+      LOG(WARNING) << "HELO didn't work, skipping";
       return false;
     }
-
-    // Hello worked
   }
 
   // Check extensions
