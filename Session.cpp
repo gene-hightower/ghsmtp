@@ -60,8 +60,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
     if (hostname.find('.') != std::string::npos)
       return hostname;
 
-    // FIXME we might not have an IP address
-    if (!IP::is_private(sock_.us_c_str()))
+    if (sock_.has_peername() && !IP::is_private(sock_.us_c_str()))
       return IP::to_address_literal(sock_.us_c_str());
 
     LOG(FATAL) << "can't determine my server ID";
