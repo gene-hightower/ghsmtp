@@ -54,7 +54,6 @@ struct Ctx {
   bool bdat_error{false};
 
   bool hdr_end{false};
-  bool hdr_parsed{false};
 
   void bdat_rset()
   {
@@ -62,7 +61,6 @@ struct Ctx {
     chunk_last = false;
     bdat_error = false;
     hdr_end = false;
-    hdr_parsed = false;
   }
 
   void new_msg()
@@ -70,27 +68,7 @@ struct Ctx {
     msg = std::make_unique<Message>();
     hdr.clear();
     hdr_end = false;
-    hdr_parsed = false;
     session.data_msg(*msg);
-  }
-
-  bool hdr_parse()
-  {
-    if (hdr_parsed)
-      return true;
-
-    if (!hdr_end) {
-      LOG(ERROR) << "may not have whole header";
-      return false;
-    }
-    if (hdr.size() > Config::max_hdr_size) {
-      LOG(ERROR) << "header size too large";
-      return false;
-    }
-
-    // parse header
-
-    return hdr_parsed = true;
   }
 };
 
