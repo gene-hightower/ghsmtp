@@ -544,6 +544,7 @@ struct action<mail_from> {
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
+    ctx.bdat_rset();
   }
 };
 
@@ -689,7 +690,6 @@ void bdat_act(Ctx& ctx)
     ctx.msg->save();
     ctx.session.bdat_msg_last(*ctx.msg, ctx.chunk_size);
     ctx.msg.reset();
-    ctx.chunk_first = true;
   }
   else {
     ctx.session.bdat_msg(ctx.chunk_size);
@@ -707,7 +707,7 @@ struct action<bdat_last> {
   static void apply(Input const& in, Ctx& ctx)
   {
     bdat_act(ctx);
-    ctx.bdat_error = true; // to make next BDAT fail.
+    ctx.bdat_rset();
   }
 };
 
@@ -995,7 +995,7 @@ int main(int argc, char* argv[])
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
   alarm(2 * 60); // initial alarm
 
-  close(2); // hackage to stop glog from spewing
+  //  close(2); // hackage to stop glog from spewing
 
   google::InitGoogleLogging(argv[0]);
 

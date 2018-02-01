@@ -465,7 +465,7 @@ void Session::data_size_error()
 
 bool Session::bdat_start()
 {
-  last_in_group_("DATA");
+  last_in_group_("BDAT");
 
   switch (state_) {
   case xact_step::helo:
@@ -496,16 +496,20 @@ bool Session::bdat_start()
 
 void Session::bdat_msg(size_t n)
 {
-  CHECK(state_ == xact_step::bdat);
-
+  if (state_ != xact_step::bdat) {
+    bdat_error();
+    return;
+  }
   out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n;
 }
 
 void Session::bdat_msg_last(Message& msg, size_t n)
 {
-  CHECK(state_ == xact_step::bdat);
-
+  if (state_ != xact_step::bdat) {
+    bdat_error();
+    return;
+  }
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
@@ -516,11 +520,9 @@ void Session::bdat_msg_last(Message& msg, size_t n)
 
 void Session::bdat_error()
 {
-  CHECK(state_ == xact_step::bdat);
-
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
-  LOG(WARNING) << "BDAT error";
+  LOG(WARNING) << "BDAT sequence error";
 }
 
 void Session::rset()
@@ -626,12 +628,11 @@ void Session::starttls()
   }
   else {
     out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
-    sock_.starttls_server();
-    reset_();
-
-    max_msg_size(Config::max_msg_size_bro);
-
-    LOG(INFO) << "STARTTLS " << sock_.tls_info();
+    if (sock_.starttls_server()) {
+      reset_();
+      max_msg_size(Config::max_msg_size_bro);
+      LOG(INFO) << "STARTTLS " << sock_.tls_info();
+    }
   }
 }
 
