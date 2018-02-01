@@ -1,7 +1,6 @@
 #ifndef SESSION_DOT_HPP
 #define SESSION_DOT_HPP
 
-#include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -134,9 +133,6 @@ private:
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
   std::string received_spf_;          // from libspf2
-
-  // per connection
-  std::random_device rd_;
 
   TLD tld_db_;
 

@@ -1,15 +1,19 @@
 #include "Pill.hpp"
 
-#include <random>
+#include <limits>
+
+#include <experimental/random>
 
 #include <boost/config.hpp>
 
 Pill::Pill()
 {
-  auto rd{std::random_device{}};
-  auto uni_dist{std::uniform_int_distribution<decltype(s_)>{}};
+  using s_t = decltype(s_);
 
-  s_ = uni_dist(rd);
+  auto constexpr min = std::numeric_limits<s_t>::min();
+  auto constexpr max = std::numeric_limits<s_t>::max();
+
+  s_ = std::experimental::randint(min, max);
 
   auto resp{b32_ndigits_};
   b32_str_[resp] = '\0';

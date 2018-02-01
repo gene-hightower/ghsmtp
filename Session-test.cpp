@@ -17,7 +17,6 @@ struct Session_test {
               << '\n';
     std::cout << "sizeof(forward_path_) == " << sizeof(Session::forward_path_)
               << '\n';
-    std::cout << "sizeof(rd_)           == " << sizeof(Session::rd_) << '\n';
     std::cout << "sizeof(binarymime_)   == " << sizeof(Session::binarymime_)
               << '\n';
 
