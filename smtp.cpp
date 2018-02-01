@@ -790,7 +790,10 @@ struct data_action<data_dot> {
 
 template <>
 struct data_action<not_data_end> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.bare_lf(); }
+  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  {
+    ctx.session.bare_lf();
+  }
 };
 
 template <>
@@ -1008,8 +1011,7 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  auto in{
-      istream_input<eol::crlf>{ctx->session.in(), Config::bfr_size, "session"}};
+  auto in{istream_input<eol::crlf>{ctx->session.in(), Config::bfr_size, "ses"}};
   auto ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
