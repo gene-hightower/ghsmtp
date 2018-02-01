@@ -995,8 +995,6 @@ int main(int argc, char* argv[])
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
   alarm(2 * 60); // initial alarm
 
-  //  close(2); // hackage to stop glog from spewing
-
   google::InitGoogleLogging(argv[0]);
 
   std::unique_ptr<RFC5321::Ctx> ctx;
