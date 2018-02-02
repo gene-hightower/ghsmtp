@@ -160,6 +160,8 @@ inline void Session::reset_()
   binarymime_ = false;
   extensions_ = false;
   smtputf8_ = false;
+
+  max_msg_size(max_msg_size());
 }
 
 inline void Session::max_msg_size(size_t max)
