@@ -57,11 +57,13 @@ public:
 
   bool starttls_server()
   {
-    return tls_active_ = tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
+    return tls_active_
+           = tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
   }
   bool starttls_client()
   {
-    return tls_active_ = tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
+    return tls_active_
+           = tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
   }
   bool tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }
