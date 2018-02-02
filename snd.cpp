@@ -51,8 +51,8 @@ DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
 DEFINE_string(keywords, "", "RFC5322 Keywords: header");
 DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header");
 
-DEFINE_bool(ip4, false, "use only IP version 4");
-DEFINE_bool(ip6, false, "use only IP version 6");
+DEFINE_bool(4, false, "use only IP version 4");
+DEFINE_bool(6, false, "use only IP version 6");
 
 DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
@@ -543,8 +543,8 @@ uint16_t get_port(char const* const service)
 
 int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
 {
-  auto const use_4{!FLAGS_ip6};
-  auto const use_6{!FLAGS_ip4};
+  auto const use_4{!FLAGS_6};
+  auto const use_6{!FLAGS_4};
 
   auto const port{get_port(service.c_str())};
   if (use_6) {
@@ -1437,7 +1437,7 @@ int main(int argc, char* argv[])
     bodies.push_back("body.txt");
 
   CHECK_EQ(bodies.size(), 1) << "only one body part for now";
-  CHECK(!(FLAGS_ip4 && FLAGS_ip6)) << "must use /some/ IP version";
+  CHECK(!(FLAGS_4 && FLAGS_6)) << "must use /some/ IP version";
 
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
