@@ -1356,7 +1356,6 @@ bool snd(int fd_in,
       }
     }
     CHECK(cnn.sock.out().good());
-    LOG(INFO) << "sent data";
 
     // Done!
     cnn.sock.out() << ".\r\n" << std::flush;
