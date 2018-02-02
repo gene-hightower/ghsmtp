@@ -10,6 +10,7 @@ DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
+DEFINE_bool(bare_lf, false, "send a bare LF");
 DEFINE_bool(huge_size, false, "attempt with huge size");
 DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(nosend, false, "don't actually send any mail");
@@ -583,7 +584,7 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
         continue;
       }
 
-      LOG(INFO) << "connected to " << addr << ":" << port;
+      LOG(INFO) << " connected to " << addr << ":" << port;
       return fd;
     }
 
@@ -917,7 +918,7 @@ auto parse_mailboxes()
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(from_in, from_mbx)) {
     LOG(FATAL) << "bad From: address syntax <" << FLAGS_from << ">";
   }
-  LOG(INFO) << "from_mbx == " << from_mbx;
+  LOG(INFO) << " from_mbx == " << from_mbx;
 
   auto local_from{memory_input<>{from_mbx.local_part(), "from.local"}};
   FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_from);
@@ -927,7 +928,7 @@ auto parse_mailboxes()
   if (!parse<RFC5322::addr_spec_only, RFC5322::action>(to_in, to_mbx)) {
     LOG(FATAL) << "bad To: address syntax <" << FLAGS_to << ">";
   }
-  LOG(INFO) << "to_mbx == " << to_mbx;
+  LOG(INFO) << " to_mbx == " << to_mbx;
 
   auto local_to{memory_input<>{to_mbx.local_part(), "to.local"}};
   FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_to);
@@ -1272,6 +1273,40 @@ bool snd(int fd_in,
 
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "RCPT TO");
+  }
+
+  if (FLAGS_bare_lf) {
+    LOG(INFO) << "C: DATA";
+    cnn.sock.out() << "DATA\r\n";
+
+    // NOW check returns
+    if (ext_pipelining) {
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+    cnn.sock.out() << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    if (cnn.reply_code != "354") {
+      LOG(ERROR) << "DATA returned " << cnn.reply_code;
+      fail(in, cnn);
+    }
+
+    // cnn.sock.out() << "\r\nThis ->\n<- is a bare LF!\r\n";
+    cnn.sock.out() << "\n.\n\r\n";
+
+    // Done!
+    cnn.sock.out() << ".\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    LOG(INFO) << "reply_code == " << cnn.reply_code;
+    if (cnn.reply_code.at(0) != '2')
+      return true;
+
+    LOG(INFO) << "C: QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    return true;
   }
 
   if (ext_chunking) {
