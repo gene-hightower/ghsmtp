@@ -165,7 +165,7 @@ bool TLS::starttls_client(int fd_in,
 
     case SSL_ERROR_SYSCALL:
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
-      [[fallthrough]]; 
+      [[fallthrough]];
 
     default:
       ssl_error();
@@ -322,7 +322,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
     case SSL_ERROR_SYSCALL:
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
-      [[fallthrough]]; 
+      [[fallthrough]];
 
     default:
       ssl_error();
@@ -409,11 +409,11 @@ std::streamsize TLS::io_tls_(char const* fnm,
 
     case SSL_ERROR_SYSCALL:
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
-      [[fallthrough]]; 
+      [[fallthrough]];
 
     default:
       ssl_error();
-      return static_cast<std::streamsize>(-1);      
+      return static_cast<std::streamsize>(-1);
     }
   }
 
