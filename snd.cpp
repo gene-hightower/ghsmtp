@@ -1061,6 +1061,39 @@ void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
   }
 }
 
+template <typename Input>
+void bare_lf(Input& in, RFC5321::Connection& cnn, bool ext_pipelining)
+{
+  LOG(INFO) << "C: DATA";
+  cnn.sock.out() << "DATA\r\n";
+
+  // NOW check returns
+  if (ext_pipelining) {
+    check_for_fail(in, cnn, "MAIL FROM");
+    check_for_fail(in, cnn, "RCPT TO");
+  }
+  cnn.sock.out() << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  if (cnn.reply_code != "354") {
+    LOG(ERROR) << "DATA returned " << cnn.reply_code;
+    fail(in, cnn);
+  }
+
+  // cnn.sock.out() << "\r\nThis ->\n<- is a bare LF!\r\n";
+  cnn.sock.out() << "\n.\n\r\n";
+
+  // Done!
+  cnn.sock.out() << ".\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+  LOG(INFO) << "reply_code == " << cnn.reply_code;
+  CHECK_EQ(cnn.reply_code.at(0), '2');
+
+  LOG(INFO) << "C: QUIT";
+  cnn.sock.out() << "QUIT\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+}
+
 bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
@@ -1276,36 +1309,7 @@ bool snd(int fd_in,
   }
 
   if (FLAGS_bare_lf) {
-    LOG(INFO) << "C: DATA";
-    cnn.sock.out() << "DATA\r\n";
-
-    // NOW check returns
-    if (ext_pipelining) {
-      check_for_fail(in, cnn, "MAIL FROM");
-      check_for_fail(in, cnn, "RCPT TO");
-    }
-    cnn.sock.out() << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    if (cnn.reply_code != "354") {
-      LOG(ERROR) << "DATA returned " << cnn.reply_code;
-      fail(in, cnn);
-    }
-
-    // cnn.sock.out() << "\r\nThis ->\n<- is a bare LF!\r\n";
-    cnn.sock.out() << "\n.\n\r\n";
-
-    // Done!
-    cnn.sock.out() << ".\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
-    LOG(INFO) << "reply_code == " << cnn.reply_code;
-    if (cnn.reply_code.at(0) != '2')
-      return true;
-
-    LOG(INFO) << "C: QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
+    bare_lf(in, cnn, ext_pipelining);
     return true;
   }
 
