@@ -500,9 +500,9 @@ struct action<chunk_size> {
   }
 };
 
-bool bdat_act(Ctx& ctx)
+void bdat_act(Ctx& ctx)
 {
-  bool errs = ctx.session.bdat_start(ctx.chunk_size);
+  ctx.session.bdat_start(ctx.chunk_size);
 
   auto bfr{std::string{}};
   auto to_xfer = ctx.chunk_size;
@@ -525,23 +525,21 @@ bool bdat_act(Ctx& ctx)
                  << ctx.session.in().gcount();
 
       ctx.session.bdat_error();
-      return false;
+      return;
     }
 
-    errs |= ctx.session.msg_data(&bfr[0], xfer_sz);
+    ctx.session.msg_data(&bfr[0], xfer_sz);
 
     to_xfer -= xfer_sz;
   }
-
-  return errs;
 }
 
 template <>
 struct action<bdat> {
   static void apply0(Ctx& ctx)
   {
-    if (bdat_act(ctx))
-      ctx.session.bdat_done(ctx.chunk_size, false);
+    bdat_act(ctx);
+    ctx.session.bdat_done(ctx.chunk_size, false);
   }
 };
 
@@ -550,8 +548,8 @@ struct action<bdat_last> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    if (bdat_act(ctx))
-      ctx.session.bdat_done(ctx.chunk_size, true);
+    bdat_act(ctx);
+    ctx.session.bdat_done(ctx.chunk_size, true);
   }
 };
 

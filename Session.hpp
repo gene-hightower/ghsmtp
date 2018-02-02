@@ -72,7 +72,7 @@ public:
   void last_in_group_(std::string_view verb);
 
   size_t max_msg_size() const { return max_msg_size_; }
-  inline void max_msg_size(size_t max);
+  void max_msg_size(size_t max);
 
   void log_stats() { sock_.log_stats(); }
 
@@ -147,12 +147,5 @@ private:
   bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
 };
-
-inline void Session::max_msg_size(size_t max)
-{
-  max_msg_size_ = max;
-  auto const overhead = max / 10;
-  sock_.set_max_read(max_msg_size() + overhead);
-}
 
 #endif // SESSION_DOT_HPP

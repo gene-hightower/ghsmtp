@@ -48,6 +48,11 @@ constexpr auto read_timeout = std::chrono::minutes(5);
 constexpr auto write_timeout = std::chrono::seconds(30);
 } // namespace Config
 
+#include <gflags/gflags.h>
+
+DEFINE_uint64(max_read, 0, "max data to read");
+DEFINE_uint64(max_write, 0, "max data to write");
+
 Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
@@ -69,6 +74,41 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   server_identity_.set(our_id);
 
   max_msg_size(Config::max_msg_size_initial);
+}
+
+void Session::max_msg_size(size_t max)
+{
+  max_msg_size_ = max;          // number to advertise via RFC 1870
+
+  if (FLAGS_max_read) {
+    sock_.set_max_read(FLAGS_max_read);
+  } else {
+    auto const overhead = std::max(max / 10, 2048ul);
+    sock_.set_max_read(max + overhead);
+  }
+}
+
+void Session::reset_()
+{
+  // RSET does not force another EHLO/HELO, one piece of transaction
+  // data saved is client_identity_:
+
+  // client_identity_.clear();
+
+  reverse_path_.clear();
+  forward_path_.clear();
+  received_spf_.clear();
+
+  binarymime_ = false;
+  smtputf8_ = false;
+
+  if (msg_) {
+    msg_.reset();
+  }
+
+  max_msg_size(max_msg_size());
+
+  state_ = xact_step::mail;
 }
 
 // Return codes from connection establishment are 220 or 554, according
@@ -170,8 +210,6 @@ void Session::ehlo(std::string_view client_identity)
   out_() << "250 SMTPUTF8\r\n" << std::flush;
 
   log_lo_(verb, client_identity);
-
-  state_ = xact_step::mail;
 }
 
 void Session::helo(std::string_view client_identity)
@@ -180,6 +218,7 @@ void Session::helo(std::string_view client_identity)
 
   last_in_group_(verb);
   reset_();
+  extensions_ = false;
 
   if (client_identity_ != client_identity) {
     client_identity_.set(client_identity);
@@ -189,8 +228,6 @@ void Session::helo(std::string_view client_identity)
   out_() << "250 " << server_id_() << "\r\n" << std::flush;
 
   log_lo_(verb, client_identity);
-
-  state_ = xact_step::mail;
 }
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
@@ -198,7 +235,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
-    LOG(WARNING) << "'MAIL FROM' before 'HELO' or 'EHLO'"
+    LOG(WARNING) << "'MAIL FROM' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::mail:
@@ -258,7 +295,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   case xact_step::data:
     break;
   case xact_step::bdat:
-    out_() << "503 5.5.1 sequence error" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -285,51 +322,6 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
 
   state_ = xact_step::data;
-}
-
-bool Session::data_start()
-{
-  last_in_group_("DATA");
-
-  switch (state_) {
-  case xact_step::helo:
-    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
-    LOG(WARNING) << "'DATA' before HELO/EHLO"
-                 << (sock_.has_peername() ? " from " : "") << client_;
-    return false;
-  case xact_step::mail:
-    out_() << "503 5.5.1 must send 'MAIL FROM' before DATA\r\n" << std::flush;
-    LOG(WARNING) << "'DATA' before 'MAIL FROM'"
-                 << (sock_.has_peername() ? " from " : "") << client_;
-    return false;
-  case xact_step::rcpt:
-    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
-    LOG(WARNING) << "no valid recipients"
-                 << (sock_.has_peername() ? " from " : "") << client_;
-    return false;
-  case xact_step::data:
-    break;
-  case xact_step::bdat:
-    out_() << "503 5.5.1 sequence error" << std::flush;
-    LOG(WARNING) << "'DATA' during BDAT transfer"
-                 << (sock_.has_peername() ? " from " : "") << client_;
-    return false;
-  }
-
-  if (binarymime_) {
-    out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
-    LOG(WARNING) << "DATA does not support BINARYMIME";
-    return false;
-  }
-  // for bounce messages
-  // CHECK(!reverse_path_.empty());
-  CHECK(!forward_path_.empty());
-
-  out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
-
-  LOG(INFO) << "DATA";
-
-  return true;
 }
 
 std::string Session::added_headers_(Message const& msg)
@@ -401,7 +393,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
   return false;
 }
 
-void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
+bool Session::msg_new()
 {
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
@@ -440,31 +432,119 @@ void Session::data_msg(Message& msg) // called /after/ {data/bdat}_start
     alarm(5 * 60);
   }
 
-  msg.open(server_id_(), max_msg_size(), status);
-  auto const hdrs{added_headers_(msg)};
-  msg.write(hdrs);
+  msg_ = std::make_unique<Message>();
+
+  if (!FLAGS_max_write)
+    FLAGS_max_write = max_msg_size();
+
+  msg_->open(server_id_(), FLAGS_max_write, status);
+  auto const hdrs{added_headers_(*(msg_.get()))};
+  msg_->write(hdrs);
+
+  return true;
 }
 
-void Session::data_msg_done(Message& msg)
+bool Session::msg_data(char const* s, std::streamsize count)
 {
-  out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
-  LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
-            << msg.id();
+  if ((state_ != xact_step::data) && (state_ != xact_step::bdat))
+    return false;
 
-  state_ = xact_step::mail;
+  if (!msg_)
+    return false;
+
+  if (msg_->write(s, count))
+    return !msg_->size_error();
+
+  return false;
+}
+
+bool Session::data_start()
+{
+  last_in_group_("DATA");
+
+  switch (state_) {
+  case xact_step::helo:
+    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    LOG(WARNING) << "'DATA' before HELO/EHLO"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::mail:
+    out_() << "503 5.5.1 must send 'MAIL FROM' before DATA\r\n" << std::flush;
+    LOG(WARNING) << "'DATA' before 'MAIL FROM'"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::rcpt:
+    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
+    LOG(WARNING) << "no valid recipients"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  case xact_step::data:
+    break;
+  case xact_step::bdat:
+    out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
+    LOG(WARNING) << "'DATA' during BDAT transfer"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
+  }
+
+  if (binarymime_) {
+    out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
+    LOG(WARNING) << "DATA does not support BINARYMIME";
+    return false;
+  }
+  // for bounce messages
+  // CHECK(!reverse_path_.empty());
+  CHECK(!forward_path_.empty());
+
+  if (!msg_new()) {
+    out_() << "451 4.3.1 mail system full\r\n" << std::flush;
+    LOG(ERROR) << "msg_new() failed";
+    return false;
+  }
+
+  out_() << "354 go, end with <CR><LF>.<CR><LF>\r\n" << std::flush;
+  LOG(INFO) << "DATA";
+  return true;
+}
+
+void Session::data_done()
+{
+  CHECK((state_ == xact_step::data));
+
+  CHECK(msg_);
+  msg_->save();
+
+  out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
+  LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
+            << msg_->id();
+
+  reset_();
 }
 
 void Session::data_size_error()
 {
   out_().clear(); // clear possible eof from input side
   out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
+  if (msg_) {
+    msg_->trash();
+  }
   LOG(WARNING) << "DATA size error";
+  reset_();
 }
 
-bool Session::bdat_start()
+void Session::data_error()
 {
-  last_in_group_("BDAT");
+  out_().clear(); // clear possible eof from input side
+  out_() << "552 5.3.4 message error of some kind\r\n" << std::flush;
+  if (msg_) {
+    msg_->trash();
+  }
+  LOG(WARNING) << "DATA error";
+  reset_();
+}
 
+bool Session::bdat_start(size_t n)
+{
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
@@ -481,39 +561,55 @@ bool Session::bdat_start()
     LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
-  case xact_step::data:
-  case xact_step::bdat:
+  case xact_step::data: // first bdat
     break;
+  case xact_step::bdat:
+    return true;
   }
 
   CHECK(!forward_path_.empty());
 
   state_ = xact_step::bdat;
-  return true;
+
+  return msg_new();
 }
 
-void Session::bdat_msg(size_t n)
+void Session::bdat_done(size_t n, bool last)
 {
-  if (state_ != xact_step::bdat) {
-    bdat_error();
+  if (state_ != xact_step::bdat)
     return;
-  }
-  out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
-  LOG(INFO) << "BDAT " << n;
-}
 
-void Session::bdat_msg_last(Message& msg, size_t n)
-{
-  if (state_ != xact_step::bdat) {
-    bdat_error();
+  if (msg_ && msg_->size_error()) {
+    bdat_size_error();
     return;
   }
+
+  if (!last) {
+    out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
+    LOG(INFO) << "BDAT " << n;
+    return;
+  }
+
+  CHECK(msg_);
+  msg_->save();
+
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
-  LOG(INFO) << "BDAT " << n << " LAST";
-  LOG(INFO) << "message delivered, " << msg.size() << " octets, with id "
-            << msg.id();
 
-  state_ = xact_step::mail;
+  LOG(INFO) << "BDAT " << n << " LAST";
+  LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
+            << msg_->id();
+  reset_();
+}
+
+void Session::bdat_size_error()
+{
+  out_().clear(); // clear possible eof from input side
+  out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
+  LOG(WARNING) << "BDAT size error";
+  if (msg_) {
+    msg_->trash();
+  }
+  reset_();
 }
 
 void Session::bdat_error()
@@ -521,16 +617,18 @@ void Session::bdat_error()
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
   LOG(WARNING) << "BDAT sequence error";
+  if (msg_) {
+    msg_->trash();
+  }
+  reset_();
 }
 
 void Session::rset()
 {
-  reset_();
   out_() << "250 2.1.5 RSET OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RSET";
-
-  state_ = xact_step::mail;
+  reset_();
 }
 
 void Session::noop(std::string_view str)
@@ -628,7 +726,7 @@ void Session::starttls()
     out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
     if (sock_.starttls_server()) {
       reset_();
-      max_msg_size(Config::max_msg_size_bro);
+      // max_msg_size(Config::max_msg_size_bro);
       LOG(INFO) << "STARTTLS " << sock_.tls_info();
     }
   }
