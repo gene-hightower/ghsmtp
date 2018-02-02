@@ -453,7 +453,7 @@ struct action<greeting_ok> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.greeting_ok = true;
-    LOG(INFO) << "< " << in.string();
+    LOG(INFO) << " S: " << in.string();
   }
 };
 
@@ -463,7 +463,7 @@ struct action<ehlo_ok_rsp> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_ok = true;
-    LOG(INFO) << "< " << in.string();
+    LOG(INFO) << " S: " << in.string();
   }
 };
 
@@ -503,7 +503,7 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << "< " << in.string();
+    LOG(INFO) << " S: " << in.string();
   }
 };
 
@@ -745,7 +745,7 @@ private:
 template <typename Input>
 void fail(Input& in, RFC5321::Connection& cnn)
 {
-  LOG(INFO) << "> QUIT";
+  LOG(INFO) << " C: QUIT";
   cnn.sock.out() << "QUIT\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   exit(EXIT_FAILURE);
@@ -1011,7 +1011,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   // Perfer PLAIN mechanism.
   if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
       != auth->second.end()) {
-    LOG(INFO) << "> AUTH PLAIN";
+    LOG(INFO) << "C: AUTH PLAIN";
     auto tok{std::stringstream{}};
     tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
@@ -1025,7 +1025,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   // The LOGIN SASL mechanism is obsolete.
   else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
            != auth->second.end()) {
-    LOG(INFO) << "> AUTH LOGIN";
+    LOG(INFO) << "C: AUTH LOGIN";
     cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
     CHECK((parse<RFC5321::auth_login_username>(in)));
     cnn.sock.out() << Base64::enc(FLAGS_username) << "\r\n" << std::flush;
@@ -1046,7 +1046,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
 template <typename Input>
 void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
 {
-  LOG(INFO) << "> STARTTLS";
+  LOG(INFO) << "C: STARTTLS";
   cnn.sock.out() << "STARTTLS\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
@@ -1054,7 +1054,7 @@ void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
 
   if (!FLAGS_starttls_1st) {
     // Skip the 2nd EHLO since we're about to try our 1st.
-    LOG(INFO) << "> EHLO " << sender.ascii();
+    LOG(INFO) << "C: EHLO " << sender.ascii();
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
@@ -1090,7 +1090,7 @@ bool snd(int fd_in,
   // try EHLO/HELO
 
   if (FLAGS_use_esmtp) {
-    LOG(INFO) << "> EHLO " << sender.ascii();
+    LOG(INFO) << "C: EHLO " << sender.ascii();
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
 
     CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
@@ -1107,7 +1107,7 @@ bool snd(int fd_in,
   }
 
   if (!FLAGS_use_esmtp) {
-    LOG(INFO) << "> HELO " << sender.ascii();
+    LOG(INFO) << "C: HELO " << sender.ascii();
     cnn.sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, cnn)) {
       LOG(WARNING) << "HELO didn't work, skipping";
@@ -1164,7 +1164,7 @@ bool snd(int fd_in,
   if (ext_smtputf8 && !ext_8bitmime) {
     LOG(ERROR)
         << "SMTPUTF8 requires 8BITMIME, see RFC-6531 section 3.1 item 8.";
-    LOG(INFO) << "> QUIT";
+    LOG(INFO) << "C: QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     exit(EXIT_FAILURE);
@@ -1221,7 +1221,7 @@ bool snd(int fd_in,
   if (ext_size && (total_size > max_msg_size)) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
-    LOG(INFO) << "> QUIT";
+    LOG(INFO) << "C: QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     exit(EXIT_FAILURE);
@@ -1247,12 +1247,12 @@ bool snd(int fd_in,
   }
 
   if (FLAGS_badpipline) {
-    LOG(INFO) << "> NOOP NOOP";
+    LOG(INFO) << "C: NOOP NOOP";
     cnn.sock.out() << "NOOP\r\nNOOP\r\n" << std::flush;
   }
 
   if (FLAGS_nosend) {
-    LOG(INFO) << "> QUIT";
+    LOG(INFO) << "C: QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     exit(EXIT_SUCCESS);
@@ -1260,14 +1260,14 @@ bool snd(int fd_in,
 
   auto param_str = param_stream.str();
 
-  LOG(INFO) << "> MAIL FROM:<" << from << '>' << param_str;
+  LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
   cnn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n";
 
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "MAIL FROM");
   }
 
-  LOG(INFO) << "> RCPT TO:<" << to << ">";
+  LOG(INFO) << "C: RCPT TO:<" << to << ">";
   cnn.sock.out() << "RCPT TO:<" << to << ">\r\n";
 
   if (!ext_pipelining) {
@@ -1277,7 +1277,7 @@ bool snd(int fd_in,
   if (ext_chunking) {
     std::stringstream bdat_stream;
     bdat_stream << "BDAT " << total_size << " LAST";
-    LOG(INFO) << "> " << bdat_stream.str();
+    LOG(INFO) << "C: " << bdat_stream.str();
 
     cnn.sock.out() << bdat_stream.str() << "\r\n";
     cnn.sock.out().write(hdr_str.data(), hdr_str.size());
@@ -1304,7 +1304,7 @@ bool snd(int fd_in,
     }
   }
   else {
-    LOG(INFO) << "> DATA";
+    LOG(INFO) << "C: DATA";
     cnn.sock.out() << "DATA\r\n";
 
     // NOW check returns
@@ -1367,7 +1367,7 @@ bool snd(int fd_in,
   }
   in.discard();
 
-  LOG(INFO) << "> QUIT";
+  LOG(INFO) << "C: QUIT";
   cnn.sock.out() << "QUIT\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
