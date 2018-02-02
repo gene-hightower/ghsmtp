@@ -25,22 +25,13 @@ using namespace std::string_literals;
 
 namespace Config {
 constexpr std::streamsize bfr_size = 4 * 1024;
-constexpr std::streamsize max_hdr_size = 16 * 1024;
 constexpr std::streamsize max_xfer_size = 64 * 1024;
 } // namespace Config
 
 namespace RFC5321 {
 
 struct Ctx {
-  Ctx(std::function<void(void)> read_hook = []() {})
-    : session(read_hook)
-  {
-  }
   Session session;
-
-  std::unique_ptr<Message> msg;
-
-  std::string hdr;
 
   std::string mb_loc;
   std::string mb_dom;
@@ -49,43 +40,10 @@ struct Ctx {
   std::unordered_map<std::string, std::string> parameters;
 
   std::streamsize chunk_size;
-  bool chunk_first{true};
-  bool chunk_last{false};
-  bool bdat_error{false};
 
-  bool hdr_end{false};
-
-  void bdat_rset()
+  Ctx(std::function<void(void)> read_hook = []() {})
+    : session(read_hook)
   {
-    chunk_first = true;
-    chunk_last = false;
-    bdat_error = false;
-    hdr_end = false;
-  }
-
-  void new_msg()
-  {
-    msg = std::make_unique<Message>();
-    hdr.clear();
-    hdr_end = false;
-    session.data_msg(*msg);
-  }
-};
-
-struct no_last_dash { // not used now...
-  // Something like this to fix up U_ldh_str and Ldh_str rules.
-  template <tao::pegtl::apply_mode A,
-            tao::pegtl::rewind_mode M,
-            template <typename...> class Action,
-            template <typename...> class Control,
-            typename Input>
-  static bool match(Input& in)
-  {
-    if (in.string().back() != '-') {
-      in.bump(in.string().size());
-      return true;
-    }
-    return false;
   }
 };
 
@@ -497,7 +455,6 @@ struct action<helo> {
     auto const beg = in.begin() + 5; // +5 for the length of "HELO "
     auto const end = in.end() - 2;   // -2 for the CRLF
     ctx.session.helo(std::string_view(beg, end - beg));
-    ctx.bdat_rset();
   }
 };
 
@@ -509,7 +466,6 @@ struct action<ehlo> {
     auto const beg = in.begin() + 5; // +5 for the length of "EHLO "
     auto const end = in.end() - 2;   // -2 for the CRLF
     ctx.session.ehlo(std::string_view(beg, end - beg));
-    ctx.bdat_rset();
   }
 };
 
@@ -518,11 +474,9 @@ struct action<mail_from> {
   static void apply0(Ctx& ctx)
   {
     ctx.session.mail_from(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
-
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
-    ctx.bdat_rset();
   }
 };
 
@@ -531,7 +485,6 @@ struct action<rcpt_to> {
   static void apply0(Ctx& ctx)
   {
     ctx.session.rcpt_to(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
-
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
@@ -547,66 +500,12 @@ struct action<chunk_size> {
   }
 };
 
-template <>
-struct action<end_marker> {
-  static void apply0(Ctx& ctx) { ctx.chunk_last = true; }
-};
-
-void bdat_act(Ctx& ctx)
+bool bdat_act(Ctx& ctx)
 {
-  if (ctx.chunk_first) {
-    ctx.chunk_first = false;
+  bool errs = ctx.session.bdat_start(ctx.chunk_size);
 
-    if (!ctx.session.bdat_start()) {
-      // no need to ctx.msg.reset() when bdat_start fails
-      ctx.bdat_error = true;
-      LOG(ERROR) << "bdat_start() returned error!";
-
-      // seek over BDAT data
-      auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
-      ctx.session.in().seekg(pos, ctx.session.in().beg);
-      return;
-    }
-
-    ctx.new_msg();
-  }
-
-  if (ctx.bdat_error || !ctx.msg) { // If we've already failed...
-    LOG(ERROR) << "BDAT continuing data error, skiping " << ctx.chunk_size
-               << " octets";
-
-    if (ctx.msg) {
-      ctx.msg->trash();
-      ctx.msg.reset();
-    }
-    ctx.session.bdat_error();
-
-    // seek over BDAT data
-    auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
-    ctx.session.in().seekg(pos, ctx.session.in().beg);
-    return;
-  }
-
-  if (ctx.chunk_size > ctx.msg->size_left()) {
-    LOG(ERROR) << "BDAT size error, skiping " << ctx.chunk_size << " octets";
-
-    ctx.session.data_size_error();
-    ctx.bdat_error = true;
-    if (ctx.msg) {
-      ctx.msg->trash();
-      ctx.msg.reset();
-    }
-
-    // seek over BDAT data
-    auto const pos{ctx.session.in().tellg() + ctx.chunk_size};
-    ctx.session.in().seekg(pos, ctx.session.in().beg);
-    return;
-  }
-
-  // First off, for every BDAT, we /must/ read the data, if there is any.
   auto bfr{std::string{}};
-
-  auto to_xfer{std::streamsize{ctx.chunk_size}};
+  auto to_xfer = ctx.chunk_size;
 
   while (to_xfer) {
     auto const xfer_sz{std::min(to_xfer, Config::max_xfer_size)};
@@ -615,6 +514,10 @@ void bdat_act(Ctx& ctx)
     ctx.session.in().read(&bfr[0], xfer_sz);
 
     if (!ctx.session.in()) {
+
+      // FIXME
+      // check for timeout
+
       if (ctx.session.in().eof())
         LOG(ERROR) << "EOF in BDAT";
 
@@ -622,61 +525,24 @@ void bdat_act(Ctx& ctx)
                  << ctx.session.in().gcount();
 
       ctx.session.bdat_error();
-      ctx.bdat_error = true;
-      if (ctx.msg) {
-        ctx.msg->trash();
-        ctx.msg.reset();
-      }
-      return;
+      return false;
     }
 
-    if (!ctx.hdr_end) {
-      auto const e{bfr.find("\r\n\r\n")};
-      if (ctx.hdr.size() < Config::max_hdr_size) {
-        ctx.hdr += bfr.substr(0, e);
-        if (e == std::string::npos) {
-          LOG(WARNING) << "may not have all headers in this chunk";
-        }
-        else {
-          ctx.hdr.append("\r\n");
-          ctx.hdr_end = true;
-        }
-      }
-    }
-
-    CHECK(ctx.msg->write(&bfr[0], xfer_sz)) << "error writing message data";
+    errs |= ctx.session.msg_data(&bfr[0], xfer_sz);
 
     to_xfer -= xfer_sz;
   }
 
-  if (ctx.msg->size_error()) {
-    LOG(ERROR) << "message size error after " << ctx.msg->size() << " octets";
-    ctx.session.data_size_error();
-    ctx.bdat_error = true;
-    if (ctx.msg) {
-      ctx.msg->trash();
-      ctx.msg.reset();
-    }
-    return;
-  }
-
-  if (ctx.chunk_last) {
-    if (!ctx.hdr_end) {
-      LOG(WARNING) << "may not have all headers in this email";
-    }
-    CHECK(ctx.msg);
-    ctx.msg->save();
-    ctx.session.bdat_msg_last(*ctx.msg, ctx.chunk_size);
-    ctx.msg.reset();
-  }
-  else {
-    ctx.session.bdat_msg(ctx.chunk_size);
-  }
+  return errs;
 }
 
 template <>
 struct action<bdat> {
-  static void apply0(Ctx& ctx) { bdat_act(ctx); }
+  static void apply0(Ctx& ctx)
+  {
+    if (bdat_act(ctx))
+      ctx.session.bdat_done(ctx.chunk_size, false);
+  }
 };
 
 template <>
@@ -684,8 +550,8 @@ struct action<bdat_last> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    bdat_act(ctx);
-    ctx.bdat_rset();
+    if (bdat_act(ctx))
+      ctx.session.bdat_done(ctx.chunk_size, true);
   }
 };
 
@@ -693,24 +559,7 @@ template <>
 struct data_action<data_end> {
   static void apply0(Ctx& ctx)
   {
-    if (ctx.msg) {
-      if (ctx.msg->size_error()) {
-        ctx.session.data_size_error();
-        if (ctx.msg) {
-          ctx.msg->trash();
-          ctx.msg.reset();
-        }
-      }
-      else {
-        if (!ctx.hdr_end) {
-          LOG(WARNING) << "may not have all headers in this email";
-        }
-        CHECK(ctx.msg);
-        ctx.msg->save();
-        ctx.session.data_msg_done(*ctx.msg);
-        ctx.msg.reset();
-      }
-    }
+    ctx.session.data_done();
   }
 };
 
@@ -719,11 +568,8 @@ struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
     constexpr char CRLF[]{'\r', '\n'};
-    if (ctx.msg) {
-      CHECK(ctx.msg->write(CRLF, sizeof(CRLF))) << "error writing message data";
-    }
-    ctx.hdr.append(CRLF, sizeof(CRLF));
-    ctx.hdr_end = true;
+    if (!ctx.session.msg_data(CRLF, sizeof(CRLF)))
+      ctx.session.data_error();
   }
 };
 
@@ -733,14 +579,8 @@ struct data_action<data_plain> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{in.end() - in.begin()};
-    if (ctx.msg) {
-      CHECK(ctx.msg->write(in.begin(), len)) << "error writing message data";
-    }
-    if (!ctx.hdr_end) {
-      if (ctx.hdr.size() < Config::max_hdr_size) {
-        ctx.hdr.append(in.begin(), len);
-      }
-    }
+    if (!ctx.session.msg_data(in.begin(), len))
+      ctx.session.data_error();
   }
 };
 
@@ -750,19 +590,8 @@ struct data_action<data_dot> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{std::streamsize{in.end() - in.begin() - 1}};
-    if (ctx.msg) {
-      CHECK(ctx.msg->write(in.begin() + 1, len))
-          << "error writing message data";
-    }
-    if (!ctx.hdr_end) {
-      LOG(WARNING) << "suspicious encoding used in header";
-      if (ctx.hdr.size() < Config::max_hdr_size) {
-        auto const max_left{Config::max_hdr_size
-                            - static_cast<std::streamsize>(ctx.hdr.size())};
-        auto const hlen{std::min(len, max_left)};
-        std::copy_n(in.begin() + 1, hlen, std::back_inserter(ctx.hdr));
-      }
-    }
+    if (!ctx.session.msg_data(in.begin() + 1, len))
+      ctx.session.data_error();
   }
 };
 
@@ -781,15 +610,8 @@ struct data_action<anything_else> {
   {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
     auto const len{std::streamsize{in.end() - in.begin()}};
-    CHECK(len);
-    if (ctx.msg) {
-      CHECK(ctx.msg->write(in.begin(), len)) << "error writing message data";
-    }
-    if (!ctx.hdr_end) {
-      if (ctx.hdr.size() < Config::max_hdr_size) {
-        ctx.hdr.append(in.begin(), len);
-      }
-    }
+    if (len)
+      ctx.session.msg_data(in.begin(), len);
   }
 };
 
@@ -799,13 +621,11 @@ struct action<data> {
   static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      ctx.new_msg();
-
-      auto data_in{
-          istream_input<eol::crlf>(ctx.session.in(), Config::bfr_size, "data")};
+      auto din =
+          istream_input<eol::crlf>(ctx.session.in(), Config::bfr_size, "din");
       try {
-        if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(
-                in, data_in, ctx)) {
+        if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
+                                                                       ctx)) {
           ctx.session.log_stats();
           if (!(ctx.session.maxed_out() || ctx.session.timed_out())) {
             ctx.session.error("bad DATA syntax");
@@ -827,11 +647,7 @@ struct action<data> {
 
 template <>
 struct action<rset> {
-  static void apply0(Ctx& ctx)
-  {
-    ctx.session.rset();
-    ctx.bdat_rset();
-  }
+  static void apply0(Ctx& ctx) { ctx.session.rset(); }
 };
 
 template <typename Input>

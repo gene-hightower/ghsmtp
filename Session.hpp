@@ -37,14 +37,17 @@ public:
   void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
-  bool data_start();
-  void data_msg(Message& msg);
-  void data_msg_done(Message& msg);
-  void data_size_error();
+  bool msg_new();
+  bool msg_data(char const* s, std::streamsize count);
 
-  bool bdat_start();
-  void bdat_msg(size_t n);
-  void bdat_msg_last(Message& msg, size_t n);
+  bool data_start();
+  void data_done();
+  void data_size_error();
+  void data_error();
+
+  bool bdat_start(size_t n);
+  void bdat_done(size_t n, bool last);
+  void bdat_size_error();
   void bdat_error();
 
   void rset();
@@ -84,7 +87,7 @@ private:
   std::string_view server_id_() const { return server_identity_.ascii(); }
 
   // clear per transaction data, preserve per connection data
-  inline void reset_();
+  void reset_();
 
   bool verify_ip_address_(std::string& error_msg);
   void verify_client_();
@@ -112,6 +115,7 @@ private:
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
   std::string received_spf_;          // from libspf2
+  std::unique_ptr<Message> msg_;
 
   TLD tld_db_;
 
@@ -143,26 +147,6 @@ private:
   bool fcrdns_whitelisted_{false};
   bool ip_whitelisted_{false};
 };
-
-inline void Session::reset_()
-{
-  // RSET does not force another EHLO/HELO, one piece of transaction
-  // data saved is client_identity_:
-
-  // client_identity_.clear();
-
-  reverse_path_.clear();
-  forward_path_.clear();
-  received_spf_.clear();
-
-  state_ = xact_step::mail;
-
-  binarymime_ = false;
-  extensions_ = false;
-  smtputf8_ = false;
-
-  max_msg_size(max_msg_size());
-}
 
 inline void Session::max_msg_size(size_t max)
 {
