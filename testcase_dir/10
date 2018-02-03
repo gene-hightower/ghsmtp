@@ -1,0 +1,4 @@
+EHLO example.com
+STARTTLS
+STARTTLS
+QUIT

@@ -1,0 +1,11 @@
+EHLO example.com
+MAIL FROM:<Sam@Random.com>
+RCPT TO:<Susan@digilicious.com>
+BDAT 86 LAST
+To: Susan@random.com
+From: Sam@random.com
+Subject: This is a bodyless test message
+NOOP
+NOOP
+NOOP
+QUIT

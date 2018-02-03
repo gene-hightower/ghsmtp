@@ -1,0 +1,10 @@
+EHLO example.com
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<postmaster@[127.0.0.1]>
+DATA
+To: postsmaster
+From: postsmaster@example.com
+Subject: foo bar baz
+
+.
+QUIT

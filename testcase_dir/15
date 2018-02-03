@@ -1,0 +1,15 @@
+EHLO example.com
+MAIL FROM:<Sam@Random.com>
+RCPT TO:<Susan@digilicious.com>
+BDAT 88 LAST
+To: Susan@random.com
+From: Sam@random.com
+Subject: This is a bodyfull test message
+
+DATA
+To: postsmaster
+From: postsmaster@example.com
+Subject: foo bar baz
+
+.
+QUIT

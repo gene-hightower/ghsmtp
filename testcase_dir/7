@@ -1,0 +1,3 @@
+EHLO example.com
+AUTH PLAIN
+QUIT
