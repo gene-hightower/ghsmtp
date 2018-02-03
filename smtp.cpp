@@ -567,7 +567,7 @@ struct data_action<data_blank> {
   {
     constexpr char CRLF[]{'\r', '\n'};
     if (!ctx.session.msg_data(CRLF, sizeof(CRLF)))
-      ctx.session.data_error();
+      ctx.session.data_size_error();
   }
 };
 
@@ -578,7 +578,7 @@ struct data_action<data_plain> {
   {
     auto const len{in.end() - in.begin()};
     if (!ctx.session.msg_data(in.begin(), len))
-      ctx.session.data_error();
+      ctx.session.data_size_error();
   }
 };
 
@@ -589,7 +589,7 @@ struct data_action<data_dot> {
   {
     auto const len{std::streamsize{in.end() - in.begin() - 1}};
     if (!ctx.session.msg_data(in.begin() + 1, len))
-      ctx.session.data_error();
+      ctx.session.data_size_error();
   }
 };
 
