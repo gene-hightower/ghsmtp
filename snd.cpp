@@ -10,6 +10,8 @@ DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
+DEFINE_bool(slow_strangle, false, "super slow mo");
+DEFINE_bool(long_line, false, "super long text line");
 DEFINE_bool(bare_lf, false, "send a bare LF");
 DEFINE_bool(huge_size, false, "attempt with huge size");
 DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
@@ -1061,18 +1063,15 @@ void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
   }
 }
 
+// Do various bad things during the DATA transfer.
+
 template <typename Input>
-void bare_lf(Input& in, RFC5321::Connection& cnn, bool ext_pipelining)
+void bad_daddy(Input& in, RFC5321::Connection& cnn)
 {
   LOG(INFO) << "C: DATA";
   cnn.sock.out() << "DATA\r\n";
-
-  // NOW check returns
-  if (ext_pipelining) {
-    check_for_fail(in, cnn, "MAIL FROM");
-    check_for_fail(in, cnn, "RCPT TO");
-  }
   cnn.sock.out() << std::flush;
+
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   if (cnn.reply_code != "354") {
     LOG(ERROR) << "DATA returned " << cnn.reply_code;
@@ -1080,7 +1079,23 @@ void bare_lf(Input& in, RFC5321::Connection& cnn, bool ext_pipelining)
   }
 
   // cnn.sock.out() << "\r\nThis ->\n<- is a bare LF!\r\n";
-  cnn.sock.out() << "\n.\n\r\n";
+  if (FLAGS_bare_lf)
+    cnn.sock.out() << "\n.\n\r\n";
+
+  if (FLAGS_long_line) {
+    for (auto i=0; i<10000; ++i) {
+      cnn.sock.out() << 'X';
+    }
+    cnn.sock.out() << "\r\n" << std::flush;
+  }
+
+  while (FLAGS_slow_strangle) {
+    for (auto i=0; i<100; ++i) {
+      cnn.sock.out() << 'X' << std::flush;
+      sleep(3);
+    }
+    cnn.sock.out() << "\r\n";
+  }
 
   // Done!
   cnn.sock.out() << ".\r\n" << std::flush;
@@ -1308,8 +1323,13 @@ bool snd(int fd_in,
     check_for_fail(in, cnn, "RCPT TO");
   }
 
-  if (FLAGS_bare_lf) {
-    bare_lf(in, cnn, ext_pipelining);
+  if (FLAGS_bare_lf || FLAGS_slow_strangle) {
+    if (ext_pipelining) {
+      cnn.sock.out() << std::flush;
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+    bad_daddy(in, cnn);
     return true;
   }
 
@@ -1442,7 +1462,7 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto && [ from_mbx, to_mbx ] = parse_mailboxes();
+  auto&& [from_mbx, to_mbx] = parse_mailboxes();
 
   if (FLAGS_pipe) {
     return snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"),
