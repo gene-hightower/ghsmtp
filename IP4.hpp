@@ -21,6 +21,8 @@ constexpr auto lit_sfx_sz{sizeof(lit_sfx) - 1};
 
 constexpr auto lit_add_sz{lit_pfx_sz + lit_sfx_sz};
 
+constexpr auto loopback_literal{"[127.0.0.1]"};
+
 std::string_view constexpr as_address(std::string_view addr)
 {
   // CHECK(is_address_literal(addr));
