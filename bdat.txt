@@ -1,5 +1,5 @@
 EHLO digilicious.com
-MAIL FROM:<test@digilicious.com> BINARYMIME SMTPUTF8
+MAIL FROM:<test@digilicious.com> BODY=BINARYMIME SMTPUTF8
 RCPT TO:<test@digilicious.com>
 BDAT 102
 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
