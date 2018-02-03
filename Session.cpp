@@ -26,8 +26,6 @@
 using namespace std::string_literals;
 
 namespace Config {
-constexpr auto max_unrecognized_cmds{20};
-
 constexpr char const* const rbls[]{
     "zen.spamhaus.org",
     "b.barracudacentral.org",
@@ -39,13 +37,14 @@ constexpr char const* const uribls[]{
     "multi.surbl.org",
 };
 
-constexpr auto greeting_wait = std::chrono::seconds(3);
-constexpr auto max_recipients_per_message = 100;
+constexpr auto greeting_wait = std::chrono::seconds{3};
+constexpr auto max_recipients_per_message{100};
+constexpr auto max_unrecognized_cmds{20};
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
-constexpr auto read_timeout = std::chrono::minutes(5);
-constexpr auto write_timeout = std::chrono::seconds(30);
+constexpr auto read_timeout = std::chrono::minutes{5};
+constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
 #include <gflags/gflags.h>
@@ -78,12 +77,13 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
 
 void Session::max_msg_size(size_t max)
 {
-  max_msg_size_ = max;          // number to advertise via RFC 1870
+  max_msg_size_ = max; // number to advertise via RFC 1870
 
   if (FLAGS_max_read) {
     sock_.set_max_read(FLAGS_max_read);
-  } else {
-    auto const overhead = std::max(max / 10, 2048ul);
+  }
+  else {
+    auto const overhead = std::max(max / 10, size_t(2048));
     sock_.set_max_read(max + overhead);
   }
 }
@@ -790,8 +790,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = "unknown "s + sock_.them_address_literal();
   }
 
-  if ((sock_.them_address_literal() == "[127.0.0.1]")
-      || (sock_.them_address_literal() == "[IPv6:::1]")) {
+  if ((sock_.them_address_literal() == IP4::loopback_literal)
+      || (sock_.them_address_literal() == IP6::loopback_literal)) {
     ip_whitelisted_ = true;
   }
   else {
