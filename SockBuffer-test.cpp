@@ -9,7 +9,7 @@
 
 int main(int argc, char* argv[])
 {
-  constexpr char infile[]{"input.txt"};
+  constexpr char infile[]{"body.txt"};
 
   int fd_in;
   PCHECK((fd_in = open(infile, O_RDONLY)) != -1);
