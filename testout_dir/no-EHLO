@@ -1,0 +1,10 @@
+220 digilicious.com ESMTP - ghsmtp
+503 5.5.1 must send HELO/EHLO first
+503 5.5.1 must send HELO/EHLO first
+503 5.5.1 must send HELO/EHLO first
+500 5.5.1 command unrecognized: "To: Postsmaster\r\n"
+500 5.5.1 command unrecognized: "From: Postsmaster@example.com\r\n"
+500 5.5.1 command unrecognized: "Subject: foo bar baz\r\n"
+500 5.5.1 command unrecognized: "\r\n"
+500 5.5.1 command unrecognized: ".\r\n"
+221 2.0.0 closing connection

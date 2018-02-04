@@ -1,0 +1,32 @@
+EHLO example.com
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<disposable.style.email.with+symbol@digilicious.com>
+RCPT TO:<"much.more unusual"@digilicious.com>
+RCPT TO:<"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@digilicious.com>
+RCPT TO:<#!$%&'*+-/=?^_`{}|~@digilicious.com>
+RCPT TO:<"()<>[]:,;@\\\"!#$%&'-/=?^_`{}| ~.a"@digilicious.com>
+RCPT TO:<"Abc\@def"@digilicious.com>
+RCPT TO:<"Joe\\Blow"@digilicious.com>
+RCPT TO:<_somename@digilicious.com>
+RCPT TO:<*@digilicious.com>
+RCPT TO:<{}@digilicious.com>
+RCPT TO:<=@digilicious.com>
+RCPT TO:<-@digilicious.com>
+RCPT TO:<+@digilicious.com>
+RCPT TO:<_@digilicious.com>
+RCPT TO:<"."@digilicious.com>
+RCPT TO:<" "@digilicious.com>
+RCPT TO:<π@digilicious.com>
+RCPT TO:<Pelé@digilicious.com>
+RCPT TO:<δοκιμή@digilicious.com>
+RCPT TO:<我買@digilicious.com>
+RCPT TO:<甲斐@digilicious.com>
+RCPT TO:<чебурашка@digilicious.com>
+DATA
+To: postsmaster
+From: postsmaster@example.com
+Subject: foo bar baz
+
+Some body text.
+.
+QUIT

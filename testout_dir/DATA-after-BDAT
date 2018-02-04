@@ -1,0 +1,20 @@
+220 digilicious.com ESMTP - ghsmtp
+250-digilicious.com
+250-SIZE 15728640
+250-8BITMIME
+250-STARTTLS
+250-ENHANCEDSTATUSCODES
+250-PIPELINING
+250-BINARYMIME
+250-CHUNKING
+250 SMTPUTF8
+250 2.1.0 MAIL FROM OK
+250 2.1.5 RCPT TO OK
+250 2.0.0 BDAT 90 LAST OK
+503 5.5.1 must send 'MAIL FROM' before DATA
+500 5.5.1 command unrecognized: "To: postsmaster\r\n"
+500 5.5.1 command unrecognized: "From: postsmaster@example.com\r\n"
+500 5.5.1 command unrecognized: "Subject: foo bar baz\r\n"
+500 5.5.1 command unrecognized: "\r\n"
+500 5.5.1 command unrecognized: ".\r\n"
+221 2.0.0 closing connection
