@@ -2,7 +2,10 @@
 namespace gflags {
 };
 
-DEFINE_bool(selftest, false, "run a self test");
+// This needs to be at least the length of each string it's trying to match.
+DEFINE_uint64(bfr_size, 4*1024, "parser buffer size");
+
+DEFINE_uint64(max_xfer_size, 64*1024, "maximum BDAT transfer size");
 
 #include <fstream>
 
@@ -22,11 +25,6 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
-
-namespace Config {
-constexpr std::streamsize bfr_size = 4 * 1024;
-constexpr std::streamsize max_xfer_size = 64 * 1024;
-} // namespace Config
 
 namespace RFC5321 {
 
@@ -508,7 +506,7 @@ void bdat_act(Ctx& ctx)
   auto to_xfer = ctx.chunk_size;
 
   while (to_xfer) {
-    auto const xfer_sz{std::min(to_xfer, Config::max_xfer_size)};
+    auto const xfer_sz{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
     bfr.resize(xfer_sz);
 
     ctx.session.in().read(&bfr[0], xfer_sz);
@@ -620,7 +618,7 @@ struct action<data> {
   {
     if (ctx.session.data_start()) {
       auto din =
-          istream_input<eol::crlf>(ctx.session.in(), Config::bfr_size, "din");
+          istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size, "din");
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
                                                                        ctx)) {
@@ -713,59 +711,6 @@ void timeout(int signum)
   _exit(1);
 }
 
-void selftest()
-{
-  const char* good_list[]{
-      "anything\r\n"
-      ".\r\n", // end
-
-      "anything\r\n"
-      "..anything\r\n"
-      ".\r\n", // end
-
-      "anything\r\n"
-      "\nanything\r\n"
-      "\ranything\r\n"
-      "anything\r\n"
-      ".\r\n", // end
-  };
-
-  const char* bad_list[]{
-      ".anything\r\n",
-
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n"
-      "anything\r\n",
-
-      "anything",  // no CRLF
-      ".anything", // no CRLF
-
-      "",
-
-  };
-
-  for (auto i : good_list) {
-    auto const bfr{std::string{i}};
-    auto data{std::istringstream{bfr}};
-    auto in{istream_input<eol::crlf>{data, Config::bfr_size, "data"}};
-    auto ctx{RFC5321::Ctx{}};
-    if (!parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
-      LOG(FATAL) << "\"" << esc(i) << "\"";
-    }
-  }
-  for (auto i : bad_list) {
-    auto const bfr{std::string{i}};
-    auto data{std::istringstream{bfr}};
-    auto in{istream_input<eol::crlf>{data, Config::bfr_size, "data"}};
-    auto ctx{RFC5321::Ctx{}};
-    if (parse<RFC5321::data_grammar, RFC5321::data_action>(in, ctx)) {
-      LOG(FATAL) << "\"" << esc(i) << "\"";
-    }
-  }
-}
-
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -774,11 +719,6 @@ int main(int argc, char* argv[])
     using namespace gflags;
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
-  }
-
-  if (FLAGS_selftest) {
-    selftest();
-    return 0;
   }
 
   // Set timeout signal handler to limit total run time.
@@ -803,7 +743,7 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  auto in{istream_input<eol::crlf>{ctx->session.in(), Config::bfr_size, "ses"}};
+  auto in{istream_input<eol::crlf>{ctx->session.in(), FLAGS_bfr_size, "ses"}};
   auto ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
