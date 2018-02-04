@@ -844,10 +844,10 @@ void Session::verify_client_()
 bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
 {
-  if (!sock_.has_peername() || ip_whitelisted_ || fcrdns_whitelisted_
-      || client_identity.is_address_literal()) {
-    return true;
-  }
+  // if (!sock_.has_peername() || ip_whitelisted_ || fcrdns_whitelisted_
+  //     || client_identity.is_address_literal()) {
+  //   return true;
+  // }
 
   // Bogus clients claim to be us or some local host.
   if ((client_identity == server_identity_) || (client_identity == "localhost")
