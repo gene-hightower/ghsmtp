@@ -1,0 +1,10 @@
+HELO example.com
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<postmaster>
+DATA
+From: postsmaster@example.com
+To: postsmaster
+Subject: foo bar baz
+
+.
+QUIT
