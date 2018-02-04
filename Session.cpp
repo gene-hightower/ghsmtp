@@ -88,6 +88,15 @@ void Session::max_msg_size(size_t max)
   }
 }
 
+void Session::bad_host_(char const* msg) const
+{
+  if (sock_.has_peername()) {
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
+           msg);
+  }
+  std::exit(EXIT_SUCCESS);
+}
+
 void Session::reset_()
 {
   // RSET does not force another EHLO/HELO, one piece of transaction
@@ -122,9 +131,7 @@ void Session::greeting()
     auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
       // no glog message at this point
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
-             error_msg.c_str());
-      std::exit(EXIT_SUCCESS);
+      bad_host_(error_msg.c_str());
     }
 
     // Wait a bit of time for pre-greeting traffic.
@@ -132,9 +139,7 @@ void Session::greeting()
         && sock_.input_ready(Config::greeting_wait)) {
       out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
       // no glog message at this point
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] input before greeting",
-             sock_.them_c_str());
-      std::exit(EXIT_SUCCESS);
+      bad_host_("input before greeting");
     }
   }
 
@@ -262,11 +267,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (!verify_sender_(reverse_path, error_msg)) {
     LOG(WARNING) << "verify sender " << reverse_path << params.str()
                  << " failed: " << error_msg;
-    if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
-             error_msg.c_str());
-    }
-    std::exit(EXIT_SUCCESS);
+    bad_host_(error_msg.c_str());
   }
 
   reverse_path_ = std::move(reverse_path);
@@ -403,7 +404,7 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
 
     // I will allow this as sort of the gold standard for naming.
-    if (client_identity_ == client_fcrdns_)
+    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_))
       return Message::SpamStatus::ham;
 
     if (fcrdns_whitelisted_)
@@ -666,11 +667,8 @@ void Session::quit()
 
 void Session::auth()
 {
-  if (sock_.has_peername()) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] auth", sock_.them_c_str());
-  }
   out_() << "454 4.7.0 authentication failure\r\n" << std::flush;
-  std::exit(EXIT_SUCCESS);
+  bad_host_("auth");
 }
 
 void Session::error(std::string_view log_msg)
@@ -833,27 +831,18 @@ void Session::verify_client_()
   auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
     LOG(WARNING) << "verify client failed: " << error_msg;
-    if (sock_.has_peername()) {
-      syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] EHLO failed: %s",
-             sock_.them_c_str(), error_msg.c_str());
-    }
-    std::exit(EXIT_SUCCESS);
+    bad_host_(error_msg.c_str());
   }
 }
 
 bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
 {
-  // if (!sock_.has_peername() || ip_whitelisted_ || fcrdns_whitelisted_
-  //     || client_identity.is_address_literal()) {
-  //   return true;
-  // }
-
   // Bogus clients claim to be us or some local host.
   if ((client_identity == server_identity_) || (client_identity == "localhost")
       || (client_identity == "localhost.localdomain")) {
 
-    if (server_identity_ != client_fcrdns_) {
+    if (!client_fcrdns_.empty() && (server_identity_ != client_fcrdns_)) {
       error_msg = "liar, claimed to be us";
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
@@ -964,7 +953,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
-  if (sender.domain() == client_fcrdns_) {
+  if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_)) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
   else if (!verify_sender_domain_(sender.domain(), error_msg)) {

@@ -84,6 +84,8 @@ private:
   std::ostream& out_() { return sock_.out(); }
   void log_lo_(char const* verb, std::string_view client_identity) const;
 
+  void bad_host_(char const* msg) const __attribute__((noreturn));
+
   std::string_view server_id_() const { return server_identity_.ascii(); }
 
   // clear per transaction data, preserve per connection data
