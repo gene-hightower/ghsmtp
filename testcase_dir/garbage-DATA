@@ -1,4 +1,4 @@
-EHLO example.com
+HELO example.com
 MAIL FROM:<Postmaster@example.com>
 RCPT TO:<Postmaster>
 DATA
