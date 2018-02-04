@@ -6,6 +6,9 @@ namespace gflags {
 // in case we didn't have one
 }
 
+// This needs to be at least the length of each string it's trying to match.
+DEFINE_uint64(bfr_size, 4*1024, "parser buffer size");
+
 DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
@@ -100,8 +103,6 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
 namespace Config {
-constexpr std::streamsize bfr_size = 4 * 1024;
-
 constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 } // namespace Config
@@ -1117,7 +1118,7 @@ bool snd(int fd_in,
 
   auto cnn{RFC5321::Connection(fd_in, fd_out, read_hook)};
 
-  auto in{istream_input<eol::crlf>{cnn.sock.in(), Config::bfr_size, "session"}};
+  auto in{istream_input<eol::crlf>{cnn.sock.in(), FLAGS_bfr_size, "session"}};
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
     LOG(WARNING) << "can't parse greeting";
     return false;
