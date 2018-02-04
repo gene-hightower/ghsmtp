@@ -564,8 +564,7 @@ struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
     constexpr char CRLF[]{'\r', '\n'};
-    if (!ctx.session.msg_data(CRLF, sizeof(CRLF)))
-      ctx.session.data_error();
+    ctx.session.msg_data(CRLF, sizeof(CRLF));
   }
 };
 
@@ -575,8 +574,7 @@ struct data_action<data_plain> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{in.end() - in.begin()};
-    if (!ctx.session.msg_data(in.begin(), len))
-      ctx.session.data_error();
+    ctx.session.msg_data(in.begin(), len);
   }
 };
 
@@ -586,8 +584,7 @@ struct data_action<data_dot> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{std::streamsize{in.end() - in.begin() - 1}};
-    if (!ctx.session.msg_data(in.begin() + 1, len))
-      ctx.session.data_error();
+    ctx.session.msg_data(in.begin() + 1, len);
   }
 };
 
