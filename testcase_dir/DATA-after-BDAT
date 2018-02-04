@@ -1,0 +1,16 @@
+EHLO example.com
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<postmaster>
+BDAT 90 LAST
+To: postsmaster
+From: postsmaster@example.com
+Subject: This is a test message
+
+Body.
+DATA
+To: postsmaster
+From: postsmaster@example.com
+Subject: foo bar baz
+
+.
+QUIT
