@@ -89,10 +89,6 @@ using namespace std::string_literals;
 #include <sys/socket.h>
 #include <sys/types.h>
 
-namespace Config {
-constexpr std::streamsize max_msg_size = 150 * 1024 * 1024;
-}
-
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -1083,14 +1079,14 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
     cnn.sock.out() << "\n.\n\r\n";
 
   if (FLAGS_long_line) {
-    for (auto i=0; i<10000; ++i) {
+    for (auto i = 0; i < 10000; ++i) {
       cnn.sock.out() << 'X';
     }
     cnn.sock.out() << "\r\n" << std::flush;
   }
 
   while (FLAGS_slow_strangle) {
-    for (auto i=0; i<100; ++i) {
+    for (auto i = 0; i < 100; ++i) {
       cnn.sock.out() << 'X' << std::flush;
       sleep(3);
     }
@@ -1230,9 +1226,6 @@ bool snd(int fd_in,
       }
     }
   }
-  if (!max_msg_size) {
-    max_msg_size = Config::max_msg_size;
-  }
 
   do_auth(in, cnn);
 
@@ -1267,7 +1260,7 @@ bool snd(int fd_in,
   for (auto const& body : bodies)
     total_size += body.size();
 
-  if (ext_size && (total_size > max_msg_size)) {
+  if (ext_size && max_msg_size && (total_size > max_msg_size)) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
                << max_msg_size;
     LOG(INFO) << "C: QUIT";
@@ -1278,7 +1271,8 @@ bool snd(int fd_in,
 
   std::stringstream param_stream;
   if (FLAGS_huge_size && ext_size) {
-    param_stream << " SIZE=" << max_msg_size * 2;
+    // Claim some huge size.
+    param_stream << " SIZE=" << std::numeric_limits<std::streamsize>::max();
   }
   else if (ext_size) {
     param_stream << " SIZE=" << total_size;
