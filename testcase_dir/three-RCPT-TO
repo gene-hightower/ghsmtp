@@ -1,13 +1,6 @@
-EHLO example.com
+HELO example.com
 MAIL FROM:<postmaster@example.com>
 RCPT TO:<foo@digilicious.com>
 RCPT TO:<bar@digilicious.com>
 RCPT TO:<baz@digilicious.com>
-DATA
-To: postsmaster
-From: postsmaster@example.com
-Subject: foo bar baz
-
-Some body text.
-.
 QUIT

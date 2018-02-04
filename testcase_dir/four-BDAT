@@ -1,6 +1,6 @@
 EHLO example.com
 MAIL FROM:<postmaster@example.com>
-RCPT TO:<postmaster@[127.0.0.1]>
+RCPT TO:<postmaster>
 BDAT 88
 To: xxxx@example.com
 From: yy@example.com
