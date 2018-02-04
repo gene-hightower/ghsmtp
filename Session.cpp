@@ -842,6 +842,11 @@ bool Session::verify_client_(Domain const& client_identity,
   if ((client_identity == server_identity_) || (client_identity == "localhost")
       || (client_identity == "localhost.localdomain")) {
 
+    if ((sock_.them_address_literal() == IP4::loopback_literal)
+        || (sock_.them_address_literal() == IP6::loopback_literal)) {
+      return true;
+    }
+
     if (!client_fcrdns_.empty() && (server_identity_ != client_fcrdns_)) {
       error_msg = "liar, claimed to be us";
       out_() << "550 5.7.1 liar\r\n" << std::flush;
