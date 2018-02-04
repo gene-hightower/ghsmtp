@@ -1,0 +1,4 @@
+EHLO example.com
+MAIL FROM:<postmaster@example.com>
+MAIL FROM:<postmaster@example.com>
+QUIT
