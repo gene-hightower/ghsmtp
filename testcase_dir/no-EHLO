@@ -1,0 +1,9 @@
+MAIL FROM:<Postmaster@example.com>
+RCPT TO:<Postmaster>
+DATA
+To: Postsmaster
+From: Postsmaster@example.com
+Subject: foo bar baz
+
+.
+QUIT

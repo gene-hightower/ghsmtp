@@ -1,12 +1,12 @@
 HELO example.com
-MAIL FROM:<postmaster@example.com>
-RCPT TO:<postmaster@[127.0.0.1]>
+MAIL FROM:<Postmaster@example.com>
+RCPT TO:<Postmaster@[127.0.0.1]>
 DATA
 To: postsmaster
 From: postsmaster@example.com
 Subject: foo bar baz
 
 Some text to make stuff longer
-..A line that starts with a '.'
+.A line that starts with a '.'
 .
 QUIT
