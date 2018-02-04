@@ -131,8 +131,10 @@ $(TEST_MAILDIR):
 #smtp.cpp: smtp.rl
 #	ragel -o smtp.cpp smtp.rl
 
-clean::
-	rm -rf $(TEST_MAILDIR)
+clean-test::
+	rm -f smtp.profraw
+	rm -f smtp.profdata
+	rm -rf $(TEST_MAILDIR)/*
 
 %.cdb : %
 	./cdb-gen < $< | cdb -c $@
@@ -165,7 +167,36 @@ public_suffix_list.dat:
 
 include MKUltra/rules
 
-regression: $(programs) $(TEST_MAILDIR)
-	MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < input.txt
-	ls -l smtp
-	size smtp
+regression:: $(programs) $(TEST_MAILDIR)
+	@for f in testcase_dir/* ; do \
+	  echo -n test `basename $$f` ""; \
+	  tmp_out=`mktemp`; \
+	  MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < $$f > $$tmp_out; \
+	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
+	  rm $$tmp_out; \
+	done
+
+check::
+	for f in testcase_dir/* ; do \
+	  echo -n test `basename $$f` ""; \
+	  tmp_out=`mktemp`; \
+	  ncat -C localhost 225 < $$f > $$tmp_out; \
+	  MAILDIR=$(TEST_MAILDIR) LLVM_PROFILE_FILE=smtp.profraw ./smtp < $$f > $$tmp_out; \
+	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
+	  mv smtp.profraw /tmp/smtp-profile/`basename $$f`; \
+	  rm $$tmp_out; \
+	done
+
+net-check::
+	@for f in testcase_dir/* ; do \
+	  echo -n test `basename $$f` ""; \
+	  tmp_out=`mktemp`; \
+	  ncat localhost 225 < $$f > $$tmp_out; \
+	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
+	  mv smtp.profraw /tmp/smtp-profile/`basename $$f`; \
+	  rm $$tmp_out; \
+	done
+
+show::
+	llvm-profdata merge -sparse /tmp/smtp-profile/* -o smtp.profdata
+	llvm-cov show ./smtp -instr-profile=smtp.profdata
