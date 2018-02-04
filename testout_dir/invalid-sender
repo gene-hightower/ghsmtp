@@ -8,4 +8,4 @@
 250-BINARYMIME
 250-CHUNKING
 250 SMTPUTF8
-221 2.0.0 closing connection
+550 5.7.1 invalid sender domain bogus

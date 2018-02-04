@@ -1,2 +1,3 @@
 EHLO invalid
+MAIL FROM:<postmaster@bogus>
 QUIT
