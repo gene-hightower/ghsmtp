@@ -511,6 +511,11 @@ void Session::data_done()
 {
   CHECK((state_ == xact_step::data));
 
+  if (msg_ && msg_->size_error()) {
+    data_size_error();
+    return;
+  }
+
   CHECK(msg_);
   msg_->save();
 
