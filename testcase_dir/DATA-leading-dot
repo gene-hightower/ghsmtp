@@ -1,6 +1,6 @@
 HELO example.com
 MAIL FROM:<Postmaster@example.com>
-RCPT TO:<Postmaster@[127.0.0.1]>
+RCPT TO:<postmaster>
 DATA
 To: postsmaster
 From: postsmaster@example.com

@@ -1,5 +1,5 @@
-MAIL FROM:<Postmaster@example.com>
-RCPT TO:<Postmaster>
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<postmaster>
 DATA
 To: Postsmaster
 From: Postsmaster@example.com

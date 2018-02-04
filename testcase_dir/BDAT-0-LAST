@@ -1,11 +1,6 @@
 EHLO example.com
 MAIL FROM:<postmaster@example.com>
-RCPT TO:<postmaster@[127.0.0.1]>
-BDAT 88
-To: xxxx@example.com
-From: yy@example.com
-Subject: This is a bodyfull test message
-
+RCPT TO:<postmaster>
 BDAT 102
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 BDAT 102
