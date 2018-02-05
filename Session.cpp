@@ -91,8 +91,7 @@ void Session::max_msg_size(size_t max)
 void Session::bad_host_(char const* msg) const
 {
   if (sock_.has_peername()) {
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
-           msg);
+    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(), msg);
   }
   std::exit(EXIT_SUCCESS);
 }
@@ -128,6 +127,8 @@ void Session::greeting()
   CHECK(state_ == xact_step::helo);
 
   if (sock_.has_peername()) {
+    close(2); // if we're a networked program, never send to stderr
+
     auto error_msg{std::string{}};
     if (!verify_ip_address_(error_msg)) {
       // no glog message at this point
@@ -438,11 +439,43 @@ bool Session::msg_new()
   if (!FLAGS_max_write)
     FLAGS_max_write = max_msg_size();
 
-  msg_->open(server_id_(), FLAGS_max_write, status);
-  auto const hdrs{added_headers_(*(msg_.get()))};
-  msg_->write(hdrs);
+  try {
+    msg_->open(server_id_(), FLAGS_max_write, status);
+    auto const hdrs{added_headers_(*(msg_.get()))};
+    msg_->write(hdrs);
+    return true;
+  }
+  catch (std::system_error const& e) {
+    switch (errno) {
+    case ENOSPC:
+      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      LOG(ERROR) << "no space";
+      msg_->trash();
+      msg_.reset();
+      return false;
 
-  return true;
+    default:
+      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      LOG(ERROR) << e.what();
+      msg_->trash();
+      msg_.reset();
+      return false;
+    }
+  }
+  catch (std::exception const& e) {
+    out_() << "550 5.0.0 mail error\r\n" << std::flush;
+    LOG(ERROR) << e.what();
+    msg_->trash();
+    msg_.reset();
+    return false;
+  }
+
+  out_() << "550 5.0.0 mail error\r\n" << std::flush;
+  LOG(ERROR) << "msg_new failed with no exception thrown";
+  msg_->trash();
+  msg_.reset();
+  return false;
 }
 
 bool Session::msg_write(char const* s, std::streamsize count)
@@ -453,9 +486,40 @@ bool Session::msg_write(char const* s, std::streamsize count)
   if (!msg_)
     return false;
 
-  if (msg_->write(s, count))
-    return true;
+  try {
+    if (msg_->write(s, count))
+      return true;
+  }
+  catch (std::system_error const& e) {
+    switch (errno) {
+    case ENOSPC:
+      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      LOG(ERROR) << "no space";
+      msg_->trash();
+      msg_.reset();
+      return false;
 
+    default:
+      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      LOG(ERROR) << e.what();
+      msg_->trash();
+      msg_.reset();
+      return false;
+    }
+  }
+  catch (std::exception const& e) {
+    out_() << "550 5.0.0 mail error\r\n" << std::flush;
+    LOG(ERROR) << e.what();
+    msg_->trash();
+    msg_.reset();
+    return false;
+  }
+
+  out_() << "550 5.0.0 mail error\r\n" << std::flush;
+  LOG(ERROR) << "write failed with no exception thrown";
+  msg_->trash();
+  msg_.reset();
   return false;
 }
 
@@ -498,7 +562,6 @@ bool Session::data_start()
   CHECK(!forward_path_.empty());
 
   if (!msg_new()) {
-    out_() << "451 4.3.1 mail system full\r\n" << std::flush;
     LOG(ERROR) << "msg_new() failed";
     return false;
   }
@@ -518,7 +581,27 @@ void Session::data_done()
   }
 
   CHECK(msg_);
-  msg_->save();
+  try {
+    msg_->save();
+  }
+  catch (std::system_error const& e) {
+    switch (errno) {
+    case ENOSPC:
+      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      LOG(ERROR) << "no space";
+      msg_->trash();
+      reset_();
+      return;
+
+    default:
+      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      LOG(ERROR) << e.what();
+      msg_->trash();
+      reset_();
+      return;
+    }
+  }
 
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
@@ -541,7 +624,7 @@ void Session::data_size_error()
 void Session::data_error()
 {
   out_().clear(); // clear possible eof from input side
-  out_() << "552 5.3.4 message error of some kind\r\n" << std::flush;
+  out_() << "554 5.3.0 message error of some kind\r\n" << std::flush;
   if (msg_) {
     msg_->trash();
   }
@@ -587,9 +670,36 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
-  if (msg_ && msg_->size_error()) {
+  if (!msg_) {
+    return;
+  }
+
+  if (msg_->size_error()) {
     bdat_size_error();
     return;
+  }
+
+  CHECK(msg_);
+  try {
+    msg_->save();
+  }
+  catch (std::system_error const& e) {
+    switch (errno) {
+    case ENOSPC:
+      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      LOG(ERROR) << "no space";
+      msg_->trash();
+      reset_();
+      return;
+
+    default:
+      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      LOG(ERROR) << e.what();
+      msg_->trash();
+      reset_();
+      return;
+    }
   }
 
   if (!last) {
@@ -597,9 +707,6 @@ void Session::bdat_done(size_t n, bool last)
     LOG(INFO) << "BDAT " << n;
     return;
   }
-
-  CHECK(msg_);
-  msg_->save();
 
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
 
@@ -613,10 +720,10 @@ void Session::bdat_size_error()
 {
   out_().clear(); // clear possible eof from input side
   out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
-  LOG(WARNING) << "BDAT size error";
   if (msg_) {
     msg_->trash();
   }
+  LOG(WARNING) << "BDAT size error";
   reset_();
 }
 
@@ -624,10 +731,10 @@ void Session::bdat_error()
 {
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
-  LOG(WARNING) << "BDAT sequence error";
   if (msg_) {
     msg_->trash();
   }
+  LOG(WARNING) << "BDAT sequence error";
   reset_();
 }
 
@@ -707,7 +814,7 @@ void Session::bare_lf()
 
 void Session::max_out()
 {
-  out_() << "552 5.3.4 message size exceeds maximium size\r\n" << std::flush;
+  out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "message size maxed out";
   exit_();
 }
@@ -931,8 +1038,10 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   CDB bad_recipients{"bad_recipients"};
   if (bad_recipients.lookup(recipient.local_part())) {
-    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
-    LOG(WARNING) << "bad recipient " << recipient;
+    out_() << "550 5.1.1 bad destination mailbox address " << recipient
+           << "\r\n"
+           << std::flush;
+    LOG(WARNING) << "bad destination mailbox address " << recipient;
     return false;
   }
 
@@ -945,7 +1054,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   auto const sender_str{std::string{sender}};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
-    out_() << "550 5.1.8 bad sender\r\n" << std::flush;
+    out_() << "501 5.1.8 bad sender\r\n" << std::flush;
     error_msg = "bad sender";
     return false;
   }
@@ -1029,7 +1138,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
         return verify_sender_domain_uribl_(look_up, error_msg);
       }
       else {
-        out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
+        out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
         error_msg = "blocked by exact match on three-level-tlds list";
         return false;
       }
@@ -1045,7 +1154,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
       return verify_sender_domain_uribl_(look_up, error_msg);
     }
     else {
-      out_() << "554 5.7.1 bad sender domain\r\n" << std::flush;
+      out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
       error_msg = "blocked by exact match on two-level-tlds list";
       return false;
     }
@@ -1070,7 +1179,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   auto res{DNS::Resolver{}};
   for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out_() << "554 5.7.1 sender blocked on advice of " << uribl << "\r\n"
+      out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
       error_msg = "blocked by "s + uribl;
       return false;
@@ -1167,8 +1276,7 @@ bool Session::verify_from_params_(parameters_t const& parameters)
         try {
           auto const sz = stoull(val);
           if (sz > max_msg_size()) {
-            out_() << "552 5.3.4 message size exceeds maximium size\r\n"
-                   << std::flush;
+            out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
             return false;
           }
