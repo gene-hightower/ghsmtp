@@ -498,46 +498,55 @@ struct action<chunk_size> {
   }
 };
 
-void bdat_act(Ctx& ctx)
+bool bdat_act(Ctx& ctx)
 {
-  ctx.session.bdat_start(ctx.chunk_size);
+  auto ret = ctx.session.bdat_start(ctx.chunk_size);
 
-  auto bfr{std::string{}};
   auto to_xfer = ctx.chunk_size;
 
+  auto const bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
+  auto bfr = std::make_unique<char[]>(bfr_size);
+
   while (to_xfer) {
-    auto const xfer_sz{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
-    bfr.resize(xfer_sz);
+    auto const xfer_sz{std::min(to_xfer, bfr_size)};
 
     ctx.session.in().read(&bfr[0], xfer_sz);
-
     if (!ctx.session.in()) {
-
-      // FIXME
-      // check for timeout
-
-      if (ctx.session.in().eof())
-        LOG(ERROR) << "EOF in BDAT";
 
       LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
                  << ctx.session.in().gcount();
 
-      ctx.session.bdat_error();
-      return;
-    }
+      if (ctx.session.maxed_out()) {
+        LOG(ERROR) << "input maxed out";
+        ctx.session.bdat_size_error();
+        return false;
+      }
 
-    ctx.session.msg_data(&bfr[0], xfer_sz);
+      if (ctx.session.timed_out()) {
+        LOG(ERROR) << "input timed out";
+      }
+
+      if (ctx.session.in().eof()) {
+        LOG(ERROR) << "EOF in BDAT";
+      }
+
+      ctx.session.bdat_error();
+      return false;
+    }
+    ctx.session.msg_write(&bfr[0], xfer_sz);
 
     to_xfer -= xfer_sz;
   }
+
+  return ret;
 }
 
 template <>
 struct action<bdat> {
   static void apply0(Ctx& ctx)
   {
-    bdat_act(ctx);
-    ctx.session.bdat_done(ctx.chunk_size, false);
+    if (bdat_act(ctx))
+      ctx.session.bdat_done(ctx.chunk_size, false);
   }
 };
 
@@ -546,8 +555,8 @@ struct action<bdat_last> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    bdat_act(ctx);
-    ctx.session.bdat_done(ctx.chunk_size, true);
+    if (bdat_act(ctx))
+      ctx.session.bdat_done(ctx.chunk_size, true);
   }
 };
 
@@ -564,7 +573,7 @@ struct data_action<data_blank> {
   static void apply0(Ctx& ctx)
   {
     constexpr char CRLF[]{'\r', '\n'};
-    ctx.session.msg_data(CRLF, sizeof(CRLF));
+    ctx.session.msg_write(CRLF, sizeof(CRLF));
   }
 };
 
@@ -574,7 +583,7 @@ struct data_action<data_plain> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{in.end() - in.begin()};
-    ctx.session.msg_data(in.begin(), len);
+    ctx.session.msg_write(in.begin(), len);
   }
 };
 
@@ -584,7 +593,7 @@ struct data_action<data_dot> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const len{std::streamsize{in.end() - in.begin() - 1}};
-    ctx.session.msg_data(in.begin() + 1, len);
+    ctx.session.msg_write(in.begin() + 1, len);
   }
 };
 
@@ -604,7 +613,7 @@ struct data_action<anything_else> {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
     auto const len{std::streamsize{in.end() - in.begin()}};
     if (len)
-      ctx.session.msg_data(in.begin(), len);
+      ctx.session.msg_write(in.begin(), len);
   }
 };
 

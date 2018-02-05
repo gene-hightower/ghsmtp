@@ -38,7 +38,7 @@ public:
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
   bool msg_new();
-  bool msg_data(char const* s, std::streamsize count);
+  bool msg_write(char const* s, std::streamsize count);
 
   bool data_start();
   void data_done();

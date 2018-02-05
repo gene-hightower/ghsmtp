@@ -445,7 +445,7 @@ bool Session::msg_new()
   return true;
 }
 
-bool Session::msg_data(char const* s, std::streamsize count)
+bool Session::msg_write(char const* s, std::streamsize count)
 {
   if ((state_ != xact_step::data) && (state_ != xact_step::bdat))
     return false;
@@ -454,7 +454,7 @@ bool Session::msg_data(char const* s, std::streamsize count)
     return false;
 
   if (msg_->write(s, count))
-    return !msg_->size_error();
+    return true;
 
   return false;
 }
@@ -582,8 +582,10 @@ bool Session::bdat_start(size_t n)
 
 void Session::bdat_done(size_t n, bool last)
 {
-  if (state_ != xact_step::bdat)
+  if (state_ != xact_step::bdat) {
+    bdat_error();
     return;
+  }
 
   if (msg_ && msg_->size_error()) {
     bdat_size_error();
