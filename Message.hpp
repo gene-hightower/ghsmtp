@@ -37,17 +37,44 @@ public:
   void save()
   {
     if (size_error()) {
-      // This should have been caught by the read size limit code.
       LOG(WARNING) << "message size error: " << size() << " exceeds "
                    << max_size();
     }
-    ofs_.close();
-    PCHECK(rename(tmpfn_.c_str(), newfn_.c_str()) == 0);
+    try {
+      ofs_.close();
+    }
+    catch (std::system_error const& e) {
+      LOG(ERROR) << e.what();
+      return;
+    }
+    catch (std::exception const& e) {
+      LOG(ERROR) << e.what();
+      return;
+    }
+
+    error_code ec;
+    rename(tmpfn_, newfn_, ec);
+    if (ec) {
+      LOG(ERROR) << "can't rename " << tmpfn_ << " to " << newfn_ << ": " << ec;
+    }
   }
   void trash()
   {
-    ofs_.close();
-    PCHECK(remove(tmpfn_.c_str()) == 0);
+    try {
+      ofs_.close();
+    }
+    catch (std::system_error const& e) {
+      LOG(ERROR) << e.what();
+    }
+    catch (std::exception const& e) {
+      LOG(ERROR) << e.what();
+    }
+
+    error_code ec;
+    fs::remove(tmpfn_, ec);
+    if (ec) {
+      LOG(ERROR) << "can't remove " << tmpfn_ << ": " << ec;
+    }
   }
 
 private:
