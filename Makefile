@@ -181,7 +181,7 @@ check::
 	  echo -n test `basename $$f` ""; \
 	  tmp_out=`mktemp`; \
 	  ncat -C localhost 225 < $$f > $$tmp_out; \
-	  MAILDIR=$(TEST_MAILDIR) LLVM_PROFILE_FILE=smtp.profraw ./smtp < $$f > $$tmp_out; \
+	  MAILDIR=$(TEST_MAILDIR) LLVM_PROFILE_FILE=smtp.profraw ASAN_OPTIONS=detect_odr_violation=0 ./smtp < $$f > $$tmp_out; \
 	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
 	  mv smtp.profraw /tmp/smtp-profile/`basename $$f`; \
 	  rm $$tmp_out; \
