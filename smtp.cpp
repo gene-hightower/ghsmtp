@@ -512,28 +512,24 @@ bool bdat_act(Ctx& ctx)
 
     ctx.session.in().read(&bfr[0], xfer_sz);
     if (!ctx.session.in()) {
-
       LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
                  << ctx.session.in().gcount();
-
       if (ctx.session.maxed_out()) {
         LOG(ERROR) << "input maxed out";
         ctx.session.bdat_size_error();
         return false;
       }
-
       if (ctx.session.timed_out()) {
         LOG(ERROR) << "input timed out";
       }
-
       if (ctx.session.in().eof()) {
         LOG(ERROR) << "EOF in BDAT";
       }
-
       ctx.session.bdat_error();
       return false;
     }
-    ctx.session.msg_write(&bfr[0], xfer_sz);
+    if (!ctx.session.msg_write(&bfr[0], xfer_sz))
+      ret = false;
 
     to_xfer -= xfer_sz;
   }
