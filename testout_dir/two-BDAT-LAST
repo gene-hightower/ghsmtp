@@ -9,9 +9,9 @@
 250-CHUNKING
 250 SMTPUTF8
 250 2.1.0 MAIL FROM OK
-554 5.7.1 relay access denied
-554 5.5.1 no valid recipients
-554 5.5.1 no valid recipients
-554 5.5.1 no valid recipients
-554 5.5.1 no valid recipients
+250 2.1.5 RCPT TO OK
+250 2.0.0 BDAT 88 OK
+250 2.0.0 BDAT 102 OK
+250 2.0.0 BDAT 102 LAST OK
+503 5.5.1 must send 'MAIL FROM' before BDAT
 221 2.0.0 closing connection
