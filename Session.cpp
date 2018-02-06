@@ -679,6 +679,12 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
+  if (!last) {
+    out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
+    LOG(INFO) << "BDAT " << n;
+    return;
+  }
+
   CHECK(msg_);
   try {
     msg_->save();
@@ -700,12 +706,6 @@ void Session::bdat_done(size_t n, bool last)
       reset_();
       return;
     }
-  }
-
-  if (!last) {
-    out_() << "250 2.0.0 BDAT " << n << " OK\r\n" << std::flush;
-    LOG(INFO) << "BDAT " << n;
-    return;
   }
 
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
