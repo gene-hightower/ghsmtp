@@ -507,8 +507,12 @@ struct sender : seq<TAOCPP_PEGTL_ISTRING("Sender:"), mailbox, eol> {
 struct reply_to : seq<TAOCPP_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
 };
 
+struct address_list_or_pm : sor<TAOCPP_PEGTL_ISTRING("Postmaster"),
+                                address_list> {
+};
+
 // Destination Address Fields
-struct to : seq<TAOCPP_PEGTL_ISTRING("To:"), address_list, eol> {
+struct to : seq<TAOCPP_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {
 };
 
 struct cc : seq<TAOCPP_PEGTL_ISTRING("Cc:"), address_list, eol> {
@@ -1749,7 +1753,7 @@ int main(int argc, char* argv[])
     auto name{fs::path(fn)};
     auto f{boost::iostreams::mapped_file_source(name)};
     auto in{memory_input<>(f.data(), f.size(), fn)};
-    // LOG(INFO) << "### " << fn;
+    LOG(INFO) << "file: " << fn;
     try {
       RFC5322::Ctx ctx;
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
