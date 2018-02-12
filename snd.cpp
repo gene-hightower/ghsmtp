@@ -54,6 +54,7 @@ DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
 DEFINE_string(keywords, "", "RFC5322 Keywords: header");
+DEFINE_string(references, "", "RFC5322 References: header");
 DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header");
 
 DEFINE_bool(4, false, "use only IP version 4");
@@ -956,6 +957,9 @@ auto create_eml(Domain const& sender,
 
   if (!FLAGS_keywords.empty())
     eml.add_hdr("Keywords", FLAGS_keywords);
+
+  if (!FLAGS_references.empty())
+    eml.add_hdr("References", FLAGS_references);
 
   if (!FLAGS_in_reply_to.empty())
     eml.add_hdr("In-Reply-To", FLAGS_in_reply_to);
