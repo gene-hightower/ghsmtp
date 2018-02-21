@@ -426,7 +426,8 @@ std::streamsize TLS::io_tls_(char const* fnm,
 
     case SSL_ERROR_ZERO_RETURN:
       // This is a close, not at all sure this is the right thing to do.
-      LOG(FATAL) << fnm << " returned SSL_ERROR_ZERO_RETURN";
+      LOG(INFO) << fnm << " returned SSL_ERROR_ZERO_RETURN";
+      break;
 
     default:
       LOG(INFO) << fnm << " returned zero";
