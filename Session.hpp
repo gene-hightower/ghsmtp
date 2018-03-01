@@ -10,6 +10,7 @@
 #include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
+#include "SPF.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
 
@@ -116,7 +117,7 @@ private:
   Domain client_identity_;            // from ehlo/helo
   Mailbox reverse_path_;              // "mail from"
   std::vector<Mailbox> forward_path_; // for each "rcpt to"
-  std::string received_spf_;          // from libspf2
+  std::string spf_received_;
   std::unique_ptr<Message> msg_;
 
   TLD tld_db_;
@@ -128,6 +129,8 @@ private:
   size_t max_msg_size_;
 
   int n_unrecognized_cmds_{0};
+
+  SPF::Result spf_result_;
 
   // RFC 5321 section 3.3. Mail Transactions
   enum class xact_step : int8_t {

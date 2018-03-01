@@ -11,7 +11,6 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "Message.hpp"
-#include "SPF.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
@@ -105,7 +104,7 @@ void Session::reset_()
 
   reverse_path_.clear();
   forward_path_.clear();
-  received_spf_.clear();
+  spf_received_.clear();
 
   binarymime_ = false;
   smtputf8_ = false;
@@ -342,8 +341,8 @@ std::string Session::added_headers_(Message const& msg)
   auto headers{std::ostringstream{}};
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
   // Received-SPF:
-  if (!received_spf_.empty()) {
-    headers << received_spf_ << "\r\n";
+  if (!spf_received_.empty()) {
+    headers << spf_received_ << "\r\n";
   }
 
   // STD 3 section 5.2.8
@@ -1202,7 +1201,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
                  << "; helo=" << client_identity_ << ";";
-    received_spf_ = received_spf.str();
+    spf_received_ = received_spf.str();
     return true;
   }
 
@@ -1228,17 +1227,20 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_req.set_env_from(from.c_str());
 
   auto const spf_res{SPF::Response{spf_req}};
+  spf_result_ = spf_res.result();
+  spf_received_ = spf_res.received_spf();
 
-  if (spf_res.result() == SPF::Result::FAIL) {
+  if (spf_result_ == SPF::Result::FAIL) {
+    LOG(WARNING) << spf_res.header_comment();
     // Error code from RFC 7372, section 3.2.  Also:
     // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
-    out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
-    LOG(WARNING) << spf_res.header_comment();
-    return false;
+    // out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
+    // return false;
+  }
+  else {
+    LOG(INFO) << spf_res.header_comment();
   }
 
-  LOG(INFO) << spf_res.header_comment();
-  received_spf_ = spf_res.received_spf();
   return true;
 }
 
