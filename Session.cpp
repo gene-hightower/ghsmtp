@@ -339,10 +339,6 @@ std::string Session::added_headers_(Message const& msg)
 
   auto headers{std::ostringstream{}};
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
-  // Received-SPF:
-  if (!spf_received_.empty()) {
-    headers << spf_received_ << "\r\n";
-  }
 
   // STD 3 section 5.2.8
 
@@ -376,6 +372,11 @@ std::string Session::added_headers_(Message const& msg)
     headers << "\r\n        (" << tls_info << ')';
   }
   headers << ";\r\n        " << msg.when() << "\r\n";
+
+  // Received-SPF:
+  if (!spf_received_.empty()) {
+    headers << spf_received_ << "\r\n";
+  }
 
   return headers.str();
 }
