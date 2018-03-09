@@ -12,7 +12,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := msg smtp sasl snd
+PROGRAMS := smtp msg sasl snd
 
 msg_STEMS := msg \
 	CDB \
@@ -177,13 +177,13 @@ regression:: $(programs) $(TEST_MAILDIR)
 	done
 
 check::
-	for f in testcase_dir/* ; do \
-	  echo -n test `basename $$f` ""; \
+	@for f in testcase_dir/* ; do \
+	  echo -n test `basename $$f`; \
 	  tmp_out=`mktemp`; \
 	  ncat -C localhost 225 < $$f > $$tmp_out; \
 	  MAILDIR=$(TEST_MAILDIR) LLVM_PROFILE_FILE=smtp.profraw ASAN_OPTIONS=detect_odr_violation=0 ./smtp < $$f > $$tmp_out; \
 	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
-	  mv smtp.profraw /tmp/smtp-profile/`basename $$f`; \
+	  if [ -e smtp.profraw ] ; then mv smtp.profraw /tmp/smtp-profile/`basename $$f`; fi; \
 	  rm $$tmp_out; \
 	done
 
@@ -193,7 +193,7 @@ net-check::
 	  tmp_out=`mktemp`; \
 	  ncat localhost 225 < $$f > $$tmp_out; \
 	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
-	  mv smtp.profraw /tmp/smtp-profile/`basename $$f`; \
+	  if [ -e smtp.profraw ] ; then mv smtp.profraw /tmp/smtp-profile/`basename $$f`; fi; \
 	  rm $$tmp_out; \
 	done
 
