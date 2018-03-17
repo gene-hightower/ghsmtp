@@ -120,26 +120,27 @@ Query::Query(Resolver const& res, RRtype type, Domain const& dom)
                                          LDNS_RESOLV_RTT_MIN); // "reachable"
       }
     }
-    return;
   }
 
-  auto const rcode = ldns_pkt_get_rcode(p_);
+  if (p_) {
+    auto const rcode = ldns_pkt_get_rcode(p_);
 
-  switch (rcode) {
-  case LDNS_RCODE_NOERROR:
-    break;
+    switch (rcode) {
+    case LDNS_RCODE_NOERROR:
+      break;
 
-  case LDNS_RCODE_NXDOMAIN:
-    nx_domain_ = true;
-    LOG(WARNING) << "NX domain (" << dom.str_ << "/" << RRtype_c_str(type)
-                 << ")";
-    return;
+    case LDNS_RCODE_NXDOMAIN:
+      nx_domain_ = true;
+      LOG(WARNING) << "NX domain (" << dom.str_ << "/" << RRtype_c_str(type)
+                   << ")";
+      return;
 
-  default:
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "DNS query (" << dom.str_ << "/" << RRtype_c_str(type)
-                 << ") ldns_resolver_query_status failed: rcode=" << rcode;
-    return;
+    default:
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "DNS query (" << dom.str_ << "/" << RRtype_c_str(type)
+                   << ") ldns_resolver_query_status failed: rcode=" << rcode;
+      return;
+    }
   }
 }
 
