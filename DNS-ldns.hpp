@@ -155,22 +155,6 @@ using RR = std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA>;
 
 using RR_set = std::vector<RR>;
 
-class Resolver {
-public:
-  Resolver(Resolver const&) = delete;
-  Resolver& operator=(Resolver const&) = delete;
-
-  Resolver();
-  ~Resolver();
-
-  RR_set get_records(RRtype typ, char const* domain);
-
-private:
-  ldns_resolver* res_;
-
-  friend class Query;
-};
-
 class Domain {
 public:
   Domain(Domain const&) = delete;
@@ -179,11 +163,27 @@ public:
   explicit Domain(char const* domain);
   ~Domain();
 
+  std::string const& str() const { return str_; }
+  ldns_rdf* get() const { return rdfp_; }
+
 private:
   std::string str_;
-  ldns_rdf* drdfp_;
+  ldns_rdf* rdfp_;
+};
 
-  friend class Query;
+class Resolver {
+public:
+  Resolver(Resolver const&) = delete;
+  Resolver& operator=(Resolver const&) = delete;
+
+  Resolver();
+  ~Resolver();
+
+  RR_set get_records(RRtype typ, Domain const& domain);
+  ldns_resolver* get() const { return res_; }
+
+private:
+  ldns_resolver* res_;
 };
 
 class Query {
@@ -197,14 +197,14 @@ public:
   // Pkt_rcode get_rcode() const;
 
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
+  bool nx_domain() const { return nx_domain_; }
+  ldns_pkt* get() const { return p_; }
 
 private:
   ldns_pkt* p_{nullptr};
 
   bool bogus_or_indeterminate_{false};
   bool nx_domain_{false};
-
-  friend class RR_list;
 };
 
 class RR_list {
@@ -219,7 +219,7 @@ public:
 
 private:
   ldns_rr_list* rrlst_answer_{nullptr};
-  ldns_rr_list* rrlst_additional_{nullptr};
+  // ldns_rr_list* rrlst_additional_{nullptr};
 };
 
 } // namespace DNS

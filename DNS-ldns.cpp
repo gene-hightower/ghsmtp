@@ -30,7 +30,7 @@ RR_AAAA::RR_AAAA(uint8_t const* rd, size_t sz)
 
 std::string rr_name_str(ldns_rdf const* rdf)
 {
-  auto sz = ldns_rdf_size(rdf);
+  auto const sz = ldns_rdf_size(rdf);
 
   if (sz > LDNS_MAX_DOMAINLEN) {
     LOG(WARNING) << "rdf size too large";
@@ -40,13 +40,13 @@ std::string rr_name_str(ldns_rdf const* rdf)
     return "."; // root label
   }
 
-  auto data = ldns_rdf_data(rdf);
+  auto const data = ldns_rdf_data(rdf);
 
   unsigned char src_pos = 0;
   unsigned char len = data[src_pos];
 
   std::ostringstream str;
-  while ((len > 0) && (src_pos < ldns_rdf_size(rdf))) {
+  while ((len > 0) && (src_pos < sz)) {
     src_pos++;
     for (unsigned char i = 0; i < len; ++i) {
       unsigned char c = data[src_pos];
@@ -62,7 +62,7 @@ std::string rr_name_str(ldns_rdf const* rdf)
       }
       src_pos++;
     }
-    if (src_pos < ldns_rdf_size(rdf)) {
+    if (src_pos < sz) {
       str << '.';
     }
     len = data[src_pos];
@@ -92,31 +92,31 @@ Resolver::~Resolver() { ldns_resolver_deep_free(res_); }
 
 Domain::Domain(char const* domain)
   : str_(domain)
-  , drdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
+  , rdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain)))
 {
 }
 
-Domain::~Domain() { ldns_rdf_deep_free(drdfp_); }
+Domain::~Domain() { ldns_rdf_deep_free(rdfp_); }
 
 Query::Query(Resolver const& res, RRtype type, Domain const& dom)
 {
   ldns_status status = ldns_resolver_query_status(
-      &p_, res.res_, dom.drdfp_, static_cast<ldns_enum_rr_type>(type),
+      &p_, res.get(), dom.get(), static_cast<ldns_enum_rr_type>(type),
       LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
 
   if (status != LDNS_STATUS_OK) {
     bogus_or_indeterminate_ = true;
 
-    LOG(WARNING) << "Query (" << dom.str_ << "/" << RRtype_c_str(type) << ") "
+    LOG(WARNING) << "Query (" << dom.str() << "/" << RRtype_c_str(type) << ") "
                  << "ldns_resolver_query_status failed: "
                  << ldns_get_errorstr_by_id(status);
 
     // If we have only one nameserver, reset the RTT otherwise all
     // future use of this resolver object will fail.
 
-    if (ldns_resolver_nameserver_count(res.res_) == 1) {
-      if (ldns_resolver_rtt(res.res_) == LDNS_RESOLV_RTT_INF) {
-        ldns_resolver_set_nameserver_rtt(res.res_, 0,
+    if (ldns_resolver_nameserver_count(res.get()) == 1) {
+      if (ldns_resolver_rtt(res.get()) == LDNS_RESOLV_RTT_INF) {
+        ldns_resolver_set_nameserver_rtt(res.get(), 0,
                                          LDNS_RESOLV_RTT_MIN); // "reachable"
       }
     }
@@ -131,13 +131,13 @@ Query::Query(Resolver const& res, RRtype type, Domain const& dom)
 
     case LDNS_RCODE_NXDOMAIN:
       nx_domain_ = true;
-      LOG(WARNING) << "NX domain (" << dom.str_ << "/" << RRtype_c_str(type)
+      LOG(WARNING) << "NX domain (" << dom.str() << "/" << RRtype_c_str(type)
                    << ")";
       return;
 
     default:
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "DNS query (" << dom.str_ << "/" << RRtype_c_str(type)
+      LOG(WARNING) << "DNS query (" << dom.str() << "/" << RRtype_c_str(type)
                    << ") ldns_resolver_query_status failed: rcode=" << rcode;
       return;
     }
@@ -152,10 +152,10 @@ Query::~Query()
 
 RR_list::RR_list(Query const& q)
 {
-  if (q.p_) {
+  if (q.get()) {
     // no clones, so no frees required
-    rrlst_answer_ = ldns_pkt_answer(q.p_);
-    rrlst_additional_ = ldns_pkt_additional(q.p_);
+    rrlst_answer_ = ldns_pkt_answer(q.get());
+    // rrlst_additional_ = ldns_pkt_additional(q.get());
   }
 }
 
@@ -237,45 +237,44 @@ RR_set RR_list::get() const
     }
   }
 
-  LOG(INFO) << "check for additional RRs";
-  if (rrlst_additional_) {
-    LOG(INFO) << "ldns_rr_list_rr_count(rrlst_additional_) == "
-              << ldns_rr_list_rr_count(rrlst_additional_);
+  // LOG(INFO) << "check for additional RRs";
+  // if (rrlst_additional_) {
+  //   LOG(INFO) << "ldns_rr_list_rr_count(rrlst_additional_) == "
+  //             << ldns_rr_list_rr_count(rrlst_additional_);
 
-    for (unsigned i = 0; i < ldns_rr_list_rr_count(rrlst_additional_); ++i) {
-      auto const rr_additional = ldns_rr_list_rr(rrlst_additional_, i);
+  //   for (unsigned i = 0; i < ldns_rr_list_rr_count(rrlst_additional_); ++i) {
+  //     auto const rr_additional = ldns_rr_list_rr(rrlst_additional_, i);
 
-      if (rr_additional) {
-        for (unsigned j = 0; j < ldns_rr_rd_count(rr_additional); ++j) {
-          auto const rdf = ldns_rr_rdf(rr_additional, j);
-          auto const type = ldns_rdf_get_type(rdf);
-          switch (type) {
-          case LDNS_RDF_TYPE_A: {
-            auto arec{RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
-            LOG(INFO) << "A == " << arec.c_str();
-            break;
-          }
-          case LDNS_RDF_TYPE_AAAA: {
-            auto aaaarec{RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
-            LOG(INFO) << "AAAA == " << aaaarec.c_str();
-            break;
-          }
-          default:
-            LOG(WARNING) << "non A/AAAA for MX additional section, type="
-                         << static_cast<unsigned>(type);
-          }
-        }
-      }
-    }
-  }
+  //     if (rr_additional) {
+  //       for (unsigned j = 0; j < ldns_rr_rd_count(rr_additional); ++j) {
+  //         auto const rdf = ldns_rr_rdf(rr_additional, j);
+  //         auto const type = ldns_rdf_get_type(rdf);
+  //         switch (type) {
+  //         case LDNS_RDF_TYPE_A: {
+  //           auto arec{RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+  //           LOG(INFO) << "A == " << arec.c_str();
+  //           break;
+  //         }
+  //         case LDNS_RDF_TYPE_AAAA: {
+  //           auto aaaarec{RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+  //           LOG(INFO) << "AAAA == " << aaaarec.c_str();
+  //           break;
+  //         }
+  //         default:
+  //           LOG(WARNING) << "non A/AAAA for MX additional section, type="
+  //                        << static_cast<unsigned>(type);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 
   return ret;
 }
 
-RR_set Resolver::get_records(RRtype typ, char const* domain)
+RR_set Resolver::get_records(RRtype typ, Domain const& domain)
 {
-  Domain dom(domain);
-  Query q(*this, typ, dom);
+  Query q(*this, typ, domain);
   RR_list rrlst(q);
   return rrlst.get();
 }
