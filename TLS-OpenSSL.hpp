@@ -1,5 +1,5 @@
-#ifndef OPENSSL_DOT_HPP
-#define OPENSSL_DOT_HPP
+#ifndef TLS_OPENSSL_DOT_HPP
+#define TLS_OPENSSL_DOT_HPP
 
 #include <chrono>
 #include <functional>
@@ -58,4 +58,4 @@ private:
   bool verified_{false};
 };
 
-#endif // OPENSSL_DOT_HPP
+#endif // TLS_OPENSSL_DOT_HPP
