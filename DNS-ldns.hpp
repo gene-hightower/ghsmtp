@@ -262,37 +262,60 @@ private:
   // ldns_rr_list* rrlst_additional_{nullptr};
 };
 
-// Compatibility with the 1st generation:
-
-template<RR_type type>
-std::vector<std::string> get_records(Resolver const& res, Domain const& domain)
+template <RR_type type>
+std::vector<std::string> get_strings(Resolver const& res, Domain const& domain)
 {
   return res.get_strings(type, domain);
 }
 
-template<RR_type type>
-inline std::vector<std::string> get_records(Resolver const& res, std::string const& domain)
+template <RR_type type>
+inline std::vector<std::string> get_strings(Resolver const& res,
+                                            std::string const& domain)
 {
-  return get_records<type>(res, Domain(domain));
+  return get_strings<type>(res, Domain(domain));
 }
 
-template<RR_type type>
-inline std::vector<std::string> get_records(Resolver const& res, char const* domain)
+template <RR_type type>
+inline std::vector<std::string> get_strings(Resolver const& res,
+                                            char const* domain)
 {
-  return get_records<type>(res, Domain(domain));
+  return get_strings<type>(res, Domain(domain));
 }
 
-template<RR_type type>
+template <RR_type type>
 inline bool has_record(Resolver const& res, char const* domain)
 {
-  auto rr_set = get_records<type>(res, Domain(domain));
+  auto rr_set = get_strings<type>(res, Domain(domain));
   return !rr_set.empty();
 }
 
-template<RR_type type>
+template <RR_type type>
 inline bool has_record(Resolver const& res, std::string const& domain)
 {
   return has_record<type>(res, domain.c_str());
+}
+
+// Compatibility with the 1st generation:
+
+template <RR_type type>
+[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
+get_records(Resolver const& res, Domain const& domain)
+{
+  return res.get_strings(type, domain);
+}
+
+template <RR_type type>
+[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
+get_records(Resolver const& res, std::string const& domain)
+{
+  return get_strings<type>(res, Domain(domain));
+}
+
+template <RR_type type>
+[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
+get_records(Resolver const& res, char const* domain)
+{
+  return get_strings<type>(res, Domain(domain));
 }
 
 } // namespace DNS

@@ -1,6 +1,6 @@
 #include "DNS-ldns.hpp"
 
-#include <algorithm> 
+#include <algorithm>
 #include <cstring>
 #include <iomanip>
 #include <ostream>
@@ -161,8 +161,7 @@ Query::Query(Resolver const& res, RR_type type, Domain const& dom)
 
     case LDNS_RCODE_NXDOMAIN:
       nx_domain_ = true;
-      LOG(WARNING) << "NX domain (" << dom.str() << "/" << type
-                   << ")";
+      LOG(WARNING) << "NX domain (" << dom.str() << "/" << type << ")";
       return;
 
     default:
@@ -393,7 +392,8 @@ RR_set Resolver::get_records(RR_type typ, Domain const& domain) const
   return rrlst.get_records();
 }
 
-std::vector<std::string> Resolver::get_strings(RR_type typ, Domain const& domain) const
+std::vector<std::string> Resolver::get_strings(RR_type typ,
+                                               Domain const& domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);
