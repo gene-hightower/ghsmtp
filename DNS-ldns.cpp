@@ -28,6 +28,19 @@ RR_AAAA::RR_AAAA(uint8_t const* rd, size_t sz)
   PCHECK(inet_ntop(AF_INET6, &addr_.sin6_addr, str_, sizeof str_));
 }
 
+RR_TLSA::RR_TLSA(uint8_t cert_usage,
+                 uint8_t selector,
+                 uint8_t matching_type,
+                 uint8_t const* assoc_data,
+                 size_t assoc_data_sz)
+  : cert_usage_(cert_usage)
+  , selector_(selector)
+  , matching_type_(matching_type)
+{
+  assoc_data_.resize(assoc_data_sz);
+  memcpy(&assoc_data_[0], assoc_data, assoc_data_sz);
+}
+
 std::string rr_name_str(ldns_rdf const* rdf)
 {
   auto const sz = ldns_rdf_size(rdf);
@@ -123,6 +136,8 @@ Query::Query(Resolver const& res, RRtype type, Domain const& dom)
   }
 
   if (p_) {
+    authentic_data_ = ldns_pkt_ad(p_);
+
     auto const rcode = ldns_pkt_get_rcode(p_);
 
     switch (rcode) {
@@ -175,8 +190,7 @@ RR_set RR_list::get() const
       auto const rr = ldns_rr_list_rr(rrlst_answer_, i);
 
       if (rr) {
-        LOG(INFO) << "ldns_rr_rd_count(rr) == " << ldns_rr_rd_count(rr);
-        LOG(INFO) << "ldns_rr_get_type(rr) == " << ldns_rr_get_type(rr);
+        // LOG(INFO) << "ldns_rr_rd_count(rr) == " << ldns_rr_rd_count(rr);
 
         switch (ldns_rr_get_type(rr)) {
         case LDNS_RR_TYPE_A: {
@@ -224,10 +238,34 @@ RR_set RR_list::get() const
           ret.emplace_back(RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
           break;
         }
+        case LDNS_RR_TYPE_TLSA: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 4);
 
-        case LDNS_RR_TYPE_TLSA:
-          LOG(WARNING) << "no code for LDNS_RR_TYPE_TLSA";
+          auto const usage{[&] {
+            auto const rdf = ldns_rr_rdf(rr, 0);
+            CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_CERTIFICATE_USAGE);
+            return ldns_rdf2native_int8(rdf);
+          }()};
+
+          auto const selector{[&] {
+            auto const rdf = ldns_rr_rdf(rr, 1);
+            CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_SELECTOR);
+            return ldns_rdf2native_int8(rdf);
+          }()};
+
+          auto const matching_type{[&] {
+            auto const rdf = ldns_rr_rdf(rr, 2);
+            CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_MATCHING_TYPE);
+            return ldns_rdf2native_int8(rdf);
+          }()};
+
+          auto const rdf = ldns_rr_rdf(rr, 3);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_HEX);
+
+          ret.emplace_back(RR_TLSA{usage, selector, matching_type,
+                                   ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
           break;
+        }
 
         default:
           LOG(WARNING) << "unknown RR type == " << ldns_rr_get_type(rr);

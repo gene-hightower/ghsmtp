@@ -151,7 +151,27 @@ private:
   char str_[INET6_ADDRSTRLEN];
 };
 
-using RR = std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA>;
+class RR_TLSA {
+public:
+  RR_TLSA(uint8_t cert_usage,
+          uint8_t selector,
+          uint8_t matching_type,
+          uint8_t const* assoc_data,
+          size_t assoc_data_sz);
+  uint8_t cert_usage() const { return cert_usage_; }
+  uint8_t selector() const { return selector_; }
+  uint8_t matching_type() const { return matching_type_; }
+  std::vector<std::byte> const& assoc_data() const { return assoc_data_; }
+
+private:
+  uint8_t cert_usage_;
+  uint8_t selector_;
+  uint8_t matching_type_;
+  std::vector<std::byte> assoc_data_;
+};
+
+using RR
+    = std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA, RR_TLSA>;
 
 using RR_set = std::vector<RR>;
 
@@ -169,6 +189,11 @@ public:
 private:
   std::string str_;
   ldns_rdf* rdfp_;
+
+  friend std::ostream& operator<<(std::ostream& os, Domain const& dom)
+  {
+    return os << dom.str();
+  }
 };
 
 class Resolver {
@@ -203,6 +228,7 @@ public:
 private:
   ldns_pkt* p_{nullptr};
 
+  bool authentic_data_{false};
   bool bogus_or_indeterminate_{false};
   bool nx_domain_{false};
 };
