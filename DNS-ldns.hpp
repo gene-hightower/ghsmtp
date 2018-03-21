@@ -16,8 +16,8 @@ typedef struct ldns_struct_rr_list ldns_rr_list;
 
 namespace DNS {
 
-enum class RRtype : uint16_t {
-  // RFC 1035 section 3.2.2 TYPE values:
+enum class RR_type : uint16_t {
+  // RFC 1035 section 3.2.2 “TYPE values”
   NONE,
   A,
   NS,
@@ -36,36 +36,36 @@ enum class RRtype : uint16_t {
   MX,
   TXT,
 
-  // RFC 3596 section 2.1 AAAA record type
+  // RFC 3596 section 2.1 “AAAA record type”
   AAAA = 28,
 
-  // RFC 6698 section 7.1 TLSA RRtype
+  // RFC 6698 section 7.1 “TLSA RRtype”
   TLSA = 52,
 };
 
-auto constexpr RRtype_c_str(RRtype const& type)
+auto constexpr RR_type_c_str(RR_type const& type)
 {
   // clang-format off
   switch (type) {
-  case RRtype::NONE:   return "NONE";
-  case RRtype::A:      return "A";
-  case RRtype::NS:     return "NS";
-  case RRtype::MD:     return "MD";
-  case RRtype::MF:     return "MF";
-  case RRtype::CNAME:  return "CNAME";
-  case RRtype::SOA:    return "SOA";
-  case RRtype::MB:     return "MB";
-  case RRtype::MG:     return "MG";
-  case RRtype::MR:     return "MR";
-  case RRtype::RR_NULL:return "RR_NULL";
-  case RRtype::WKS:    return "WKS";
-  case RRtype::PTR:    return "PTR";
-  case RRtype::HINFO:  return "HINFO";
-  case RRtype::MINFO:  return "MINFO";
-  case RRtype::MX:     return "MX";
-  case RRtype::TXT:    return "TXT";
-  case RRtype::AAAA:   return "AAAA";
-  case RRtype::TLSA:   return "TLSA";
+  case RR_type::NONE:   return "NONE";
+  case RR_type::A:      return "A";
+  case RR_type::NS:     return "NS";
+  case RR_type::MD:     return "MD";
+  case RR_type::MF:     return "MF";
+  case RR_type::CNAME:  return "CNAME";
+  case RR_type::SOA:    return "SOA";
+  case RR_type::MB:     return "MB";
+  case RR_type::MG:     return "MG";
+  case RR_type::MR:     return "MR";
+  case RR_type::RR_NULL:return "RR_NULL";
+  case RR_type::WKS:    return "WKS";
+  case RR_type::PTR:    return "PTR";
+  case RR_type::HINFO:  return "HINFO";
+  case RR_type::MINFO:  return "MINFO";
+  case RR_type::MX:     return "MX";
+  case RR_type::TXT:    return "TXT";
+  case RR_type::AAAA:   return "AAAA";
+  case RR_type::TLSA:   return "TLSA";
   }
   return "** Unknown **";
   // clang-format on
@@ -91,6 +91,7 @@ public:
   }
 
   std::string const& str() const { return cname_; }
+  char const* c_str() const { return cname_.c_str(); }
 
 private:
   std::string cname_;
@@ -105,6 +106,7 @@ public:
   }
 
   std::string const& str() const { return ptrdname_; }
+  char const* c_str() const { return ptrdname_.c_str(); }
 
 private:
   std::string ptrdname_;
@@ -134,6 +136,7 @@ public:
   }
 
   std::string const& str() const { return txt_data_; }
+  char const* c_str() const { return txt_data_.c_str(); }
 
 private:
   std::string txt_data_;
@@ -181,6 +184,7 @@ public:
   Domain& operator=(Domain const&) = delete;
 
   explicit Domain(char const* domain);
+  explicit Domain(std::string const& domain);
   ~Domain();
 
   std::string const& str() const { return str_; }
@@ -204,7 +208,18 @@ public:
   Resolver();
   ~Resolver();
 
-  RR_set get_records(RRtype typ, Domain const& domain);
+  RR_set get_records(RR_type typ, Domain const& domain) const;
+  RR_set get_records(RR_type typ, std::string const& domain) const
+  {
+    return get_records(typ, Domain(domain));
+  }
+  RR_set get_records(RR_type typ, char const* domain) const
+  {
+    return get_records(typ, Domain(domain));
+  }
+
+  std::vector<std::string> get_strings(RR_type typ, Domain const& domain) const;
+
   ldns_resolver* get() const { return res_; }
 
 private:
@@ -216,10 +231,8 @@ public:
   Query(Query const&) = delete;
   Query& operator=(Query const&) = delete;
 
-  Query(Resolver const& res, RRtype type, Domain const& dom);
+  Query(Resolver const& res, RR_type type, Domain const& dom);
   ~Query();
-
-  // Pkt_rcode get_rcode() const;
 
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
@@ -241,13 +254,49 @@ public:
   explicit RR_list(Query const& q);
   ~RR_list();
 
-  RR_set get() const;
+  RR_set get_records() const;
+  std::vector<std::string> get_strings() const;
 
 private:
   ldns_rr_list* rrlst_answer_{nullptr};
   // ldns_rr_list* rrlst_additional_{nullptr};
 };
 
+// Compatibility with the 1st generation:
+
+template<RR_type type>
+std::vector<std::string> get_records(Resolver const& res, Domain const& domain)
+{
+  return res.get_strings(type, domain);
+}
+
+template<RR_type type>
+inline std::vector<std::string> get_records(Resolver const& res, std::string const& domain)
+{
+  return get_records<type>(res, Domain(domain));
+}
+
+template<RR_type type>
+inline std::vector<std::string> get_records(Resolver const& res, char const* domain)
+{
+  return get_records<type>(res, Domain(domain));
+}
+
+template<RR_type type>
+inline bool has_record(Resolver const& res, char const* domain)
+{
+  auto rr_set = get_records<type>(res, Domain(domain));
+  return !rr_set.empty();
+}
+
+template<RR_type type>
+inline bool has_record(Resolver const& res, std::string const& domain)
+{
+  return has_record<type>(res, domain.c_str());
+}
+
 } // namespace DNS
+
+std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type);
 
 #endif // DNS_LDNS_DOT_HPP

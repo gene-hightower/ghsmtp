@@ -1,7 +1,10 @@
 #include "DNS-ldns.hpp"
 
+#include <algorithm> 
 #include <cstring>
 #include <iomanip>
+#include <ostream>
+#include <random>
 
 #include <cstdbool> // needs to be above ldns includes
 #include <ldns/ldns.h>
@@ -11,6 +14,12 @@
 #include <arpa/inet.h>
 
 #include <glog/logging.h>
+
+std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type)
+{
+  os << DNS::RR_type_c_str(type);
+  return os;
+}
 
 namespace DNS {
 
@@ -109,9 +118,15 @@ Domain::Domain(char const* domain)
 {
 }
 
+Domain::Domain(std::string const& domain)
+  : str_(domain)
+  , rdfp_(CHECK_NOTNULL(ldns_dname_new_frm_str(domain.c_str())))
+{
+}
+
 Domain::~Domain() { ldns_rdf_deep_free(rdfp_); }
 
-Query::Query(Resolver const& res, RRtype type, Domain const& dom)
+Query::Query(Resolver const& res, RR_type type, Domain const& dom)
 {
   ldns_status status = ldns_resolver_query_status(
       &p_, res.get(), dom.get(), static_cast<ldns_enum_rr_type>(type),
@@ -120,7 +135,7 @@ Query::Query(Resolver const& res, RRtype type, Domain const& dom)
   if (status != LDNS_STATUS_OK) {
     bogus_or_indeterminate_ = true;
 
-    LOG(WARNING) << "Query (" << dom.str() << "/" << RRtype_c_str(type) << ") "
+    LOG(WARNING) << "Query (" << dom.str() << "/" << type << ") "
                  << "ldns_resolver_query_status failed: "
                  << ldns_get_errorstr_by_id(status);
 
@@ -146,13 +161,13 @@ Query::Query(Resolver const& res, RRtype type, Domain const& dom)
 
     case LDNS_RCODE_NXDOMAIN:
       nx_domain_ = true;
-      LOG(WARNING) << "NX domain (" << dom.str() << "/" << RRtype_c_str(type)
+      LOG(WARNING) << "NX domain (" << dom.str() << "/" << type
                    << ")";
       return;
 
     default:
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "DNS query (" << dom.str() << "/" << RRtype_c_str(type)
+      LOG(WARNING) << "DNS query (" << dom.str() << "/" << type
                    << ") ldns_resolver_query_status failed: rcode=" << rcode;
       return;
     }
@@ -176,13 +191,11 @@ RR_list::RR_list(Query const& q)
 
 RR_list::~RR_list() {}
 
-RR_set RR_list::get() const
+RR_set RR_list::get_records() const
 {
   RR_set ret;
 
   if (rrlst_answer_) {
-    LOG(INFO) << "ldns_rr_list_rr_count(rrlst_answer_) == "
-              << ldns_rr_list_rr_count(rrlst_answer_);
 
     ret.reserve(ldns_rr_list_rr_count(rrlst_answer_));
 
@@ -310,11 +323,81 @@ RR_set RR_list::get() const
   return ret;
 }
 
-RR_set Resolver::get_records(RRtype typ, Domain const& domain)
+std::vector<std::string> RR_list::get_strings() const
+{
+  std::vector<std::string> ret;
+
+  if (rrlst_answer_) {
+
+    ret.reserve(ldns_rr_list_rr_count(rrlst_answer_));
+
+    for (unsigned i = 0; i < ldns_rr_list_rr_count(rrlst_answer_); ++i) {
+      auto const rr = ldns_rr_list_rr(rrlst_answer_, i);
+
+      if (rr) {
+        // LOG(INFO) << "ldns_rr_rd_count(rr) == " << ldns_rr_rd_count(rr);
+
+        switch (ldns_rr_get_type(rr)) {
+        case LDNS_RR_TYPE_A: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 1);
+          auto const rdf = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_A);
+          auto const a{RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+          ret.emplace_back(a.c_str());
+          break;
+        }
+        case LDNS_RR_TYPE_CNAME: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 1);
+          auto const rdf = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_DNAME);
+          ret.emplace_back(rr_name_str(rdf));
+          break;
+        }
+        case LDNS_RR_TYPE_PTR: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 1);
+          auto const rdf = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_DNAME);
+          ret.emplace_back(rr_name_str(rdf));
+          break;
+        }
+        case LDNS_RR_TYPE_TXT: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 1);
+          auto const rdf = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_STR);
+          ret.emplace_back(rr_str(rdf));
+          break;
+        }
+        case LDNS_RR_TYPE_AAAA: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 1);
+          auto const rdf = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_AAAA);
+          auto const a{RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+          ret.emplace_back(a.c_str());
+          break;
+        }
+        default:
+          LOG(WARNING) << "unknown RR type == " << ldns_rr_get_type(rr);
+          break;
+        }
+      }
+    }
+  }
+
+  return ret;
+}
+
+RR_set Resolver::get_records(RR_type typ, Domain const& domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);
-  return rrlst.get();
+  return rrlst.get_records();
+}
+
+std::vector<std::string> Resolver::get_strings(RR_type typ, Domain const& domain) const
+{
+  Query q(*this, typ, domain);
+  RR_list rrlst(q);
+  return rrlst.get_strings();
 }
 
 } // namespace DNS
