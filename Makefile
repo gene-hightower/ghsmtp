@@ -74,7 +74,6 @@ snd_STEMS := snd \
 TESTS := \
 	Base64-test \
 	CDB-test \
-	DNS-ldns-test \
 	DNS-test \
 	Domain-test \
 	IP4-test \
@@ -95,7 +94,6 @@ TESTS := \
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
-DNS-ldns-test_STEMS := DNS-ldns
 DNS-test_STEMS := DNS
 Domain-test_STEMS := DNS Domain IP IP4 IP6
 IP4-test_STEMS := DNS IP4

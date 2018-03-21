@@ -1,10 +1,9 @@
 #include "DNS.hpp"
 
-#include <glog/logging.h>
+#include <algorithm>
+#include <random>
 
-#include <cstdbool> // needs to be above ldns includes
-#include <ldns/packet.h>
-#include <ldns/rr.h>
+#include <glog/logging.h>
 
 int main(int argc, char const* argv[])
 {
@@ -12,22 +11,55 @@ int main(int argc, char const* argv[])
 
   DNS::Resolver res;
 
-  auto goog_a = "google-public-dns-a.google.com";
-  auto goog_b = "google-public-dns-b.google.com";
+  auto goog_a = DNS::Domain{"google-public-dns-a.google.com"};
+  auto goog_b = DNS::Domain{"google-public-dns-b.google.com"};
 
-  auto addrs_a = DNS::get_records<DNS::RR_type::A>(res, goog_a);
+  auto addrs_a = res.get_records(RR_type::A, goog_a);
+
   CHECK_EQ(addrs_a.size(), 1U);
-  CHECK_EQ(addrs_a[0], "8.8.8.8");
+  CHECK_EQ(strcmp(std::get<RR_A>(addrs_a[0]).c_str(), "8.8.8.8"), 0);
 
-  auto addrs_b = DNS::get_records<DNS::RR_type::A>(res, goog_b);
+  auto addrs_b = res.get_records(RR_type::A, goog_b);
   CHECK_EQ(addrs_b.size(), 1U);
-  CHECK_EQ(addrs_b[0], "8.8.4.4");
+  CHECK_EQ(strcmp(std::get<RR_A>(addrs_b[0]).c_str(), "8.8.4.4"), 0);
 
-  auto aaaaddrs_a = DNS::get_records<DNS::RR_type::AAAA>(res, goog_a);
+  auto aaaaddrs_a = res.get_records(RR_type::AAAA, goog_a);
   CHECK_EQ(aaaaddrs_a.size(), 1U);
-  CHECK_EQ(aaaaddrs_a[0], "2001:4860:4860::8888");
+  CHECK_EQ(
+      strcmp(std::get<RR_AAAA>(aaaaddrs_a[0]).c_str(), "2001:4860:4860::8888"),
+      0);
 
-  auto aaaaddrs_b = DNS::get_records<DNS::RR_type::AAAA>(res, goog_b);
+  auto aaaaddrs_b = res.get_records(RR_type::AAAA, goog_b);
   CHECK_EQ(aaaaddrs_b.size(), 1U);
-  CHECK_EQ(aaaaddrs_b[0], "2001:4860:4860::8844");
+  CHECK_EQ(
+      strcmp(std::get<RR_AAAA>(aaaaddrs_b[0]).c_str(), "2001:4860:4860::8844"),
+      0);
+
+  auto mxes = res.get_records(RR_type::MX, DNS::Domain("anyold.host"));
+
+  // RFC 5321 section 5.1 “Locating the Target Host”
+  std::shuffle(mxes.begin(), mxes.end(), std::default_random_engine());
+  std::stable_sort(mxes.begin(), mxes.end(), [](RR const& a, RR const& b) {
+    if (std::holds_alternative<RR_MX>(a) && std::holds_alternative<RR_MX>(b)) {
+      return std::get<RR_MX>(a).preference() < std::get<RR_MX>(b).preference();
+    }
+    LOG(WARNING) << "non MX records in answer section";
+    return false;
+  });
+
+  for (auto const& mx : mxes) {
+    LOG(INFO) << "mx.preference == " << std::get<RR_MX>(mx).preference();
+    LOG(INFO) << "mx.exchange   == " << std::get<RR_MX>(mx).exchange();
+  }
+
+  auto as = res.get_records(RR_type::A, DNS::Domain("amazon.com"));
+  for (auto const& a : as) {
+    LOG(INFO) << "a   == " << std::get<RR_A>(a).c_str();
+  }
+
+  auto danes
+      = res.get_records(RR_type::TLSA, DNS::Domain("_25._tcp.digilicious.com"));
+  for (auto const& dane : danes) {
+    // LOG(INFO) << "dane   == " << std::get<RR_DANE>(a).c_str();
+  }
 }
