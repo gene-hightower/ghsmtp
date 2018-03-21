@@ -111,20 +111,19 @@ std::string reverse(std::string_view addr_str)
 
 std::string fcrdns(std::string_view addr)
 {
-  using namespace DNS;
-
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
   auto const reversed{reverse(addr)};
 
   // The reverse part, check PTR records.
-  auto res{Resolver{}};
-  auto const ptrs = get_records<RR_type::PTR>(res, reversed + "ip6.arpa");
+  auto res{DNS::Resolver{}};
+  auto const ptrs
+      = DNS::get_strings<DNS::RR_type::PTR>(res, reversed + "ip6.arpa");
 
   auto const ptr = std::find_if(
       ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
         // The forward part, check each PTR for matching AAAA record.
-        auto addrs = get_records<RR_type::AAAA>(res, s);
+        auto addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, s);
         return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
       });
 
