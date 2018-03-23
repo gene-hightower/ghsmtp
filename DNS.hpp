@@ -91,7 +91,7 @@ public:
   }
 
   std::string const& str() const { return cname_; }
-  char const* c_str() const { return cname_.c_str(); }
+  char const* c_str() const { return str().c_str(); }
 
 private:
   std::string cname_;
@@ -106,7 +106,7 @@ public:
   }
 
   std::string const& str() const { return ptrdname_; }
-  char const* c_str() const { return ptrdname_.c_str(); }
+  char const* c_str() const { return str().c_str(); }
 
 private:
   std::string ptrdname_;
@@ -136,7 +136,7 @@ public:
   }
 
   std::string const& str() const { return txt_data_; }
-  char const* c_str() const { return txt_data_.c_str(); }
+  char const* c_str() const { return str().c_str(); }
 
 private:
   std::string txt_data_;
