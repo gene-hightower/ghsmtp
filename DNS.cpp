@@ -161,14 +161,20 @@ Query::Query(Resolver const& res, RR_type type, Domain const& dom)
 
     case LDNS_RCODE_NXDOMAIN:
       nx_domain_ = true;
-      LOG(WARNING) << "NX domain (" << dom.str() << "/" << type << ")";
-      return;
+      // LOG(WARNING) << "NX domain (" << dom.str() << "/" << type << ")";
+      break;
+
+    case LDNS_RCODE_SERVFAIL:
+      bogus_or_indeterminate_ = true;
+      // LOG(WARNING) << "DNS server fail (" << dom.str() << "/" << type << ")";
+      break;
 
     default:
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "DNS query (" << dom.str() << "/" << type
-                   << ") ldns_resolver_query_status failed: rcode=" << rcode;
-      return;
+      LOG(WARNING) << "DNS unknown error (" << dom.str() << "/" << type
+                   << "), rcode = " << rcode_c_str(rcode) << " (" << rcode
+                   << ")";
+      break;
     }
   }
 }
@@ -184,7 +190,7 @@ RR_list::RR_list(Query const& q)
   if (q.get()) {
     // no clones, so no frees required
     rrlst_answer_ = ldns_pkt_answer(q.get());
-    // rrlst_additional_ = ldns_pkt_additional(q.get());
+    rrlst_additional_ = ldns_pkt_additional(q.get());
   }
 }
 
@@ -287,37 +293,20 @@ RR_set RR_list::get_records() const
     }
   }
 
-  // LOG(INFO) << "check for additional RRs";
-  // if (rrlst_additional_) {
-  //   LOG(INFO) << "ldns_rr_list_rr_count(rrlst_additional_) == "
-  //             << ldns_rr_list_rr_count(rrlst_additional_);
-
-  //   for (unsigned i = 0; i < ldns_rr_list_rr_count(rrlst_additional_); ++i) {
-  //     auto const rr_additional = ldns_rr_list_rr(rrlst_additional_, i);
-
-  //     if (rr_additional) {
-  //       for (unsigned j = 0; j < ldns_rr_rd_count(rr_additional); ++j) {
-  //         auto const rdf = ldns_rr_rdf(rr_additional, j);
-  //         auto const type = ldns_rdf_get_type(rdf);
-  //         switch (type) {
-  //         case LDNS_RDF_TYPE_A: {
-  //           auto arec{RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
-  //           LOG(INFO) << "A == " << arec.c_str();
-  //           break;
-  //         }
-  //         case LDNS_RDF_TYPE_AAAA: {
-  //           auto aaaarec{RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
-  //           LOG(INFO) << "AAAA == " << aaaarec.c_str();
-  //           break;
-  //         }
-  //         default:
-  //           LOG(WARNING) << "non A/AAAA for MX additional section, type="
-  //                        << static_cast<unsigned>(type);
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
+  if (rrlst_additional_) {
+    auto const rr_count = ldns_rr_list_rr_count(rrlst_additional_);
+    if (rr_count) {
+      LOG(WARNING) << rr_count << " additional RR records";
+      for (unsigned i = 0; i < rr_count; ++i) {
+        auto const rr = ldns_rr_list_rr(rrlst_additional_, i);
+        if (rr) {
+          auto type = ldns_rr_get_type(rr);
+          LOG(WARNING) << "additional record " << i << " type "
+                       << rcode_c_str(type);
+        }
+      }
+    }
+  }
 
   return ret;
 }

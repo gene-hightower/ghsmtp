@@ -43,10 +43,9 @@ enum class RR_type : uint16_t {
   TLSA = 52,
 };
 
-auto constexpr RR_type_c_str(RR_type const& type)
+constexpr char const* RR_type_c_str(RR_type type)
 {
-  // clang-format off
-  switch (type) {
+  switch (type) { // clang-format off
   case RR_type::NONE:   return "NONE";
   case RR_type::A:      return "A";
   case RR_type::NS:     return "NS";
@@ -66,9 +65,52 @@ auto constexpr RR_type_c_str(RR_type const& type)
   case RR_type::TXT:    return "TXT";
   case RR_type::AAAA:   return "AAAA";
   case RR_type::TLSA:   return "TLSA";
+  } // clang-format on
+  return "*** unknown RR_type ***";
+}
+
+constexpr char const* rcode_c_str(uint16_t rcode)
+{
+  // https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-6
+  switch (rcode) { // clang-format off
+  case 0:  return "no error";                           // [RFC1035]
+  case 1:  return "format error";                       // [RFC1035]
+  case 2:  return "server failure";                     // [RFC1035]
+  case 3:  return "non-existent domain";                // [RFC1035]
+  case 4:  return "not implemented";                    // [RFC1035]
+  case 5:  return "query Refused";                      // [RFC1035]
+  case 6:  return "name exists when it should not";     // [RFC2136][RFC6672]
+  case 7:  return "RR set exists when it should not";   // [RFC2136]
+  case 8:  return "RR set that should exist does not";  // [RFC2136]
+  case 9:  return "server not authoritative for zone or not authorized"; // [RFC2136 & RFC2845]
+  case 10: return "name not contained in zone";         // [RFC2136]
+  case 11: return "unassigned-11";
+  case 12: return "unassigned-12";
+  case 13: return "unassigned-13";
+  case 14: return "unassigned-14";
+  case 15: return "unassigned-15";
+  case 16: return "bad OPT version or TSIG signature failure"; // [RFC6891 & RFC2845]
+  case 17: return "key not recognized";                 // [RFC2845]
+  case 18: return "signature out of time window";       // [RFC2845]
+  case 19: return "bad TKEY mode";                      // [RFC2930]
+  case 20: return "duplicate key name";                 // [RFC2930]
+  case 21: return "algorithm not supported";            // [RFC2930]
+  case 22: return "bad truncation";                     // [RFC4635]
+  case 23: return "bad/missing server cookie";          // [RFC7873]
+  } // clang-format on
+  if ((24 <= rcode) && (rcode <= 3840)) {
+    return "unassigned-24-3840";
   }
-  return "** Unknown **";
-  // clang-format on
+  if ((3841 <= rcode) && (rcode <= 4095)) {
+    return "reserved for private use"; // [RFC6895]
+  }
+  if ((4096 <= rcode) && (rcode <= 65534)) {
+    return "unassigned-4096-65534";
+  }
+  if (rcode == 65535) {
+    return "reserved-65535"; // [RFC6895]
+  }
+  return "*** rcode out of range ***";
 }
 
 class RR_A {
@@ -234,9 +276,11 @@ public:
   Query(Resolver const& res, RR_type type, Domain const& dom);
   ~Query();
 
+  ldns_pkt* get() const { return p_; }
+
+  bool authentic_data() const { return authentic_data_; }
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
-  ldns_pkt* get() const { return p_; }
 
 private:
   ldns_pkt* p_{nullptr};
@@ -259,7 +303,7 @@ public:
 
 private:
   ldns_rr_list* rrlst_answer_{nullptr};
-  // ldns_rr_list* rrlst_additional_{nullptr};
+  ldns_rr_list* rrlst_additional_{nullptr};
 };
 
 template <RR_type type>

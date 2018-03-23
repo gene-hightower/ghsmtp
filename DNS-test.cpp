@@ -39,7 +39,7 @@ int main(int argc, char const* argv[])
 
   // RFC 5321 section 5.1 “Locating the Target Host”
   std::shuffle(mxes.begin(), mxes.end(), std::default_random_engine());
-  std::stable_sort(mxes.begin(), mxes.end(), [](RR const& a, RR const& b) {
+  std::sort(mxes.begin(), mxes.end(), [](RR const& a, RR const& b) {
     if (std::holds_alternative<RR_MX>(a) && std::holds_alternative<RR_MX>(b)) {
       return std::get<RR_MX>(a).preference() < std::get<RR_MX>(b).preference();
     }
@@ -57,9 +57,39 @@ int main(int argc, char const* argv[])
     LOG(INFO) << "a   == " << std::get<RR_A>(a).c_str();
   }
 
-  auto danes
-      = res.get_records(RR_type::TLSA, DNS::Domain("_25._tcp.digilicious.com"));
-  for (auto const& dane : danes) {
-    // LOG(INFO) << "dane   == " << std::get<RR_DANE>(a).c_str();
+  Query q(res, RR_type::TLSA, DNS::Domain("_25._tcp.digilicious.com"));
+  CHECK(q.authentic_data()) << "TLSA records must be authenticated";
+  RR_list rrlst(q);
+  auto tlsas = rrlst.get_records();
+
+  for (auto const& tlsa : tlsas) {
+    unsigned usage = std::get<RR_TLSA>(tlsa).cert_usage();
+    unsigned selector = std::get<RR_TLSA>(tlsa).selector();
+    unsigned mtype = std::get<RR_TLSA>(tlsa).matching_type();
+
+    // LOG(INFO) << "tlsa usage     == " << usage;
+    // LOG(INFO) << "tlsa selector  == " << selector;
+    // LOG(INFO) << "tlsa mtype     == " << mtype;
+  }
+
+  Query q_noexist(res, RR_type::A,
+                  DNS::Domain("does-not-exist.test.digilicious.com"));
+  CHECK(q_noexist.nx_domain());
+  CHECK(!q_noexist.bogus_or_indeterminate());
+
+  Query q_dee(res, RR_type::A, DNS::Domain("dee.test.digilicious.com"));
+  CHECK(!q_dee.nx_domain());
+  CHECK(q_dee.bogus_or_indeterminate());
+
+  auto cmxes
+      = res.get_records(RR_type::MX, DNS::Domain("cname.test.digilicious.com"));
+  for (auto const& cmx : cmxes) {
+    if (std::holds_alternative<RR_CNAME>(cmx)) {
+      LOG(INFO) << "cname == " << std::get<RR_CNAME>(cmx).str();
+    }
+    else {
+      LOG(INFO) << "mx.preference == " << std::get<RR_MX>(cmx).preference();
+      LOG(INFO) << "mx.exchange   == " << std::get<RR_MX>(cmx).exchange();
+    }
   }
 }
