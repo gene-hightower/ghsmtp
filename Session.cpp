@@ -861,6 +861,71 @@ void Session::exit_()
 // All of the verify_* functions send their own error messages back to
 // the client on failure, and return false.
 
+bool ip4_whitelisted(char const* addr)
+{
+  struct nw {
+    char const* addr;
+    char const* mask;
+    char const* comment;
+  };
+
+  // clang-format off
+
+  // 255 0b11111111 8
+  // 254 0b11111110 7
+  // 252 0b11111100 6
+  // 248 0b11111000 5
+  // 240 0b11110000 4
+  // 224 0b11100000 3
+  // 192 0b11000000 2
+  // 128 0b10000000 1
+
+  nw const networks[]{
+    // the old ip-white file, more or less:
+    {"108.83.36.112",   "255.255.255.248", "108.83.36.112/29"},
+    {"129.6.100.204",   "255.255.255.255", "dane-test.had.dnsops.gov."},
+    {"138.68.46.51",    "255.255.255.255", "pug.altvox.com."},
+    {"151.236.4.207",   "255.255.255.255", "207-4-236-151.static.edis.at."},
+    {"172.249.180.22",  "255.255.255.255", "cpe-172-249-180-22.socal.res.rr.com."},
+    {"208.69.40.157",   "255.255.255.255", "medusa.blackops.org."},
+    {"209.237.225.253", "255.255.255.255", "new.toad.com."},
+
+    // some additional senders
+    {"4.31.198.44",     "255.255.255.255", "mail.ietf.org."},
+    {"64.207.162.101",  "255.255.255.255", "billmax.mtsvc.net."},
+    {"100.2.39.101",    "255.255.255.255", "straasha.imrryr.org."},
+
+    // accept from major providers:
+    {"17.0.0.0",        "255.0.0.0",       "17.0.0.0/8 APPLE-WWNET"},
+    {"66.220.144.0",    "255.255.240.0",   "66.220.144.0/20 TFBNET3"},
+    {"104.40.0.0",      "255.248.0.0",     "104.40.0.0/13 MSFT"},
+    {"108.174.0.0",     "255.255.240.0",   "108.174.0.0/20 LINKEDIN"},
+    {"208.192.0.0",     "255.192.0.0",     "208.192.0.0/10 UUNET1996B"},
+    {"209.85.128.0",    "255.255.128.0"    "209.85.128.0/17 GOOGLE"},
+  };
+  // clang-format on
+
+  uint32_t addr32;
+  CHECK_EQ(inet_pton(AF_INET, addr, &addr32), 1)
+      << "can't interpret as IPv4 address";
+
+  for (auto const& network : networks) {
+    uint32_t net32;
+    CHECK_EQ(inet_pton(AF_INET, network.addr, &net32), 1);
+    uint32_t mask32;
+    CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1);
+    CHECK_EQ(net32 & (~mask32), 0)
+        << "bogus config addr=" << network.addr << ", mask=" << network.mask;
+
+    if (net32 == (addr32 & mask32)) {
+      LOG(INFO) << addr << " whitelisted " << network.comment;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool Session::verify_ip_address_(std::string& error_msg)
 {
   CDB ip_black{"ip-black"};
@@ -901,33 +966,40 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = "unknown "s + sock_.them_address_literal();
   }
 
-  if ((sock_.them_address_literal() == IP4::loopback_literal)
-      || (sock_.them_address_literal() == IP6::loopback_literal)) {
+  if (sock_.them_address_literal() == IP4::loopback_literal) {
+    LOG(INFO) << "IP4 loopback address whitelisted";
     ip_whitelisted_ = true;
+    return true;
   }
-  else {
-    CDB ip_white{"ip-white"};
-    if (ip_white.lookup(sock_.them_c_str())) {
-      LOG(INFO) << "IP address " << sock_.them_c_str() << " whitelisted";
-      ip_whitelisted_ = true;
-    }
-    else if (IP4::is_address(sock_.them_c_str())) {
-      using namespace DNS;
 
-      // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-      auto const reversed{IP4::reverse(sock_.them_c_str())};
-      auto const res{DNS::Resolver{}};
-      for (auto rbl : Config::rbls) {
-        if (has_record<RR_type::A>(res, reversed + rbl)) {
-          error_msg = "blocked by "s + rbl;
-          out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
-                 << std::flush;
-          return false;
-        }
-      }
-      // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
-      // blacklisted";
+  if (sock_.them_address_literal() == IP6::loopback_literal) {
+    LOG(INFO) << "IP6 loopback address whitelisted";
+    ip_whitelisted_ = true;
+    return true;
+  }
+
+  if (IP4::is_address(sock_.them_c_str())) {
+    if (ip4_whitelisted(sock_.them_c_str())) {
+      LOG(INFO) << "IP4 address " << sock_.them_c_str() << " whitelisted";
+      ip_whitelisted_ = true;
+      return true;
     }
+
+    using namespace DNS;
+
+    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+    auto const reversed{IP4::reverse(sock_.them_c_str())};
+    auto const res{DNS::Resolver{}};
+    for (auto rbl : Config::rbls) {
+      if (has_record<RR_type::A>(res, reversed + rbl)) {
+        error_msg = "blocked by "s + rbl;
+        out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
+               << std::flush;
+        return false;
+      }
+    }
+    // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
+    // blacklisted";
   }
 
   return true;
