@@ -911,9 +911,9 @@ bool ip4_whitelisted(char const* addr)
 
   for (auto const& network : networks) {
     uint32_t net32;
-    CHECK_EQ(inet_pton(AF_INET, network.addr, &net32), 1);
+    CHECK_EQ(inet_pton(AF_INET, network.addr, &net32), 1) << "can't grok " << network.addr;
     uint32_t mask32;
-    CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1);
+    CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1) << "can't grok " << network.mask;
     CHECK_EQ(net32 & (~mask32), 0)
         << "bogus config addr=" << network.addr << ", mask=" << network.mask;
 
