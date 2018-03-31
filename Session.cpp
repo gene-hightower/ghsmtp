@@ -981,7 +981,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if (IP4::is_address(sock_.them_c_str())) {
     if (ip4_whitelisted(sock_.them_c_str())) {
-      LOG(INFO) << "IP4 address " << sock_.them_c_str() << " whitelisted";
       ip_whitelisted_ = true;
       return true;
     }
