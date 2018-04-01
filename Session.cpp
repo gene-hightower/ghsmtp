@@ -864,7 +864,7 @@ void Session::exit_()
 bool ip4_whitelisted(char const* addr)
 {
   struct nw {
-    char const* addr;
+    char const* net;
     char const* mask;
     char const* comment;
   };
@@ -912,11 +912,13 @@ bool ip4_whitelisted(char const* addr)
 
   for (auto const& network : networks) {
     uint32_t net32;
-    CHECK_EQ(inet_pton(AF_INET, network.addr, &net32), 1) << "can't grok " << network.addr;
+    CHECK_EQ(inet_pton(AF_INET, network.net, &net32), 1) << "can't grok " << network.net;
     uint32_t mask32;
     CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1) << "can't grok " << network.mask;
+
+    // sanity check: all unmasked bits must be zero
     CHECK_EQ(net32 & (~mask32), 0)
-        << "bogus config addr=" << network.addr << ", mask=" << network.mask;
+        << "bogus config net=" << network.net << ", mask=" << network.mask;
 
     if (net32 == (addr32 & mask32)) {
       LOG(INFO) << addr << " whitelisted " << network.comment;
