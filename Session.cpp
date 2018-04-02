@@ -264,7 +264,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   auto error_msg{std::string{}};
   if (!verify_sender_(reverse_path, error_msg)) {
-    LOG(WARNING) << "verify sender " << reverse_path << params.str()
+    LOG(WARNING) << "verify sender " << reverse_path
                  << " failed: " << error_msg;
     bad_host_(error_msg.c_str());
   }
@@ -918,9 +918,11 @@ bool ip4_whitelisted(char const* addr)
 
   for (auto const& network : networks) {
     uint32_t net32;
-    CHECK_EQ(inet_pton(AF_INET, network.net, &net32), 1) << "can't grok " << network.net;
+    CHECK_EQ(inet_pton(AF_INET, network.net, &net32), 1)
+        << "can't grok " << network.net;
     uint32_t mask32;
-    CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1) << "can't grok " << network.mask;
+    CHECK_EQ(inet_pton(AF_INET, network.mask, &mask32), 1)
+        << "can't grok " << network.mask;
 
     // sanity check: all unmasked bits must be zero
     CHECK_EQ(net32 & (~mask32), 0)
