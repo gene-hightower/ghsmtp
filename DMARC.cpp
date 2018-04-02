@@ -12,7 +12,7 @@ u_char* uc(char const* cp)
 namespace OpenDMARC {
 Lib::Lib()
 {
-  lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
+  memset(&lib_, 0, sizeof(lib_));
 
   auto const path{[] {
     auto const system_list{
@@ -27,8 +27,10 @@ Lib::Lib()
     LOG(FATAL) << "can't find public_suffix_list.dat";
   }()};
 
+  lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
   strncpy(reinterpret_cast<char*>(lib_.tld_source_file), path.string().c_str(),
           PATH_MAX);
+
   auto const status = opendmarc_policy_library_init(&lib_);
   CHECK_EQ(status, DMARC_PARSE_OKAY) << opendmarc_policy_status_to_str(status);
 }
