@@ -883,11 +883,6 @@ void Session::exit_()
   std::exit(EXIT_SUCCESS);
 }
 
-/////////////////////////////////////////////////////////////////////////////
-
-// All of the verify_* functions send their own error messages back to
-// the client on failure, and return false.
-
 bool ip4_whitelisted(char const* addr)
 {
   struct nw {
@@ -977,6 +972,11 @@ bool ip4_whitelisted(char const* addr)
 
   return false;
 }
+
+/////////////////////////////////////////////////////////////////////////////
+
+// All of the verify_* functions send their own error messages back to
+// the client on failure, and return false.
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
