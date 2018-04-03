@@ -399,12 +399,16 @@ bool Session::msg_new()
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
   auto const status{[&] {
+    if (spf_result_ == SPF::Result::FAIL)
+      return Message::SpamStatus::spam;
+
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls())
       return Message::SpamStatus::ham;
 
     // I will allow this as sort of the gold standard for naming.
-    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_))
+    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_)
+        && (client_identity_ == reverse_path_.domain()))
       return Message::SpamStatus::ham;
 
     if (fcrdns_whitelisted_)
@@ -1328,6 +1332,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     LOG(WARNING) << spf_res.header_comment();
     // Error code from RFC 7372, section 3.2.  Also:
     // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+
+    // If we want to refuse mail that fails SPF:
     // out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
     // return false;
   }
