@@ -410,13 +410,6 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
     }
 
-    // I will allow this as sort of the gold standard for naming.
-    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_)
-        && (client_identity_ == reverse_path_.domain())) {
-      LOG(INFO) << "ham since confirmed DNS name matches reverse_path";
-      return Message::SpamStatus::ham;
-    }
-
     if (fcrdns_whitelisted_) {
       LOG(INFO) << "ham since confirmed DNS is whitelisted";
       return Message::SpamStatus::ham;
@@ -443,6 +436,19 @@ bool Session::msg_new()
     if (tld_rp && white_.lookup(tld_rp)) {
       LOG(INFO) << "ham since reverse path registered domain is whitelisted";
       return Message::SpamStatus::ham;
+    }
+
+    // I will allow this as sort of the gold standard for naming.
+    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_)) {
+      if (client_fcrdns_ == rp_dom) {
+        LOG(INFO) << "ham since reverse_path matches confirmed DNS name";
+        return Message::SpamStatus::ham;
+      }
+      if (client_fcrdns_ == tld_rp) {
+        LOG(INFO) << "ham since reverse_path registered domain matches "
+                     "confirmed DNS name";
+        return Message::SpamStatus::ham;
+      }
     }
 
     LOG(INFO) << "spam since it's not ham";
@@ -1349,12 +1355,13 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   if (spf_result_ == SPF::Result::FAIL) {
     LOG(WARNING) << spf_res.header_comment();
-    // Error code from RFC 7372, section 3.2.  Also:
-    // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
-
-    // If we want to refuse mail that fails SPF:
-    // out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
-    // return false;
+    /*
+      If we want to refuse mail that fails SPF:
+      // Error code from RFC 7372, section 3.2.  Also:
+      // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+      out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
+      return false;
+    */
   }
   else {
     LOG(INFO) << spf_res.header_comment();
@@ -1366,34 +1373,34 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 bool Session::verify_from_params_(parameters_t const& parameters)
 {
   // Take a look at the optional parameters:
-  for (auto const& [name, val] : parameters) {
+  for (auto const& [name, value] : parameters) {
     if (iequal(name, "BODY")) {
-      if (iequal(val, "8BITMIME")) {
+      if (iequal(value, "8BITMIME")) {
         // everything is cool, this is our default...
       }
-      else if (iequal(val, "7BIT")) {
+      else if (iequal(value, "7BIT")) {
         // nothing to see here, move along...
       }
-      else if (iequal(val, "BINARYMIME")) {
+      else if (iequal(value, "BINARYMIME")) {
         binarymime_ = true;
       }
       else {
-        LOG(WARNING) << "unrecognized BODY type \"" << val << "\" requested";
+        LOG(WARNING) << "unrecognized BODY type \"" << value << "\" requested";
       }
     }
     else if (iequal(name, "SMTPUTF8")) {
-      if (!val.empty()) {
-        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << val;
+      if (!value.empty()) {
+        LOG(WARNING) << "SMTPUTF8 parameter has a value: " << value;
       }
       smtputf8_ = true;
     }
     else if (iequal(name, "SIZE")) {
-      if (val.empty()) {
+      if (value.empty()) {
         LOG(WARNING) << "SIZE parameter has no value.";
       }
       else {
         try {
-          auto const sz = stoull(val);
+          auto const sz = stoull(value);
           if (sz > max_msg_size()) {
             out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
             LOG(WARNING) << "SIZE parameter too large: " << sz;
@@ -1401,16 +1408,17 @@ bool Session::verify_from_params_(parameters_t const& parameters)
           }
         }
         catch (std::invalid_argument const& e) {
-          LOG(WARNING) << "SIZE parameter has invalid value: " << val;
+          LOG(WARNING) << "SIZE parameter has invalid value: " << value;
         }
         catch (std::out_of_range const& e) {
-          LOG(WARNING) << "SIZE parameter has out-of-range value: " << val;
+          LOG(WARNING) << "SIZE parameter has out-of-range value: " << value;
         }
         // I guess we just ignore bad size parameters.
       }
     }
     else {
-      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "=" << val;
+      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "="
+                   << value;
     }
   }
 
