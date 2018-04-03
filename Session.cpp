@@ -399,35 +399,51 @@ bool Session::msg_new()
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
   auto const status{[&] {
-    if (spf_result_ == SPF::Result::FAIL)
+    if (spf_result_ == SPF::Result::FAIL) {
+      LOG(INFO) << "failed SPF makes this spam";
       return Message::SpamStatus::spam;
+    }
 
     // Anything enciphered tastes a lot like ham.
-    if (sock_.tls())
+    if (sock_.tls()) {
+      LOG(INFO) << "TLS makes this ham";
       return Message::SpamStatus::ham;
+    }
 
     // I will allow this as sort of the gold standard for naming.
     if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_)
-        && (client_identity_ == reverse_path_.domain()))
+        && (client_identity_ == reverse_path_.domain())) {
+      LOG(INFO) << "ham since confirmed DNS name matches reverse_path";
       return Message::SpamStatus::ham;
+    }
 
-    if (fcrdns_whitelisted_)
+    if (fcrdns_whitelisted_) {
+      LOG(INFO) << "ham since confirmed DNS is whitelisted";
       return Message::SpamStatus::ham;
+    }
 
-    if (lookup_domain(white_, client_identity_))
+    if (lookup_domain(white_, client_identity_)) {
+      LOG(INFO) << "ham since client identity is whitelisted";
       return Message::SpamStatus::ham;
+    }
 
     auto tld_id{tld_db_.get_registered_domain(client_identity_.lc())};
-    if (tld_id && white_.lookup(tld_id))
+    if (tld_id && white_.lookup(tld_id)) {
+      LOG(INFO) << "ham since client identity registered domain is whitelisted";
       return Message::SpamStatus::ham;
+    }
 
     auto rp_dom = reverse_path_.domain();
-    if (lookup_domain(white_, rp_dom))
+    if (lookup_domain(white_, rp_dom)) {
+      LOG(INFO) << "ham since reverse path is whitelisted";
       return Message::SpamStatus::ham;
+    }
 
     auto tld_rp{tld_db_.get_registered_domain(rp_dom.lc())};
-    if (tld_rp && white_.lookup(tld_rp))
+    if (tld_rp && white_.lookup(tld_rp)) {
+      LOG(INFO) << "ham since reverse path registered domain is whitelisted";
       return Message::SpamStatus::ham;
+    }
 
     return Message::SpamStatus::spam;
   }()};
