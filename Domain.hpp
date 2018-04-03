@@ -24,6 +24,7 @@ public:
   inline void clear();
   bool empty() const { return lc_.empty(); }
 
+  inline static std::string_view remove_trailing_dot(std::string_view a);
   inline static bool match(std::string_view a, std::string_view b);
 
   bool operator==(std::string_view rhs) const { return match(lc_, rhs); }
@@ -57,15 +58,17 @@ inline void Domain::clear()
   is_address_literal_ = false;
 }
 
-inline bool Domain::match(std::string_view a, std::string_view b)
+inline std::string_view Domain::remove_trailing_dot(std::string_view a)
 {
-  if ((0 != a.length()) && ('.' == a.back())) {
+  if (a.length() && ('.' == a.back())) {
     a.remove_suffix(1);
   }
-  if ((0 != b.length()) && ('.' == b.back())) {
-    b.remove_suffix(1);
-  }
-  return iequal(a, b);
+  return a;
+}
+
+inline bool Domain::match(std::string_view a, std::string_view b)
+{
+  return iequal(remove_trailing_dot(a), remove_trailing_dot(b));
 }
 
 inline std::string Domain::address() const
