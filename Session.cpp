@@ -400,13 +400,13 @@ bool Session::msg_new()
 
   auto const status{[&] {
     if (spf_result_ == SPF::Result::FAIL) {
-      LOG(INFO) << "failed SPF makes this spam";
+      LOG(INFO) << "spam since SPF failed";
       return Message::SpamStatus::spam;
     }
 
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls()) {
-      LOG(INFO) << "TLS makes this ham";
+      LOG(INFO) << "ham since they used TLS";
       return Message::SpamStatus::ham;
     }
 
@@ -445,6 +445,7 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
     }
 
+    LOG(INFO) << "spam since it's not ham";
     return Message::SpamStatus::spam;
   }()};
 
