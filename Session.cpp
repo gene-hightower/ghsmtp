@@ -916,6 +916,7 @@ bool ip4_whitelisted(char const* addr)
     {"4.31.198.44",     "255.255.255.255", "mail.ietf.org."},
     {"64.207.162.101",  "255.255.255.255", "billmax.mtsvc.net."},
     {"100.2.39.101",    "255.255.255.255", "straasha.imrryr.org."},
+    {"207.38.5.120",    "255.255.255.255", "lists.uuasc.org"},
 
     // accept from major providers:
     {"5.45.198.0",      "255.255.254.0",   "5.45.198.0/23 YANDEX-5-45-198"},
@@ -1215,7 +1216,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
   }
 
   if (white_.lookup(sender.lc())) {
-    LOG(INFO) << "sender \"" << sender.lc() << "\" whitelisted";
+    LOG(INFO) << "sender " << sender.lc() << " whitelisted";
     return true;
   }
 
