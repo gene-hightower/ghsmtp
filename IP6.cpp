@@ -97,6 +97,7 @@ std::string reverse(std::string_view addr_str)
   CHECK_EQ(1, inet_pton(AF_INET6, addr_str.data(), addr_void));
 
   auto q{std::string{}};
+  q.reserve(2 * NS_IN6ADDRSZ + 1);
 
   for (auto n = NS_IN6ADDRSZ - 1; n >= 0; --n) {
     auto const ch = addr_uint[n];
