@@ -98,11 +98,17 @@ std::string reverse(std::string_view addr_str)
 
   auto q{std::string{}};
 
-  for (auto n = NS_IN6ADDRSZ - 1; n >= 0; n--) {
-    constexpr char nibblechar[] = "0123456789abcdef";
-    q += nibblechar[addr_uint[n] & 0xf];
+  for (auto n = NS_IN6ADDRSZ - 1; n >= 0; --n) {
+    auto const ch = addr_uint[n];
+
+    auto const lo = ch & 0xF;
+    auto const hi = (ch >> 4) & 0xF;
+
+    auto constexpr hex_digits = "0123456789abcdef";
+
+    q += hex_digits[lo];
     q += '.';
-    q += nibblechar[(addr_uint[n] >> 4) & 0xf];
+    q += hex_digits[hi];
     q += '.';
   }
 
