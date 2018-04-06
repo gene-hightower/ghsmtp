@@ -67,7 +67,7 @@ int main(int argc, char const* argv[])
   auto const addr_lit = "[108.83.36.113]";
 
   auto fcrdnses = fcrdns(addr);
-  CHECK_EQ(fcrdnses.size(), 1);
+  CHECK_GT(fcrdnses.size(), 1);
   CHECK(Domain::match(fcrdnses.front(), "digilicious.com"));
 
   CHECK(is_address(addr));
