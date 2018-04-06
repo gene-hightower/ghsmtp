@@ -740,7 +740,7 @@ int main(int argc, char* argv[])
 
   // Don't wait for STARTTLS to fail if no cert.
   auto const config_path = osutil::get_config_dir();
-  auto const cert_path = config_path / TLS::cert_fn;
+  auto const cert_path = config_path / Config::cert_fn;
   CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
 
   ctx->session.greeting();

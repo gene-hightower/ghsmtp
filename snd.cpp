@@ -7,7 +7,7 @@ namespace gflags {
 }
 
 // This needs to be at least the length of each string it's trying to match.
-DEFINE_uint64(bfr_size, 4*1024, "parser buffer size");
+DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
 DEFINE_bool(selftest, false, "run a self test");
 
@@ -34,7 +34,7 @@ DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
 
-DEFINE_bool(starttls_1st, false, "inappropriately STARTTLS before EHLO");
+DEFINE_bool(force_tls, true, "use STARTTLS or die");
 
 // To force it, set if you have UTF8 in the local part of any RFC5321
 // address.
@@ -43,7 +43,7 @@ DEFINE_bool(force_smtputf8, false, "force SMTPUTF8 extension");
 DEFINE_string(sender, "", "FQDN of sending node");
 
 DEFINE_string(local_address, "", "local address to bind");
-DEFINE_string(mx_host, "localhost", "FQDN of receiving node");
+DEFINE_string(mx_host, "", "FQDN of receiving node");
 DEFINE_string(service, "smtp-test", "service name");
 
 DEFINE_string(from, "", "RFC5321 MAIL FROM address");
@@ -80,9 +80,12 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "imemstream.hpp"
 #include "osutil.hpp"
 
+#include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -529,7 +532,7 @@ uint16_t get_port(char const* const service)
 
   auto result_buf{servent{}};
   auto result_ptr{(servent*){}};
-  auto str_buf{std::vector<char>(1024)};
+  auto str_buf{std::vector<char>(1024)}; // 1024 suggested by getservbyname_r(3)
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
          == ERANGE) {
@@ -541,12 +544,11 @@ uint16_t get_port(char const* const service)
   return ntohs(result_buf.s_port);
 }
 
-int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
+int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 {
   auto const use_4{!FLAGS_6};
   auto const use_6{!FLAGS_4};
 
-  auto const port{get_port(service.c_str())};
   if (use_6) {
     auto const fd{socket(AF_INET6, SOCK_STREAM, 0)};
     PCHECK(fd >= 0) << "socket() failed";
@@ -564,13 +566,14 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
     }
 
     auto addrs{std::vector<std::string>{}};
+
     if (node.is_address_literal()) {
       if (IP6::is_address(node.ascii())) {
-        addrs.push_back(node.address());
+        addrs.push_back(node.ascii());
       }
     }
     else {
-      addrs = DNS::get_records<DNS::RR_type::AAAA>(res, node.ascii());
+      addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, node.ascii());
     }
     for (auto const& addr : addrs) {
       auto in6{sockaddr_in6{}};
@@ -580,11 +583,11 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
       if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
-        PLOG(WARNING) << "connect failed " << addr << ":" << port;
+        PLOG(WARNING) << "connect failed [" << addr << "]:" << port;
         continue;
       }
 
-      LOG(INFO) << " connected to " << addr << ":" << port;
+      LOG(INFO) << " connected to [" << addr << "]:" << port;
       return fd;
     }
 
@@ -608,12 +611,12 @@ int conn(DNS::Resolver& res, Domain const& node, std::string const& service)
 
     auto addrs{std::vector<std::string>{}};
     if (node.is_address_literal()) {
-      if (IP4::is_address_literal(node.ascii())) {
-        addrs.push_back(node.address());
+      if (IP4::is_address(node.ascii())) {
+        addrs.push_back(node.ascii());
       }
     }
     else {
-      addrs = DNS::get_records<DNS::RR_type::A>(res, node.ascii());
+      addrs = DNS::get_strings<DNS::RR_type::A>(res, node.ascii());
     }
     for (auto addr : addrs) {
       auto in4{sockaddr_in{}};
@@ -884,27 +887,68 @@ std::vector<Domain> get_receivers(DNS::Resolver& res, Mailbox const& to_mbx)
 {
   auto receivers{std::vector<Domain>{}};
 
+  // User provided explicit host to receive mail.
   if (!FLAGS_mx_host.empty()) {
-    receivers.push_back(Domain(FLAGS_mx_host));
+    receivers.emplace_back(FLAGS_mx_host);
+    return receivers;
   }
-  else {
-    // look up MX records for to_mbx.domain()
-    // returns list of servers sorted by priority, low to high
-    auto const mxs{
-        DNS::get_records<DNS::RR_type::MX>(res, to_mbx.domain().ascii())};
 
-    // RFC 7505 null MX record
-    if ((mxs.size() == 1) && (mxs.front() == ".")) {
-      LOG(FATAL) << "domain does not accept mail";
-    }
+  // RFC 5321 section 5.1 "Locating the Target Host"
 
-    if (mxs.empty()) {
-      receivers.push_back(to_mbx.domain());
-    }
-    else {
-      for (auto const& mx : mxs) {
-        receivers.push_back(Domain(mx));
+  // “The lookup first attempts to locate an MX record associated with
+  //  the name.  If a CNAME record is found, the resulting name is
+  //  processed as if it were the initial name.”
+
+  // Our (full) resolver will traverse any CNAMEs for us and return
+  // the CNAME and MX records all together.
+
+  auto const& domain = to_mbx.domain().lc();
+
+  auto mxs{res.get_records(DNS::RR_type::MX, domain)};
+
+  auto const nmx = std::count_if(mxs.begin(), mxs.end(), [](DNS::RR const& rr) {
+    return std::holds_alternative<DNS::RR_MX>(rr);
+  });
+
+  if (nmx == 1) {
+    for (auto const& mx : mxs) {
+      if (std::holds_alternative<DNS::RR_MX>(mx)) {
+        // RFC 7505 null MX record
+        if ((std::get<DNS::RR_MX>(mx).preference() == 0)
+            && (std::get<DNS::RR_MX>(mx).exchange() == ".")) {
+          LOG(FATAL) << "domain " << domain << " does not accept mail";
+        }
       }
+    }
+  }
+
+  if (nmx == 0) {
+    // implicit MX RR
+    receivers.emplace_back(domain);
+    return receivers;
+  }
+
+  // […] then the sender-SMTP MUST randomize them to spread the load
+  // across multiple mail exchangers for a specific organization.
+  std::shuffle(mxs.begin(), mxs.end(), std::default_random_engine());
+  std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
+    if (std::holds_alternative<DNS::RR_MX>(a)
+        && std::holds_alternative<DNS::RR_MX>(b)) {
+      return std::get<DNS::RR_MX>(a).preference()
+             < std::get<DNS::RR_MX>(b).preference();
+    }
+    return false;
+  });
+
+  if (nmx)
+    LOG(INFO) << "MXs for " << domain << " are:";
+
+  for (auto const& mx : mxs) {
+    if (std::holds_alternative<DNS::RR_MX>(mx)) {
+      receivers.emplace_back(std::get<DNS::RR_MX>(mx).exchange());
+      LOG(INFO) << std::setfill(' ') << std::setw(3)
+                << std::get<DNS::RR_MX>(mx).preference() << " "
+                << std::get<DNS::RR_MX>(mx).exchange();
     }
   }
 
@@ -1047,23 +1091,6 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   }
 }
 
-template <typename Input>
-void starttls(Input& in, RFC5321::Connection& cnn, Domain const& sender)
-{
-  LOG(INFO) << "C: STARTTLS";
-  cnn.sock.out() << "STARTTLS\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-
-  cnn.sock.starttls_client();
-
-  if (!FLAGS_starttls_1st) {
-    // Skip the 2nd EHLO since we're about to try our 1st.
-    LOG(INFO) << "C: EHLO " << sender.ascii();
-    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
-    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
-  }
-}
-
 // Do various bad things during the DATA transfer.
 
 template <typename Input>
@@ -1114,6 +1141,7 @@ bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
          Domain const& receiver,
+         uint16_t port,
          Mailbox const& from_mbx,
          Mailbox const& to_mbx,
          std::vector<content> const& bodies)
@@ -1131,10 +1159,6 @@ bool snd(int fd_in,
   if (!cnn.greeting_ok) {
     LOG(WARNING) << "greeting was not in the affirmative, skipping";
     return false;
-  }
-
-  if (FLAGS_starttls_1st) {
-    starttls(in, cnn, sender);
   }
 
   // try EHLO/HELO
@@ -1198,8 +1222,25 @@ bool snd(int fd_in,
     return false;
   }
 
-  if (!FLAGS_starttls_1st && ext_starttls) {
-    starttls(in, cnn, sender);
+  if (ext_starttls) {
+    LOG(INFO) << "C: STARTTLS";
+    cnn.sock.out() << "STARTTLS\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+
+    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.lc() << ", " << port
+              << ");";
+    cnn.sock.starttls_client(receiver.lc().c_str(), port);
+
+    LOG(INFO) << "C: EHLO " << sender.ascii();
+    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+  }
+  else if (FLAGS_force_tls) {
+    LOG(ERROR) << "No TLS extension, won't send mail in plain text.";
+    LOG(INFO) << "C: QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    exit(EXIT_FAILURE);
   }
 
   if (receiver != cnn.server_id) {
@@ -1461,10 +1502,10 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto&& [from_mbx, to_mbx] = parse_mailboxes();
+  auto && [ from_mbx, to_mbx ] = parse_mailboxes();
 
   if (FLAGS_pipe) {
-    return snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"),
+    return snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"), 0,
                from_mbx, to_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
@@ -1473,16 +1514,18 @@ int main(int argc, char* argv[])
   auto res{DNS::Resolver{}};
   auto receivers = get_receivers(res, to_mbx);
 
+  auto const port{get_port(FLAGS_service.c_str())};
+
   for (auto const& receiver : receivers) {
     LOG(INFO) << "trying " << receiver << ":" << FLAGS_service;
 
-    auto fd = conn(res, receiver, FLAGS_service);
+    auto fd = conn(res, receiver, port);
     if (fd == -1) {
       LOG(WARNING) << "bad connection, skipping";
       continue;
     }
 
-    if (snd(fd, fd, sender, receiver, from_mbx, to_mbx, bodies)) {
+    if (snd(fd, fd, sender, receiver, port, from_mbx, to_mbx, bodies)) {
       return EXIT_SUCCESS;
     }
 

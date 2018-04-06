@@ -7,6 +7,15 @@
 
 #include <openssl/ssl.h>
 
+namespace Config {
+auto constexpr cert_verify_depth{10};
+
+auto constexpr cert_fn = "smtp.pem";
+auto constexpr key_fn = "smtp.key";
+auto constexpr cert_fn_re = ".+\\.pem$";
+
+} // namespace Config
+
 class TLS {
 public:
   TLS(TLS const&) = delete;
@@ -15,8 +24,11 @@ public:
   TLS(std::function<void(void)> read_hook);
   ~TLS();
 
-  bool
-  starttls_client(int fd_in, int fd_out, std::chrono::milliseconds timeout);
+  bool starttls_client(int fd_in,
+                       int fd_out,
+                       char const* hostname,
+                       uint16_t port,
+                       std::chrono::milliseconds timeout);
   bool
   starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);
 
@@ -38,8 +50,19 @@ public:
 
   std::string info() const;
 
-  static constexpr auto cert_fn = "smtp.pem";
-  static constexpr auto key_fn = "smtp.key";
+  class per_cert_ctx {
+  public:
+    explicit per_cert_ctx(SSL_CTX* ctx)
+      : ctx_(ctx)
+    {
+    }
+    ~per_cert_ctx();
+
+    SSL_CTX* ctx() const { return ctx_; };
+
+  private:
+    SSL_CTX* ctx_;
+  };
 
 private:
   std::streamsize io_tls_(char const* fnm,
@@ -52,9 +75,12 @@ private:
   static void ssl_error();
 
 private:
-  SSL_CTX* ctx_{nullptr};
   SSL* ssl_{nullptr};
+
+  std::vector<per_cert_ctx> cert_ctx_;
+
   std::function<void(void)> read_hook_;
+
   bool verified_{false};
 };
 

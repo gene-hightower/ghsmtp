@@ -115,7 +115,6 @@ databases := \
 	bad_recipients.cdb \
 	black.cdb \
 	ip-black.cdb \
-	ip-white.cdb \
 	three-level-tlds.cdb \
 	two-level-tlds.cdb \
 	white.cdb \
@@ -143,7 +142,6 @@ clean::
 	rm -f accept_domains.cdb
 	rm -f black.cdb
 	rm -f ip-black.cdb
-	rm -f ip-white.cdb
 	rm -f three-level-tlds.cdb
 	rm -f two-level-tlds.cdb
 	rm -f white.cdb cdb-gen
@@ -154,7 +152,6 @@ real-clean::
 accept_domains.cdb: accept_domains cdb-gen
 black.cdb: black cdb-gen
 ip-black.cdb: ip-black cdb-gen
-ip-white.cdb: ip-white cdb-gen
 three-level-tlds.cdb: three-level-tlds cdb-gen
 two-level-tlds.cdb: two-level-tlds cdb-gen
 white.cdb: white cdb-gen
@@ -164,6 +161,12 @@ two-level-tlds three-level-tlds:
 
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
+
+safty_flags := # nada
+
+# visibility_flags := # nada
+
+# lto_flags := # nada
 
 include MKUltra/rules
 

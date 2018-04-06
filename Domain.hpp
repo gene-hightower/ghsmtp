@@ -40,12 +40,10 @@ public:
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
-  inline std::string address() const;
-
 private:
-  std::string lc_;
   std::string ascii_;
   std::string utf8_;
+  std::string lc_;
 
   bool is_address_literal_{false};
 };
@@ -69,13 +67,6 @@ inline std::string_view Domain::remove_trailing_dot(std::string_view a)
 inline bool Domain::match(std::string_view a, std::string_view b)
 {
   return iequal(remove_trailing_dot(a), remove_trailing_dot(b));
-}
-
-inline std::string Domain::address() const
-{
-  if (is_address_literal())
-    return std::string(IP::as_address(ascii_));
-  throw std::runtime_error("domain is not an address");
 }
 
 inline std::ostream& operator<<(std::ostream& os, Domain const& dom)

@@ -203,16 +203,16 @@ public:
           uint8_t matching_type,
           uint8_t const* assoc_data,
           size_t assoc_data_sz);
-  uint8_t cert_usage() const { return cert_usage_; }
-  uint8_t selector() const { return selector_; }
-  uint8_t matching_type() const { return matching_type_; }
-  std::vector<std::byte> const& assoc_data() const { return assoc_data_; }
+  unsigned cert_usage() const { return cert_usage_; }
+  unsigned selector() const { return selector_; }
+  unsigned matching_type() const { return matching_type_; }
+  std::vector<unsigned char> const& assoc_data() const { return assoc_data_; }
 
 private:
+  std::vector<unsigned char> assoc_data_;
   uint8_t cert_usage_;
   uint8_t selector_;
   uint8_t matching_type_;
-  std::vector<std::byte> assoc_data_;
 };
 
 using RR

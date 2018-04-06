@@ -109,9 +109,9 @@ private:
   Sock sock_;
 
   // per connection/session
-  Domain server_identity_; // who we identify as
-  Domain client_fcrdns_;   // who they look-up as
-  std::string client_;     // (fcrdns_ [sock_.them_c_str()])
+  Domain server_identity_;            // who we identify as
+  std::vector<Domain> client_fcrdns_; // who they look-up as
+  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
 
   // per transaction
   Domain client_identity_;            // from ehlo/helo

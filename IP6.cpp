@@ -116,7 +116,7 @@ std::string reverse(std::string_view addr_str)
   return q;
 }
 
-std::string fcrdns(std::string_view addr)
+std::vector<std::string> fcrdns(std::string_view addr)
 {
   // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
 
@@ -127,16 +127,16 @@ std::string fcrdns(std::string_view addr)
   auto const ptrs
       = DNS::get_strings<DNS::RR_type::PTR>(res, reversed + "ip6.arpa");
 
-  auto const ptr = std::find_if(
-      ptrs.begin(), ptrs.end(), [&res, addr](std::string const& s) {
-        // The forward part, check each PTR for matching AAAA record.
-        auto addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, s);
-        return std::find(addrs.begin(), addrs.end(), addr) != addrs.end();
-      });
+  std::vector<std::string> fcrdns;
 
-  if (ptr != ptrs.end()) {
-    return *ptr;
-  }
-  return "";
+  std::copy_if(ptrs.begin(), ptrs.end(), std::back_inserter(fcrdns),
+               [&res, addr](std::string const& s) {
+                 // The forward part, check each PTR for matching AAAA record.
+                 auto addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, s);
+                 return std::find(addrs.begin(), addrs.end(), addr)
+                        != addrs.end();
+               });
+
+  return fcrdns;
 }
 } // namespace IP6

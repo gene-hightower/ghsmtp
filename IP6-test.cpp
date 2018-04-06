@@ -24,6 +24,8 @@ int main(int argc, char const* argv[])
 
   auto const gmail_com{"2607:f8b0:4000:815::2005"};
   auto const gmail_com_rev{fcrdns(gmail_com)};
-  CHECK(Domain::match(gmail_com_rev, "dfw28s04-in-x05.1e100.net."))
-      << gmail_com_rev;
+
+  CHECK_EQ(gmail_com_rev.size(), 1);
+  CHECK(Domain::match(gmail_com_rev.front(), "dfw28s04-in-x05.1e100.net."))
+      << gmail_com_rev.front();
 }

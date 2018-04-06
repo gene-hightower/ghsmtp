@@ -60,10 +60,10 @@ public:
     return tls_active_
            = tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
   }
-  bool starttls_client()
+  bool starttls_client(char const* hostname, uint16_t port)
   {
     return tls_active_
-           = tls_.starttls_client(fd_in_, fd_out_, starttls_timeout_);
+           = tls_.starttls_client(fd_in_, fd_out_, hostname, port, starttls_timeout_);
   }
   bool tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }

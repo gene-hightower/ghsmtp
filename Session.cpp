@@ -148,7 +148,10 @@ void Session::greeting()
 void Session::log_lo_(char const* verb, std::string_view client_identity) const
 {
   if (sock_.has_peername()) {
-    if (client_fcrdns_ == client_identity_) {
+    if (!client_fcrdns_.empty()
+        && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
+                      client_identity_)
+            != client_fcrdns_.end())) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -416,37 +419,37 @@ bool Session::msg_new()
     }
 
     if (lookup_domain(white_, client_identity_)) {
-      LOG(INFO) << "ham since client identity is whitelisted";
+      LOG(INFO) << "ham since client identity (" << client_identity_
+                << ") is whitelisted";
       return Message::SpamStatus::ham;
     }
 
     auto tld_id{tld_db_.get_registered_domain(client_identity_.lc())};
     if (tld_id && white_.lookup(tld_id)) {
-      LOG(INFO) << "ham since client identity registered domain is whitelisted";
+      LOG(INFO) << "ham since client identity registered domain (" << tld_id
+                << ") is whitelisted";
       return Message::SpamStatus::ham;
     }
 
     auto rp_dom = reverse_path_.domain();
     if (lookup_domain(white_, rp_dom)) {
-      LOG(INFO) << "ham since reverse path is whitelisted";
+      LOG(INFO) << "ham since reverse path (" << rp_dom << ") is whitelisted";
       return Message::SpamStatus::ham;
     }
 
     auto tld_rp{tld_db_.get_registered_domain(rp_dom.lc())};
     if (tld_rp && white_.lookup(tld_rp)) {
-      LOG(INFO) << "ham since reverse path registered domain is whitelisted";
+      LOG(INFO) << "ham since reverse path registered domain (" << tld_rp
+                << ") is whitelisted";
       return Message::SpamStatus::ham;
     }
 
     // I will allow this as sort of the gold standard for naming.
-    if (!client_fcrdns_.empty() && (client_identity_ == client_fcrdns_)) {
-      if (client_fcrdns_ == rp_dom) {
-        LOG(INFO) << "ham since reverse_path matches confirmed DNS name";
-        return Message::SpamStatus::ham;
-      }
-      if (client_fcrdns_ == tld_rp) {
-        LOG(INFO) << "ham since reverse_path registered domain matches "
-                     "confirmed DNS name";
+    if (!client_fcrdns_.empty()) {
+      if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
+          != client_fcrdns_.end()) {
+        LOG(INFO) << "ham since reverse_path (" << rp_dom
+                  << ") matches confirmed DNS name";
         return Message::SpamStatus::ham;
       }
     }
@@ -988,30 +991,44 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return false;
   }
 
-  client_fcrdns_ = IP::fcrdns(sock_.them_c_str());
+  client_fcrdns_.clear();
+  auto fcrdns = IP::fcrdns(sock_.them_c_str());
+  for (auto const& fcr : fcrdns) {
+    client_fcrdns_.emplace_back(fcr);
+  }
+
+  // Sort by name length: short to long.
+  std::sort(client_fcrdns_.begin(), client_fcrdns_.end(),
+            [](Domain const& a, Domain const& b) {
+              return a.lc().length() < b.lc().length();
+            });
+
   if (!client_fcrdns_.empty()) {
-    client_ = client_fcrdns_.ascii() + " " + sock_.them_address_literal();
+    client_
+        = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
 
-    if (black_.lookup(client_fcrdns_.lc())) {
-      error_msg = "FCrDNS "s + client_fcrdns_.lc() + " on static blacklist"s;
-      out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
-      return false;
-    }
-    if (white_.lookup(client_fcrdns_.lc())) {
-      LOG(INFO) << "FCrDNS domain " << client_fcrdns_.lc() << " whitelisted";
-      fcrdns_whitelisted_ = true;
-    }
-
-    auto const tld{tld_db_.get_registered_domain(client_fcrdns_.lc())};
-    if (tld) {
-      if (black_.lookup(tld)) {
-        error_msg = "FCrDNS domain "s + tld + " on static blacklist"s;
+    for (auto const& client_fcrdns : client_fcrdns_) {
+      if (black_.lookup(client_fcrdns.lc())) {
+        error_msg = "FCrDNS "s + client_fcrdns.lc() + " on static blacklist"s;
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
-      if (white_.lookup(tld)) {
-        LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+      if (white_.lookup(client_fcrdns.lc())) {
+        LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
+      }
+
+      auto const tld{tld_db_.get_registered_domain(client_fcrdns.lc())};
+      if (tld) {
+        if (black_.lookup(tld)) {
+          error_msg = "FCrDNS domain "s + tld + " on static blacklist"s;
+          out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+          return false;
+        }
+        if (white_.lookup(tld)) {
+          LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+          fcrdns_whitelisted_ = true;
+        }
       }
     }
   }
@@ -1079,7 +1096,8 @@ bool Session::verify_client_(Domain const& client_identity,
       return true;
     }
 
-    if (!client_fcrdns_.empty() && (server_identity_ != client_fcrdns_)) {
+    if (!client_fcrdns_.empty()
+        && (server_identity_ != client_fcrdns_.front())) {
       error_msg = "liar, claimed to be us";
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
@@ -1190,7 +1208,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
-  if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_)) {
+  if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_.front())) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
   else if (!verify_sender_domain_(sender.domain(), error_msg)) {

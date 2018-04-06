@@ -1,5 +1,7 @@
 #include <chrono>
 #include <functional>
+#include <iomanip>
+#include <regex>
 #include <string>
 
 #include <openssl/err.h>
@@ -12,237 +14,14 @@
 
 #include <glog/logging.h>
 
+#include "DNS.hpp"
 #include "POSIX.hpp"
 #include "TLS-OpenSSL.hpp"
 #include "osutil.hpp"
 
-TLS::TLS(std::function<void(void)> read_hook)
-  : read_hook_(read_hook)
-{
-}
-
-TLS::~TLS()
-{
-  if (ssl_) {
-    SSL_free(ssl_);
-  }
-  if (ctx_) {
-    SSL_CTX_free(ctx_);
-  }
-}
-
-struct session_context {
-  int verify_depth{10};
-  bool verbose_mode{true};
-  bool always_continue{true};
-};
-
-static int session_context_index = -1;
-
-static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
-{
-  auto const cert = X509_STORE_CTX_get_current_cert(ctx);
-  auto err = X509_STORE_CTX_get_error(ctx);
-
-  auto const ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-
-  CHECK_GE(session_context_index, 0);
-
-  auto const mydata = reinterpret_cast<session_context*>(
-      SSL_get_ex_data(ssl, session_context_index));
-
-  auto const depth = X509_STORE_CTX_get_error_depth(ctx);
-
-  // auto max_depth = SSL_get_verify_depth(ssl) - 1;
-
-  char buf[256];
-  X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
-
-  if (depth > mydata->verify_depth) {
-    preverify_ok = 0;
-    err = X509_V_ERR_CERT_CHAIN_TOO_LONG;
-    X509_STORE_CTX_set_error(ctx, err);
-  }
-  if (!preverify_ok) {
-    LOG(INFO) << "verify error:num=" << err << ':'
-              << X509_verify_cert_error_string(err) << ": depth=" << depth
-              << ':' << buf;
-  }
-  else if (mydata->verbose_mode) {
-    LOG(INFO) << "depth=" << depth << ':' << buf;
-  }
-
-  if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
-    if (cert) {
-      X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
-      LOG(INFO) << "issuer=" << buf;
-    }
-    else {
-      LOG(INFO) << "issuer=<unknown>";
-    }
-  }
-
-  if (mydata->always_continue)
-    return 1;
-
-  return preverify_ok;
-}
-
-bool TLS::starttls_client(int fd_in,
-                          int fd_out,
-                          std::chrono::milliseconds timeout)
-{
-  SSL_load_error_strings();
-  SSL_library_init();
-
-  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
-
-  auto const method = CHECK_NOTNULL(SSLv23_client_method());
-  ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
-
-  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
-  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
-
-  auto const config_path = osutil::get_config_dir();
-
-  auto const cert_path = config_path / cert_fn;
-  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
-  auto cert_path_str = cert_path.string();
-  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path_str.c_str()) > 0)
-      << "Can't load certificate chain file \"" << cert_path << "\"";
-
-  auto const key_path = config_path / key_fn;
-  CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
-  auto const key_path_str = key_path.string();
-  CHECK(
-      SSL_CTX_use_PrivateKey_file(ctx_, key_path_str.c_str(), SSL_FILETYPE_PEM)
-      > 0)
-      << "Can't load private key file \"" << key_path_str << "\"";
-
-  CHECK(SSL_CTX_check_private_key(ctx_))
-      << "Private key does not match the public certificate";
-
-  session_context context;
-  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
-
-  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
-                     verify_callback);
-
-  ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
-  SSL_set_rfd(ssl_, fd_in);
-  SSL_set_wfd(ssl_, fd_out);
-
-  if (session_context_index < 0) {
-    session_context_index
-        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-  }
-  SSL_set_ex_data(ssl_, session_context_index, &context);
-
-  using namespace std::chrono;
-  auto start = system_clock::now();
-
-  int rc;
-  while ((rc = SSL_connect(ssl_)) < 0) {
-
-    auto now = system_clock::now();
-
-    CHECK(now < (start + timeout)) << "starttls timed out";
-
-    auto time_left = duration_cast<milliseconds>((start + timeout) - now);
-
-    switch (SSL_get_error(ssl_, rc)) {
-    case SSL_ERROR_WANT_READ:
-      CHECK(POSIX::input_ready(fd_in, time_left))
-          << "starttls timed out on input_ready";
-      continue; // try SSL_accept again
-
-    case SSL_ERROR_WANT_WRITE:
-      CHECK(POSIX::output_ready(fd_out, time_left))
-          << "starttls timed out on output_ready";
-      continue; // try SSL_accept again
-
-    case SSL_ERROR_SYSCALL:
-      LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
-      [[fallthrough]];
-
-    default:
-      ssl_error();
-      return false;
-    }
-  }
-  return true;
-}
-
-bool TLS::starttls_server(int fd_in,
-                          int fd_out,
-                          std::chrono::milliseconds timeout)
-{
-  SSL_load_error_strings();
-  SSL_library_init();
-
-  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
-
-  auto const method = CHECK_NOTNULL(SSLv23_server_method());
-  ctx_ = CHECK_NOTNULL(SSL_CTX_new(method));
-
-  SSL_CTX_set_options(ctx_, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
-  CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx_), 1);
-
-  // <https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37376.pdf>
-
-  // Shooting for ECDHE-RSA-AES128-GCM-SHA256, since OpenSSL will pick
-  // the larger AES given the option, we remove them.
-
-  // // clang-format off
-  // char const* cipher_list
-  //     = "ECDHE-RSA-AES128-GCM-SHA256:"
-  //       "ECDHE-ECDSA-AES128-GCM-SHA256:"
-  //       // "ECDHE-RSA-AES256-GCM-SHA384:"
-  //       // "ECDHE-ECDSA-AES256-GCM-SHA384:"
-  //       "DHE-RSA-AES128-GCM-SHA256:"
-  //       "kEDH+AESGCM:"
-  //       "ECDHE-RSA-AES128-SHA256:"
-  //       "ECDHE-ECDSA-AES128-SHA256:"
-  //       "ECDHE-RSA-AES128-SHA:"
-  //       "ECDHE-ECDSA-AES128-SHA:"
-  //       // "ECDHE-RSA-AES256-SHA384:"
-  //       // "ECDHE-ECDSA-AES256-SHA384:"
-  //       // "ECDHE-RSA-AES256-SHA:"
-  //       // "ECDHE-ECDSA-AES256-SHA:"
-  //       "DHE-RSA-AES128-SHA256:"
-  //       "DHE-RSA-AES128-SHA:"
-  //       // "DHE-RSA-AES256-SHA256:"
-  //       // "DHE-RSA-AES256-SHA:"
-  //       "!aNULL:!eNULL:!EXPORT:!DSS:!DES:!RC4:!3DES:!MD5:!PSK";
-  // // clang-format on
-
-  // CHECK(SSL_CTX_set_cipher_list(ctx_, cipher_list) > 0)
-  //     << "Can't set cipher list to " << cipher_list;
-
-  auto const config_path = osutil::get_config_dir();
-
-  auto const cert_path = config_path / cert_fn;
-  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
-  auto const cert_path_str = cert_path.string();
-  CHECK(SSL_CTX_use_certificate_chain_file(ctx_, cert_path_str.c_str()) > 0)
-      << "Can't load certificate chain file \"" << cert_path << "\"";
-
-  auto const key_path = config_path / key_fn;
-  CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
-  auto const key_path_str = key_path.string();
-  CHECK(
-      SSL_CTX_use_PrivateKey_file(ctx_, key_path_str.c_str(), SSL_FILETYPE_PEM)
-      > 0)
-      << "Can't load private key file \"" << key_fn << "\"";
-
-  CHECK(SSL_CTX_check_private_key(ctx_))
-      << "Private key does not match the public certificate";
-
-  // <https://wiki.mozilla.org/Security/Server_Side_TLS#DHE_handshake_and_dhparam>
-  constexpr char ffdhe4096[] = R"(
+// <https://tools.ietf.org/html/rfc7919>
+// <https://wiki.mozilla.org/Security/Server_Side_TLS#DHE_handshake_and_dhparam>
+constexpr char ffdhe4096[] = R"(
 -----BEGIN DH PARAMETERS-----
 MIICCAKCAgEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
 +8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a
@@ -258,6 +37,355 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 -----END DH PARAMETERS-----
 )";
 
+// convert binary input into a std::string of hex digits
+
+auto bin2hexstring(uint8_t const* data, size_t length)
+{
+  std::string ret;
+  ret.reserve(2 * length + 1);
+
+  for (size_t n = 0u; n < length; ++n) {
+    auto const ch = data[n];
+
+    auto const lo = ch & 0xF;
+    auto const hi = (ch >> 4) & 0xF;
+
+    auto constexpr hex_digits = "0123456789abcdef";
+
+    ret += hex_digits[hi];
+    ret += hex_digits[lo];
+  }
+
+  return ret;
+}
+
+auto list_directory(fs::path const& path, std::string const& pattern)
+{
+  std::vector<fs::path> ret;
+
+#if defined(__APPLE__) || defined(_WIN32)
+  auto const traits
+      = std::regex_constants::ECMAScript | std::regex_constants::icase;
+#else
+  auto const traits = std::regex_constants::ECMAScript;
+#endif
+
+  std::regex const pattern_regex(pattern, traits);
+
+  for (auto const& it : fs::directory_iterator(path)) {
+    auto const it_filename = it.path().filename().string();
+    std::smatch matches;
+    if (std::regex_match(it_filename, matches, pattern_regex)) {
+      ret.push_back(it.path());
+    }
+  }
+
+  return ret;
+}
+
+TLS::TLS(std::function<void(void)> read_hook)
+  : read_hook_(read_hook)
+{
+}
+
+TLS::per_cert_ctx::~per_cert_ctx()
+{
+  if (ctx_) {
+    SSL_CTX_free(ctx_);
+  }
+}
+
+TLS::~TLS()
+{
+  if (ssl_) {
+    SSL_free(ssl_);
+  }
+}
+
+struct session_context {
+};
+
+static int session_context_index = -1;
+
+static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
+{
+  auto const cert = X509_STORE_CTX_get_current_cert(ctx);
+  auto err = X509_STORE_CTX_get_error(ctx);
+
+  auto const ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+
+  CHECK_GE(session_context_index, 0);
+
+  auto const unused = reinterpret_cast<session_context*>(
+      SSL_get_ex_data(ssl, session_context_index));
+
+  auto const depth = X509_STORE_CTX_get_error_depth(ctx);
+
+  char buf[256];
+  X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
+
+  if (depth > Config::cert_verify_depth) {
+    preverify_ok = 0;
+    err = X509_V_ERR_CERT_CHAIN_TOO_LONG;
+    X509_STORE_CTX_set_error(ctx, err);
+  }
+  if (!preverify_ok) {
+    LOG(INFO) << "verify error:num=" << err << ':'
+              << X509_verify_cert_error_string(err) << ": depth=" << depth
+              << ':' << buf;
+  }
+  else {
+    LOG(INFO) << "preverify_ok; depth=" << depth << " subject_name=«" << buf
+              << "»";
+  }
+
+  if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
+    if (cert) {
+      X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
+      LOG(INFO) << "issuer=" << buf;
+    }
+    else {
+      LOG(INFO) << "issuer=<unknown>";
+    }
+  }
+
+  return 1; // always continue
+}
+
+static int ssl_servername_callback(SSL* s, int* ad, void* arg)
+{
+  auto unused = static_cast<std::vector<TLS::per_cert_ctx>*>(arg);
+
+  auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
+
+  LOG(INFO) << "**** servername == " << servername;
+
+  return SSL_TLSEXT_ERR_OK;
+}
+
+bool TLS::starttls_client(int fd_in,
+                          int fd_out,
+                          char const* hostname,
+                          uint16_t port,
+                          std::chrono::milliseconds timeout)
+{
+  SSL_load_error_strings();
+  SSL_library_init();
+
+  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
+
+  auto const method = CHECK_NOTNULL(SSLv23_client_method());
+
+  {
+    auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+
+    // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    CHECK_GT(SSL_CTX_dane_enable(ctx), 0);
+
+    // you'd think if it's the default, you'd not have to call this
+    CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
+
+    auto const config_path = osutil::get_config_dir();
+
+    auto const cert_path = config_path / Config::cert_fn;
+    CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
+    auto const& cert_path_str = cert_path.string();
+
+    CHECK(SSL_CTX_use_certificate_chain_file(ctx, cert_path_str.c_str()) > 0)
+        << "Can't load certificate chain file \"" << cert_path << "\"";
+
+    auto const key_path = config_path / Config::key_fn;
+    CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
+    auto const key_path_str = key_path.string();
+
+    CHECK(
+        SSL_CTX_use_PrivateKey_file(ctx, key_path_str.c_str(), SSL_FILETYPE_PEM)
+        > 0)
+        << "Can't load private key file \"" << key_path_str << "\"";
+
+    CHECK(SSL_CTX_check_private_key(ctx))
+        << "Private key does not match the public certificate";
+
+    SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                       verify_callback);
+
+    cert_ctx_.emplace_back(ctx);
+  }
+
+  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx()));
+
+  SSL_set_rfd(ssl_, fd_in);
+  SSL_set_wfd(ssl_, fd_out);
+
+  // CHECK_EQ(SSL_set_tlsext_host_name(ssl_, hostname), 1);
+  // same as:
+  // CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
+  //                   TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
+  //          1);
+  // LOG(INFO) << "SSL_set_tlsext_host_name == " << hostname;
+
+  // For each TLSA
+
+  std::ostringstream tlsa;
+
+  // tlsa << '_' << port << "._tcp." << hostname;
+  tlsa << "_25._tcp." << hostname;
+
+  DNS::Resolver res;
+  DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
+
+  if (q.nx_domain()) {
+    LOG(WARNING) << "TLSA data not found";
+  }
+
+  if (q.bogus_or_indeterminate()) {
+    LOG(WARNING) << "TLSA data bogus_or_indeterminate";
+  }
+
+  if (!q.authentic_data()) {
+    LOG(WARNING) << "TLSA meaningless without DNSSEC";
+  }
+
+  DNS::RR_list rrlst(q);
+
+  auto tlsa_rrs = rrlst.get_records();
+
+  LOG(INFO) << "tlsa_rrs.size() == " << tlsa_rrs.size();
+
+  if (tlsa_rrs.size()) {
+    CHECK_GE(SSL_dane_enable(ssl_, hostname), 0) << "SSL_dane_enable() failed";
+    LOG(INFO) << "SSL_dane_enable(ssl_, " << hostname << ")";
+  }
+
+  auto usable_TLSA_records = 0;
+
+  for (auto const& tlsa_rr : tlsa_rrs) {
+    if (std::holds_alternative<DNS::RR_TLSA>(tlsa_rr)) {
+      auto const rp = std::get<DNS::RR_TLSA>(tlsa_rr);
+      auto data = rp.assoc_data();
+      auto rc = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
+                                  rp.matching_type(), data.data(), data.size());
+
+      if (rc < 0) {
+        auto const cp = bin2hexstring(data.data(), data.size());
+        LOG(ERROR) << "SSL_dane_tlsa_add() failed.";
+        LOG(ERROR) << "failed record: " << rp.cert_usage() << " "
+                   << rp.selector() << " " << rp.matching_type() << " " << cp;
+      }
+      else if (rc == 0) {
+        auto const cp = bin2hexstring(data.data(), data.size());
+        LOG(ERROR) << "unusable TLSA record: " << rp.cert_usage() << " "
+                   << rp.selector() << " " << rp.matching_type() << " " << cp;
+      }
+      else {
+        // auto const cp = bin2hexstring(data.data(), data.size());
+        // LOG(INFO) << "added TLSA record: " << rp.cert_usage() << " "
+        //           << rp.selector() << " " << rp.matching_type() << " " << cp;
+        ++usable_TLSA_records;
+      }
+    }
+  }
+
+  if (session_context_index < 0) {
+    session_context_index
+        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+  }
+  session_context context;
+  SSL_set_ex_data(ssl_, session_context_index, &context);
+
+  using namespace std::chrono;
+  auto start = system_clock::now();
+
+  ERR_clear_error();
+
+  int rc;
+  while ((rc = SSL_connect(ssl_)) < 0) {
+
+    auto now = system_clock::now();
+
+    CHECK(now < (start + timeout)) << "starttls timed out";
+
+    auto time_left = duration_cast<milliseconds>((start + timeout) - now);
+
+    switch (SSL_get_error(ssl_, rc)) {
+    case SSL_ERROR_WANT_READ:
+      CHECK(POSIX::input_ready(fd_in, time_left))
+          << "starttls timed out on input_ready";
+      ERR_clear_error();
+      continue; // try SSL_accept again
+
+    case SSL_ERROR_WANT_WRITE:
+      CHECK(POSIX::output_ready(fd_out, time_left))
+          << "starttls timed out on output_ready";
+      ERR_clear_error();
+      continue; // try SSL_accept again
+
+    case SSL_ERROR_SYSCALL:
+      LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
+      [[fallthrough]];
+
+    default:
+      ssl_error();
+      return false;
+    }
+  }
+
+  if (SSL_get_verify_result(ssl_) == X509_V_OK) {
+    LOG(INFO) << "server certificate verified";
+    verified_ = true;
+
+    char const* const peername = SSL_get0_peername(ssl_);
+    if (peername != nullptr) {
+      // Name checks were in scope and matched the peername
+      LOG(INFO) << "verified peername: " << peername;
+    }
+    else {
+      LOG(INFO) << "no verified peername";
+    }
+
+    EVP_PKEY* mspki = nullptr;
+    int depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
+    if (depth >= 0) {
+
+      uint8_t usage, selector, mtype;
+      const unsigned char* certdata;
+      size_t certdata_len;
+
+      SSL_get0_dane_tlsa(ssl_, &usage, &selector, &mtype, &certdata,
+                         &certdata_len);
+
+      LOG(INFO) << "DANE TLSA " << unsigned(usage) << " " << unsigned(selector)
+                << " " << unsigned(mtype) << " [" << bin2hexstring(certdata, 6)
+                << "...] "
+                << ((mspki != nullptr) ? "TA public key verified certificate"
+                                       : depth ? "matched TA certificate"
+                                               : "matched EE certificate")
+                << " at depth " << depth;
+    }
+  }
+  else {
+    LOG(WARNING) << "server certificate failed to verify";
+  }
+
+  return true;
+}
+
+bool TLS::starttls_server(int fd_in,
+                          int fd_out,
+                          std::chrono::milliseconds timeout)
+{
+  SSL_load_error_strings();
+  SSL_library_init();
+
+  CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
+
+  auto const method = CHECK_NOTNULL(SSLv23_server_method());
+
+  auto const config_path = osutil::get_config_dir();
+
   auto const bio
       = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
   auto const dh
@@ -265,28 +393,74 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
   auto const ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
 
+  auto const certs = list_directory(config_path, Config::cert_fn_re);
+
+  CHECK_GE(certs.size(), 1) << "no server certs found";
+
+  for (auto const& cert : certs) {
+
+    auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+
+    // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    // you'd think if it's the default, you'd not have to call this
+    CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
+
+    CHECK_GT(SSL_CTX_use_certificate_chain_file(ctx, cert.string().c_str()), 0)
+        << "Can't load certificate chain file " << cert;
+
+    auto const key = fs::path(cert).replace_extension(".key");
+
+    if (fs::exists(key)) {
+
+      CHECK_GT(SSL_CTX_use_PrivateKey_file(ctx, key.string().c_str(),
+                                           SSL_FILETYPE_PEM),
+               0)
+          << "Can't load private key file " << key;
+
+      CHECK(SSL_CTX_check_private_key(ctx))
+          << "SSL_CTX_check_private_key failed for " << key;
+    }
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 
-  SSL_CTX_set_tmp_dh(ctx_, dh);
-  SSL_CTX_set_tmp_ecdh(ctx_, ecdh);
+    SSL_CTX_set_tmp_dh(ctx, dh);
+    SSL_CTX_set_tmp_ecdh(ctx, ecdh);
 
 #pragma GCC diagnostic pop
+
+    SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
+
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                       verify_callback);
+
+    // SSL_CTX_set_tlsext_servername_callback(ctx, ssl_servername_callback);
+    // same as:
+    SSL_CTX_callback_ctrl(
+        ctx, SSL_CTRL_SET_TLSEXT_SERVERNAME_CB,
+        reinterpret_cast<void (*)()>(ssl_servername_callback));
+
+    // SSL_CTX_set_tlsext_servername_arg(ctx, &cert_ctx_);
+    // same as:
+    SSL_CTX_ctrl(ctx, SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG, 0,
+                 reinterpret_cast<void*>(&cert_ctx_));
+
+    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
+        << "unable to enable DANE on SSL context";
+
+    SSL_CTX_dane_set_flags(ctx, DANE_FLAG_NO_DANE_EE_NAMECHECKS);
+
+    cert_ctx_.emplace_back(ctx);
+  }
 
   DH_free(dh);
   BIO_free(bio);
 
   EC_KEY_free(ecdh);
 
-  // CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx_, "!SSLv2:SSLv3:TLSv1"));
+  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx()));
 
-  auto context{session_context{}};
-  SSL_CTX_set_verify_depth(ctx_, context.verify_depth + 1);
-
-  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
-                     verify_callback);
-
-  ssl_ = CHECK_NOTNULL(SSL_new(ctx_));
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
@@ -294,10 +468,13 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     session_context_index
         = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
+  session_context context;
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   using namespace std::chrono;
   auto const start = system_clock::now();
+
+  ERR_clear_error();
 
   int rc;
   while ((rc = SSL_accept(ssl_)) < 0) {
@@ -313,11 +490,13 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
           << "starttls timed out on input_ready";
+      ERR_clear_error();
       continue; // try SSL_accept again
 
     case SSL_ERROR_WANT_WRITE:
       CHECK(POSIX::output_ready(fd_out, time_left))
           << "starttls timed out on output_ready";
+      ERR_clear_error();
       continue; // try SSL_accept again
 
     case SSL_ERROR_SYSCALL:
@@ -330,14 +509,45 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
     }
   }
 
-  if (SSL_get_peer_certificate(ssl_)) {
+  if (auto const peer_cert = SSL_get_peer_certificate(ssl_); peer_cert) {
     if (SSL_get_verify_result(ssl_) == X509_V_OK) {
       LOG(INFO) << "client certificate verified";
       verified_ = true;
+
+      char const* const peername = SSL_get0_peername(ssl_);
+      if (peername != nullptr) {
+        // name checks were in scope and matched the peername
+        LOG(INFO) << "verified peername: " << peername;
+      }
+      else {
+        LOG(INFO) << "no verified peername";
+      }
+
+      EVP_PKEY* mspki = nullptr;
+      int depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
+      if (depth >= 0) {
+
+        uint8_t usage, selector, mtype;
+        const unsigned char* certdata;
+        size_t certdata_len;
+
+        SSL_get0_dane_tlsa(ssl_, &usage, &selector, &mtype, &certdata,
+                           &certdata_len);
+
+        LOG(INFO) << "DANE TLSA " << usage << " " << selector << " " << mtype
+                  << " [" << bin2hexstring(certdata, 6) << "...] "
+                  << ((mspki != nullptr) ? "TA public key verified certificate"
+                                         : depth ? "matched TA certificate"
+                                                 : "matched EE certificate")
+                  << " at depth " << depth;
+      }
     }
     else {
       LOG(WARNING) << "client certificate failed to verify";
     }
+  }
+  else {
+    LOG(INFO) << "no client certificate";
   }
 
   return true;
@@ -347,9 +557,10 @@ std::string TLS::info() const
 {
   auto info{std::ostringstream{}};
 
+  info << SSL_get_version(ssl_);
   auto const c = SSL_get_current_cipher(ssl_);
   if (c) {
-    info << "version=" << SSL_CIPHER_get_version(c);
+    info << " version=" << SSL_CIPHER_get_version(c);
     info << " cipher=" << SSL_CIPHER_get_name(c);
     int alg_bits;
     int bits = SSL_CIPHER_get_bits(c, &alg_bits);
@@ -373,6 +584,8 @@ std::streamsize TLS::io_tls_(char const* fnm,
   auto const start = system_clock::now();
   auto const end_time = start + timeout;
 
+  ERR_clear_error();
+
   int n_ret;
   while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
          < 0) {
@@ -390,8 +603,10 @@ std::streamsize TLS::io_tls_(char const* fnm,
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
       read_hook_();
-      if (POSIX::input_ready(fd, time_left))
+      if (POSIX::input_ready(fd, time_left)) {
+        ERR_clear_error();
         continue; // try io_fnc again
+      }
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
@@ -400,8 +615,10 @@ std::streamsize TLS::io_tls_(char const* fnm,
     case SSL_ERROR_WANT_WRITE: {
       int fd = SSL_get_wfd(ssl_);
       CHECK_NE(-1, fd);
-      if (POSIX::output_ready(fd, time_left))
+      if (POSIX::output_ready(fd, time_left)) {
+        ERR_clear_error();
         continue; // try io_fnc again
+      }
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
