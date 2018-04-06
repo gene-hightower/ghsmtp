@@ -138,6 +138,12 @@ std::vector<std::string> fcrdns(std::string_view addr)
                         != addrs.end();
                });
 
+  // Sort by name length: short to long.
+  std::sort(fcrdns.begin(), fcrdns.end(),
+            [](std::string const& a, std::string const& b) {
+              return a.length() < b.length();
+            });
+
   return fcrdns;
 }
 } // namespace IP4

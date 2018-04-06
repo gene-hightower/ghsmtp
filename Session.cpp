@@ -997,12 +997,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_fcrdns_.emplace_back(fcr);
   }
 
-  // Sort by name length: short to long.
-  std::sort(client_fcrdns_.begin(), client_fcrdns_.end(),
-            [](Domain const& a, Domain const& b) {
-              return a.lc().length() < b.lc().length();
-            });
-
   if (!client_fcrdns_.empty()) {
     client_
         = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
