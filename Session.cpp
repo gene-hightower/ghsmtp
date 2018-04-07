@@ -1010,6 +1010,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       if (white_.lookup(client_fcrdns.lc())) {
         LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
+        break;
       }
 
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.lc())};
@@ -1022,6 +1023,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         if (white_.lookup(tld)) {
           LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
           fcrdns_whitelisted_ = true;
+          break;
         }
       }
     }
