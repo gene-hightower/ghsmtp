@@ -19,6 +19,7 @@ DEFINE_bool(bare_lf, false, "send a bare LF");
 DEFINE_bool(huge_size, false, "attempt with huge size");
 DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(nosend, false, "don't actually send any mail");
+DEFINE_bool(noconn, false, "don't connect to any host");
 DEFINE_bool(rawdog,
             false,
             "send the body exactly as is, don't fix CRLF issues "
@@ -904,7 +905,12 @@ std::vector<Domain> get_receivers(DNS::Resolver& res, Mailbox const& to_mbx)
 
   auto const& domain = to_mbx.domain().lc();
 
-  auto mxs{res.get_records(DNS::RR_type::MX, domain)};
+  auto q{DNS::Query{res, DNS::RR_type::MX, DNS::Domain{domain}}};
+  if (!q.authentic_data()) {
+    LOG(INFO) << "MX records can't be authenticated for domain " << domain;
+  }
+  auto rrlst{DNS::RR_list{q}};
+  auto mxs{rrlst.get_records()};
 
   auto const nmx = std::count_if(mxs.begin(), mxs.end(), [](DNS::RR const& rr) {
     return std::holds_alternative<DNS::RR_MX>(rr);
@@ -1519,6 +1525,11 @@ int main(int argc, char* argv[])
   for (auto const& receiver : receivers) {
     LOG(INFO) << "trying " << receiver << ":" << FLAGS_service;
 
+    if (FLAGS_noconn) {
+      LOG(INFO) << "skipping";
+      continue;
+    }
+
     auto fd = conn(res, receiver, port);
     if (fd == -1) {
       LOG(WARNING) << "bad connection, skipping";
@@ -1532,5 +1543,5 @@ int main(int argc, char* argv[])
     close(fd);
   }
 
-  LOG(FATAL) << "we ran out of hosts to try";
+  LOG(WARNING) << "we ran out of hosts to try";
 }
