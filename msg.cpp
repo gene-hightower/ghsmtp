@@ -1600,11 +1600,12 @@ struct action<message> {
     ctx.dmp.store_from_domain(from_domain.ascii().c_str());
 
     ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
-      // LOG(INFO) << "DKIM check for " << domain
-      //           << (passed ? " passed" : " failed");
+      LOG(INFO) << "DKIM check for " << domain
+                << (passed ? " passed" : " failed");
 
       int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                           : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+
       ctx.dmp.store_dkim(domain, result, nullptr);
     });
 
