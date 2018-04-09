@@ -5,12 +5,10 @@
 #include <string>
 
 #include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/ssl.h>
-
 #include <openssl/rand.h>
 
-#include <openssl/opensslv.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 #include <glog/logging.h>
 
@@ -110,6 +108,9 @@ static int session_context_index = -1;
 static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 {
   auto const cert = X509_STORE_CTX_get_current_cert(ctx);
+  if (cert == nullptr)
+    return 1;
+
   auto err = X509_STORE_CTX_get_error(ctx);
 
   auto const ssl = reinterpret_cast<SSL*>(
@@ -159,7 +160,12 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
-  LOG(INFO) << "**** servername == " << servername;
+  if (servername && *servername) {
+    LOG(INFO) << "**** servername == " << servername;
+  }
+  else {
+    LOG(INFO) << "no servername";
+  }
 
   return SSL_TLSEXT_ERR_OK;
 }
@@ -182,7 +188,8 @@ bool TLS::starttls_client(int fd_in,
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
-    CHECK_GT(SSL_CTX_dane_enable(ctx), 0);
+    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
+        << "unable to enable DANE on SSL context";
 
     // you'd think if it's the default, you'd not have to call this
     CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
@@ -220,15 +227,6 @@ bool TLS::starttls_client(int fd_in,
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
-  // CHECK_EQ(SSL_set_tlsext_host_name(ssl_, hostname), 1);
-  // same as:
-  // CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
-  //                   TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
-  //          1);
-  // LOG(INFO) << "SSL_set_tlsext_host_name == " << hostname;
-
-  // For each TLSA
-
   std::ostringstream tlsa;
 
   // tlsa << '_' << port << "._tcp." << hostname;
@@ -245,10 +243,6 @@ bool TLS::starttls_client(int fd_in,
     LOG(WARNING) << "TLSA data bogus_or_indeterminate";
   }
 
-  if (!q.authentic_data()) {
-    LOG(WARNING) << "TLSA meaningless without DNSSEC";
-  }
-
   DNS::RR_list rrlst(q);
 
   auto tlsa_rrs = rrlst.get_records();
@@ -256,6 +250,10 @@ bool TLS::starttls_client(int fd_in,
   LOG(INFO) << "tlsa_rrs.size() == " << tlsa_rrs.size();
 
   if (tlsa_rrs.size()) {
+    if (!q.authentic_data()) {
+      LOG(ERROR) << "TLSA meaningless without DNSSEC";
+    }
+
     CHECK_GE(SSL_dane_enable(ssl_, hostname), 0) << "SSL_dane_enable() failed";
     LOG(INFO) << "SSL_dane_enable(ssl_, " << hostname << ")";
   }
@@ -288,6 +286,13 @@ bool TLS::starttls_client(int fd_in,
       }
     }
   }
+
+  // CHECK_EQ(SSL_set_tlsext_host_name(ssl_, hostname), 1);
+  // same as:
+  // CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
+  //                   TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
+  //          1);
+  // LOG(INFO) << "SSL_set_tlsext_host_name == " << hostname;
 
   if (session_context_index < 0) {
     session_context_index
@@ -446,10 +451,63 @@ bool TLS::starttls_server(int fd_in,
     SSL_CTX_ctrl(ctx, SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG, 0,
                  reinterpret_cast<void*>(&cert_ctx_));
 
+    // SSL_CTX_dane_set_flags(ctx, DANE_FLAG_NO_DANE_EE_NAMECHECKS);
+
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
         << "unable to enable DANE on SSL context";
 
-    SSL_CTX_dane_set_flags(ctx, DANE_FLAG_NO_DANE_EE_NAMECHECKS);
+    //.......................................................
+
+    auto const x509 = SSL_CTX_get0_certificate(ctx);
+    if (x509) {
+      char buf[256];
+
+      X509_NAME_oneline(X509_get_subject_name(x509), buf, sizeof(buf));
+      LOG(INFO) << "**** X509_get_subject_name == " << buf;
+
+      X509_NAME* subj = X509_get_subject_name(x509);
+
+      for (int k = 0; k < X509_NAME_entry_count(subj); ++k) {
+        X509_NAME_ENTRY* e = X509_NAME_get_entry(subj, k);
+        ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
+        auto str = ASN1_STRING_get0_data(d);
+        LOG(INFO) << "str " << k << " " << str;
+      }
+
+      X509_NAME_oneline(X509_get_issuer_name(x509), buf, sizeof(buf));
+      LOG(INFO) << "**** X509_get_issuer_name == " << buf;
+
+      auto ext_stack = X509_get0_extensions(x509);
+      // same as? STACK_OF(X509_EXTENSION)* ext_stack =
+      // x509->cert_info->extensions;
+
+      LOG(INFO) << "sk_X509_EXTENSION_num(ext_stack) == "
+                << sk_X509_EXTENSION_num(ext_stack);
+
+      for (int i = 0; i < sk_X509_EXTENSION_num(ext_stack); i++) {
+
+        X509_EXTENSION* ext
+            = CHECK_NOTNULL(sk_X509_EXTENSION_value(ext_stack, i));
+
+        ASN1_OBJECT* asn1_obj = CHECK_NOTNULL(X509_EXTENSION_get_object(ext));
+
+        unsigned nid = OBJ_obj2nid(asn1_obj);
+        if (nid == NID_undef) {
+          // no lookup found for the provided OID so nid came back as undefined.
+          char extname[256];
+          OBJ_obj2txt(extname, sizeof(extname), asn1_obj, 1);
+          LOG(INFO) << "extension name is " << extname;
+        }
+        else {
+          // the OID translated to a NID which implies that the OID has a known
+          // sn/ln
+          const char* c_ext_name = CHECK_NOTNULL(OBJ_nid2ln(nid));
+          LOG(INFO) << "extension name is " << c_ext_name;
+        }
+      }
+    }
+
+    //.......................................................
 
     cert_ctx_.emplace_back(ctx);
   }
