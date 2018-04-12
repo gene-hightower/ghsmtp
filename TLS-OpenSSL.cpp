@@ -160,18 +160,26 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 
   if (servername && *servername) {
     LOG(INFO) << "servername requested " << servername;
-    for (auto const& ctx : *cert_ctx) {
-      if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
-          c != ctx.cn.end()) {
-        LOG(INFO) << "found match, switching context";
-        SSL_set_SSL_CTX(s, ctx.ctx);
-        return SSL_TLSEXT_ERR_OK;
-      }
+    if (cert_ctx->count() == 1) {
+      LOG(INFO) << "we have just the one cert, so whateves";
+      return SSL_TLSEXT_ERR_OK;
     }
-    LOG(INFO) << "servername not found";
+    else {
+      for (auto const& ctx : *cert_ctx) {
+        if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
+            c != ctx.cn.end()) {
+          LOG(INFO) << "found match, switching context";
+          SSL_set_SSL_CTX(s, ctx.ctx);
+          return SSL_TLSEXT_ERR_OK;
+        }
+      }
+      LOG(INFO) << "servername not found";
+      return SSL_TLSEXT_ERR_ALERT_WARNING;
+    }
   }
 
-  return SSL_TLSEXT_ERR_ALERT_WARNING;
+  LOG(INFO) << "no specific server name requested";
+  return SSL_TLSEXT_ERR_OK;
 }
 
 bool TLS::starttls_client(int fd_in,
@@ -526,7 +534,7 @@ bool TLS::starttls_server(int fd_in,
               reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
 
-          LOG(INFO) << "email or uri ignored " << str;
+          LOG(INFO) << "email or uri alt name " << str;
         }
         else if (gen->type == GEN_DNS) {
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
@@ -536,7 +544,7 @@ bool TLS::starttls_server(int fd_in,
               ASN1_STRING_length(asn1_str));
 
           if (find(cn.begin(), cn.end(), str) == cn.end()) {
-            LOG(INFO) << "additional name found " << str;
+            LOG(INFO) << "additional name " << str;
             cn.emplace_back(str);
           }
           else {
