@@ -86,15 +86,13 @@ TLS::TLS(std::function<void(void)> read_hook)
 {
 }
 
-TLS::per_cert_ctx::~per_cert_ctx()
-{
-  if (ctx_) {
-    SSL_CTX_free(ctx_);
-  }
-}
-
 TLS::~TLS()
 {
+  for (auto&& ctx : cert_ctx_) {
+    if (ctx.ctx) {
+      SSL_CTX_free(ctx.ctx);
+    }
+  }
   if (ssl_) {
     SSL_free(ssl_);
   }
@@ -156,18 +154,24 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
 static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 {
-  auto unused = static_cast<std::vector<TLS::per_cert_ctx>*>(arg);
+  auto cert_ctx = static_cast<std::vector<TLS::per_cert_ctx>*>(arg);
 
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
-    LOG(INFO) << "**** servername == " << servername;
-  }
-  else {
-    LOG(INFO) << "no servername";
+    LOG(INFO) << "servername requested " << servername;
+    for (auto const& ctx : *cert_ctx) {
+      if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
+          c != ctx.cn.end()) {
+        LOG(INFO) << "found match, switching context";
+        SSL_set_SSL_CTX(s, ctx.ctx);
+        return SSL_TLSEXT_ERR_OK;
+      }
+    }
+    LOG(INFO) << "servername not found";
   }
 
-  return SSL_TLSEXT_ERR_OK;
+  return SSL_TLSEXT_ERR_ALERT_WARNING;
 }
 
 bool TLS::starttls_client(int fd_in,
@@ -185,6 +189,7 @@ bool TLS::starttls_client(int fd_in,
 
   {
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+    std::vector<Domain> cn;
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
@@ -219,24 +224,23 @@ bool TLS::starttls_client(int fd_in,
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                        verify_callback);
 
-    cert_ctx_.emplace_back(ctx);
+    cert_ctx_.emplace_back(ctx, cn);
   }
 
-  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx()));
+  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
 
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
   std::ostringstream tlsa;
 
-  // tlsa << '_' << port << "._tcp." << hostname;
-  tlsa << "_25._tcp." << hostname;
+  tlsa << '_' << port << "._tcp." << hostname;
 
   DNS::Resolver res;
   DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
 
   if (q.nx_domain()) {
-    LOG(WARNING) << "TLSA data not found";
+    LOG(INFO) << "TLSA data not found";
   }
 
   if (q.bogus_or_indeterminate()) {
@@ -257,6 +261,20 @@ bool TLS::starttls_client(int fd_in,
     CHECK_GE(SSL_dane_enable(ssl_, hostname), 0) << "SSL_dane_enable() failed";
     LOG(INFO) << "SSL_dane_enable(ssl_, " << hostname << ")";
   }
+  else {
+    CHECK_EQ(SSL_set1_host(ssl_, hostname), 1);
+
+    // SSL_set_tlsext_host_name(ssl_, hostname);
+    // same as:
+    CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
+                      TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
+             1);
+    LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << hostname
+              << ")";
+  }
+
+  // No partial label wildcards
+  SSL_set_hostflags(ssl_, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
 
   auto usable_TLSA_records = 0;
 
@@ -405,8 +423,12 @@ bool TLS::starttls_server(int fd_in,
   for (auto const& cert : certs) {
 
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+    std::vector<Domain> cn;
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
+        << "unable to enable DANE on SSL context";
 
     // you'd think if it's the default, you'd not have to call this
     CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
@@ -453,63 +475,101 @@ bool TLS::starttls_server(int fd_in,
 
     // SSL_CTX_dane_set_flags(ctx, DANE_FLAG_NO_DANE_EE_NAMECHECKS);
 
-    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
-        << "unable to enable DANE on SSL context";
-
     //.......................................................
 
     auto const x509 = SSL_CTX_get0_certificate(ctx);
     if (x509) {
-      char buf[256];
-
-      X509_NAME_oneline(X509_get_subject_name(x509), buf, sizeof(buf));
-      LOG(INFO) << "**** X509_get_subject_name == " << buf;
-
       X509_NAME* subj = X509_get_subject_name(x509);
 
-      for (int k = 0; k < X509_NAME_entry_count(subj); ++k) {
-        X509_NAME_ENTRY* e = X509_NAME_get_entry(subj, k);
+      int lastpos = -1;
+      for (;;) {
+        lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
+        if (lastpos == -1)
+          break;
+        auto e = X509_NAME_get_entry(subj, lastpos);
         ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
         auto str = ASN1_STRING_get0_data(d);
-        LOG(INFO) << "str " << k << " " << str;
+        LOG(INFO) << "cert found for " << str;
+        cn.emplace_back(reinterpret_cast<const char*>(str));
       }
 
-      X509_NAME_oneline(X509_get_issuer_name(x509), buf, sizeof(buf));
-      LOG(INFO) << "**** X509_get_issuer_name == " << buf;
+      // auto ext_stack = X509_get0_extensions(x509);
+      // for (int i = 0; i < sk_X509_EXTENSION_num(ext_stack); i++) {
+      //   X509_EXTENSION* ext
+      //       = CHECK_NOTNULL(sk_X509_EXTENSION_value(ext_stack, i));
+      //   ASN1_OBJECT* asn1_obj =
+      //   CHECK_NOTNULL(X509_EXTENSION_get_object(ext)); unsigned nid =
+      //   OBJ_obj2nid(asn1_obj); if (nid == NID_undef) {
+      //     // no lookup found for the provided OID so nid came back as
+      //     undefined. char extname[256]; OBJ_obj2txt(extname, sizeof(extname),
+      //     asn1_obj, 1); LOG(INFO) << "undef extension name is " << extname;
+      //   } else {
+      //     // the OID translated to a NID which implies that the OID has a
+      //     known
+      //     // sn/ln
+      //     const char* c_ext_name = CHECK_NOTNULL(OBJ_nid2ln(nid));
+      //     LOG(INFO) << "extension " << c_ext_name;
+      //   }
+      // }
 
-      auto ext_stack = X509_get0_extensions(x509);
-      // same as? STACK_OF(X509_EXTENSION)* ext_stack =
-      // x509->cert_info->extensions;
+      auto subject_alt_names = static_cast<GENERAL_NAMES*>(
+          X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
 
-      LOG(INFO) << "sk_X509_EXTENSION_num(ext_stack) == "
-                << sk_X509_EXTENSION_num(ext_stack);
+      for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
 
-      for (int i = 0; i < sk_X509_EXTENSION_num(ext_stack); i++) {
+        GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
 
-        X509_EXTENSION* ext
-            = CHECK_NOTNULL(sk_X509_EXTENSION_value(ext_stack, i));
+        if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
+          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-        ASN1_OBJECT* asn1_obj = CHECK_NOTNULL(X509_EXTENSION_get_object(ext));
+          std::string str(
+              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+              ASN1_STRING_length(asn1_str));
 
-        unsigned nid = OBJ_obj2nid(asn1_obj);
-        if (nid == NID_undef) {
-          // no lookup found for the provided OID so nid came back as undefined.
-          char extname[256];
-          OBJ_obj2txt(extname, sizeof(extname), asn1_obj, 1);
-          LOG(INFO) << "extension name is " << extname;
+          LOG(INFO) << "email or uri ignored " << str;
+        }
+        else if (gen->type == GEN_DNS) {
+          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+          std::string str(
+              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+              ASN1_STRING_length(asn1_str));
+
+          if (find(cn.begin(), cn.end(), str) == cn.end()) {
+            LOG(INFO) << "additional name found for " << str;
+            cn.emplace_back(str);
+          }
+          else {
+            LOG(INFO) << "dup name " << str << " ignored";
+          }
+        }
+        else if (gen->type == GEN_IPADD) {
+          unsigned char* p = gen->d.ip->data;
+          if (gen->d.ip->length == 4) {
+            std::stringstream ip;
+            ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.'
+               << unsigned(p[2]) << '.' << unsigned(p[3]);
+
+            LOG(INFO) << "alt name IP4 address " << ip.str();
+          }
+          else if (gen->d.ip->length == 16) {
+            LOG(ERROR) << "IPv6 not implemented";
+          }
+          else {
+            LOG(ERROR) << "unknown IP type";
+          }
         }
         else {
-          // the OID translated to a NID which implies that the OID has a known
-          // sn/ln
-          const char* c_ext_name = CHECK_NOTNULL(OBJ_nid2ln(nid));
-          LOG(INFO) << "extension name is " << c_ext_name;
+          LOG(ERROR) << "unknown alt name type";
         }
       }
+
+      GENERAL_NAMES_free(subject_alt_names);
+
+      //.......................................................
     }
 
-    //.......................................................
-
-    cert_ctx_.emplace_back(ctx);
+    cert_ctx_.emplace_back(ctx, cn);
   }
 
   DH_free(dh);
@@ -517,7 +577,7 @@ bool TLS::starttls_server(int fd_in,
 
   EC_KEY_free(ecdh);
 
-  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx()));
+  ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
 
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);

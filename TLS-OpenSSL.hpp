@@ -1,9 +1,9 @@
 #ifndef TLS_OPENSSL_DOT_HPP
 #define TLS_OPENSSL_DOT_HPP
 
+#include "Domain.hpp"
+
 #include <chrono>
-#include <functional>
-#include <string>
 
 #include <openssl/ssl.h>
 
@@ -21,7 +21,7 @@ public:
   TLS(TLS const&) = delete;
   TLS& operator=(const TLS&) = delete;
 
-  TLS(std::function<void(void)> read_hook);
+  explicit TLS(std::function<void(void)> read_hook);
   ~TLS();
 
   bool starttls_client(int fd_in,
@@ -50,18 +50,15 @@ public:
 
   std::string info() const;
 
-  class per_cert_ctx {
-  public:
-    explicit per_cert_ctx(SSL_CTX* ctx)
-      : ctx_(ctx)
+  struct per_cert_ctx {
+    explicit per_cert_ctx(SSL_CTX* ctx_, std::vector<Domain> cn_)
+      : ctx(ctx_)
+      , cn(cn_)
     {
     }
-    ~per_cert_ctx();
 
-    SSL_CTX* ctx() const { return ctx_; };
-
-  private:
-    SSL_CTX* ctx_;
+    SSL_CTX* ctx;
+    std::vector<Domain> cn;
   };
 
 private:
