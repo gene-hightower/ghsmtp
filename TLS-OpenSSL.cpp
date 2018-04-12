@@ -489,7 +489,7 @@ bool TLS::starttls_server(int fd_in,
         auto e = X509_NAME_get_entry(subj, lastpos);
         ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
         auto str = ASN1_STRING_get0_data(d);
-        LOG(INFO) << "cert found for " << str;
+        LOG(INFO) << "server cert found for " << str;
         cn.emplace_back(reinterpret_cast<const char*>(str));
       }
 
@@ -536,11 +536,11 @@ bool TLS::starttls_server(int fd_in,
               ASN1_STRING_length(asn1_str));
 
           if (find(cn.begin(), cn.end(), str) == cn.end()) {
-            LOG(INFO) << "additional name found for " << str;
+            LOG(INFO) << "additional name found " << str;
             cn.emplace_back(str);
           }
           else {
-            LOG(INFO) << "dup name " << str << " ignored";
+            // LOG(INFO) << "duplicate name " << str << " ignored";
           }
         }
         else if (gen->type == GEN_IPADD) {
