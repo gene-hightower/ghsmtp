@@ -545,7 +545,7 @@ struct in_reply_to
 };
 
 struct references
-  : seq<TAOCPP_PEGTL_ISTRING("References:"), plus<msg_id>, eol> {
+  : seq<TAOCPP_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
 };
 
 // Informational Fields
