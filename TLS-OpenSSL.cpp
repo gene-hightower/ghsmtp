@@ -544,7 +544,7 @@ bool TLS::starttls_server(int fd_in,
               ASN1_STRING_length(asn1_str));
 
           if (find(cn.begin(), cn.end(), str) == cn.end()) {
-            LOG(INFO) << "additional name " << str;
+            LOG(INFO) << "additional name found " << str;
             cn.emplace_back(str);
           }
           else {
