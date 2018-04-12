@@ -4,6 +4,7 @@
 #include "Domain.hpp"
 
 #include <chrono>
+#include <functional>
 
 #include <openssl/ssl.h>
 
