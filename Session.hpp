@@ -93,6 +93,7 @@ private:
   void reset_();
 
   bool verify_ip_address_(std::string& error_msg);
+  bool verify_ip_address_dnsbl_(std::string& error_msg);
   void verify_client_();
   bool verify_client_(Domain const& client_identity, std::string& error_msg);
   bool verify_recipient_(Mailbox const& recipient);

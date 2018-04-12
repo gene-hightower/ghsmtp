@@ -256,6 +256,13 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
+  if (sock_.has_peername() && !sock_.tls()) {
+    auto error_msg{std::string{}};
+    if (!verify_ip_address_dnsbl_(error_msg)) {
+      bad_host_(error_msg.c_str());
+    }
+  }
+
   if (!verify_from_params_(parameters)) {
     return;
   }
@@ -992,6 +999,21 @@ bool Session::verify_ip_address_(std::string& error_msg)
   }
 
   client_fcrdns_.clear();
+
+  if (sock_.them_address_literal() == IP4::loopback_literal) {
+    LOG(INFO) << "IP4 loopback address whitelisted";
+    ip_whitelisted_ = true;
+    client_fcrdns_.emplace_back("localhost");
+    return true;
+  }
+
+  if (sock_.them_address_literal() == IP6::loopback_literal) {
+    LOG(INFO) << "IP6 loopback address whitelisted";
+    ip_whitelisted_ = true;
+    client_fcrdns_.emplace_back("localhost");
+    return true;
+  }
+
   auto fcrdns = IP::fcrdns(sock_.them_c_str());
   for (auto const& fcr : fcrdns) {
     client_fcrdns_.emplace_back(fcr);
@@ -1032,24 +1054,17 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = "unknown "s + sock_.them_address_literal();
   }
 
-  if (sock_.them_address_literal() == IP4::loopback_literal) {
-    LOG(INFO) << "IP4 loopback address whitelisted";
+  if (IP4::is_address(sock_.them_c_str()) && ip4_whitelisted(sock_.them_c_str())) {
     ip_whitelisted_ = true;
     return true;
   }
 
-  if (sock_.them_address_literal() == IP6::loopback_literal) {
-    LOG(INFO) << "IP6 loopback address whitelisted";
-    ip_whitelisted_ = true;
-    return true;
-  }
+  return true;
+}
 
+bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
+{
   if (IP4::is_address(sock_.them_c_str())) {
-    if (ip4_whitelisted(sock_.them_c_str())) {
-      ip_whitelisted_ = true;
-      return true;
-    }
-
     using namespace DNS;
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
