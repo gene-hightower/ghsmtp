@@ -29,12 +29,6 @@ constexpr char const* const rbls[]{
     "b.barracudacentral.org",
 };
 
-constexpr char const* const uribls[]{
-    "dbl.spamhaus.org",
-    "black.uribl.com",
-    "multi.surbl.org",
-};
-
 constexpr auto greeting_wait = std::chrono::seconds{3};
 constexpr auto max_recipients_per_message{100};
 constexpr auto max_unrecognized_cmds{20};
@@ -1219,7 +1213,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   }
 
   // If the reverse path domain matches the Forward-confirmed reverse
-  // DNS of the sending IP address, we skip the uribl check.
+  // DNS of the sending IP address, we skip the other checks.
   if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_.front())) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
@@ -1286,7 +1280,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
       if (labels.size() > 3) {
         auto look_up = labels[labels.size() - 4] + "." + three_level;
         LOG(INFO) << "looking up " << look_up;
-        return verify_sender_domain_uribl_(look_up, error_msg);
+        return verify_sender_domain_dns_(look_up, error_msg);
       }
       else {
         out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
@@ -1302,7 +1296,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     if (labels.size() > 2) {
       auto look_up = labels[labels.size() - 3] + "." + two_level;
       LOG(INFO) << "looking up " << look_up;
-      return verify_sender_domain_uribl_(look_up, error_msg);
+      return verify_sender_domain_dns_(look_up, error_msg);
     }
     else {
       out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
@@ -1317,27 +1311,27 @@ bool Session::verify_sender_domain_(Domain const& sender,
   }
 
   LOG(INFO) << "looking up " << two_level;
-  return verify_sender_domain_uribl_(two_level, error_msg);
+  return verify_sender_domain_dns_(two_level, error_msg);
 }
 
-// check sender domain on dynamic URI black lists
-bool Session::verify_sender_domain_uribl_(std::string const& sender,
-                                          std::string& error_msg)
+// check sender domain looks up on DNS
+bool Session::verify_sender_domain_dns_(std::string const& sender,
+                                        std::string& error_msg)
 {
   if (!sock_.has_peername()) // short circuit
     return true;
 
   auto res{DNS::Resolver{}};
-  for (auto uribl : Config::uribls) {
-    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
-      out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
-             << std::flush;
-      error_msg = "blocked by "s + uribl;
-      return false;
-    }
+  if (DNS::has_record<DNS::RR_type::MX>(res, sender)
+      || DNS::has_record<DNS::RR_type::A>(res, sender)
+      || DNS::has_record<DNS::RR_type::AAAA>(res, sender)) {
+    out_() << "550 5.7.1 sender " << sender << " DNS lookup failure\r\n"
+           << std::flush;
+    error_msg = "DNS lookup failed for "s + sender;
+    return false;
   }
 
-  LOG(INFO) << sender << " cleared by URIBLs";
+  LOG(INFO) << sender << " has SOA record";
   return true;
 }
 
@@ -1389,7 +1383,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     /*
       If we want to refuse mail that fails SPF:
       // Error code from RFC 7372, section 3.2.  Also:
-      // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+      //
+      <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
       out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
       return false;
     */
