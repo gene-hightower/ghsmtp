@@ -96,10 +96,10 @@ void Session::bad_host_(char const* msg) const
 
 void Session::reset_()
 {
-  // RSET does not force another EHLO/HELO, one piece of transaction
-  // data saved is client_identity_:
+  // RSET does not force another EHLO/HELO, the one piece of per
+  // transaction data saved is client_identity_:
 
-  // client_identity_.clear();
+  // client_identity_.clear(); <-- not cleared!
 
   reverse_path_.clear();
   forward_path_.clear();
@@ -1157,7 +1157,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
         }
       }
       else {
-        // If we have no list of domains to accept, take our own.
+        // If we have no list of domains to accept, at least take our own.
         if (recipient.domain() == server_identity_) {
           return true;
         }
