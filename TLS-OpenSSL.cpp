@@ -160,7 +160,7 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 
   if (servername && *servername) {
     LOG(INFO) << "servername requested " << servername;
-    if (cert_ctx->count() == 1) {
+    if (cert_ctx->size() == 1) {
       LOG(INFO) << "we have just the one cert, so whateves";
       return SSL_TLSEXT_ERR_OK;
     }
