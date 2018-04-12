@@ -1331,7 +1331,7 @@ bool Session::verify_sender_domain_dns_(std::string const& sender,
     return false;
   }
 
-  LOG(INFO) << sender << " has SOA record";
+  LOG(INFO) << sender << " has DNS records";
   return true;
 }
 
