@@ -1078,8 +1078,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
         return false;
       }
     }
-    // LOG(INFO) << "IP address " << sock_.them_c_str() << " not
-    // blacklisted";
+    LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
   }
 
   return true;
