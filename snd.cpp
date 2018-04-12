@@ -752,7 +752,8 @@ void fail(Input& in, RFC5321::Connection& cnn)
 {
   LOG(INFO) << " C: QUIT";
   cnn.sock.out() << "QUIT\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+  // we might have a few error replies stacked up if we're pipelining
+  // CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   exit(EXIT_FAILURE);
 }
 
@@ -1511,7 +1512,7 @@ int main(int argc, char* argv[])
   auto && [ from_mbx, to_mbx ] = parse_mailboxes();
 
   if (FLAGS_pipe) {
-    return snd(STDIN_FILENO, STDOUT_FILENO, sender, Domain("localhost"), 0,
+    return snd(STDIN_FILENO, STDOUT_FILENO, sender, to_mbx.domain(), 25,
                from_mbx, to_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
