@@ -135,9 +135,9 @@ Query::Query(Resolver const& res, RR_type type, Domain const& dom)
   if (status != LDNS_STATUS_OK) {
     bogus_or_indeterminate_ = true;
 
-    LOG(WARNING) << "Query (" << dom.str() << "/" << type << ") "
-                 << "ldns_resolver_query_status failed: "
-                 << ldns_get_errorstr_by_id(status);
+    // LOG(WARNING) << "Query (" << dom.str() << "/" << type << ") "
+    //              << "ldns_resolver_query_status failed: "
+    //              << ldns_get_errorstr_by_id(status);
 
     // If we have only one nameserver, reset the RTT otherwise all
     // future use of this resolver object will fail.
