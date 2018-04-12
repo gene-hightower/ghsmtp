@@ -256,7 +256,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  if (sock_.has_peername() && !sock_.tls()) {
+  if (sock_.has_peername() && !sock_.tls() && !fcrdns_whitelisted_
+      && !ip_whitelisted_) {
     auto error_msg{std::string{}};
     if (!verify_ip_address_dnsbl_(error_msg)) {
       bad_host_(error_msg.c_str());
@@ -1054,7 +1055,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = "unknown "s + sock_.them_address_literal();
   }
 
-  if (IP4::is_address(sock_.them_c_str()) && ip4_whitelisted(sock_.them_c_str())) {
+  if (IP4::is_address(sock_.them_c_str())
+      && ip4_whitelisted(sock_.them_c_str())) {
     ip_whitelisted_ = true;
     return true;
   }
