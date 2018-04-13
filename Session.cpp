@@ -1321,15 +1321,15 @@ bool Session::verify_sender_domain_dns_(std::string const& sender,
   if (!sock_.has_peername()) // short circuit
     return true;
 
-  // auto res{DNS::Resolver{}};
-  // if (DNS::has_record<DNS::RR_type::MX>(res, sender)
-  //     || DNS::has_record<DNS::RR_type::A>(res, sender)
-  //     || DNS::has_record<DNS::RR_type::AAAA>(res, sender)) {
-  //   out_() << "550 5.7.1 sender " << sender << " DNS lookup failure\r\n"
-  //          << std::flush;
-  //   error_msg = "DNS lookup failed for "s + sender;
-  //   return false;
-  // }
+  auto res{DNS::Resolver{}};
+  if (DNS::has_record<DNS::RR_type::MX>(res, sender)
+      || DNS::has_record<DNS::RR_type::A>(res, sender)
+      || DNS::has_record<DNS::RR_type::AAAA>(res, sender)) {
+    out_() << "550 5.7.1 sender " << sender << " DNS lookup failure\r\n"
+           << std::flush;
+    error_msg = "DNS lookup failed for "s + sender;
+    return false;
+  }
 
   LOG(INFO) << sender << " skipping DNS checks";
   return true;

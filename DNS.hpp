@@ -329,7 +329,7 @@ inline std::vector<std::string> get_strings(Resolver const& res,
 template <RR_type type>
 inline bool has_record(Resolver const& res, char const* domain)
 {
-  auto rr_set = get_strings<type>(res, Domain(domain));
+  auto rr_set = res.get_records(type, Domain(domain));
   return !rr_set.empty();
 }
 
