@@ -1110,7 +1110,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
     if (!client_fcrdns_.empty()
         && (server_identity_ != client_fcrdns_.front())) {
-      error_msg = "liar, claimed to be us";
+      error_msg = "liar, claimed to be "s + client_identity.ascii();
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       return false;
     }
