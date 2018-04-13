@@ -29,6 +29,12 @@ constexpr char const* const rbls[]{
     "b.barracudacentral.org",
 };
 
+constexpr char const* const uribls[]{
+    "dbl.spamhaus.org",
+    "black.uribl.com",
+    "multi.surbl.org",
+};
+
 constexpr auto greeting_wait = std::chrono::seconds{3};
 constexpr auto max_recipients_per_message{100};
 constexpr auto max_unrecognized_cmds{20};
@@ -1213,7 +1219,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   }
 
   // If the reverse path domain matches the Forward-confirmed reverse
-  // DNS of the sending IP address, we skip the other checks.
+  // DNS of the sending IP address, we skip the uribl check.
   if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_.front())) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
@@ -1275,12 +1281,12 @@ bool Session::verify_sender_domain_(Domain const& sender,
     auto three_level{labels[labels.size() - 3] + "." + two_level};
 
     CDB three_tld{"three-level-tlds"};
-    if (three_tld.lookup(reg_dom)) {
+    if (three_tld.lookup(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
         auto look_up = labels[labels.size() - 4] + "." + three_level;
         LOG(INFO) << "looking up " << look_up;
-        return verify_sender_domain_dns_(look_up, error_msg);
+        return verify_sender_domain_uribl_(look_up, error_msg);
       }
       else {
         out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
@@ -1291,12 +1297,12 @@ bool Session::verify_sender_domain_(Domain const& sender,
   }
 
   CDB two_tld{"two-level-tlds"};
-  if (two_tld.lookup(reg_dom)) {
+  if (two_tld.lookup(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
       auto look_up = labels[labels.size() - 3] + "." + two_level;
       LOG(INFO) << "looking up " << look_up;
-      return verify_sender_domain_dns_(look_up, error_msg);
+      return verify_sender_domain_uribl_(look_up, error_msg);
     }
     else {
       out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
@@ -1305,33 +1311,28 @@ bool Session::verify_sender_domain_(Domain const& sender,
     }
   }
 
-  if (two_level.compare(reg_dom)) {
-    LOG(INFO) << "two level '" << two_level << "' != registered domain '"
-              << reg_dom << "'";
-  }
-
-  LOG(INFO) << "looking up " << two_level;
-  return verify_sender_domain_dns_(two_level, error_msg);
+  LOG(INFO) << "looking up " << reg_dom;
+  return verify_sender_domain_uribl_(reg_dom, error_msg);
 }
 
-// check sender domain looks up on DNS
-bool Session::verify_sender_domain_dns_(std::string const& sender,
-                                        std::string& error_msg)
+// check sender domain on dynamic URI black lists
+bool Session::verify_sender_domain_uribl_(std::string const& sender,
+                                          std::string& error_msg)
 {
   if (!sock_.has_peername()) // short circuit
     return true;
 
   auto res{DNS::Resolver{}};
-  if (DNS::has_record<DNS::RR_type::MX>(res, sender)
-      || DNS::has_record<DNS::RR_type::A>(res, sender)
-      || DNS::has_record<DNS::RR_type::AAAA>(res, sender)) {
-    out_() << "550 5.7.1 sender " << sender << " DNS lookup failure\r\n"
-           << std::flush;
-    error_msg = "DNS lookup failed for "s + sender;
-    return false;
+  for (auto uribl : Config::uribls) {
+    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+      out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
+             << std::flush;
+      error_msg = "blocked by "s + uribl;
+      return false;
+    }
   }
 
-  LOG(INFO) << sender << " skipping DNS checks";
+  LOG(INFO) << sender << " cleared by URIBLs";
   return true;
 }
 
