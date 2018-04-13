@@ -11,9 +11,8 @@
 namespace Config {
 auto constexpr cert_verify_depth{10};
 
-auto constexpr cert_fn = "smtp.pem";
-auto constexpr key_fn = "smtp.key";
 auto constexpr cert_fn_re = ".+\\.pem$";
+auto constexpr key_ext = ".key";
 
 } // namespace Config
 

@@ -1,7 +1,6 @@
 #include <chrono>
 #include <functional>
 #include <iomanip>
-#include <regex>
 #include <string>
 
 #include <openssl/err.h>
@@ -52,30 +51,6 @@ auto bin2hexstring(uint8_t const* data, size_t length)
 
     ret += hex_digits[hi];
     ret += hex_digits[lo];
-  }
-
-  return ret;
-}
-
-auto list_directory(fs::path const& path, std::string const& pattern)
-{
-  std::vector<fs::path> ret;
-
-#if defined(__APPLE__) || defined(_WIN32)
-  auto const traits
-      = std::regex_constants::ECMAScript | std::regex_constants::icase;
-#else
-  auto const traits = std::regex_constants::ECMAScript;
-#endif
-
-  std::regex const pattern_regex(pattern, traits);
-
-  for (auto const& it : fs::directory_iterator(path)) {
-    auto const it_filename = it.path().filename().string();
-    std::smatch matches;
-    if (std::regex_match(it_filename, matches, pattern_regex)) {
-      ret.push_back(it.path());
-    }
   }
 
   return ret;
@@ -195,7 +170,14 @@ bool TLS::starttls_client(int fd_in,
 
   auto const method = CHECK_NOTNULL(SSLv23_client_method());
 
-  {
+  auto const config_path = osutil::get_config_dir();
+
+  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
+
+  CHECK_GE(certs.size(), 1) << "no client cert(s) found";
+
+  for (auto const& cert : certs) {
+
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
     std::vector<Domain> cn;
 
@@ -207,30 +189,97 @@ bool TLS::starttls_client(int fd_in,
     // you'd think if it's the default, you'd not have to call this
     CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
 
-    auto const config_path = osutil::get_config_dir();
+    CHECK_GT(SSL_CTX_use_certificate_chain_file(ctx, cert.string().c_str()), 0)
+        << "Can't load certificate chain file " << cert;
 
-    auto const cert_path = config_path / Config::cert_fn;
-    CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
-    auto const& cert_path_str = cert_path.string();
+    auto const key = fs::path(cert).replace_extension(Config::key_ext);
 
-    CHECK(SSL_CTX_use_certificate_chain_file(ctx, cert_path_str.c_str()) > 0)
-        << "Can't load certificate chain file \"" << cert_path << "\"";
+    if (fs::exists(key)) {
 
-    auto const key_path = config_path / Config::key_fn;
-    CHECK(fs::exists(key_path)) << "can't find key file " << key_path;
-    auto const key_path_str = key_path.string();
+      CHECK_GT(SSL_CTX_use_PrivateKey_file(ctx, key.string().c_str(),
+                                           SSL_FILETYPE_PEM),
+               0)
+          << "Can't load private key file " << key;
 
-    CHECK(
-        SSL_CTX_use_PrivateKey_file(ctx, key_path_str.c_str(), SSL_FILETYPE_PEM)
-        > 0)
-        << "Can't load private key file \"" << key_path_str << "\"";
-
-    CHECK(SSL_CTX_check_private_key(ctx))
-        << "Private key does not match the public certificate";
+      CHECK(SSL_CTX_check_private_key(ctx))
+          << "SSL_CTX_check_private_key failed for " << key;
+    }
 
     SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                        verify_callback);
+
+    //.......................................................
+
+    auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
+
+    X509_NAME* subj = X509_get_subject_name(x509);
+
+    int lastpos = -1;
+    for (;;) {
+      lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
+      if (lastpos == -1)
+        break;
+      auto e = X509_NAME_get_entry(subj, lastpos);
+      ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
+      auto str = ASN1_STRING_get0_data(d);
+      LOG(INFO) << "client cert found for " << str;
+    }
+
+    auto subject_alt_names = static_cast<GENERAL_NAMES*>(
+        X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+
+    for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
+
+      GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
+
+      if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
+        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+        std::string str(
+            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+            ASN1_STRING_length(asn1_str));
+
+        LOG(INFO) << "email or uri alt name " << str;
+      }
+      else if (gen->type == GEN_DNS) {
+        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+        std::string str(
+            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+            ASN1_STRING_length(asn1_str));
+
+        if (find(cn.begin(), cn.end(), str) == cn.end()) {
+          LOG(INFO) << "additional name found " << str;
+        }
+        else {
+          // LOG(INFO) << "duplicate name " << str << " ignored";
+        }
+      }
+      else if (gen->type == GEN_IPADD) {
+        unsigned char* p = gen->d.ip->data;
+        if (gen->d.ip->length == 4) {
+          std::stringstream ip;
+          ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.' << unsigned(p[2])
+             << '.' << unsigned(p[3]);
+
+          LOG(INFO) << "alt name IP4 address " << ip.str();
+        }
+        else if (gen->d.ip->length == 16) {
+          LOG(ERROR) << "IPv6 not implemented";
+        }
+        else {
+          LOG(ERROR) << "unknown IP type";
+        }
+      }
+      else {
+        LOG(ERROR) << "unknown alt name type";
+      }
+    }
+
+    GENERAL_NAMES_free(subject_alt_names);
+
+    //.......................................................
 
     cert_ctx_.emplace_back(ctx, cn);
   }
@@ -424,9 +473,9 @@ bool TLS::starttls_server(int fd_in,
 
   auto const ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
 
-  auto const certs = list_directory(config_path, Config::cert_fn_re);
+  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
-  CHECK_GE(certs.size(), 1) << "no server certs found";
+  CHECK_GE(certs.size(), 1) << "no server cert(s) found";
 
   for (auto const& cert : certs) {
 
@@ -444,7 +493,7 @@ bool TLS::starttls_server(int fd_in,
     CHECK_GT(SSL_CTX_use_certificate_chain_file(ctx, cert.string().c_str()), 0)
         << "Can't load certificate chain file " << cert;
 
-    auto const key = fs::path(cert).replace_extension(".key");
+    auto const key = fs::path(cert).replace_extension(Config::key_ext);
 
     if (fs::exists(key)) {
 
@@ -485,97 +534,96 @@ bool TLS::starttls_server(int fd_in,
 
     //.......................................................
 
-    auto const x509 = SSL_CTX_get0_certificate(ctx);
-    if (x509) {
-      X509_NAME* subj = X509_get_subject_name(x509);
+    auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
 
-      int lastpos = -1;
-      for (;;) {
-        lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
-        if (lastpos == -1)
-          break;
-        auto e = X509_NAME_get_entry(subj, lastpos);
-        ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
-        auto str = ASN1_STRING_get0_data(d);
-        LOG(INFO) << "server cert found for " << str;
-        cn.emplace_back(reinterpret_cast<const char*>(str));
+    X509_NAME* subj = X509_get_subject_name(x509);
+
+    int lastpos = -1;
+    for (;;) {
+      lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
+      if (lastpos == -1)
+        break;
+      auto e = X509_NAME_get_entry(subj, lastpos);
+      ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
+      auto str = ASN1_STRING_get0_data(d);
+      LOG(INFO) << "server cert found for " << str;
+      cn.emplace_back(reinterpret_cast<const char*>(str));
+    }
+
+    // auto ext_stack = X509_get0_extensions(x509);
+    // for (int i = 0; i < sk_X509_EXTENSION_num(ext_stack); i++) {
+    //   X509_EXTENSION* ext
+    //       = CHECK_NOTNULL(sk_X509_EXTENSION_value(ext_stack, i));
+    //   ASN1_OBJECT* asn1_obj =
+    //   CHECK_NOTNULL(X509_EXTENSION_get_object(ext)); unsigned nid =
+    //   OBJ_obj2nid(asn1_obj); if (nid == NID_undef) {
+    //     // no lookup found for the provided OID so nid came back as
+    //     undefined. char extname[256]; OBJ_obj2txt(extname, sizeof(extname),
+    //     asn1_obj, 1); LOG(INFO) << "undef extension name is " << extname;
+    //   } else {
+    //     // the OID translated to a NID which implies that the OID has a
+    //     known
+    //     // sn/ln
+    //     const char* c_ext_name = CHECK_NOTNULL(OBJ_nid2ln(nid));
+    //     LOG(INFO) << "extension " << c_ext_name;
+    //   }
+    // }
+
+    auto subject_alt_names = static_cast<GENERAL_NAMES*>(
+        X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+
+    for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
+
+      GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
+
+      if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
+        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+        std::string str(
+            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+            ASN1_STRING_length(asn1_str));
+
+        LOG(INFO) << "email or uri alt name " << str;
       }
+      else if (gen->type == GEN_DNS) {
+        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-      // auto ext_stack = X509_get0_extensions(x509);
-      // for (int i = 0; i < sk_X509_EXTENSION_num(ext_stack); i++) {
-      //   X509_EXTENSION* ext
-      //       = CHECK_NOTNULL(sk_X509_EXTENSION_value(ext_stack, i));
-      //   ASN1_OBJECT* asn1_obj =
-      //   CHECK_NOTNULL(X509_EXTENSION_get_object(ext)); unsigned nid =
-      //   OBJ_obj2nid(asn1_obj); if (nid == NID_undef) {
-      //     // no lookup found for the provided OID so nid came back as
-      //     undefined. char extname[256]; OBJ_obj2txt(extname, sizeof(extname),
-      //     asn1_obj, 1); LOG(INFO) << "undef extension name is " << extname;
-      //   } else {
-      //     // the OID translated to a NID which implies that the OID has a
-      //     known
-      //     // sn/ln
-      //     const char* c_ext_name = CHECK_NOTNULL(OBJ_nid2ln(nid));
-      //     LOG(INFO) << "extension " << c_ext_name;
-      //   }
-      // }
+        std::string str(
+            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+            ASN1_STRING_length(asn1_str));
 
-      auto subject_alt_names = static_cast<GENERAL_NAMES*>(
-          X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
-
-      for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
-
-        GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
-
-        if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
-          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
-
-          std::string str(
-              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
-              ASN1_STRING_length(asn1_str));
-
-          LOG(INFO) << "email or uri alt name " << str;
-        }
-        else if (gen->type == GEN_DNS) {
-          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
-
-          std::string str(
-              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
-              ASN1_STRING_length(asn1_str));
-
-          if (find(cn.begin(), cn.end(), str) == cn.end()) {
-            LOG(INFO) << "additional name found " << str;
-            cn.emplace_back(str);
-          }
-          else {
-            // LOG(INFO) << "duplicate name " << str << " ignored";
-          }
-        }
-        else if (gen->type == GEN_IPADD) {
-          unsigned char* p = gen->d.ip->data;
-          if (gen->d.ip->length == 4) {
-            std::stringstream ip;
-            ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.'
-               << unsigned(p[2]) << '.' << unsigned(p[3]);
-
-            LOG(INFO) << "alt name IP4 address " << ip.str();
-          }
-          else if (gen->d.ip->length == 16) {
-            LOG(ERROR) << "IPv6 not implemented";
-          }
-          else {
-            LOG(ERROR) << "unknown IP type";
-          }
+        if (find(cn.begin(), cn.end(), str) == cn.end()) {
+          LOG(INFO) << "additional name found " << str;
+          cn.emplace_back(str);
         }
         else {
-          LOG(ERROR) << "unknown alt name type";
+          // LOG(INFO) << "duplicate name " << str << " ignored";
         }
       }
+      else if (gen->type == GEN_IPADD) {
+        unsigned char* p = gen->d.ip->data;
+        if (gen->d.ip->length == 4) {
+          std::stringstream ip;
+          ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.' << unsigned(p[2])
+             << '.' << unsigned(p[3]);
 
-      GENERAL_NAMES_free(subject_alt_names);
-
-      //.......................................................
+          LOG(INFO) << "alt name IP4 address " << ip.str();
+        }
+        else if (gen->d.ip->length == 16) {
+          LOG(ERROR) << "IPv6 not implemented";
+        }
+        else {
+          LOG(ERROR) << "unknown IP type";
+        }
+      }
+      else {
+        LOG(ERROR) << "unknown alt name type";
+      }
     }
+
+    GENERAL_NAMES_free(subject_alt_names);
+
+    //.......................................................
 
     cert_ctx_.emplace_back(ctx, cn);
   }

@@ -3,9 +3,9 @@ namespace gflags {
 };
 
 // This needs to be at least the length of each string it's trying to match.
-DEFINE_uint64(bfr_size, 4*1024, "parser buffer size");
+DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
-DEFINE_uint64(max_xfer_size, 64*1024, "maximum BDAT transfer size");
+DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 #include <fstream>
 
@@ -558,10 +558,7 @@ struct action<bdat_last> {
 
 template <>
 struct data_action<data_end> {
-  static void apply0(Ctx& ctx)
-  {
-    ctx.session.data_done();
-  }
+  static void apply0(Ctx& ctx) { ctx.session.data_done(); }
 };
 
 template <>
@@ -619,8 +616,8 @@ struct action<data> {
   static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      auto din =
-          istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size, "din");
+      auto din
+          = istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size, "din");
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
                                                                        ctx)) {
@@ -740,8 +737,8 @@ int main(int argc, char* argv[])
 
   // Don't wait for STARTTLS to fail if no cert.
   auto const config_path = osutil::get_config_dir();
-  auto const cert_path = config_path / Config::cert_fn;
-  CHECK(fs::exists(cert_path)) << "can't find cert chain file " << cert_path;
+  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
+  CHECK_GE(certs.size(), 1) << "no certs found";
 
   ctx->session.greeting();
 
