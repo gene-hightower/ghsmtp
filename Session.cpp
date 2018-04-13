@@ -814,6 +814,7 @@ void Session::quit()
 void Session::auth()
 {
   out_() << "454 4.7.0 authentication failure\r\n" << std::flush;
+  LOG(INFO) << "AUTH";
   bad_host_("auth");
 }
 
