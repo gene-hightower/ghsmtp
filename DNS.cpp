@@ -348,6 +348,15 @@ std::vector<std::string> RR_list::get_strings() const
           ret.emplace_back(rr_name_str(rdf));
           break;
         }
+        case LDNS_RR_TYPE_MX: {
+          CHECK_EQ(ldns_rr_rd_count(rr), 2);
+          auto const rdf_0 = ldns_rr_rdf(rr, 0);
+          CHECK_EQ(ldns_rdf_get_type(rdf_0), LDNS_RDF_TYPE_INT16);
+          auto const rdf_1 = ldns_rr_rdf(rr, 1);
+          CHECK_EQ(ldns_rdf_get_type(rdf_1), LDNS_RDF_TYPE_DNAME);
+          ret.emplace_back(rr_name_str(rdf_1));
+          break;
+        }
         case LDNS_RR_TYPE_TXT: {
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
