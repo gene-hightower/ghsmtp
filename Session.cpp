@@ -1075,6 +1075,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     for (auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
+        LOG(INFO) << error_msg;
         out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
                << std::flush;
         return false;
@@ -1325,9 +1326,9 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   auto res{DNS::Resolver{}};
   for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+      error_msg = "blocked by "s + uribl;
       out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
-      error_msg = "blocked by "s + uribl;
       return false;
     }
   }
