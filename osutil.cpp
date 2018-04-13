@@ -1,3 +1,5 @@
+#include <regex>
+
 #include "osutil.hpp"
 
 #include <boost/algorithm/string/classification.hpp>
@@ -85,6 +87,31 @@ std::string get_hostname()
   // }
 
   return node;
+}
+
+std::vector<fs::path> list_directory(fs::path const& path,
+                                     std::string const& pattern)
+{
+  std::vector<fs::path> ret;
+
+#if defined(__APPLE__) || defined(_WIN32)
+  auto const traits
+      = std::regex_constants::ECMAScript | std::regex_constants::icase;
+#else
+  auto const traits = std::regex_constants::ECMAScript;
+#endif
+
+  std::regex const pattern_regex(pattern, traits);
+
+  for (auto const& it : fs::directory_iterator(path)) {
+    auto const it_filename = it.path().filename().string();
+    std::smatch matches;
+    if (std::regex_match(it_filename, matches, pattern_regex)) {
+      ret.push_back(it.path());
+    }
+  }
+
+  return ret;
 }
 
 } // namespace osutil
