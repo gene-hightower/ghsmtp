@@ -885,7 +885,8 @@ auto get_sender()
   return sender;
 }
 
-std::vector<Domain> get_receivers(DNS::Resolver& res, Mailbox const& to_mbx)
+std::vector<Domain>
+get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 {
   auto receivers{std::vector<Domain>{}};
 
@@ -909,6 +910,7 @@ std::vector<Domain> get_receivers(DNS::Resolver& res, Mailbox const& to_mbx)
   auto q{DNS::Query{res, DNS::RR_type::MX, DNS::Domain{domain}}};
   if (!q.authentic_data()) {
     LOG(INFO) << "MX records can't be authenticated for domain " << domain;
+    enforce_dane = false;
   }
   auto rrlst{DNS::RR_list{q}};
   auto mxs{rrlst.get_records()};
@@ -1148,7 +1150,8 @@ bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
          Domain const& receiver,
-         uint16_t port,
+         DNS::RR_set const& tlsa_rrs,
+         bool enforce_dane,
          Mailbox const& from_mbx,
          Mailbox const& to_mbx,
          std::vector<content> const& bodies)
@@ -1234,9 +1237,9 @@ bool snd(int fd_in,
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.lc() << ", " << port
-              << ");";
-    cnn.sock.starttls_client(receiver.lc().c_str(), port);
+    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.lc() << ");";
+    cnn.sock.starttls_client("FIXME CLIENT NAME", receiver.lc().c_str(),
+                             tlsa_rrs, enforce_dane);
 
     LOG(INFO) << "C: EHLO " << sender.ascii();
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
@@ -1479,6 +1482,29 @@ bool snd(int fd_in,
   return true;
 }
 
+DNS::RR_set
+get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
+{
+  std::ostringstream tlsa;
+  tlsa << '_' << port << "._tcp." << domain.lc();
+
+  DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
+
+  if (q.nx_domain()) {
+    LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
+  }
+
+  DNS::RR_list rrlst(q);
+  auto tlsa_rrs = rrlst.get_records();
+
+  if (q.bogus_or_indeterminate()) {
+    LOG(WARNING) << "TLSA data bogus_or_indeterminate";
+    tlsa_rrs.clear();
+  }
+
+  return tlsa_rrs;
+}
+
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -1511,17 +1537,20 @@ int main(int argc, char* argv[])
 
   auto && [ from_mbx, to_mbx ] = parse_mailboxes();
 
+  auto const port{get_port(FLAGS_service.c_str())};
+
+  auto res{DNS::Resolver{}};
+  auto tlsa_rrs{get_tlsa_rrs(res, to_mbx.domain(), port)};
+
   if (FLAGS_pipe) {
-    return snd(STDIN_FILENO, STDOUT_FILENO, sender, to_mbx.domain(), 25,
-               from_mbx, to_mbx, bodies)
+    return snd(STDIN_FILENO, STDOUT_FILENO, sender, to_mbx.domain(), tlsa_rrs,
+               false, from_mbx, to_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
 
-  auto res{DNS::Resolver{}};
-  auto receivers = get_receivers(res, to_mbx);
-
-  auto const port{get_port(FLAGS_service.c_str())};
+  bool enforce_dane = true;
+  auto receivers = get_receivers(res, to_mbx, enforce_dane);
 
   for (auto const& receiver : receivers) {
     LOG(INFO) << "trying " << receiver << ":" << FLAGS_service;
@@ -1537,7 +1566,11 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    if (snd(fd, fd, sender, receiver, port, from_mbx, to_mbx, bodies)) {
+    auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
+    tlsa_rrs_mx.insert(tlsa_rrs_mx.end(), tlsa_rrs.begin(), tlsa_rrs.end());
+
+    if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
+            to_mbx, bodies)) {
       return EXIT_SUCCESS;
     }
 

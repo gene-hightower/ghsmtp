@@ -1,6 +1,7 @@
 #ifndef TLS_OPENSSL_DOT_HPP
 #define TLS_OPENSSL_DOT_HPP
 
+#include "DNS.hpp"
 #include "Domain.hpp"
 
 #include <chrono>
@@ -26,8 +27,10 @@ public:
 
   bool starttls_client(int fd_in,
                        int fd_out,
-                       char const* hostname,
-                       uint16_t port,
+                       char const* client_name,
+                       char const* server_name,
+                       DNS::RR_set const& tlsa_rrs,
+                       bool enforce_dane,
                        std::chrono::milliseconds timeout);
   bool
   starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);

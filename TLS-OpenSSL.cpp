@@ -159,8 +159,10 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 
 bool TLS::starttls_client(int fd_in,
                           int fd_out,
-                          char const* hostname,
-                          uint16_t port,
+                          char const* client_name,
+                          char const* server_name,
+                          DNS::RR_set const& tlsa_rrs,
+                          bool enforce_dane,
                           std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
@@ -224,6 +226,7 @@ bool TLS::starttls_client(int fd_in,
       ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
       auto str = ASN1_STRING_get0_data(d);
       LOG(INFO) << "client cert found for " << str;
+      cn.emplace_back(reinterpret_cast<const char*>(str));
     }
 
     auto subject_alt_names = static_cast<GENERAL_NAMES*>(
@@ -251,6 +254,7 @@ bool TLS::starttls_client(int fd_in,
 
         if (find(cn.begin(), cn.end(), str) == cn.end()) {
           LOG(INFO) << "additional name found " << str;
+          cn.emplace_back(str);
         }
         else {
           // LOG(INFO) << "duplicate name " << str << " ignored";
@@ -289,45 +293,23 @@ bool TLS::starttls_client(int fd_in,
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
-  std::ostringstream tlsa;
-
-  tlsa << '_' << port << "._tcp." << hostname;
-
-  DNS::Resolver res;
-  DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
-
-  if (q.nx_domain()) {
-    LOG(INFO) << "TLSA data not found";
-  }
-
-  if (q.bogus_or_indeterminate()) {
-    LOG(WARNING) << "TLSA data bogus_or_indeterminate";
-  }
-
-  DNS::RR_list rrlst(q);
-
-  auto tlsa_rrs = rrlst.get_records();
-
   LOG(INFO) << "tlsa_rrs.size() == " << tlsa_rrs.size();
 
   if (tlsa_rrs.size()) {
-    if (!q.authentic_data()) {
-      LOG(ERROR) << "TLSA meaningless without DNSSEC";
-    }
-
-    CHECK_GE(SSL_dane_enable(ssl_, hostname), 0) << "SSL_dane_enable() failed";
-    LOG(INFO) << "SSL_dane_enable(ssl_, " << hostname << ")";
+    CHECK_GE(SSL_dane_enable(ssl_, server_name), 0)
+        << "SSL_dane_enable() failed";
+    LOG(INFO) << "SSL_dane_enable(ssl_, " << server_name << ")";
   }
   else {
-    CHECK_EQ(SSL_set1_host(ssl_, hostname), 1);
+    CHECK_EQ(SSL_set1_host(ssl_, server_name), 1);
 
-    // SSL_set_tlsext_host_name(ssl_, hostname);
+    // SSL_set_tlsext_host_name(ssl_, server_name);
     // same as:
     CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
-                      TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
+                      TLSEXT_NAMETYPE_host_name,
+                      const_cast<char*>(server_name)),
              1);
-    LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << hostname
-              << ")";
+    LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << server_name;
   }
 
   // No partial label wildcards
@@ -362,12 +344,13 @@ bool TLS::starttls_client(int fd_in,
     }
   }
 
-  // CHECK_EQ(SSL_set_tlsext_host_name(ssl_, hostname), 1);
+  // CHECK_EQ(SSL_set_tlsext_host_name(ssl_, server_name), 1);
   // same as:
   // CHECK_EQ(SSL_ctrl(ssl_, SSL_CTRL_SET_TLSEXT_HOSTNAME,
-  //                   TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname)),
+  //                   TLSEXT_NAMETYPE_host_name,
+  //                   const_cast<char*>(server_name)),
   //          1);
-  // LOG(INFO) << "SSL_set_tlsext_host_name == " << hostname;
+  // LOG(INFO) << "SSL_set_tlsext_host_name == " << server_name;
 
   if (session_context_index < 0) {
     session_context_index
@@ -444,6 +427,10 @@ bool TLS::starttls_client(int fd_in,
                                        : depth ? "matched TA certificate"
                                                : "matched EE certificate")
                 << " at depth " << depth;
+    }
+    else if (usable_TLSA_records && enforce_dane) {
+      LOG(WARNING) << "enforcing DANE; failing starttls";
+      return false;
     }
   }
   else {
@@ -731,10 +718,12 @@ std::string TLS::info() const
 {
   auto info{std::ostringstream{}};
 
-  info << SSL_get_version(ssl_);
+  // same as SSL_CIPHER_get_version() below
+  // info << SSL_get_version(ssl_);
+
   auto const c = SSL_get_current_cipher(ssl_);
   if (c) {
-    info << " version=" << SSL_CIPHER_get_version(c);
+    info << "version=" << SSL_CIPHER_get_version(c);
     info << " cipher=" << SSL_CIPHER_get_name(c);
     int alg_bits;
     int bits = SSL_CIPHER_get_bits(c, &alg_bits);

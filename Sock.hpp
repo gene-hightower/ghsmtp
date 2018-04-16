@@ -46,9 +46,13 @@ public:
   std::ostream& out() { return iostream_; }
 
   bool starttls_server() { return iostream_->starttls_server(); }
-  bool starttls_client(char const* hostname, uint16_t port)
+  bool starttls_client(char const* client_name,
+                       char const* server_name,
+                       DNS::RR_set const& tlsa_rrs,
+                       bool enforce_dane)
   {
-    return iostream_->starttls_client(hostname, port);
+    return iostream_->starttls_client(client_name, server_name, tlsa_rrs,
+                                      enforce_dane);
   }
   bool tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }
