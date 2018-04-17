@@ -1076,7 +1076,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     for (auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
-        LOG(INFO) << error_msg;
+        LOG(INFO) << sock_.them_c_str() << " " << error_msg;
         out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
                << std::flush;
         return false;
@@ -1093,7 +1093,8 @@ void Session::verify_client_()
 {
   auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
-    LOG(WARNING) << "verify client failed: " << error_msg;
+    LOG(WARNING) << "verify client failed for " << client_ << " : "
+                 << error_msg;
     bad_host_(error_msg.c_str());
   }
 }
@@ -1122,15 +1123,18 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.lc(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    // Sometimes we may want to look at mail from misconfigured
-    // sending systems.
-    LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
-                 << client_ << " claiming " << client_identity;
-    return true;
+    error_msg = "claimed bogus identity "s + client_identity.lc();
+    out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
+    return false;
+    // // Sometimes we may want to look at mail from misconfigured
+    // // sending systems.
+    // LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
+    //              << client_ << " claiming " << client_identity;
+    // return true;
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = "claimed blacklisted identity";
+    error_msg = "claimed blacklisted identity "s + client_identity.lc();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -1386,8 +1390,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     /*
       If we want to refuse mail that fails SPF:
       // Error code from RFC 7372, section 3.2.  Also:
-      //
-      <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+      // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
       out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
       return false;
     */
