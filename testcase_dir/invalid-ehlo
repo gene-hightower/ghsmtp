@@ -1,0 +1,3 @@
+EHLO foobar
+MAIL FROM:<postmaster@example.com>
+QUIT
