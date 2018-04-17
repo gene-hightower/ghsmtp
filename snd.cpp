@@ -908,7 +908,10 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   auto const& domain = to_mbx.domain().lc();
 
   auto q{DNS::Query{res, DNS::RR_type::MX, DNS::Domain{domain}}};
-  if (!q.authentic_data()) {
+  if (q.authentic_data()) {
+    LOG(INFO) << "MX records authentic for domain " << domain;
+  }
+  else {
     LOG(INFO) << "MX records can't be authenticated for domain " << domain;
     enforce_dane = false;
   }
@@ -1350,13 +1353,6 @@ bool snd(int fd_in,
     cnn.sock.out() << "NOOP\r\nNOOP\r\n" << std::flush;
   }
 
-  if (FLAGS_nosend) {
-    LOG(INFO) << "C: QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_SUCCESS);
-  }
-
   auto param_str = param_stream.str();
 
   LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
@@ -1371,6 +1367,18 @@ bool snd(int fd_in,
 
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "RCPT TO");
+  }
+
+  if (FLAGS_nosend) {
+    LOG(INFO) << "C: QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+    if (ext_pipelining) {
+      check_for_fail(in, cnn, "MAIL FROM");
+      check_for_fail(in, cnn, "RCPT TO");
+    }
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    LOG(INFO) << "no-sending";
+    exit(EXIT_SUCCESS);
   }
 
   if (FLAGS_bare_lf || FLAGS_slow_strangle) {
