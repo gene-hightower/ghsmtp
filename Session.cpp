@@ -1093,8 +1093,8 @@ void Session::verify_client_()
 {
   auto error_msg{std::string{}};
   if (!verify_client_(client_identity_, error_msg)) {
-    LOG(WARNING) << "verify client failed for " << client_ << " : "
-                 << error_msg;
+    // LOG(WARNING) << "verify client failed for " << client_ << " : "
+    //              << error_msg;
     bad_host_(error_msg.c_str());
   }
 }
