@@ -1574,12 +1574,19 @@ int main(int argc, char* argv[])
       continue;
     }
 
-    auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
-    tlsa_rrs_mx.insert(tlsa_rrs_mx.end(), tlsa_rrs.begin(), tlsa_rrs.end());
-
-    if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
-            to_mbx, bodies)) {
-      return EXIT_SUCCESS;
+    if (to_mbx.domain() == receiver) {
+      if (snd(fd, fd, sender, receiver, tlsa_rrs, enforce_dane, from_mbx,
+              to_mbx, bodies)) {
+        return EXIT_SUCCESS;
+      }
+    }
+    else {
+      auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
+      tlsa_rrs_mx.insert(tlsa_rrs_mx.end(), tlsa_rrs.begin(), tlsa_rrs.end());
+      if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
+              to_mbx, bodies)) {
+        return EXIT_SUCCESS;
+      }
     }
 
     close(fd);
