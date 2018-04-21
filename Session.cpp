@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -24,12 +25,12 @@
 using namespace std::string_literals;
 
 namespace Config {
-constexpr char const* const rbls[]{
+char const* rbls[]{
     "zen.spamhaus.org",
     "b.barracudacentral.org",
 };
 
-constexpr char const* const uribls[]{
+char const* uribls[]{
     "dbl.spamhaus.org",
     "black.uribl.com",
     "multi.surbl.org",
@@ -1073,6 +1074,8 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
     auto const res{DNS::Resolver{}};
+    std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
+                 std::default_random_engine());
     for (auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
@@ -1102,21 +1105,28 @@ void Session::verify_client_()
 bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
 {
+  if (!client_fcrdns_.empty()
+      && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
+                    client_identity)
+          != client_fcrdns_.end())) {
+    LOG(INFO) << "claimed identity " << client_identity << " matches FCrDNS";
+    return true;
+  }
+
   // Bogus clients claim to be us or some local host.
-  if ((client_identity == server_identity_) || (client_identity == "localhost")
-      || (client_identity == "localhost.localdomain")) {
+  if (sock_.has_peername()
+      && ((client_identity == server_identity_)
+          || (client_identity == "localhost")
+          || (client_identity == "localhost.localdomain"))) {
 
     if ((sock_.them_address_literal() == IP4::loopback_literal)
         || (sock_.them_address_literal() == IP6::loopback_literal)) {
       return true;
     }
 
-    if (!client_fcrdns_.empty()
-        && (server_identity_ != client_fcrdns_.front())) {
-      error_msg = "liar, claimed to be "s + client_identity.ascii();
-      out_() << "550 5.7.1 liar\r\n" << std::flush;
-      return false;
-    }
+    error_msg = "liar, claimed to be "s + client_identity.ascii();
+    out_() << "550 5.7.1 liar\r\n" << std::flush;
+    return false;
   }
 
   auto labels{std::vector<std::string>{}};
@@ -1143,7 +1153,7 @@ bool Session::verify_client_(Domain const& client_identity,
   if (!tld) {
     // Sometimes we may want to look at mail from misconfigured
     // sending systems.
-    LOG(WARNING) << "claimed identity has to TLD";
+    LOG(WARNING) << "claimed identity has no TLD";
     return true;
   }
   if (black_.lookup(tld)) {
@@ -1152,6 +1162,7 @@ bool Session::verify_client_(Domain const& client_identity,
     return false;
   }
 
+  // not otherwise objectionable
   return true;
 }
 
@@ -1226,7 +1237,10 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
-  if (!client_fcrdns_.empty() && (sender.domain() == client_fcrdns_.front())) {
+  if (!client_fcrdns_.empty()
+      && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
+                    sender.domain())
+          != client_fcrdns_.end())) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
   else if (!verify_sender_domain_(sender.domain(), error_msg)) {
@@ -1329,6 +1343,8 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
     return true;
 
   auto res{DNS::Resolver{}};
+  std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
+               std::default_random_engine());
   for (auto uribl : Config::uribls) {
     if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
       error_msg = "blocked by "s + uribl;
