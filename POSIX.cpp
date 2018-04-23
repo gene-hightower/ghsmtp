@@ -69,7 +69,7 @@ std::streamsize POSIX::io_fd_(char const* fnm,
       continue; // try io_fnc again
 
     if (errno == ECONNRESET) {
-      LOG(WARNING) << fnm << " raised ECONNRESET, interpreting as EOF";
+      // LOG(WARNING) << fnm << " raised ECONNRESET, interpreting as EOF";
       return static_cast<std::streamsize>(-1);
     }
 
