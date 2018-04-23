@@ -757,9 +757,9 @@ int main(int argc, char* argv[])
   else if (ctx->session.timed_out()) {
     ctx->session.time_out();
   }
-  else {
-    ctx->session.error("session end without QUIT command from client");
-  }
+  // else {
+  //   ctx->session.error("session end without QUIT command from client");
+  // }
 
   return ret;
 }
