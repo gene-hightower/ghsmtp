@@ -257,14 +257,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  if (sock_.has_peername() && !sock_.tls() && !fcrdns_whitelisted_
-      && !ip_whitelisted_) {
-    auto error_msg{std::string{}};
-    if (!verify_ip_address_dnsbl_(error_msg)) {
-      bad_host_(error_msg.c_str());
-    }
-  }
-
   if (!verify_from_params_(parameters)) {
     return;
   }
@@ -1063,7 +1055,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return true;
   }
 
-  return true;
+  return verify_ip_address_dnsbl_(error_msg);
 }
 
 bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
@@ -1085,7 +1077,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
         return false;
       }
     }
-    LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
+    // LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
   }
 
   return true;
