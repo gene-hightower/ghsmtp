@@ -1071,7 +1071,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     for (auto rbl : Config::rbls) {
       if (has_record<RR_type::A>(res, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
-        LOG(INFO) << sock_.them_c_str() << " " << error_msg;
+        // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
         out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
                << std::flush;
         return false;
