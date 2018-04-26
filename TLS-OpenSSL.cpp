@@ -285,7 +285,10 @@ bool TLS::starttls_client(int fd_in,
 
     //.......................................................
 
-    cert_ctx_.emplace_back(ctx, cn);
+    if (std::find(cn.begin(), cn.end(), client_name) != cn.end()) {
+      LOG(INFO) << "**** using cert for " << client_name;
+      cert_ctx_.emplace_back(ctx, cn);
+    }
   }
 
   ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
