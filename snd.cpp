@@ -46,6 +46,7 @@ DEFINE_string(sender, "", "FQDN of sending node");
 DEFINE_string(local_address, "", "local address to bind");
 DEFINE_string(mx_host, "", "FQDN of receiving node");
 DEFINE_string(service, "smtp-test", "service name");
+DEFINE_string(client_id, "", "client name (ID) for EHLO/HELO");
 
 DEFINE_string(from, "", "RFC5321 MAIL FROM address");
 DEFINE_string(to, "", "RFC5321 RCPT TO address");
@@ -870,16 +871,27 @@ void selftest()
 auto get_sender()
 {
   if (FLAGS_sender.empty()) {
-    FLAGS_sender = osutil::get_hostname();
-  }
+    FLAGS_sender = {[&] {
+    auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
+    if (id_from_env)
+      return std::string{id_from_env};
+
+    auto const hostname{osutil::get_hostname()};
+    if (hostname.find('.') != std::string::npos)
+      return hostname;
+
+    LOG(FATAL) << "can't determine my server ID";
+  }()};
+  };
 
   auto const sender{Domain{FLAGS_sender}};
 
   if (FLAGS_from.empty()) {
-    FLAGS_from = "test-it@"s + sender.ascii();
+    FLAGS_from = "test-it@"s + sender.utf8();
   }
+
   if (FLAGS_to.empty()) {
-    FLAGS_to = "test-it@"s + sender.ascii();
+    FLAGS_to = "test-it@"s + sender.utf8();
   }
 
   return sender;
@@ -1241,7 +1253,7 @@ bool snd(int fd_in,
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     LOG(INFO) << "cnn.sock.starttls_client(" << receiver.lc() << ");";
-    cnn.sock.starttls_client("FIXME CLIENT NAME", receiver.lc().c_str(),
+    cnn.sock.starttls_client(sender.ascii().c_str(), receiver.lc().c_str(),
                              tlsa_rrs, enforce_dane);
 
     LOG(INFO) << "C: EHLO " << sender.ascii();
@@ -1543,7 +1555,7 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto && [ from_mbx, to_mbx ] = parse_mailboxes();
+  auto&& [from_mbx, to_mbx] = parse_mailboxes();
 
   auto const port{get_port(FLAGS_service.c_str())};
 
@@ -1572,6 +1584,66 @@ int main(int argc, char* argv[])
     if (fd == -1) {
       LOG(WARNING) << "bad connection, skipping";
       continue;
+    }
+
+    // Get our local IP address as "us".
+
+    union sa {
+      struct sockaddr addr;
+      struct sockaddr_in addr_in;
+      struct sockaddr_in6 addr_in6;
+      struct sockaddr_storage addr_storage;
+    };
+
+    sa us_addr{};
+    socklen_t us_addr_len{sizeof us_addr};
+    char us_addr_str[INET6_ADDRSTRLEN]{'\0'};
+    std::vector<std::string> fcrdns;
+    bool private_addr = false;
+
+    if (-1 == getsockname(fd, &us_addr.addr, &us_addr_len)) {
+      // Ignore ENOTSOCK errors from getsockname, useful for testing.
+      PLOG_IF(WARNING, ENOTSOCK != errno) << "getsockname failed";
+    }
+    else {
+      switch (us_addr_len) {
+      case sizeof(sockaddr_in):
+        PCHECK(inet_ntop(AF_INET, &us_addr.addr_in.sin_addr, us_addr_str,
+                         sizeof us_addr_str)
+               != nullptr);
+        if (IP4::is_private(us_addr_str))
+          private_addr = true;
+        else
+          fcrdns = IP4::fcrdns(us_addr_str);
+        break;
+
+      case sizeof(sockaddr_in6):
+        PCHECK(inet_ntop(AF_INET6, &us_addr.addr_in6.sin6_addr, us_addr_str,
+                         sizeof us_addr_str)
+               != nullptr);
+        if (IP6::is_private(us_addr_str))
+          private_addr = true;
+        else
+          fcrdns = IP6::fcrdns(us_addr_str);
+        break;
+
+      default:
+        LOG(FATAL) << "bogus address length (" << us_addr_len
+                   << ") returned from getsockname";
+      }
+    }
+
+    if (fcrdns.size()) {
+      LOG(INFO) << "our names are:";
+      for (auto const& fc : fcrdns) {
+        LOG(INFO) << "    " << fc;
+      }
+    }
+
+    if (!private_addr) {
+      // look at from_mbx.domain() and get SPF records
+
+      // also look at our ID to get SPF records.
     }
 
     if (to_mbx.domain() == receiver) {
