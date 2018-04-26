@@ -20,4 +20,18 @@ inline bool iequal(std::string_view a, std::string_view b)
   return false;
 }
 
+// inline bool iequal(char const* a, char const* b)
+// {
+//   if (a == b)
+//     return true;
+//   for (;;) {
+//     if (!iequal_char(*a, *b))
+//       return false;
+//     if (*a == '\0')
+//       return true;
+//     ++a;
+//     ++b;
+//   }
+// }
+
 #endif // IEQUAL_DOT_HPP
