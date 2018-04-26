@@ -14,11 +14,13 @@ LDLIBS += \
 
 PROGRAMS := smtp msg sasl snd
 
+DNS := DNS-rrs DNS-ldns
+
 msg_STEMS := msg \
 	CDB \
 	DKIM \
 	DMARC \
-	DNS \
+	$(DNS) \
 	Domain \
 	IP \
 	IP4 \
@@ -37,7 +39,7 @@ sasl_STEMS := sasl \
 
 smtp_STEMS := smtp \
 	CDB \
-	DNS \
+	$(DNS) \
 	Domain \
 	IP \
 	IP4 \
@@ -56,7 +58,7 @@ smtp_STEMS := smtp \
 snd_STEMS := snd \
 	Base64 \
 	DKIM \
-	DNS \
+	$(DNS) \
 	Domain \
 	IP \
 	IP4 \
@@ -94,17 +96,17 @@ TESTS := \
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
-DNS-test_STEMS := DNS
-Domain-test_STEMS := DNS Domain IP IP4 IP6
-IP4-test_STEMS := DNS IP4
-IP6-test_STEMS := DNS IP6
+DNS-test_STEMS := $(DNS)
+Domain-test_STEMS := $(DNS) Domain IP IP4 IP6
+IP4-test_STEMS := $(DNS) IP4
+IP6-test_STEMS := $(DNS) IP6
 Magic-test_STEMS := Magic
-Mailbox-test_STEMS := DNS Domain IP IP4 IP6
-Message-test_STEMS := DNS Domain IP IP4 IP6 Message Pill
+Mailbox-test_STEMS := $(DNS) Domain IP IP4 IP6
+Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
-SPF-test_STEMS := DNS IP4 IP6 SPF
-Session-test_STEMS := CDB DNS Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock SockBuffer TLS-OpenSSL esc osutil
+SPF-test_STEMS := $(DNS) IP4 IP6 SPF
+Session-test_STEMS := CDB $(DNS) Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock SockBuffer TLS-OpenSSL esc osutil
 Sock-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL osutil
@@ -162,7 +164,7 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-# safty_flags := # nada
+safty_flags := # nada
 
 # visibility_flags := # nada
 
