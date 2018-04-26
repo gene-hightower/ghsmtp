@@ -54,6 +54,13 @@ DEFINE_uint64(max_write, 0, "max data to write");
 Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
+  if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
+    auto fcrdns = IP::fcrdns(sock_.us_c_str());
+    for (auto const& fcr : fcrdns) {
+      server_fcrdns_.emplace_back(fcr);
+    }
+  }
+
   auto const our_id{[&] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
     if (id_from_env)
@@ -63,8 +70,14 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
     if (hostname.find('.') != std::string::npos)
       return hostname;
 
-    if (sock_.has_peername() && !IP::is_private(sock_.us_c_str()))
+    if (!server_fcrdns_.empty()) {
+      // first result should be shortest
+      return server_fcrdns_.front().ascii();
+    }
+
+    if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
       return IP::to_address_literal(sock_.us_c_str());
+    }
 
     LOG(FATAL) << "can't determine my server ID";
   }()};
@@ -1027,7 +1040,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       if (white_.lookup(client_fcrdns.lc())) {
         LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
-        break;
+        return true;
       }
 
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.lc())};
@@ -1040,7 +1053,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         if (white_.lookup(tld)) {
           LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
           fcrdns_whitelisted_ = true;
-          break;
+          return true;
         }
       }
     }
@@ -1128,7 +1141,7 @@ bool Session::verify_client_(Domain const& client_identity,
     error_msg = "claimed bogus identity "s + client_identity.lc();
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
-    // // Sometimes we may want to look at mail from misconfigured
+    // // Sometimes we may want to look at mail from non conforming
     // // sending systems.
     // LOG(WARNING) << "invalid sender" << (sock_.has_peername() ? " " : "")
     //              << client_ << " claiming " << client_identity;

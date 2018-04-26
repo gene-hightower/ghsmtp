@@ -112,6 +112,7 @@ private:
   // per connection/session
   Domain server_identity_;            // who we identify as
   std::vector<Domain> client_fcrdns_; // who they look-up as
+  std::vector<Domain> server_fcrdns_; // who we look-up as
   std::string client_;                // (fcrdns_ [sock_.them_c_str()])
 
   // per transaction
