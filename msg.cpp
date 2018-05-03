@@ -90,13 +90,22 @@ constexpr char const* defined_fields[]{
 };
 // clang-format on
 
-bool is_defined_field(std::string_view value)
+bool is_defined_field(std::string_view name)
 {
   for (auto const& defined_field : defined_fields) {
-    if (iequal(value, defined_field))
+    if (iequal(name, defined_field))
       return true;
   }
   return false;
+}
+
+char const* defined_field(std::string_view name)
+{
+  for (auto&& defined_field : defined_fields) {
+    if (iequal(name, defined_field))
+      return defined_field;
+  }
+  return "";
 }
 
 struct ci_less : public std::binary_function<std::string, std::string, bool> {
@@ -128,6 +137,9 @@ struct Ctx {
 
   std::map<std::string, std::string, ci_less> spf_info;
   std::string spf_result;
+
+  std::unordered_map<char const*, std::string> defined_hdrs;
+  std::map<std::string, std::string, ci_less> opt_hdrs;
 
   std::string unstructured;
   std::string id;
@@ -650,9 +662,8 @@ struct spf_key_value_list
 struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
                           opt<CFWS>,
                           result,
-                          FWS,
-                          opt<seq<comment, FWS>>,
-                          opt<spf_key_value_list>,
+                          opt<seq<FWS, comment>>,
+                          opt<seq<FWS, spf_key_value_list>>,
                           eol> {
 };
 
@@ -931,6 +942,10 @@ struct action<optional_field> {
         ctx.msg_errors.push_back(err);
         // LOG(ERROR) << err;
       }
+      ctx.defined_hdrs[defined_field(ctx.opt_name)] = ctx.opt_value;
+    }
+    else {
+      ctx.opt_hdrs[ctx.opt_name] = ctx.opt_value;
     }
     header(in, ctx);
     ctx.unstructured.clear();
@@ -1718,12 +1733,12 @@ void selftest()
       // works
       "Received-SPF: pass (digilicious.com: domain of gmail.com designates "
       "74.125.82.46 as permitted sender) client-ip=74.125.82.46; "
-      "envelope-from=sclark0322@gmail.com; helo=mail-wm0-f46.google.com;\r\n",
+      "envelope-from=l23456789O@gmail.com; helo=mail-wm0-f46.google.com;\r\n",
 
       // also works
       "Received-SPF: neutral (google.com: 2607:f8b0:4001:c0b::22a is neither "
       "permitted nor denied by best guess record for domain of "
-      "rickoco@riscv.org) client-ip=2607:f8b0:4001:c0b::22a;\r\n",
+      "1234567@riscv.org) client-ip=2607:f8b0:4001:c0b::22a;\r\n",
   };
 
   for (auto i : spf_list) {
