@@ -268,6 +268,11 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
+  case xact_step::rset:
+    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    LOG(WARNING) << "error state must be cleared with a RSET"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
   }
 
   if (!verify_from_params_(parameters)) {
@@ -314,6 +319,11 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
+  case xact_step::rset:
+    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   }
@@ -593,11 +603,17 @@ bool Session::data_start()
     LOG(WARNING) << "'DATA' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
+  case xact_step::rset:
+    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    LOG(WARNING) << "error state must be cleared with a RSET"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
   }
 
   if (binarymime_) {
     out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
     LOG(WARNING) << "DATA does not support BINARYMIME";
+    state_ = xact_step::rset; // RFC 3030 section 3 page 5
     return false;
   }
   // for bounce messages
@@ -697,6 +713,11 @@ bool Session::bdat_start(size_t n)
     break;
   case xact_step::bdat:
     return true;
+  case xact_step::rset:
+    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    LOG(WARNING) << "error state must be cleared with a RSET"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return false;
   }
 
   CHECK(!forward_path_.empty());

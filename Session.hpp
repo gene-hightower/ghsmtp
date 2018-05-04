@@ -141,6 +141,7 @@ private:
     rcpt,
     data,
     bdat, // RFC 3030
+    rset, // must now send RSET
   };
 
   // per transaction
