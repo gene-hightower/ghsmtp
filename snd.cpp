@@ -897,6 +897,15 @@ auto get_sender()
   return sender;
 }
 
+bool is_localhost(DNS::RR const& rr)
+{
+  if (std::holds_alternative<DNS::RR_MX>(rr)) {
+    if (iequal(std::get<DNS::RR_MX>(rr).exchange(), "localhost"))
+      return true;
+  }
+  return false;
+}
+
 std::vector<Domain>
 get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 {
@@ -929,6 +938,8 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   }
   auto rrlst{DNS::RR_list{q}};
   auto mxs{rrlst.get_records()};
+
+  mxs.erase(std::remove_if(mxs.begin(), mxs.end(), is_localhost), mxs.end());
 
   auto const nmx = std::count_if(mxs.begin(), mxs.end(), [](DNS::RR const& rr) {
     return std::holds_alternative<DNS::RR_MX>(rr);
