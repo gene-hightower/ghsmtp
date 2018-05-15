@@ -926,7 +926,7 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   // Our (full) resolver will traverse any CNAMEs for us and return
   // the CNAME and MX records all together.
 
-  auto const& domain = to_mbx.domain().lc();
+  auto const& domain = to_mbx.domain().ascii();
 
   auto q{DNS::Query{res, DNS::RR_type::MX, DNS::Domain{domain}}};
   if (q.authentic_data()) {
@@ -1263,8 +1263,8 @@ bool snd(int fd_in,
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.lc() << ");";
-    cnn.sock.starttls_client(sender.ascii().c_str(), receiver.lc().c_str(),
+    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
+    cnn.sock.starttls_client(sender.ascii().c_str(), receiver.ascii().c_str(),
                              tlsa_rrs, enforce_dane);
 
     LOG(INFO) << "C: EHLO " << sender.ascii();
@@ -1517,7 +1517,7 @@ DNS::RR_set
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   std::ostringstream tlsa;
-  tlsa << '_' << port << "._tcp." << domain.lc();
+  tlsa << '_' << port << "._tcp." << domain.ascii();
 
   DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
 

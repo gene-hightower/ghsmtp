@@ -64,7 +64,7 @@ int main(int argc, char const* argv[])
   }
 
   Domain mixed_case{"ExAmPle.COM"};
-  CHECK_EQ(mixed_case.lc(), "example.com");
+  CHECK_EQ(mixed_case.ascii(), "example.com");
 
   for (auto arg = 1; arg < argc; ++arg) {
     Domain a{argv[arg]};

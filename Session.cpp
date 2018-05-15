@@ -411,7 +411,7 @@ std::string Session::added_headers_(Message const& msg)
 bool lookup_domain(CDB& cdb, Domain const& domain)
 {
   if (!domain.empty()) {
-    if (cdb.lookup(domain.lc())) {
+    if (cdb.lookup(domain.ascii())) {
       return true;
     }
     if (domain.is_unicode() && cdb.lookup(domain.utf8())) {
@@ -448,7 +448,7 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
     }
 
-    auto tld_id{tld_db_.get_registered_domain(client_identity_.lc())};
+    auto tld_id{tld_db_.get_registered_domain(client_identity_.ascii())};
     if (tld_id && white_.lookup(tld_id)) {
       LOG(INFO) << "ham since client identity registered domain (" << tld_id
                 << ") is whitelisted";
@@ -461,7 +461,7 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
     }
 
-    auto tld_rp{tld_db_.get_registered_domain(rp_dom.lc())};
+    auto tld_rp{tld_db_.get_registered_domain(rp_dom.ascii())};
     if (tld_rp && white_.lookup(tld_rp)) {
       LOG(INFO) << "ham since reverse path registered domain (" << tld_rp
                 << ") is whitelisted";
@@ -1054,18 +1054,19 @@ bool Session::verify_ip_address_(std::string& error_msg)
         = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
 
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (black_.lookup(client_fcrdns.lc())) {
-        error_msg = "FCrDNS "s + client_fcrdns.lc() + " on static blacklist"s;
+      if (black_.lookup(client_fcrdns.ascii())) {
+        error_msg
+            = "FCrDNS "s + client_fcrdns.ascii() + " on static blacklist"s;
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
-      if (white_.lookup(client_fcrdns.lc())) {
+      if (white_.lookup(client_fcrdns.ascii())) {
         LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
         return true;
       }
 
-      auto const tld{tld_db_.get_registered_domain(client_fcrdns.lc())};
+      auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
         if (black_.lookup(tld)) {
           error_msg = "FCrDNS domain "s + tld + " on static blacklist"s;
@@ -1157,10 +1158,10 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   auto labels{std::vector<std::string>{}};
-  boost::algorithm::split(labels, client_identity.lc(),
+  boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg = "claimed bogus identity "s + client_identity.lc();
+    error_msg = "claimed bogus identity "s + client_identity.ascii();
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1171,12 +1172,12 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = "claimed blacklisted identity "s + client_identity.lc();
+    error_msg = "claimed blacklisted identity "s + client_identity.ascii();
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
 
-  auto const tld{tld_db_.get_registered_domain(client_identity.lc())};
+  auto const tld{tld_db_.get_registered_domain(client_identity.ascii())};
   if (!tld) {
     // Sometimes we may want to look at mail from misconfigured
     // sending systems.
@@ -1292,15 +1293,15 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return true;
   }
 
-  if (white_.lookup(sender.lc())) {
-    LOG(INFO) << "sender " << sender.lc() << " whitelisted";
+  if (white_.lookup(sender.ascii())) {
+    LOG(INFO) << "sender " << sender.ascii() << " whitelisted";
     return true;
   }
 
   // Break sender domain into labels:
 
   auto labels{std::vector<std::string>{}};
-  boost::algorithm::split(labels, sender.lc(),
+  boost::algorithm::split(labels, sender.ascii(),
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
@@ -1310,7 +1311,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return false;
   }
 
-  auto reg_dom{tld_db_.get_registered_domain(sender.lc())};
+  auto reg_dom{tld_db_.get_registered_domain(sender.ascii())};
   if (!reg_dom) {
     error_msg = "no registered domain";
     return false;
@@ -1433,7 +1434,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     /*
       If we want to refuse mail that fails SPF:
       // Error code from RFC 7372, section 3.2.  Also:
-      // <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+      //
+      <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
       out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
       return false;
     */

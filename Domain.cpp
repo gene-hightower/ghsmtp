@@ -32,14 +32,12 @@ void Domain::set(std::string_view dom)
   if (IP4::is_address(dom)) {
     ascii_ = IP4::to_address_literal(dom);
     utf8_ = ascii_;
-    lc_ = ascii_;
     is_address_literal_ = true;
     return;
   }
   if (IP6::is_address(dom)) {
     ascii_ = IP6::to_address_literal(dom);
     utf8_ = ascii_;
-    lc_ = ascii_;
     is_address_literal_ = true;
     return;
   }
@@ -47,7 +45,6 @@ void Domain::set(std::string_view dom)
   if (IP4::is_address_literal(dom) || IP6::is_address_literal(dom)) {
     ascii_ = std::string(dom.data(), dom.length());
     utf8_ = ascii_;
-    lc_ = ascii_;
     is_address_literal_ = true;
     return;
   }
@@ -75,7 +72,4 @@ void Domain::set(std::string_view dom)
   }
   utf8_ = ptr;
   idn2_free(ptr);
-
-  lc_.resize(ascii_.length());
-  std::transform(ascii_.begin(), ascii_.end(), lc_.begin(), ::tolower);
 }

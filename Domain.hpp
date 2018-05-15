@@ -22,35 +22,32 @@ public:
   void set(std::string_view dom);
 
   inline void clear();
-  bool empty() const { return lc_.empty(); }
+  bool empty() const { return ascii_.empty(); }
 
   inline static std::string_view remove_trailing_dot(std::string_view a);
   inline static bool match(std::string_view a, std::string_view b);
 
-  bool operator==(std::string_view rhs) const { return match(lc_, rhs); }
+  bool operator==(std::string_view rhs) const { return match(ascii_, rhs); }
   bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
 
-  bool operator==(Domain const& rhs) const { return match(lc_, rhs.lc_); }
+  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
   bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
 
   bool is_address_literal() const { return is_address_literal_; }
   bool is_unicode() const { return utf8() != ascii(); }
 
-  std::string const& lc() const { return lc_; }
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
 private:
   std::string ascii_;
   std::string utf8_;
-  std::string lc_;
 
   bool is_address_literal_{false};
 };
 
 inline void Domain::clear()
 {
-  lc_.clear();
   ascii_.clear();
   utf8_.clear();
   is_address_literal_ = false;
