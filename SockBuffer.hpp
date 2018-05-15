@@ -71,6 +71,7 @@ public:
   }
   bool tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }
+  bool verified() const { return tls_.verified(); };
 
   void set_max_read(std::streamsize max)
   {

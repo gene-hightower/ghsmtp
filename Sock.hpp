@@ -56,6 +56,7 @@ public:
   }
   bool tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }
+  bool verified() { return iostream_->verified(); };
 
   void set_max_read(std::streamsize max) { iostream_->set_max_read(max); }
 
