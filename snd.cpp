@@ -1554,8 +1554,11 @@ int main(int argc, char* argv[])
   }
 
   auto bodies{std::vector<content>{}};
-  for (int a = 1; a < argc; ++a)
+  for (int a = 1; a < argc; ++a) {
+    if (!fs::exists(argv[a]))
+      LOG(FATAL) << "can't find mail body part " << argv[a];
     bodies.push_back(argv[a]);
+  }
 
   if (argc == 1)
     bodies.push_back("body.txt");
