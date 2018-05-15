@@ -53,6 +53,8 @@ public:
 
   std::string info() const;
 
+  bool verified() const { return verified_; };
+
   struct per_cert_ctx {
     explicit per_cert_ctx(SSL_CTX* ctx_, std::vector<Domain> cn_)
       : ctx(ctx_)
