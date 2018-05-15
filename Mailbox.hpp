@@ -7,8 +7,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/algorithm/string.hpp>
-
 class Mailbox {
 public:
   Mailbox() = default;
@@ -21,7 +19,6 @@ public:
   void set_local(std::string local_part) { local_part_ = local_part; }
   void set_domain(std::string d)
   {
-    boost::to_lower(d);
     domain_.set(d);
   }
   void clear()
