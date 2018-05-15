@@ -57,6 +57,8 @@ void Domain::set(std::string_view dom)
 
   auto norm = nfkc(dom);
 
+  // idn2_to_ascii_8z() converts (ASCII) to lower case
+
   char* ptr = nullptr;
   auto code = idn2_to_ascii_8z(norm.data(), &ptr, IDN2_TRANSITIONAL);
   if (code != IDN2_OK) {
