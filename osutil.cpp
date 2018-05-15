@@ -89,11 +89,12 @@ std::string get_hostname()
   return node;
 }
 
-std::vector<fs::path> list_directory(fs::path const& path,
-                                     // pattern should be std::string_view see p0506r0:
-                                     // <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0506r0.pdf>
-                                     // maybe C++20?
-                                     std::string const& pattern)
+std::vector<fs::path> list_directory(
+    fs::path const& path,
+    // pattern should be std::string_view see p0506r0:
+    // <http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0506r0.pdf>
+    // maybe C++20?
+    std::string const& pattern)
 {
   std::vector<fs::path> ret;
 

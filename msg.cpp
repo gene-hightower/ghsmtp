@@ -519,8 +519,8 @@ struct sender : seq<TAOCPP_PEGTL_ISTRING("Sender:"), mailbox, eol> {
 struct reply_to : seq<TAOCPP_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
 };
 
-struct address_list_or_pm : sor<TAOCPP_PEGTL_ISTRING("Postmaster"),
-                                address_list> {
+struct address_list_or_pm
+  : sor<TAOCPP_PEGTL_ISTRING("Postmaster"), address_list> {
 };
 
 // Destination Address Fields

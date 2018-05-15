@@ -43,4 +43,4 @@ RR_TLSA::RR_TLSA(uint8_t cert_usage,
   memcpy(&assoc_data_[0], assoc_data, assoc_data_sz);
 }
 
-}
+} // namespace DNS

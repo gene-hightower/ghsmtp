@@ -214,6 +214,6 @@ using RR
 
 using RR_set = std::vector<RR>;
 
-}
+} // namespace DNS
 
 #endif // DNS_RRS_DOT_HPP

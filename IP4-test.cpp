@@ -68,7 +68,8 @@ int main(int argc, char const* argv[])
 
   auto fcrdnses = fcrdns(addr);
   CHECK_GT(fcrdnses.size(), 1);
-  CHECK(Domain::match(fcrdnses.front(), "digilicious.com")) << "no match for " << fcrdnses.front();
+  CHECK(Domain::match(fcrdnses.front(), "digilicious.com"))
+      << "no match for " << fcrdnses.front();
 
   CHECK(is_address(addr));
   CHECK(is_address_literal(addr_lit));
