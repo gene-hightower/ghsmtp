@@ -9,7 +9,11 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+auto constexpr v6 = false;
+
 auto constexpr addr4 = "1.1.1.1";
+auto constexpr addr6 = "2606:4700:4700::1111";
+
 auto constexpr srv = "domain-s";
 
 auto constexpr client_name = "digilicious.com";
@@ -22,14 +26,28 @@ int main(int argc, char* argv[])
   auto const fd{socket(AF_INET, SOCK_STREAM, 0)};
   PCHECK(fd >= 0) << "socket() failed";
 
-  auto in4{sockaddr_in{}};
-  in4.sin_family = AF_INET;
-  in4.sin_port = htons(port);
-  CHECK_EQ(inet_pton(AF_INET, addr4, reinterpret_cast<void*>(&in4.sin_addr)),
-           1);
+  if (v6) {
+    auto const fd{socket(AF_INET6, SOCK_STREAM, 0)};
+    PCHECK(fd >= 0) << "socket() failed";
 
-  if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
-    PLOG(FATAL) << "connect failed [" << addr4 << "]:" << port;
+    auto in6{sockaddr_in6{}};
+    in6.sin6_family = AF_INET6;
+    in6.sin6_port = htons(port);
+    CHECK_EQ(
+        inet_pton(AF_INET6, addr6, reinterpret_cast<void*>(&in6.sin6_addr)), 1);
+    if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
+      PLOG(FATAL) << "connect failed [" << addr6 << "]:" << port;
+    }
+  }
+  else {
+    auto in4{sockaddr_in{}};
+    in4.sin_family = AF_INET;
+    in4.sin_port = htons(port);
+    CHECK_EQ(inet_pton(AF_INET, addr4, reinterpret_cast<void*>(&in4.sin_addr)),
+             1);
+    if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
+      PLOG(FATAL) << "connect failed [" << addr4 << "]:" << port;
+    }
   }
 
   Sock sock(fd, fd);
