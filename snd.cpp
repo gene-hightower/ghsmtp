@@ -523,29 +523,6 @@ struct action<reply_code> {
 };
 } // namespace RFC5321
 
-uint16_t get_port(char const* const service)
-{
-  auto ep{(char*){}};
-  auto const service_no{strtoul(service, &ep, 10)};
-  if (ep && (*ep == '\0')) {
-    CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());
-    return static_cast<uint16_t>(service_no);
-  }
-
-  auto result_buf{servent{}};
-  auto result_ptr{(servent*){}};
-  auto str_buf{std::vector<char>(1024)}; // 1024 suggested by getservbyname_r(3)
-  while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
-                         str_buf.size(), &result_ptr)
-         == ERANGE) {
-    str_buf.resize(str_buf.size() * 2);
-  }
-  if (result_ptr == nullptr) {
-    LOG(FATAL) << "service " << service << " unknown";
-  }
-  return ntohs(result_buf.s_port);
-}
-
 int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 {
   auto const use_4{!FLAGS_6};
@@ -1571,7 +1548,7 @@ int main(int argc, char* argv[])
 
   auto&& [from_mbx, to_mbx] = parse_mailboxes();
 
-  auto const port{get_port(FLAGS_service.c_str())};
+  auto const port{osutil::get_port(FLAGS_service.c_str())};
 
   auto res{DNS::Resolver{}};
   auto tlsa_rrs{get_tlsa_rrs(res, to_mbx.domain(), port)};

@@ -14,6 +14,10 @@ DEFINE_string(config_dir, "", "path to support/config files");
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
 #include <glog/logging.h>
 
 namespace osutil {
@@ -87,6 +91,29 @@ std::string get_hostname()
   // }
 
   return node;
+}
+
+uint16_t get_port(char const* const service)
+{
+  auto ep{(char*){}};
+  auto const service_no{strtoul(service, &ep, 10)};
+  if (ep && (*ep == '\0')) {
+    CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());
+    return static_cast<uint16_t>(service_no);
+  }
+
+  auto result_buf{servent{}};
+  auto result_ptr{(servent*){}};
+  auto str_buf{std::vector<char>(1024)}; // 1024 suggested by getservbyname_r(3)
+  while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
+                         str_buf.size(), &result_ptr)
+         == ERANGE) {
+    str_buf.resize(str_buf.size() * 2);
+  }
+  if (result_ptr == nullptr) {
+    LOG(FATAL) << "service " << service << " unknown";
+  }
+  return ntohs(result_buf.s_port);
 }
 
 std::vector<fs::path> list_directory(
