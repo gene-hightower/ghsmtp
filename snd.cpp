@@ -872,16 +872,16 @@ auto get_sender()
 {
   if (FLAGS_sender.empty()) {
     FLAGS_sender = {[&] {
-    auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
-    if (id_from_env)
-      return std::string{id_from_env};
+      auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
+      if (id_from_env)
+        return std::string{id_from_env};
 
-    auto const hostname{osutil::get_hostname()};
-    if (hostname.find('.') != std::string::npos)
-      return hostname;
+      auto const hostname{osutil::get_hostname()};
+      if (hostname.find('.') != std::string::npos)
+        return hostname;
 
-    LOG(FATAL) << "can't determine my server ID";
-  }()};
+      LOG(FATAL) << "can't determine my server ID";
+    }()};
   };
 
   auto const sender{Domain{FLAGS_sender}};
