@@ -190,11 +190,15 @@ struct rcpt_parameters : list<esmtp_param, SP> {};
 struct string : sor<quoted_string, atom> {};
 
 struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"),
-                  SP, domain, CRLF> {};
+                  SP,
+                  sor<domain, address_literal>,
+                  opt<sor<SP, string>>,
+                  CRLF> {};
 
 struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
                   SP,
                   sor<domain, address_literal>,
+                  opt<sor<SP, string>>,
                   CRLF> {};
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
@@ -451,7 +455,7 @@ struct action<helo> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const beg = in.begin() + 5; // +5 for the length of "HELO "
-    auto const end = in.end() - 2;   // -2 for the CRLF
+    auto const end = std::find(beg, in.end() - 2, ' '); // -2 for the CRLF
     ctx.session.helo(std::string_view(beg, end - beg));
   }
 };
@@ -462,7 +466,7 @@ struct action<ehlo> {
   static void apply(Input const& in, Ctx& ctx)
   {
     auto const beg = in.begin() + 5; // +5 for the length of "EHLO "
-    auto const end = in.end() - 2;   // -2 for the CRLF
+    auto const end = std::find(beg, in.end() - 2, ' '); // -2 for the CRLF
     ctx.session.ehlo(std::string_view(beg, end - beg));
   }
 };
