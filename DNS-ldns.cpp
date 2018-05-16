@@ -106,12 +106,8 @@ Query::Query(Resolver const& res, RR_type type, Domain const& dom)
     // If we have only one nameserver, reset the RTT otherwise all
     // future use of this resolver object will fail.
 
-    if (ldns_resolver_nameserver_count(res.get()) == 1) {
-      if (ldns_resolver_rtt(res.get()) == LDNS_RESOLV_RTT_INF) {
-        ldns_resolver_set_nameserver_rtt(res.get(), 0,
-                                         LDNS_RESOLV_RTT_MIN); // "reachable"
-      }
-    }
+    ldns_resolver_set_nameserver_rtt(res.get(), 0,
+                                     LDNS_RESOLV_RTT_MIN); // "reachable"
   }
 
   if (p_) {
