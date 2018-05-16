@@ -174,120 +174,141 @@ bool TLS::starttls_client(int fd_in,
 
   auto const config_path = osutil::get_config_dir();
 
-  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
-
-  CHECK_GE(certs.size(), 1) << "no client cert(s) found";
-
-  for (auto const& cert : certs) {
-
+  if (client_name == nullptr) {
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
-    std::vector<Domain> cn;
-
-    // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
         << "unable to enable DANE on SSL context";
 
     // you'd think if it's the default, you'd not have to call this
     CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
 
-    CHECK_GT(SSL_CTX_use_certificate_chain_file(ctx, cert.string().c_str()), 0)
-        << "Can't load certificate chain file " << cert;
-
-    auto const key = fs::path(cert).replace_extension(Config::key_ext);
-
-    if (fs::exists(key)) {
-
-      CHECK_GT(SSL_CTX_use_PrivateKey_file(ctx, key.string().c_str(),
-                                           SSL_FILETYPE_PEM),
-               0)
-          << "Can't load private key file " << key;
-
-      CHECK(SSL_CTX_check_private_key(ctx))
-          << "SSL_CTX_check_private_key failed for " << key;
-    }
-
     SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                        verify_callback);
 
-    //.......................................................
+    LOG(INFO) << "**** using no client cert";
 
-    auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
+    std::vector<Domain> cn;
+    cert_ctx_.emplace_back(ctx, cn);
+  }
+  else {
 
-    X509_NAME* subj = X509_get_subject_name(x509);
+    auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
-    int lastpos = -1;
-    for (;;) {
-      lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
-      if (lastpos == -1)
-        break;
-      auto e = X509_NAME_get_entry(subj, lastpos);
-      ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
-      auto str = ASN1_STRING_get0_data(d);
-      LOG(INFO) << "client cert found for " << str;
-      cn.emplace_back(reinterpret_cast<const char*>(str));
-    }
+    CHECK_GE(certs.size(), 1) << "no client cert(s) found";
 
-    auto subject_alt_names = static_cast<GENERAL_NAMES*>(
-        X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+    for (auto const& cert : certs) {
 
-    for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
+      auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+      std::vector<Domain> cn;
 
-      GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
+      // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
-      if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
-        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+      CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
+          << "unable to enable DANE on SSL context";
 
-        std::string str(
-            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
-            ASN1_STRING_length(asn1_str));
+      // you'd think if it's the default, you'd not have to call this
+      CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
 
-        LOG(INFO) << "email or uri alt name " << str;
+      CHECK_GT(SSL_CTX_use_certificate_chain_file(ctx, cert.string().c_str()),
+               0)
+          << "Can't load certificate chain file " << cert;
+
+      auto const key = fs::path(cert).replace_extension(Config::key_ext);
+
+      if (fs::exists(key)) {
+
+        CHECK_GT(SSL_CTX_use_PrivateKey_file(ctx, key.string().c_str(),
+                                             SSL_FILETYPE_PEM),
+                 0)
+            << "Can't load private key file " << key;
+
+        CHECK(SSL_CTX_check_private_key(ctx))
+            << "SSL_CTX_check_private_key failed for " << key;
       }
-      else if (gen->type == GEN_DNS) {
-        ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-        std::string str(
-            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
-            ASN1_STRING_length(asn1_str));
+      SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
+      SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                         verify_callback);
 
-        if (find(cn.begin(), cn.end(), str) == cn.end()) {
-          LOG(INFO) << "additional name found " << str;
-          cn.emplace_back(str);
+      //.......................................................
+
+      auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
+
+      X509_NAME* subj = X509_get_subject_name(x509);
+
+      int lastpos = -1;
+      for (;;) {
+        lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
+        if (lastpos == -1)
+          break;
+        auto e = X509_NAME_get_entry(subj, lastpos);
+        ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
+        auto str = ASN1_STRING_get0_data(d);
+        LOG(INFO) << "client cert found for " << str;
+        cn.emplace_back(reinterpret_cast<const char*>(str));
+      }
+
+      auto subject_alt_names = static_cast<GENERAL_NAMES*>(
+          X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+
+      for (int i = 0; i < sk_GENERAL_NAME_num(subject_alt_names); ++i) {
+
+        GENERAL_NAME* gen = sk_GENERAL_NAME_value(subject_alt_names, i);
+
+        if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
+          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+          std::string str(
+              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+              ASN1_STRING_length(asn1_str));
+
+          LOG(INFO) << "email or uri alt name " << str;
+        }
+        else if (gen->type == GEN_DNS) {
+          ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
+
+          std::string str(
+              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+              ASN1_STRING_length(asn1_str));
+
+          if (find(cn.begin(), cn.end(), str) == cn.end()) {
+            LOG(INFO) << "additional name found " << str;
+            cn.emplace_back(str);
+          }
+          else {
+            // LOG(INFO) << "duplicate name " << str << " ignored";
+          }
+        }
+        else if (gen->type == GEN_IPADD) {
+          unsigned char* p = gen->d.ip->data;
+          if (gen->d.ip->length == 4) {
+            std::stringstream ip;
+            ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.'
+               << unsigned(p[2]) << '.' << unsigned(p[3]);
+
+            LOG(INFO) << "alt name IP4 address " << ip.str();
+          }
+          else if (gen->d.ip->length == 16) {
+            LOG(ERROR) << "IPv6 not implemented";
+          }
+          else {
+            LOG(ERROR) << "unknown IP type";
+          }
         }
         else {
-          // LOG(INFO) << "duplicate name " << str << " ignored";
+          LOG(ERROR) << "unknown alt name type";
         }
       }
-      else if (gen->type == GEN_IPADD) {
-        unsigned char* p = gen->d.ip->data;
-        if (gen->d.ip->length == 4) {
-          std::stringstream ip;
-          ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.' << unsigned(p[2])
-             << '.' << unsigned(p[3]);
 
-          LOG(INFO) << "alt name IP4 address " << ip.str();
-        }
-        else if (gen->d.ip->length == 16) {
-          LOG(ERROR) << "IPv6 not implemented";
-        }
-        else {
-          LOG(ERROR) << "unknown IP type";
-        }
+      GENERAL_NAMES_free(subject_alt_names);
+
+      //.......................................................
+
+      if (std::find(cn.begin(), cn.end(), client_name) != cn.end()) {
+        LOG(INFO) << "**** using cert for " << client_name;
+        cert_ctx_.emplace_back(ctx, cn);
       }
-      else {
-        LOG(ERROR) << "unknown alt name type";
-      }
-    }
-
-    GENERAL_NAMES_free(subject_alt_names);
-
-    //.......................................................
-
-    if (std::find(cn.begin(), cn.end(), client_name) != cn.end()) {
-      LOG(INFO) << "**** using cert for " << client_name;
-      cert_ctx_.emplace_back(ctx, cn);
     }
   }
 
