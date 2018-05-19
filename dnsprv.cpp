@@ -48,31 +48,27 @@ struct nameserver {
   char const* port;
 };
 
-constexpr nameserver nameservers[]
-{
-#if 1
-  {
-      "localhost",
-      "127.0.0.1",
-      "domain",
-  },
-#else
-  {
-      "1dot1dot1dot1.cloudflare-dns.com",
-      "1.0.0.1",
-      "domain-s",
-  },
-      {
-          "1dot1dot1dot1.cloudflare-dns.com",
-          "1.1.1.1",
-          "domain-s",
-      },
-      {
-          "dns.quad9.net",
-          "9.9.9.10",
-          "domain-s",
-      },
-#endif
+constexpr nameserver nameservers[]{
+    {
+        "localhost",
+        "127.0.0.1",
+        "domain",
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.0.0.1",
+        "domain-s",
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.1.1.1",
+        "domain-s",
+    },
+    {
+        "dns.quad9.net",
+        "9.9.9.10",
+        "domain-s",
+    },
 };
 
 int main(int argc, char* argv[])
