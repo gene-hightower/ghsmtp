@@ -1,5 +1,4 @@
-USES := ldns libglog libidn2 opendkim openssl libcares
-
+USES := ldns libglog libidn2 opendkim openssl
 
 LDLIBS += \
 	-lboost_filesystem \
