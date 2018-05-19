@@ -1,4 +1,5 @@
-USES := ldns libglog libidn2 opendkim openssl
+USES := ldns libglog libidn2 opendkim openssl libcares
+
 
 LDLIBS += \
 	-lboost_filesystem \
@@ -12,7 +13,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := smtp msg sasl snd dnsprv
+PROGRAMS := smtp msg sasl snd
 
 DNS := DNS-rrs DNS-ldns
 
