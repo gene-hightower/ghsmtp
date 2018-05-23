@@ -12,12 +12,13 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := smtp msg sasl snd
+PROGRAMS := smtp msg sasl snd dnsprv
 
 DNS := DNS-rrs DNS-ldns
 
 dnsprv_STEMS := dnsprv \
 	Domain \
+	DNS-rrs \
 	IP4 \
 	IP6 \
 	POSIX \

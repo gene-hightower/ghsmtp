@@ -1105,7 +1105,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  std::default_random_engine());
     for (auto rbl : Config::rbls) {
-      if (has_record<RR_type::A>(res, reversed + rbl)) {
+      if (has_record(res, RR_type::A, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
         // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
         out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
@@ -1374,7 +1374,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
                std::default_random_engine());
   for (auto uribl : Config::uribls) {
-    if (DNS::has_record<DNS::RR_type::A>(res, (sender + ".") + uribl)) {
+    if (DNS::has_record(res, DNS::RR_type::A, (sender + ".") + uribl)) {
       error_msg = "blocked by "s + uribl;
       out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;

@@ -48,17 +48,18 @@ public:
   Resolver();
   ~Resolver();
 
-  RR_set get_records(RR_type typ, Domain const& domain) const;
   RR_set get_records(RR_type typ, std::string const& domain) const
   {
-    return get_records(typ, Domain(domain));
+    return get_records(typ, domain.c_str());
   }
-  RR_set get_records(RR_type typ, char const* domain) const
-  {
-    return get_records(typ, Domain(domain));
-  }
+  RR_set get_records(RR_type typ, char const* domain) const;
 
-  std::vector<std::string> get_strings(RR_type typ, Domain const& domain) const;
+  std::vector<std::string> get_strings(RR_type typ,
+                                       std::string const& domain) const
+  {
+    return get_strings(typ, domain.c_str());
+  }
+  std::vector<std::string> get_strings(RR_type typ, char const* domain) const;
 
   ldns_resolver* get() const { return res_; }
 
@@ -71,7 +72,8 @@ public:
   Query(Query const&) = delete;
   Query& operator=(Query const&) = delete;
 
-  Query(Resolver const& res, RR_type type, Domain const& dom);
+  Query(Resolver const& res, RR_type type, std::string const& dom);
+  Query(Resolver const& res, RR_type type, char const* dom);
   ~Query();
 
   ldns_pkt* get() const { return p_; }
@@ -104,60 +106,28 @@ private:
   ldns_rr_list* rrlst_additional_{nullptr};
 };
 
-template <RR_type type>
-std::vector<std::string> get_strings(Resolver const& res, Domain const& domain)
+inline std::vector<std::string>
+get_strings(Resolver const& res, RR_type type, char const* domain)
 {
   return res.get_strings(type, domain);
 }
 
-template <RR_type type>
-inline std::vector<std::string> get_strings(Resolver const& res,
-                                            std::string const& domain)
+inline std::vector<std::string>
+get_strings(Resolver const& res, RR_type type, std::string const& domain)
 {
-  return get_strings<type>(res, Domain(domain));
+  return res.get_strings(type, domain.c_str());
 }
 
-template <RR_type type>
-inline std::vector<std::string> get_strings(Resolver const& res,
-                                            char const* domain)
+inline bool has_record(Resolver const& res, RR_type type, char const* domain)
 {
-  return get_strings<type>(res, Domain(domain));
-}
-
-template <RR_type type>
-inline bool has_record(Resolver const& res, char const* domain)
-{
-  auto rr_set = res.get_records(type, Domain(domain));
+  auto rr_set = res.get_records(type, domain);
   return !rr_set.empty();
 }
 
-template <RR_type type>
-inline bool has_record(Resolver const& res, std::string const& domain)
+inline bool
+has_record(Resolver const& res, RR_type type, std::string const& domain)
 {
-  return has_record<type>(res, domain.c_str());
-}
-
-// Compatibility with the 1st generation:
-
-template <RR_type type>
-[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
-get_records(Resolver const& res, Domain const& domain)
-{
-  return res.get_strings(type, domain);
-}
-
-template <RR_type type>
-[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
-get_records(Resolver const& res, std::string const& domain)
-{
-  return get_strings<type>(res, Domain(domain));
-}
-
-template <RR_type type>
-[[deprecated("replaced by get_strings")]] inline std::vector<std::string>
-get_records(Resolver const& res, char const* domain)
-{
-  return get_strings<type>(res, Domain(domain));
+  return has_record(res, type, domain.c_str());
 }
 
 } // namespace DNS

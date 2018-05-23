@@ -90,8 +90,15 @@ Domain::Domain(std::string const& domain)
 
 Domain::~Domain() { ldns_rdf_deep_free(rdfp_); }
 
-Query::Query(Resolver const& res, RR_type type, Domain const& dom)
+Query::Query(Resolver const& res, RR_type type, std::string const& dom)
+  : Query(res, type, dom.c_str())
 {
+}
+
+Query::Query(Resolver const& res, RR_type type, char const* domain)
+{
+  Domain dom(domain);
+
   ldns_status status = ldns_resolver_query_status(
       &p_, res.get(), dom.get(), static_cast<ldns_enum_rr_type>(type),
       LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
@@ -343,7 +350,7 @@ std::vector<std::string> RR_list::get_strings() const
   return ret;
 }
 
-RR_set Resolver::get_records(RR_type typ, Domain const& domain) const
+RR_set Resolver::get_records(RR_type typ, char const* domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);
@@ -351,7 +358,7 @@ RR_set Resolver::get_records(RR_type typ, Domain const& domain) const
 }
 
 std::vector<std::string> Resolver::get_strings(RR_type typ,
-                                               Domain const& domain) const
+                                               char const* domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);

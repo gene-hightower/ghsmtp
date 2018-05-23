@@ -125,14 +125,14 @@ std::vector<std::string> fcrdns(std::string_view addr)
   // The reverse part, check PTR records.
   auto res{DNS::Resolver{}};
   auto const ptrs
-      = DNS::get_strings<DNS::RR_type::PTR>(res, reversed + "ip6.arpa");
+    = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
 
   std::vector<std::string> fcrdns;
 
   std::copy_if(ptrs.begin(), ptrs.end(), std::back_inserter(fcrdns),
                [&res, addr](std::string const& s) {
                  // The forward part, check each PTR for matching AAAA record.
-                 auto addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, s);
+                 auto addrs = res.get_strings(DNS::RR_type::AAAA, s);
                  return std::find(addrs.begin(), addrs.end(), addr)
                         != addrs.end();
                });

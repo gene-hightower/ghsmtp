@@ -552,7 +552,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
       }
     }
     else {
-      addrs = DNS::get_strings<DNS::RR_type::AAAA>(res, node.ascii());
+      addrs = res.get_strings(DNS::RR_type::AAAA, node.ascii());
     }
     for (auto const& addr : addrs) {
       auto in6{sockaddr_in6{}};
@@ -595,7 +595,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
       }
     }
     else {
-      addrs = DNS::get_strings<DNS::RR_type::A>(res, node.ascii());
+      addrs = res.get_strings(DNS::RR_type::A, node.ascii());
     }
     for (auto addr : addrs) {
       auto in4{sockaddr_in{}};
@@ -905,7 +905,7 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 
   auto const& domain = to_mbx.domain().ascii();
 
-  auto q{DNS::Query{res, DNS::RR_type::MX, DNS::Domain{domain}}};
+  auto q{DNS::Query{res, DNS::RR_type::MX, domain}};
   if (q.authentic_data()) {
     LOG(INFO) << "MX records authentic for domain " << domain;
   }
@@ -1496,7 +1496,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
   std::ostringstream tlsa;
   tlsa << '_' << port << "._tcp." << domain.ascii();
 
-  DNS::Query q(res, DNS::RR_type::TLSA, DNS::Domain(tlsa.str()));
+  DNS::Query q(res, DNS::RR_type::TLSA, tlsa.str());
 
   if (q.nx_domain()) {
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;

@@ -11,8 +11,8 @@ int main(int argc, char const* argv[])
 
   DNS::Resolver res;
 
-  auto goog_a = DNS::Domain{"google-public-dns-a.google.com"};
-  auto goog_b = DNS::Domain{"google-public-dns-b.google.com"};
+  auto goog_a{"google-public-dns-a.google.com"};
+  auto goog_b{"google-public-dns-b.google.com"};
 
   auto addrs_a = res.get_records(RR_type::A, goog_a);
 
@@ -35,7 +35,7 @@ int main(int argc, char const* argv[])
       strcmp(std::get<RR_AAAA>(aaaaddrs_b[0]).c_str(), "2001:4860:4860::8844"),
       0);
 
-  auto mxes = res.get_records(RR_type::MX, DNS::Domain("anyold.host"));
+  auto mxes = res.get_records(RR_type::MX, "anyold.host");
 
   // RFC 5321 section 5.1 “Locating the Target Host”
   std::shuffle(mxes.begin(), mxes.end(), std::default_random_engine());
@@ -52,12 +52,12 @@ int main(int argc, char const* argv[])
     LOG(INFO) << "mx.exchange   == " << std::get<RR_MX>(mx).exchange();
   }
 
-  auto as = res.get_records(RR_type::A, DNS::Domain("amazon.com"));
+  auto as = res.get_records(RR_type::A, "amazon.com");
   for (auto const& a : as) {
     LOG(INFO) << "a   == " << std::get<RR_A>(a).c_str();
   }
 
-  Query q(res, RR_type::TLSA, DNS::Domain("_25._tcp.digilicious.com"));
+  Query q(res, RR_type::TLSA, "_25._tcp.digilicious.com");
   CHECK(q.authentic_data()) << "TLSA records must be authenticated";
   RR_list rrlst(q);
   auto tlsas = rrlst.get_records();
@@ -72,17 +72,15 @@ int main(int argc, char const* argv[])
     // LOG(INFO) << "tlsa mtype     == " << mtype;
   }
 
-  Query q_noexist(res, RR_type::A,
-                  DNS::Domain("does-not-exist.test.digilicious.com"));
+  Query q_noexist(res, RR_type::A, "does-not-exist.test.digilicious.com");
   CHECK(q_noexist.nx_domain());
   CHECK(!q_noexist.bogus_or_indeterminate());
 
-  Query q_dee(res, RR_type::A, DNS::Domain("dee.test.digilicious.com"));
+  Query q_dee(res, RR_type::A, "dee.test.digilicious.com");
   CHECK(!q_dee.nx_domain());
   CHECK(q_dee.bogus_or_indeterminate());
 
-  auto cmxes
-      = res.get_records(RR_type::MX, DNS::Domain("cname.test.digilicious.com"));
+  auto cmxes = res.get_records(RR_type::MX, "cname.test.digilicious.com");
   for (auto const& cmx : cmxes) {
     if (std::holds_alternative<RR_CNAME>(cmx)) {
       LOG(INFO) << "cname == " << std::get<RR_CNAME>(cmx).str();
