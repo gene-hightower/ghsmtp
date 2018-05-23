@@ -646,7 +646,7 @@ int main(int argc, char* argv[])
         continue;
       }
 
-      auto const sock = std::make_shared<Sock>(fd, fd);
+      auto sock = std::make_unique<Sock>(fd, fd);
 
       if (port != 53) {
         DNS::RR_set tlsa_rrs; // empty
