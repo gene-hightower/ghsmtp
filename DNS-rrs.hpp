@@ -255,4 +255,6 @@ using RR_set = std::vector<RR>;
 
 } // namespace DNS
 
+std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type);
+
 #endif // DNS_RRS_DOT_HPP

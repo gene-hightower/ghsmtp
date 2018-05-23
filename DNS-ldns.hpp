@@ -132,6 +132,4 @@ has_record(Resolver const& res, RR_type type, std::string const& domain)
 
 } // namespace DNS
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type);
-
 #endif // DNS_LDNS_DOT_HPP
