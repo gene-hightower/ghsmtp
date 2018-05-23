@@ -29,9 +29,32 @@ enum class RR_type : uint16_t {
   MINFO,
   MX,
   TXT,
+  RP,    // RFC 1183 Responsible Person
+  AFSDB, // RFC 1183 AFS database record
+
+  // RFC 2535
+  SIG = 24, // RFC 2535 Signature
+  KEY = 25, // RFC 2535 and RFC 2930 Key record
 
   // RFC 3596 section 2.1 “AAAA record type”
   AAAA = 28,
+
+  // RFC 2782 Service locator
+  SRV = 33,
+
+  // RFC 4398 Certificate record
+  CERT = 37,
+
+  // RFC 6891 EDNS(0) OPT pseudo-RR
+  OPT = 41,
+
+  // RFC 4255 SSH Public Key Fingerprint
+  SSHFP = 44,
+
+  // RFC 4034
+  RRSIG = 46,  // DNSSEC signature
+  NSEC = 47,   // Next Secure record
+  DNSKEY = 48, // DNS Key record
 
   // RFC 6698 section 7.1 “TLSA RRtype”
   TLSA = 52,
@@ -57,10 +80,26 @@ constexpr char const* RR_type_c_str(RR_type type)
   case RR_type::MINFO:  return "MINFO";
   case RR_type::MX:     return "MX";
   case RR_type::TXT:    return "TXT";
+  case RR_type::RP:     return "RP";
+  case RR_type::AFSDB:  return "AFSDB";
+  case RR_type::SIG:    return "SIG";
+  case RR_type::KEY:    return "KEY";
   case RR_type::AAAA:   return "AAAA";
+  case RR_type::SRV:    return "SRV";
+  case RR_type::CERT:   return "CERT";
+  case RR_type::OPT:    return "OPT";
+  case RR_type::SSHFP:  return "SSHFP";
+  case RR_type::RRSIG:  return "RRSIG";
+  case RR_type::NSEC:   return "NSEC";
+  case RR_type::DNSKEY: return "DNSKEY";
   case RR_type::TLSA:   return "TLSA";
   } // clang-format on
   return "*** unknown RR_type ***";
+}
+
+constexpr char const* RR_type_c_str(uint16_t rcode)
+{
+  return RR_type_c_str(static_cast<RR_type>(rcode));
 }
 
 constexpr char const* rcode_c_str(uint16_t rcode)
