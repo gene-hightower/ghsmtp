@@ -1101,7 +1101,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
-    auto const res{DNS::Resolver{}};
+    auto res{DNS::Resolver{}};
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  std::default_random_engine());
     for (auto rbl : Config::rbls) {

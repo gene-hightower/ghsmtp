@@ -1,6 +1,6 @@
-#include <iostream>
-
 #include "Sock.hpp"
+
+#include <iostream>
 
 int main(int argc, char* argv[])
 {

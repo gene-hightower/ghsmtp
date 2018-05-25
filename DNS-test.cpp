@@ -59,8 +59,7 @@ int main(int argc, char const* argv[])
 
   Query q(res, RR_type::TLSA, "_25._tcp.digilicious.com");
   CHECK(q.authentic_data()) << "TLSA records must be authenticated";
-  RR_list rrlst(q);
-  auto tlsas = rrlst.get_records();
+  auto tlsas = q.get_records();
 
   for (auto const& tlsa : tlsas) {
     unsigned usage = std::get<RR_TLSA>(tlsa).cert_usage();
@@ -88,6 +87,14 @@ int main(int argc, char const* argv[])
     else {
       LOG(INFO) << "mx.preference == " << std::get<RR_MX>(cmx).preference();
       LOG(INFO) << "mx.exchange   == " << std::get<RR_MX>(cmx).exchange();
+    }
+  }
+
+  auto txts = res.get_records(RR_type::TXT, "digilicious.com");
+  for (auto const& txt : txts) {
+    if (std::holds_alternative<RR_TXT>(txt)) {
+      LOG(INFO) << "len == " << std::get<RR_TXT>(txt).str().length();
+      LOG(INFO) << "txt == " << std::get<RR_TXT>(txt).str();
     }
   }
 }

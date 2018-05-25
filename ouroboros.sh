@@ -10,7 +10,6 @@ coproc \
     MAILDIR=/tmp/Maildir \
     GOOGLE_LOG_DIR=/tmp/Maillogs \
     GLOG_minloglevel=0 \
-    ./smtp \
-    -log_data=true
+    ./smtp
 
-ASAN_OPTIONS=detect_odr_violation=0 ./snd -log_data=true -pipe=true <&${COPROC[0]} >&${COPROC[1]}
+ASAN_OPTIONS=detect_odr_violation=0 ./snd -pipe=true <&${COPROC[0]} >&${COPROC[1]}

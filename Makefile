@@ -14,7 +14,7 @@ LDLIBS += \
 
 PROGRAMS := smtp msg sasl snd dnsprv
 
-DNS := DNS-rrs DNS-ldns
+DNS := DNS-rrs DNS-priv
 
 dnsprv_STEMS := dnsprv \
 	Domain \
@@ -36,14 +36,24 @@ msg_STEMS := msg \
 	Domain \
 	IP \
 	IP4 \
+	IP4-fcrdns \
 	IP6 \
+	IP6-fcrdns \
+	POSIX \
 	SPF \
+	Sock \
+	SockBuffer \
+	TLS-OpenSSL \
 	esc \
 	osutil
 
 sasl_STEMS := sasl \
 	Base64 \
+	Domain \
+	IP4 \
+	IP6 \
 	POSIX \
+	Sock \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
@@ -55,7 +65,9 @@ smtp_STEMS := smtp \
 	Domain \
 	IP \
 	IP4 \
+	IP4-fcrdns \
 	IP6 \
+	IP6-fcrdns \
 	Message \
 	POSIX \
 	Pill \
@@ -74,7 +86,9 @@ snd_STEMS := snd \
 	Domain \
 	IP \
 	IP4 \
+	IP4-fcrdns \
 	IP6 \
+	IP6-fcrdns \
 	Magic \
 	POSIX \
 	Pill \
@@ -108,20 +122,42 @@ TESTS := \
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
-DNS-test_STEMS := $(DNS)
-Domain-test_STEMS := $(DNS) Domain IP IP4 IP6
-IP4-test_STEMS := $(DNS) IP4
-IP6-test_STEMS := $(DNS) IP6
+
+DNS-test_STEMS := $(DNS) Domain IP IP4 IP4-fcrdns IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+
+Domain-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP4-test_STEMS := $(DNS) Domain IP4 IP4-fcrdns IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP6-test_STEMS := $(DNS) Domain IP4 IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Magic-test_STEMS := Magic
-Mailbox-test_STEMS := $(DNS) Domain IP IP4 IP6
-Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill
+Mailbox-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Message-test_STEMS := $(DNS) Domain IP IP4 IP4-fcrdns IP6 IP6-fcrdns Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
-SPF-test_STEMS := $(DNS) IP4 IP6 SPF
-Session-test_STEMS := CDB $(DNS) Domain IP IP4 IP6 Message POSIX Pill SPF Session Sock SockBuffer TLS-OpenSSL esc osutil
-Sock-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-SockBuffer-test_STEMS := POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-TLS-OpenSSL-test_STEMS := POSIX TLS-OpenSSL osutil
+SPF-test_STEMS := $(DNS) Domain IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+
+Session-test_STEMS := \
+	CDB \
+	$(DNS) \
+	Domain \
+	IP \
+	IP4 \
+	IP4-fcrdns \
+	IP6 \
+	IP6-fcrdns \
+	Message \
+	POSIX \
+	Pill \
+	SPF \
+	Session \
+	Sock \
+	SockBuffer \
+	TLS-OpenSSL \
+	esc \
+	osutil
+
+Sock-test_STEMS := Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+SockBuffer-test_STEMS := Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+TLS-OpenSSL-test_STEMS := Domain IP4 IP6 POSIX TLS-OpenSSL osutil
 esc-test_STEMS := esc
 
 databases := \
@@ -176,7 +212,7 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-safty_flags := # nada
+# safty_flags := # nada
 
 # visibility_flags := # nada
 

@@ -1,3 +1,9 @@
+#include "DNS-priv.hpp"
+
+#include "Sock.hpp"
+
+#include <glog/logging.h>
+
 #include <limits>
 #include <memory>
 #include <tuple>
@@ -8,8 +14,6 @@
 
 #include <arpa/nameser.h>
 
-#include "DNS-rrs.hpp"
-#include "Sock.hpp"
 #include "osutil.hpp"
 
 auto constexpr max_udp_sz{uint16_t(4 * 1024)};
@@ -27,15 +31,15 @@ struct nameserver {
 };
 
 constexpr nameserver nameservers[]{
-    //*
-      {
-          "localhost",
-          "127.0.0.1",
-          "domain",
-      },
-    //*/
-
     /*
+    {
+        "localhost",
+        "127.0.0.1",
+        "domain",
+    },
+    */
+
+    //*
     {
         "1dot1dot1dot1.cloudflare-dns.com",
         "1.0.0.1",
@@ -51,7 +55,7 @@ constexpr nameserver nameservers[]{
         "9.9.9.10",
         "domain-s",
     },
-    */
+    //*/
 };
 
 /*
@@ -126,7 +130,7 @@ class question {
   octet qclass_lo_;
 
 public:
-  explicit question(DNS::RR_type qtype, uint16_t qclass = ns_c_in)
+  explicit question(DNS::RR_type qtype, uint16_t qclass)
     : qtype_hi_(hi(static_cast<uint16_t>(qtype)))
     , qtype_lo_(lo(static_cast<uint16_t>(qtype)))
     , qclass_hi_(hi(qclass))
@@ -170,7 +174,7 @@ class edns0_opt_meta_rr {
   octet root_domain_name_{0}; // must be zero
 
   octet type_hi_{0};
-  octet type_lo_{ns_t_opt}; // OPT
+  octet type_lo_{ns_t_opt};
 
   octet class_hi_; // UDP payload size
   octet class_lo_;
@@ -251,6 +255,11 @@ public:
   unsigned char const* rddata() const
   {
     return reinterpret_cast<unsigned char const*>(this) + sizeof(rr);
+  }
+
+  char const* cdata() const
+  {
+    return reinterpret_cast<char const*>(this) + sizeof(rr);
   }
 
   unsigned char const* next_rr_name() const { return rddata() + rdlength(); }
@@ -440,9 +449,10 @@ int name_put(unsigned char* bfr, char const* name)
   return sz;
 }
 
-// returns both a unique_ptr to an array of chars and it's size
+// returns a unique_ptr to an array of chars and it's size in q_bfr_sz
 
-auto create_question(char const* name, DNS::RR_type type, uint16_t id)
+DNS::pkt
+create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
 {
   // size to allocate may be larger than needed if backslash escapes
   // are used in domain name
@@ -461,7 +471,7 @@ auto create_question(char const* name, DNS::RR_type type, uint16_t id)
   CHECK_GE(len, 1) << "malformed domain name " << name;
   q += len;
 
-  new (q) question(type);
+  new (q) question(type, cls);
   q += sizeof(question);
 
   new (q) edns0_opt_meta_rr(max_udp_sz);
@@ -471,151 +481,14 @@ auto create_question(char const* name, DNS::RR_type type, uint16_t id)
   auto sz = q - bfr.get();
   CHECK_LE(sz, sz_alloc);
 
-  return std::make_tuple(std::move(bfr), sz);
+  return DNS::pkt{std::move(bfr), static_cast<uint16_t>(sz)};
 }
 
-bool parse_answer(unsigned char const* bfr, uint16_t sz)
+namespace DNS {
+
+Resolver::Resolver()
 {
-  if (sz < sizeof(header)) {
-    LOG(WARNING) << "packet too small at " << sz << " octets";
-    return false;
-  }
-
-  auto p = bfr;
-
-  auto hdr_p = reinterpret_cast<header const*>(p);
-  p += sizeof(header);
-
-  CHECK_EQ(hdr_p->id(), 0x1234);
-
-  if (hdr_p->authentic_data()) {
-    LOG(INFO) << "*** authentic data";
-  }
-
-  auto rcode = hdr_p->rcode();
-  LOG(INFO) << "basic rcode == " << DNS::rcode_c_str(rcode);
-
-  LOG(INFO) << "*** questions == " << hdr_p->qdcount();
-  for (auto i = 0; i < hdr_p->qdcount(); ++i) {
-    std::string qname;
-    auto enc_len = 0;
-
-    CHECK(expand_name(p, bfr, sz, qname, &enc_len));
-    p += enc_len;
-    auto question_p = reinterpret_cast<question const*>(p);
-
-    LOG(INFO) << "qname == " << qname;
-    LOG(INFO) << "question_p->qtype() == "
-              << DNS::RR_type_c_str(question_p->qtype());
-    LOG(INFO) << "question_p->qclass() == " << question_p->qclass();
-
-    p += sizeof(question);
-  }
-
-  LOG(INFO) << "*** answers == " << hdr_p->ancount();
-  for (auto i = 0; i < hdr_p->ancount(); ++i) {
-    std::string name;
-    auto enc_len = 0;
-
-    CHECK(expand_name(p, bfr, sz, name, &enc_len));
-    p += enc_len;
-    auto rr_p = reinterpret_cast<rr const*>(p);
-
-    LOG(INFO) << "name == " << name;
-    LOG(INFO) << "rr_p->type()     == " << DNS::RR_type_c_str(rr_p->rr_type());
-    LOG(INFO) << "rr_p->class()    == " << rr_p->rr_class();
-    LOG(INFO) << "rr_p->ttl()      == " << rr_p->rr_ttl();
-    LOG(INFO) << "rr_p->rdlength() == " << rr_p->rdlength();
-
-    if (rr_p->rr_class() == ns_c_in) {
-      auto typ = static_cast<DNS::RR_type>(rr_p->rr_type());
-      switch (typ) {
-      case DNS::RR_type::A:
-        break;
-      case DNS::RR_type::MX:
-        break;
-      case DNS::RR_type::TXT:
-        break;
-      case DNS::RR_type::TLSA:
-        break;
-      default:
-        break;
-      }
-    }
-
-    p = rr_p->next_rr_name();
-  }
-
-  LOG(INFO) << "*** nameservers == " << hdr_p->nscount();
-  for (auto i = 0; i < hdr_p->nscount(); ++i) {
-    std::string name;
-    auto enc_len = 0;
-
-    CHECK(expand_name(p, bfr, sz, name, &enc_len));
-    p += enc_len;
-    auto rr_p = reinterpret_cast<rr const*>(p);
-
-    LOG(INFO) << "name == " << name;
-    LOG(INFO) << "rr_p->type()  == " << DNS::RR_type_c_str(rr_p->rr_type());
-    LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
-    LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
-
-    p = rr_p->next_rr_name();
-  }
-
-  LOG(INFO) << "*** additional == " << hdr_p->arcount();
-  for (auto i = 0; i < hdr_p->arcount(); ++i) {
-    std::string name;
-    auto enc_len = 0;
-
-    CHECK(expand_name(p, bfr, sz, name, &enc_len));
-    p += enc_len;
-    auto rr_p = reinterpret_cast<rr const*>(p);
-
-    if (rr_p->rr_type() == ns_t_opt) {
-      auto opt_p = reinterpret_cast<edns0_opt_meta_rr const*>(p);
-      auto ext_rcode = (opt_p->extended_rcode() << 4) + hdr_p->rcode();
-      LOG(INFO) << "extended rcode == " << DNS::rcode_c_str(ext_rcode);
-    }
-    else {
-      LOG(INFO) << "name == " << name;
-      LOG(INFO) << "rr_p->type()  == " << DNS::RR_type_c_str(rr_p->rr_type());
-      LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
-      LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
-    }
-
-    p = rr_p->next_rr_name();
-  }
-
-  return true;
-}
-
-int main(int argc, char* argv[])
-{
-  static_assert(sizeof(header) == 12);
-  static_assert(sizeof(question) == 4);
-  static_assert(sizeof(edns0_opt_meta_rr) == 11);
-
-  /*
-  unsigned char test_bfr[300];
-  CHECK_EQ(name_put(test_bfr, "foo.bar"), 9);
-  CHECK_EQ(memcmp(test_bfr, "\03foo\03bar", 9), 0);
-
-  CHECK_EQ(name_put(test_bfr, "."), 1);
-  CHECK_EQ(memcmp(test_bfr, "", 1), 0);
-
-  CHECK_EQ(name_put(test_bfr, ""), 1);
-  CHECK_EQ(memcmp(test_bfr, "", 1), 0);
-
-  CHECK_EQ(name_put(test_bfr, ".."), -1);
-
-  CHECK_EQ(name_put(test_bfr, ".foo"), -1);
-
-  CHECK_EQ(name_put(test_bfr, "foo."), 5);
-  CHECK_EQ(memcmp(test_bfr, "\03foo", 5), 0);
-  */
-
-  auto ns_sock{[&] {
+  ns_sock_ = [&] {
     auto tries = countof(nameservers);
     auto ns = std::experimental::randint(
         0, static_cast<int>(countof(nameservers) - 1));
@@ -666,31 +539,423 @@ int main(int argc, char* argv[])
     }
 
     LOG(FATAL) << "no nameservers left to try";
-  }()};
-
-  //.............................................................................
-
-  auto constexpr name{"google-public-dns-a.google.com"};
-
-  uint16_t id = 0x1234;
-
-  auto [q_buf, q_buflen] = create_question(name, DNS::RR_type::A, id);
-  LOG(INFO) << "q_buflen == " << q_buflen;
-
-  uint16_t sz = q_buflen;
-  sz = htons(sz);
-
-  ns_sock->out().write(reinterpret_cast<char*>(&sz), sizeof sz);
-  ns_sock->out().write(reinterpret_cast<char*>(q_buf.get()), q_buflen);
-  ns_sock->out().flush();
-
-  sz = 0;
-  ns_sock->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
-  sz = ntohs(sz);
-  LOG(INFO) << "read sz == " << sz;
-
-  auto rd_bfr = std::make_unique<char[]>(sz);
-  ns_sock->in().read(rd_bfr.get(), sz);
-
-  parse_answer(reinterpret_cast<unsigned char const*>(rd_bfr.get()), sz);
+  }();
 }
+
+void Resolver::send(pkt const& q)
+{
+  uint16_t sz = htons(q.sz);
+
+  ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
+  ns_sock_->out().write(reinterpret_cast<char const*>(q.bfr.get()), q.sz);
+  ns_sock_->out().flush();
+}
+
+void Resolver::receive(pkt& a)
+{
+  uint16_t sz = 0;
+
+  ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
+  a.sz = ntohs(sz);
+
+  a.bfr = std::make_unique<unsigned char[]>(a.sz);
+  ns_sock_->in().read(reinterpret_cast<char*>(a.bfr.get()), a.sz);
+
+  if (!ns_sock_->in()) {
+    LOG(WARNING) << "Resolver::receive read only " << ns_sock_->in().gcount()
+                 << " octets";
+  }
+}
+
+RR_set Resolver::get_records(RR_type typ, char const* name)
+{
+  Query q(*this, typ, name);
+  return q.get_records();
+}
+
+std::vector<std::string> Resolver::get_strings(RR_type typ, char const* name)
+{
+  Query q(*this, typ, name);
+  return q.get_strings();
+}
+
+Query::Query(Resolver& res, RR_type type, char const* name)
+{
+  static_assert(sizeof(header) == 12);
+  static_assert(sizeof(question) == 4);
+  static_assert(sizeof(edns0_opt_meta_rr) == 11);
+  static_assert(sizeof(rr) == 10);
+
+  auto id = std::experimental::randint(uint16_t(0),
+                                       std::numeric_limits<uint16_t>::max());
+  uint16_t cls = ns_c_in;
+  q_ = create_question(name, type, cls, id);
+
+  res.send(q_);
+  res.receive(a_);
+
+  auto p = static_cast<unsigned char const*>(a_.bfr.get());
+  auto pend = p + a_.sz;
+
+  if ((p + sizeof(header)) >= pend) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet";
+    return;
+  }
+  auto hdr_p = reinterpret_cast<header const*>(p);
+  p += sizeof(header);
+
+  if (hdr_p->id() != id) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "packet out of order; ids don't match";
+    return;
+  }
+
+  rcode_ = hdr_p->rcode();
+  switch (rcode_) {
+  case ns_r_noerror:
+    break;
+
+  case ns_r_nxdomain:
+    nx_domain_ = true;
+    break;
+
+  default:
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "name lookup error: " << rcode_c_str(rcode_) << " for "
+                 << name << "/" << type;
+  }
+
+  authentic_data_ = hdr_p->authentic_data();
+  has_record_ = hdr_p->ancount() != 0;
+
+  // check the question part of the replay
+
+  if (hdr_p->qdcount() != 1) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "question not copied into answer";
+    return;
+  }
+
+  std::string qname;
+  auto enc_len = 0;
+
+  if (!expand_name(p, a_.bfr.get(), a_.sz, qname, &enc_len)) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet";
+    return;
+  }
+  p += enc_len;
+  if (p >= pend) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet";
+    return;
+  }
+
+  if (!iequal(qname, name)) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "names don't match, " << qname << " != " << name;
+    return;
+  }
+
+  if ((p + sizeof(question)) >= pend) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet";
+    return;
+  }
+  auto question_p = reinterpret_cast<question const*>(p);
+
+  if (question_p->qtype() != static_cast<uint16_t>(type)) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "qtypes don't match, " << question_p->qtype()
+                 << " != " << type;
+    return;
+  }
+  if (question_p->qclass() != cls) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "qclasses don't match, " << question_p->qclass()
+                 << " != " << cls;
+    return;
+  }
+
+  p += sizeof(question);
+  if (p >= pend) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet";
+    return;
+  }
+
+  // skip answers
+  for (auto i = 0; i < hdr_p->ancount(); ++i) {
+    std::string name;
+    auto enc_len = 0;
+    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    p += enc_len;
+    if ((p + sizeof(rr)) > pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    auto rr_p = reinterpret_cast<rr const*>(p);
+    p = rr_p->next_rr_name();
+  }
+
+  // skip nameservers
+  for (auto i = 0; i < hdr_p->nscount(); ++i) {
+    std::string name;
+    auto enc_len = 0;
+    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    p += enc_len;
+    if ((p + sizeof(rr)) > pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    auto rr_p = reinterpret_cast<rr const*>(p);
+    p = rr_p->next_rr_name();
+  }
+
+  // check additional for OPT record
+  for (auto i = 0; i < hdr_p->arcount(); ++i) {
+    std::string name;
+    auto enc_len = 0;
+    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    p += enc_len;
+    if ((p + sizeof(rr)) > pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    auto rr_p = reinterpret_cast<rr const*>(p);
+
+    if (rr_p->rr_type() == ns_t_opt) {
+      auto opt_p = reinterpret_cast<edns0_opt_meta_rr const*>(p);
+      extended_rcode_ = (opt_p->extended_rcode() << 4) + hdr_p->rcode();
+    }
+    else {
+      LOG(INFO) << "unknown additional record, name == " << name;
+      LOG(INFO) << "rr_p->type()  == " << DNS::RR_type_c_str(rr_p->rr_type());
+      LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
+      LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
+    }
+
+    p = rr_p->next_rr_name();
+  }
+
+  auto size_check = p - static_cast<unsigned char const*>(a_.bfr.get());
+  if (size_check != a_.sz) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "bad packet size";
+    return;
+  }
+}
+
+RR_set Query::get_records()
+{
+  RR_set ret;
+
+  if (bogus_or_indeterminate_) // if ctor() found and error with the packet
+    return ret;
+
+  auto p = static_cast<unsigned char const*>(a_.bfr.get());
+  auto pend = p + a_.sz;
+
+  auto hdr_p = reinterpret_cast<header const*>(p);
+  p += sizeof(header);
+
+  // skip queries
+  for (auto i = 0; i < hdr_p->qdcount(); ++i) {
+    std::string qname;
+    auto enc_len = 0;
+
+    CHECK(expand_name(p, a_.bfr.get(), a_.sz, qname, &enc_len));
+    p += enc_len;
+    // auto question_p = reinterpret_cast<question const*>(p);
+    p += sizeof(question);
+  }
+
+  // get answers
+  for (auto i = 0; i < hdr_p->ancount(); ++i) {
+    std::string name;
+    auto enc_len = 0;
+
+    CHECK(expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len));
+    p += enc_len;
+    if ((p + sizeof(rr)) > pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return RR_set{};
+    }
+    auto rr_p = reinterpret_cast<rr const*>(p);
+    if ((p + rr_p->rdlength()) > pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return RR_set{};
+    }
+
+    auto typ = static_cast<DNS::RR_type>(rr_p->rr_type());
+    switch (typ) {
+    case DNS::RR_type::A: {
+      if (rr_p->rdlength() != 4) {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus A";
+        return RR_set{};
+      }
+      ret.emplace_back(RR_A{rr_p->rddata(), rr_p->rdlength()});
+      break;
+    }
+
+    case DNS::RR_type::CNAME: {
+      p = rr_p->rddata();
+      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+        ret.emplace_back(RR_CNAME{name});
+      }
+      else {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus CNAME";
+        return RR_set{};
+      }
+      break;
+    }
+
+    case DNS::RR_type::PTR: {
+      p = rr_p->rddata();
+      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+        ret.emplace_back(RR_PTR{name});
+      }
+      else {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus PTR";
+        return RR_set{};
+      }
+      break;
+    }
+
+    case DNS::RR_type::MX: {
+      if (rr_p->rdlength() < 3) {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus MX";
+        return RR_set{};
+      }
+      p = rr_p->rddata();
+      uint16_t preference = (p[0] << 8) + p[1];
+      p += 2;
+      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+        ret.emplace_back(RR_MX{name, preference});
+      }
+      else {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus MX";
+        return RR_set{};
+      }
+      break;
+    }
+
+    case DNS::RR_type::TXT: {
+      if (rr_p->rdlength() < 1) {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus TXT";
+        return RR_set{};
+      }
+      std::string str;
+      p = rr_p->rddata();
+      do {
+        if ((p + 1 + *p) > rr_p->next_rr_name()) {
+          bogus_or_indeterminate_ = true;
+          LOG(WARNING) << "bogus string in TXT record";
+          return RR_set{};
+        }
+        str += std::string(reinterpret_cast<char const*>(p) + 1, *p);
+        p = p + *p + 1;
+      } while (p < rr_p->next_rr_name());
+      ret.emplace_back(RR_TXT{str});
+      break;
+    }
+
+    case DNS::RR_type::AAAA: {
+      if (rr_p->rdlength() != 16) {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus AAAA";
+        return RR_set{};
+      }
+      ret.emplace_back(RR_AAAA{rr_p->rddata(), rr_p->rdlength()});
+      break;
+    }
+
+    case DNS::RR_type::RRSIG: {
+      // LOG(WARNING) << "#### FIXME! RRSIG";
+      // ret.emplace_back(RR_RRSIG{rr_p->rddata(), rr_p->rdlength()});
+      break;
+    }
+
+    case DNS::RR_type::TLSA: {
+      p = rr_p->rddata();
+
+      if ((rr_p->rdlength() < 4) || (p + rr_p->rdlength()) > pend) {
+        bogus_or_indeterminate_ = true;
+        LOG(WARNING) << "bogus TLSA";
+        return RR_set{};
+      }
+
+      uint8_t cert_usage = *p++;
+      uint8_t selector = *p++;
+      uint8_t matching_type = *p++;
+
+      uint8_t const* assoc_data = p;
+      size_t assoc_data_sz = rr_p->rdlength() - 3;
+
+      ret.emplace_back(RR_TLSA{cert_usage, selector, matching_type, assoc_data,
+                               assoc_data_sz});
+      break;
+    }
+
+    default:
+      LOG(WARNING) << "no code to process record type " << typ;
+      break;
+    }
+
+    p = rr_p->next_rr_name();
+  }
+
+  return ret;
+}
+
+std::vector<std::string> Query::get_strings()
+{
+  std::vector<std::string> ret;
+
+  auto rr_set = get_records();
+  for (auto rr : rr_set) {
+    if (std::holds_alternative<DNS::RR_A>(rr)) {
+      ret.push_back(std::get<DNS::RR_A>(rr).c_str());
+    }
+    else if (std::holds_alternative<DNS::RR_CNAME>(rr)) {
+      ret.push_back(std::get<DNS::RR_CNAME>(rr).str());
+    }
+    else if (std::holds_alternative<DNS::RR_PTR>(rr)) {
+      ret.push_back(std::get<DNS::RR_PTR>(rr).str());
+    }
+    else if (std::holds_alternative<DNS::RR_AAAA>(rr)) {
+      ret.push_back(std::get<DNS::RR_AAAA>(rr).c_str());
+    }
+    else if (std::holds_alternative<DNS::RR_MX>(rr)) {
+      ret.push_back(std::get<DNS::RR_MX>(rr).exchange());
+    }
+  }
+
+  return ret;
+}
+
+} // namespace DNS

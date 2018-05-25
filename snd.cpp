@@ -913,8 +913,7 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
     LOG(INFO) << "MX records can't be authenticated for domain " << domain;
     enforce_dane = false;
   }
-  auto rrlst{DNS::RR_list{q}};
-  auto mxs{rrlst.get_records()};
+  auto mxs{q.get_records()};
 
   mxs.erase(std::remove_if(mxs.begin(), mxs.end(), is_localhost), mxs.end());
 
@@ -1502,8 +1501,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
   }
 
-  DNS::RR_list rrlst(q);
-  auto tlsa_rrs = rrlst.get_records();
+  auto tlsa_rrs = q.get_records();
 
   if (q.bogus_or_indeterminate()) {
     LOG(WARNING) << "TLSA data bogus_or_indeterminate";

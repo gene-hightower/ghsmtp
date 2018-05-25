@@ -1,7 +1,7 @@
 #ifndef TLS_OPENSSL_DOT_HPP
 #define TLS_OPENSSL_DOT_HPP
 
-#include "DNS.hpp"
+#include "DNS-rrs.hpp"
 #include "Domain.hpp"
 
 #include <chrono>
