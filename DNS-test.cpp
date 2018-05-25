@@ -67,9 +67,11 @@ int main(int argc, char const* argv[])
     unsigned selector = std::get<RR_TLSA>(tlsa).selector();
     unsigned mtype = std::get<RR_TLSA>(tlsa).matching_type();
 
-    // LOG(INFO) << "tlsa usage     == " << usage;
-    // LOG(INFO) << "tlsa selector  == " << selector;
-    // LOG(INFO) << "tlsa mtype     == " << mtype;
+    LOG(INFO) << "tlsa usage     == " << usage;
+    LOG(INFO) << "tlsa selector  == " << selector;
+    LOG(INFO) << "tlsa mtype     == " << mtype;
+
+    break;
   }
 
   Query q_noexist(res, RR_type::A, "does-not-exist.test.digilicious.com");
