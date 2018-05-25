@@ -1,5 +1,7 @@
 #include "DNS-priv.hpp"
 
+#include "IP4.hpp"
+#include "IP6.hpp"
 #include "Sock.hpp"
 
 #include <glog/logging.h>
@@ -25,7 +27,7 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
 }
 
 struct nameserver {
-  char const* host;
+  char const* host;             // name used to match cert
   char const* addr;
   char const* port;
 };
@@ -37,9 +39,9 @@ constexpr nameserver nameservers[]{
         "domain",
     },
     {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "1.0.0.1",
-        "domain-s",
+        "localhost",
+        "::1",
+        "domain",
     },
     {
         "1dot1dot1dot1.cloudflare-dns.com",
@@ -47,8 +49,33 @@ constexpr nameserver nameservers[]{
         "domain-s",
     },
     {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.0.0.1",
+        "domain-s",
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1111",
+        "domain-s",
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1001",
+        "domain-s",
+    },
+    {
         "dns.quad9.net",
         "9.9.9.10",
+        "domain-s",
+    },
+    {
+        "dns.quad9.net",
+        "149.112.112.10",
+        "domain-s",
+    },
+    {
+        "dns.quad9.net",
+        "2620:fe::10",
         "domain-s",
     },
 };
@@ -496,22 +523,42 @@ Resolver::Resolver()
       }
       auto const& nameserver = nameservers[ns];
 
-      auto const fd{socket(AF_INET, SOCK_STREAM, 0)};
-      PCHECK(fd >= 0) << "socket() failed";
-
+      int fd = -1;
       uint16_t port = osutil::get_port(nameserver.port);
 
-      auto in4{sockaddr_in{}};
-      in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
-      CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
-                         reinterpret_cast<void*>(&in4.sin_addr)),
-               1);
-      if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
-        PLOG(INFO) << "connect failed " << nameserver.host << '['
-                   << nameserver.addr << "]:" << nameserver.port;
-        close(fd);
-        continue;
+      if (IP4::is_address(nameserver.addr)) {
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+        PCHECK(fd >= 0) << "socket() failed";
+
+        auto in4{sockaddr_in{}};
+        in4.sin_family = AF_INET;
+        in4.sin_port = htons(port);
+        CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
+                           reinterpret_cast<void*>(&in4.sin_addr)),
+                 1);
+        if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
+          PLOG(INFO) << "connect failed " << nameserver.host << '['
+                     << nameserver.addr << "]:" << nameserver.port;
+          close(fd);
+          continue;
+        }
+      }
+      else if (IP6::is_address(nameserver.addr)) {
+        fd = socket(AF_INET6, SOCK_STREAM, 0);
+        PCHECK(fd >= 0) << "socket() failed";
+
+        auto in6{sockaddr_in6{}};
+        in6.sin6_family = AF_INET6;
+        in6.sin6_port = htons(port);
+        CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
+                           reinterpret_cast<void*>(&in6.sin6_addr)),
+                 1);
+        if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
+          PLOG(INFO) << "connect failed " << nameserver.host << '['
+                     << nameserver.addr << "]:" << nameserver.port;
+          close(fd);
+          continue;
+        }
       }
 
       auto sock = std::make_unique<Sock>(fd, fd);
