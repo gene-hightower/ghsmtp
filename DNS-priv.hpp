@@ -32,8 +32,7 @@ public:
     return get_strings(typ, name.c_str());
   }
 
-  void send(pkt const& q);
-  void receive(pkt& a);
+  pkt xchg(pkt const& q);
 
 private:
   std::unique_ptr<Sock> ns_sock_;
@@ -59,16 +58,18 @@ public:
   std::vector<std::string> get_strings();
 
 private:
-  bool authentic_data_{false};
-  bool bogus_or_indeterminate_{false};
-  bool nx_domain_{false};
-  bool has_record_{false};
+  uint16_t rcode_{0};
+  uint16_t extended_rcode_{0};
+
+  RR_type type_;
 
   pkt q_;
   pkt a_;
 
-  uint16_t rcode_{0};
-  uint16_t extended_rcode_{0};
+  bool authentic_data_{false};
+  bool bogus_or_indeterminate_{false};
+  bool nx_domain_{false};
+  bool has_record_{false};
 };
 
 inline std::vector<std::string>

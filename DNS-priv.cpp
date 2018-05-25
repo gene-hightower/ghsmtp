@@ -27,7 +27,7 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
 }
 
 struct nameserver {
-  char const* host;             // name used to match cert
+  char const* host; // name used to match cert
   char const* addr;
   char const* port;
 };
@@ -584,29 +584,28 @@ Resolver::Resolver()
   }();
 }
 
-void Resolver::send(pkt const& q)
+pkt Resolver::xchg(pkt const& q)
 {
   uint16_t sz = htons(q.sz);
 
   ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
   ns_sock_->out().write(reinterpret_cast<char const*>(q.bfr.get()), q.sz);
   ns_sock_->out().flush();
-}
 
-void Resolver::receive(pkt& a)
-{
-  uint16_t sz = 0;
+  sz = 0;
 
   ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
-  a.sz = ntohs(sz);
+  sz = ntohs(sz);
 
-  a.bfr = std::make_unique<unsigned char[]>(a.sz);
-  ns_sock_->in().read(reinterpret_cast<char*>(a.bfr.get()), a.sz);
+  auto bfr = std::make_unique<unsigned char[]>(sz);
+  ns_sock_->in().read(reinterpret_cast<char*>(bfr.get()), sz);
 
   if (!ns_sock_->in()) {
-    LOG(WARNING) << "Resolver::receive read only " << ns_sock_->in().gcount()
-                 << " octets";
+    LOG(WARNING) << "Resolver::xchg was able to read only "
+                 << ns_sock_->in().gcount() << " octets";
   }
+
+  return pkt{std::move(bfr), sz};
 }
 
 RR_set Resolver::get_records(RR_type typ, char const* name)
@@ -622,7 +621,10 @@ std::vector<std::string> Resolver::get_strings(RR_type typ, char const* name)
 }
 
 Query::Query(Resolver& res, RR_type type, char const* name)
+  : type_(type)
 {
+  // LOG(INFO) << "DNS lookup of " << name << '/' << type;
+
   static_assert(sizeof(header) == 12);
   static_assert(sizeof(question) == 4);
   static_assert(sizeof(edns0_opt_meta_rr) == 11);
@@ -633,8 +635,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   uint16_t cls = ns_c_in;
   q_ = create_question(name, type, cls, id);
 
-  res.send(q_);
-  res.receive(a_);
+  a_ = res.xchg(q_);
 
   auto p = static_cast<unsigned char const*>(a_.bfr.get());
   auto pend = p + a_.sz;
@@ -980,20 +981,40 @@ std::vector<std::string> Query::get_strings()
 
   auto rr_set = get_records();
   for (auto rr : rr_set) {
-    if (std::holds_alternative<DNS::RR_A>(rr)) {
-      ret.push_back(std::get<DNS::RR_A>(rr).c_str());
-    }
-    else if (std::holds_alternative<DNS::RR_CNAME>(rr)) {
-      ret.push_back(std::get<DNS::RR_CNAME>(rr).str());
-    }
-    else if (std::holds_alternative<DNS::RR_PTR>(rr)) {
-      ret.push_back(std::get<DNS::RR_PTR>(rr).str());
-    }
-    else if (std::holds_alternative<DNS::RR_AAAA>(rr)) {
-      ret.push_back(std::get<DNS::RR_AAAA>(rr).c_str());
-    }
-    else if (std::holds_alternative<DNS::RR_MX>(rr)) {
-      ret.push_back(std::get<DNS::RR_MX>(rr).exchange());
+    switch (type_) {
+    case RR_type::A:
+      if (std::holds_alternative<RR_A>(rr)) {
+        ret.push_back(std::get<RR_A>(rr).c_str());
+      }
+      break;
+
+    case RR_type::CNAME:
+      if (std::holds_alternative<RR_CNAME>(rr)) {
+        ret.push_back(std::get<RR_CNAME>(rr).str());
+      }
+      break;
+
+    case RR_type::PTR:
+      if (std::holds_alternative<RR_PTR>(rr)) {
+        ret.push_back(std::get<RR_PTR>(rr).str());
+      }
+      break;
+
+    case RR_type::AAAA:
+      if (std::holds_alternative<DNS::RR_AAAA>(rr)) {
+        ret.push_back(std::get<DNS::RR_AAAA>(rr).c_str());
+      }
+      break;
+
+    case RR_type::MX:
+      if (std::holds_alternative<DNS::RR_MX>(rr)) {
+        ret.push_back(std::get<DNS::RR_MX>(rr).exchange());
+      }
+      break;
+
+    default:
+      // ignore other types
+      break;
     }
   }
 
