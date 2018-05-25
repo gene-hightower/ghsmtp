@@ -14,17 +14,20 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
   auto const reversed{IP4::reverse(addr)};
 
   // The reverse part, check PTR records.
-  auto const ptrs = res.get_strings(RR_type::PTR, reversed + "in-addr.arpa");
+  auto const ptrs = res.get_records(RR_type::PTR, reversed + "in-addr.arpa");
 
   std::vector<std::string> fcrdns;
 
-  std::copy_if(ptrs.begin(), ptrs.end(), std::back_inserter(fcrdns),
-               [&res, addr](std::string const& s) {
-                 // The forward part, check each PTR for matching A record.
-                 auto const addrs = res.get_strings(RR_type::A, s);
-                 return std::find(addrs.begin(), addrs.end(), addr)
-                        != addrs.end();
-               });
+  for (auto&& ptr : ptrs) {
+    if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
+      // The forward part, check each PTR for matching A record.
+      auto const addrs
+          = res.get_strings(RR_type::A, std::get<DNS::RR_PTR>(ptr).str());
+      if (std::find(addrs.begin(), addrs.end(), addr) != addrs.end()) {
+        fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
+      }
+    }
+  }
 
   // Sort by name length: short to long.
   std::sort(fcrdns.begin(), fcrdns.end(),
@@ -40,17 +43,20 @@ std::vector<std::string> fcrdns6(Resolver& res, std::string_view addr)
   auto const reversed{IP6::reverse(addr)};
 
   // The reverse part, check PTR records.
-  auto const ptrs = res.get_strings(RR_type::PTR, reversed + "ip6.arpa");
+  auto const ptrs = res.get_records(RR_type::PTR, reversed + "ip6.arpa");
 
   std::vector<std::string> fcrdns;
 
-  std::copy_if(ptrs.begin(), ptrs.end(), std::back_inserter(fcrdns),
-               [&res, addr](std::string const& s) {
-                 // The forward part, check each PTR for matching AAAA record.
-                 auto addrs = res.get_strings(RR_type::AAAA, s);
-                 return std::find(addrs.begin(), addrs.end(), addr)
-                        != addrs.end();
-               });
+  for (auto&& ptr : ptrs) {
+    if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
+      // The forward part, check each PTR for matching AAAA record.
+      auto const addrs
+          = res.get_strings(RR_type::AAAA, std::get<DNS::RR_PTR>(ptr).str());
+      if (std::find(addrs.begin(), addrs.end(), addr) != addrs.end()) {
+        fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
+      }
+    }
+  }
 
   // Sort by name length: short to long.
   std::sort(fcrdns.begin(), fcrdns.end(),
