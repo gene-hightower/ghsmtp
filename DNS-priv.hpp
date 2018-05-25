@@ -93,7 +93,6 @@ inline bool has_record(Resolver& res, RR_type type, std::string const& name)
 {
   return has_record(res, type, name.c_str());
 }
-
 } // namespace DNS
 
 #endif // DNS_PRIV_DOT_HPP
