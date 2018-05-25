@@ -14,7 +14,7 @@ LDLIBS += \
 
 PROGRAMS := smtp msg sasl snd dnsprv
 
-DNS := DNS-rrs DNS-priv
+DNS := DNS-rrs DNS-priv DNS-fcrdns
 
 dnsprv_STEMS := dnsprv \
 	Domain \
@@ -36,9 +36,7 @@ msg_STEMS := msg \
 	Domain \
 	IP \
 	IP4 \
-	IP4-fcrdns \
 	IP6 \
-	IP6-fcrdns \
 	POSIX \
 	SPF \
 	Sock \
@@ -65,9 +63,7 @@ smtp_STEMS := smtp \
 	Domain \
 	IP \
 	IP4 \
-	IP4-fcrdns \
 	IP6 \
-	IP6-fcrdns \
 	Message \
 	POSIX \
 	Pill \
@@ -86,9 +82,7 @@ snd_STEMS := snd \
 	Domain \
 	IP \
 	IP4 \
-	IP4-fcrdns \
 	IP6 \
-	IP6-fcrdns \
 	Magic \
 	POSIX \
 	Pill \
@@ -123,14 +117,14 @@ TESTS := \
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
 
-DNS-test_STEMS := $(DNS) Domain IP IP4 IP4-fcrdns IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+DNS-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 
 Domain-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-IP4-test_STEMS := $(DNS) Domain IP4 IP4-fcrdns IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-IP6-test_STEMS := $(DNS) Domain IP4 IP6 IP6-fcrdns POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP4-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP6-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Magic-test_STEMS := Magic
 Mailbox-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-Message-test_STEMS := $(DNS) Domain IP IP4 IP4-fcrdns IP6 IP6-fcrdns Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
@@ -141,9 +135,7 @@ Session-test_STEMS := \
 	Domain \
 	IP \
 	IP4 \
-	IP4-fcrdns \
 	IP6 \
-	IP6-fcrdns \
 	Message \
 	POSIX \
 	Pill \
@@ -212,7 +204,7 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-# safty_flags := # nada
+safty_flags := # nada
 
 # visibility_flags := # nada
 

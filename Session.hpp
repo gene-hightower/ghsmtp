@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CDB.hpp"
+#include "DNS-fcrdns.hpp"
 #include "Domain.hpp"
 #include "Mailbox.hpp"
 #include "Message.hpp"
@@ -107,6 +108,7 @@ private:
   void exit_() __attribute__((noreturn));
 
 private:
+  DNS::Resolver res_;
   Sock sock_;
 
   // per connection/session

@@ -10,7 +10,7 @@ bool is_private(std::string_view addr)
 {
   if (IP4::is_address(addr))
     return IP4::is_private(addr);
-  if (IP6::is_address(addr))
+  else if (IP6::is_address(addr))
     return IP6::is_private(addr);
   return false;
 }
@@ -52,14 +52,4 @@ std::string reverse(std::string_view addr)
   LOG(FATAL) << "not a valid IP address " << addr;
 }
 
-std::vector<std::string> fcrdns(std::string_view addr)
-{
-  // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
-
-  if (IP4::is_address(addr))
-    return IP4::fcrdns(addr);
-  if (IP6::is_address(addr))
-    return IP6::fcrdns(addr);
-  LOG(FATAL) << "not a valid IP address " << addr;
-}
 } // namespace IP

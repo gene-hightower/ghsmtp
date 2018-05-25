@@ -12,7 +12,6 @@ bool is_address_literal(std::string_view addr);
 std::string to_address_literal(std::string_view addr);
 std::string_view as_address(std::string_view addr);
 std::string reverse(std::string_view addr);
-std::vector<std::string> fcrdns(std::string_view addr);
 } // namespace IP
 
 #endif // IP_DOT_HPP

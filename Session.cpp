@@ -55,7 +55,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
   : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
-    auto fcrdns = IP::fcrdns(sock_.us_c_str());
+    auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
     for (auto const& fcr : fcrdns) {
       server_fcrdns_.emplace_back(fcr);
     }
@@ -1044,7 +1044,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return true;
   }
 
-  auto fcrdns = IP::fcrdns(sock_.them_c_str());
+  auto fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
   for (auto const& fcr : fcrdns) {
     client_fcrdns_.emplace_back(fcr);
   }
@@ -1101,11 +1101,10 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
-    auto res{DNS::Resolver{}};
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  std::default_random_engine());
     for (auto rbl : Config::rbls) {
-      if (has_record(res, RR_type::A, reversed + rbl)) {
+      if (has_record(res_, RR_type::A, reversed + rbl)) {
         error_msg = "blocked by "s + rbl;
         // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
         out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
@@ -1370,11 +1369,10 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   if (!sock_.has_peername()) // short circuit
     return true;
 
-  auto res{DNS::Resolver{}};
   std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
                std::default_random_engine());
   for (auto uribl : Config::uribls) {
-    if (DNS::has_record(res, DNS::RR_type::A, (sender + ".") + uribl)) {
+    if (DNS::has_record(res_, DNS::RR_type::A, (sender + ".") + uribl)) {
       error_msg = "blocked by "s + uribl;
       out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
              << std::flush;
@@ -1432,10 +1430,10 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   if (spf_result_ == SPF::Result::FAIL) {
     LOG(WARNING) << spf_res.header_comment();
     /*
-      If we want to refuse mail that fails SPF:
-      // Error code from RFC 7372, section 3.2.  Also:
-      //
+      If we want to refuse mail that fails SPF.
+      Error code from RFC 7372, section 3.2.  Also:
       <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
+
       out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
       return false;
     */

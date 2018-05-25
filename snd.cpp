@@ -69,6 +69,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 
 #include "Base64.hpp"
 #include "DKIM.hpp"
+#include "DNS-fcrdns.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
 #include "IP4.hpp"
@@ -1603,7 +1604,7 @@ int main(int argc, char* argv[])
         if (IP4::is_private(us_addr_str))
           private_addr = true;
         else
-          fcrdns = IP4::fcrdns(us_addr_str);
+          fcrdns = DNS::fcrdns4(res, us_addr_str);
         break;
 
       case sizeof(sockaddr_in6):
@@ -1613,7 +1614,7 @@ int main(int argc, char* argv[])
         if (IP6::is_private(us_addr_str))
           private_addr = true;
         else
-          fcrdns = IP6::fcrdns(us_addr_str);
+          fcrdns = DNS::fcrdns6(res, us_addr_str);
         break;
 
       default:
