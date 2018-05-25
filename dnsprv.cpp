@@ -27,15 +27,16 @@ struct nameserver {
 };
 
 constexpr nameserver nameservers[]{
-    //*
-      {
-          "localhost",
-          "127.0.0.1",
-          "domain",
-      },
-    //*/
-
-    /*
+    {
+        "localhost",
+        "127.0.0.1",
+        "domain",
+    },
+    {
+        "google-public-dns-a.google.com",
+        "8.8.8.8",
+        "domain",
+    },
     {
         "1dot1dot1dot1.cloudflare-dns.com",
         "1.0.0.1",
@@ -51,7 +52,6 @@ constexpr nameserver nameservers[]{
         "9.9.9.10",
         "domain-s",
     },
-    */
 };
 
 /*
