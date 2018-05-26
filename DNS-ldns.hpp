@@ -82,6 +82,9 @@ public:
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
 
+  RR_set get_records() const;
+  std::vector<std::string> get_strings() const;
+
 private:
   ldns_pkt* p_{nullptr};
 

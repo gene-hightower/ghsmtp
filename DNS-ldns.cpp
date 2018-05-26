@@ -152,6 +152,18 @@ Query::~Query()
     ldns_pkt_free(p_);
 }
 
+RR_set Query::get_records() const
+{
+  RR_list rrlst(*this);
+  return rrlst.get_records();
+}
+
+std::vector<std::string> Query::get_strings() const
+{
+  RR_list rrlst(*this);
+  return rrlst.get_strings();
+}
+
 RR_list::RR_list(Query const& q)
 {
   if (q.get()) {
