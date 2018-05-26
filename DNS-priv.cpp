@@ -33,6 +33,7 @@ struct nameserver {
 };
 
 constexpr nameserver nameservers[]{
+  /*
     {
         "localhost",
         "127.0.0.1",
@@ -43,6 +44,18 @@ constexpr nameserver nameservers[]{
         "::1",
         "domain",
     },
+    {
+        "digilicious.com",
+        "127.0.0.1",
+        "domain-s",
+    },
+    {
+        "digilicious.com",
+        "::1",
+        "domain-s",
+    },
+  */
+
     {
         "1dot1dot1dot1.cloudflare-dns.com",
         "1.1.1.1",
