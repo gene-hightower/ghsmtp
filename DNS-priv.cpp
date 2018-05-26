@@ -26,71 +26,84 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
   return N;
 }
 
+enum class sock_type : bool { stream, dgram };
+
 struct nameserver {
   char const* host; // name used to match cert
   char const* addr;
   char const* port;
+  sock_type typ;
 };
 
 constexpr nameserver nameservers[]{
-  /*
     {
         "localhost",
         "127.0.0.1",
         "domain",
+        sock_type::dgram,
     },
     {
         "localhost",
         "::1",
         "domain",
+        sock_type::dgram,
     },
-    {
-        "digilicious.com",
-        "127.0.0.1",
-        "domain-s",
-    },
-    {
-        "digilicious.com",
-        "::1",
-        "domain-s",
-    },
-  */
-
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "1.1.1.1",
-        "domain-s",
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "1.0.0.1",
-        "domain-s",
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "2606:4700:4700::1111",
-        "domain-s",
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "2606:4700:4700::1001",
-        "domain-s",
-    },
-    {
-        "dns.quad9.net",
-        "9.9.9.10",
-        "domain-s",
-    },
-    {
-        "dns.quad9.net",
-        "149.112.112.10",
-        "domain-s",
-    },
-    {
-        "dns.quad9.net",
-        "2620:fe::10",
-        "domain-s",
-    },
+    /*
+        {
+            "digilicious.com",
+            "127.0.0.1",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "digilicious.com",
+            "::1",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "1dot1dot1dot1.cloudflare-dns.com",
+            "1.1.1.1",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "1dot1dot1dot1.cloudflare-dns.com",
+            "1.0.0.1",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "1dot1dot1dot1.cloudflare-dns.com",
+            "2606:4700:4700::1111",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "1dot1dot1dot1.cloudflare-dns.com",
+            "2606:4700:4700::1001",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "dns.quad9.net",
+            "9.9.9.10",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "dns.quad9.net",
+            "149.112.112.10",
+            "domain-s",
+            sock_type::stream,
+        },
+        {
+            "dns.quad9.net",
+            "2620:fe::10",
+            "domain-s",
+            sock_type::stream,
+        },
+    */
 };
 
 /*
@@ -523,101 +536,145 @@ namespace DNS {
 
 Resolver::Resolver()
 {
-  ns_sock_ = [&] {
-    auto tries = countof(nameservers);
-    auto ns = std::experimental::randint(
-        0, static_cast<int>(countof(nameservers) - 1));
+  auto tries = countof(nameservers);
+  auto ns = std::experimental::randint(
+      0, static_cast<int>(countof(nameservers) - 1));
 
-    while (tries--) {
+  while (tries--) {
 
-      // try the next one, with wrap
-      if (++ns == countof(nameservers)) {
-        ns = 0;
+    // try the next one, with wrap
+    if (++ns == countof(nameservers)) {
+      ns = 0;
+    }
+    auto const& nameserver = nameservers[ns];
+
+    ns_fd_ = -1;
+    uint16_t port = osutil::get_port(nameserver.port);
+
+    if (IP4::is_address(nameserver.addr)) {
+      if (nameserver.typ == sock_type::stream)
+        ns_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+      else
+        ns_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
+      PCHECK(ns_fd_ >= 0) << "socket() failed";
+
+      auto in4{sockaddr_in{}};
+      in4.sin_family = AF_INET;
+      in4.sin_port = htons(port);
+      CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
+                         reinterpret_cast<void*>(&in4.sin_addr)),
+               1);
+      if (connect(ns_fd_, reinterpret_cast<const sockaddr*>(&in4),
+                  sizeof(in4))) {
+        PLOG(INFO) << "connect failed " << nameserver.host << '['
+                   << nameserver.addr << "]:" << nameserver.port;
+        close(ns_fd_);
+        ns_fd_ = -1;
+        continue;
       }
-      auto const& nameserver = nameservers[ns];
+    }
+    else if (IP6::is_address(nameserver.addr)) {
+      if (nameserver.typ == sock_type::stream)
+        ns_fd_ = socket(AF_INET6, SOCK_STREAM, 0);
+      else
+        ns_fd_ = socket(AF_INET6, SOCK_DGRAM, 0);
+      PCHECK(ns_fd_ >= 0) << "socket() failed";
 
-      int fd = -1;
-      uint16_t port = osutil::get_port(nameserver.port);
-
-      if (IP4::is_address(nameserver.addr)) {
-        fd = socket(AF_INET, SOCK_STREAM, 0);
-        PCHECK(fd >= 0) << "socket() failed";
-
-        auto in4{sockaddr_in{}};
-        in4.sin_family = AF_INET;
-        in4.sin_port = htons(port);
-        CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
-                           reinterpret_cast<void*>(&in4.sin_addr)),
-                 1);
-        if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
-          PLOG(INFO) << "connect failed " << nameserver.host << '['
-                     << nameserver.addr << "]:" << nameserver.port;
-          close(fd);
-          continue;
-        }
+      auto in6{sockaddr_in6{}};
+      in6.sin6_family = AF_INET6;
+      in6.sin6_port = htons(port);
+      CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
+                         reinterpret_cast<void*>(&in6.sin6_addr)),
+               1);
+      if (connect(ns_fd_, reinterpret_cast<const sockaddr*>(&in6),
+                  sizeof(in6))) {
+        PLOG(INFO) << "connect failed " << nameserver.host << '['
+                   << nameserver.addr << "]:" << nameserver.port;
+        close(ns_fd_);
+        ns_fd_ = -1;
+        continue;
       }
-      else if (IP6::is_address(nameserver.addr)) {
-        fd = socket(AF_INET6, SOCK_STREAM, 0);
-        PCHECK(fd >= 0) << "socket() failed";
+    }
 
-        auto in6{sockaddr_in6{}};
-        in6.sin6_family = AF_INET6;
-        in6.sin6_port = htons(port);
-        CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
-                           reinterpret_cast<void*>(&in6.sin6_addr)),
-                 1);
-        if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
-          PLOG(INFO) << "connect failed " << nameserver.host << '['
-                     << nameserver.addr << "]:" << nameserver.port;
-          close(fd);
-          continue;
-        }
-      }
+    POSIX::set_nonblocking(ns_fd_);
 
-      auto sock = std::make_unique<Sock>(fd, fd);
+    if (nameserver.typ == sock_type::stream) {
+      ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
 
       if (port != 53) {
         DNS::RR_set tlsa_rrs; // empty
-        sock->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
-        if (sock->verified()) {
+        ns_sock_->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
+        if (ns_sock_->verified()) {
           LOG(INFO) << "using TLS " << nameserver.host << '[' << nameserver.addr
                     << "]:" << nameserver.port;
-          return sock;
+          ns_fd_ = -1;
+          return;
         }
-        close(fd);
+        close(ns_fd_);
+        ns_fd_ = -1;
         continue;
       }
 
-      LOG(INFO) << "using " << nameserver.host << '[' << nameserver.addr
-                << "]:" << nameserver.port;
-      return sock;
-    }
+      ns_fd_ = -1;
 
-    LOG(FATAL) << "no nameservers left to try";
-  }();
+      LOG(INFO) << "using TCP " << nameserver.host << '[' << nameserver.addr
+                << "]:" << nameserver.port;
+    }
+    else {
+      LOG(INFO) << "using UDP " << nameserver.host << '[' << nameserver.addr
+                << "]:" << nameserver.port;
+    }
+    return;
+  }
+
+  LOG(FATAL) << "no nameservers left to try";
 }
 
 pkt Resolver::xchg(pkt const& q)
 {
-  uint16_t sz = htons(q.sz);
+  if (ns_fd_ == -1) {
+    uint16_t sz = htons(q.sz);
 
-  ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
-  ns_sock_->out().write(reinterpret_cast<char const*>(q.bfr.get()), q.sz);
-  ns_sock_->out().flush();
+    ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
+    ns_sock_->out().write(reinterpret_cast<char const*>(q.bfr.get()), q.sz);
+    ns_sock_->out().flush();
 
-  sz = 0;
+    sz = 0;
 
-  ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
-  sz = ntohs(sz);
+    ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
+    sz = ntohs(sz);
 
-  auto bfr = std::make_unique<unsigned char[]>(sz);
-  ns_sock_->in().read(reinterpret_cast<char*>(bfr.get()), sz);
+    auto bfr = std::make_unique<unsigned char[]>(sz);
+    ns_sock_->in().read(reinterpret_cast<char*>(bfr.get()), sz);
 
-  if (!ns_sock_->in()) {
-    LOG(WARNING) << "Resolver::xchg was able to read only "
-                 << ns_sock_->in().gcount() << " octets";
+    if (!ns_sock_->in()) {
+      LOG(WARNING) << "Resolver::xchg was able to read only "
+                   << ns_sock_->in().gcount() << " octets";
+    }
+
+    return pkt{std::move(bfr), sz};
   }
 
+  CHECK_EQ(send(ns_fd_, q.bfr.get(), q.sz, 0), q.sz);
+
+  auto sz = max_udp_sz;
+  auto bfr = std::make_unique<unsigned char[]>(sz);
+
+  auto constexpr hook{[]() {}};
+  auto t_o{false};
+  auto a_buflen = POSIX::read(ns_fd_, reinterpret_cast<char*>(bfr.get()),
+                              int(sz), hook, std::chrono::seconds(3), t_o);
+
+  if (t_o || (a_buflen < 0)) {
+    if (t_o)
+      LOG(WARNING) << "DNS read timed out";
+    else
+      LOG(WARNING) << "DNS read failed ";
+
+    return pkt{std::make_unique<unsigned char[]>(1), uint16_t(0)};
+  }
+
+  sz = a_buflen;
   return pkt{std::move(bfr), sz};
 }
 
@@ -651,6 +708,12 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   a_ = res.xchg(q_);
 
   auto p = static_cast<unsigned char const*>(a_.bfr.get());
+  if (!a_.sz) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "no reply from nameserver";
+    return;
+  }
+
   auto pend = p + a_.sz;
 
   if ((p + sizeof(header)) >= pend) {
