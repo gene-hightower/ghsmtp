@@ -14,7 +14,7 @@ LDLIBS += \
 
 PROGRAMS := smtp msg sasl snd dnsprv
 
-DNS := DNS-rrs DNS-priv DNS-fcrdns
+DNS := DNS-rrs DNS-ldns DNS-fcrdns
 
 dnsprv_STEMS := dnsprv \
 	Domain \
