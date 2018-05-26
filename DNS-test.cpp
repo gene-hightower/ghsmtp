@@ -105,11 +105,11 @@ int main(int argc, char const* argv[])
 
   auto fcrdnses4 = fcrdns4(res, "1.1.1.1");
   CHECK_EQ(fcrdnses4.size(), 1);
-  CHECK(Domain::match(fcrdnses4.front(), "1dot1dot1dot1.cloudflare-dns.com"))
+  CHECK(fcrdnses4.front() == "1dot1dot1dot1.cloudflare-dns.com.")
       << "no match for " << fcrdnses4.front();
 
   auto fcrdnses6 = fcrdns6(res, "2606:4700:4700::1111");
   CHECK_EQ(fcrdnses6.size(), 1);
-  CHECK(Domain::match(fcrdnses6.front(), "1dot1dot1dot1.cloudflare-dns.com"))
+  CHECK(fcrdnses6.front() == "1dot1dot1dot1.cloudflare-dns.com.")
       << "no match for " << fcrdnses6.front();
 }
