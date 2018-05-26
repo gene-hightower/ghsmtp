@@ -1,7 +1,7 @@
 #ifndef DNS_FCRDNS_DOT_HPP_INCLUDED
 #define DNS_FCRDNS_DOT_HPP_INCLUDED
 
-#include "DNS-priv.hpp"
+#include "DNS.hpp"
 
 #include <string>
 #include <string_view>

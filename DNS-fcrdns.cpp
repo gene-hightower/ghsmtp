@@ -3,6 +3,8 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
+#include <algorithm>
+
 #include <glog/logging.h>
 
 // <https://en.wikipedia.org/wiki/Forward-confirmed_reverse_DNS>
