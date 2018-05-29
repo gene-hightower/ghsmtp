@@ -6,6 +6,7 @@
 
 #include <glog/logging.h>
 
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <tuple>
@@ -42,67 +43,67 @@ constexpr nameserver nameservers[]{
         "domain",
         sock_type::dgram,
     },
+    /*
     {
         "localhost",
         "::1",
         "domain",
         sock_type::dgram,
     },
-    /*
-        {
-            "digilicious.com",
-            "127.0.0.1",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "digilicious.com",
-            "::1",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "1dot1dot1dot1.cloudflare-dns.com",
-            "1.1.1.1",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "1dot1dot1dot1.cloudflare-dns.com",
-            "1.0.0.1",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "1dot1dot1dot1.cloudflare-dns.com",
-            "2606:4700:4700::1111",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "1dot1dot1dot1.cloudflare-dns.com",
-            "2606:4700:4700::1001",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "dns.quad9.net",
-            "9.9.9.10",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "dns.quad9.net",
-            "149.112.112.10",
-            "domain-s",
-            sock_type::stream,
-        },
-        {
-            "dns.quad9.net",
-            "2620:fe::10",
-            "domain-s",
-            sock_type::stream,
-        },
+    {
+        "digilicious.com",
+        "127.0.0.1",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "digilicious.com",
+        "::1",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.1.1.1",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.0.0.1",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1111",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1001",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "dns.quad9.net",
+        "9.9.9.10",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "dns.quad9.net",
+        "149.112.112.10",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "dns.quad9.net",
+        "2620:fe::10",
+        "domain-s",
+        sock_type::stream,
+    },
     */
 };
 
@@ -615,10 +616,10 @@ Resolver::Resolver()
         continue;
       }
 
-      ns_fd_ = -1;
-
       LOG(INFO) << "using TCP " << nameserver.host << '[' << nameserver.addr
                 << "]:" << nameserver.port;
+      ns_fd_ = -1;
+      return;
     }
     else {
       LOG(INFO) << "using UDP " << nameserver.host << '[' << nameserver.addr
@@ -662,14 +663,15 @@ pkt Resolver::xchg(pkt const& q)
 
   auto constexpr hook{[]() {}};
   auto t_o{false};
-  auto a_buflen = POSIX::read(ns_fd_, reinterpret_cast<char*>(bfr.get()),
-                              int(sz), hook, std::chrono::seconds(3), t_o);
+  auto a_buf = reinterpret_cast<char*>(bfr.get());
+  auto a_buflen
+      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(3), t_o);
 
   if (t_o || (a_buflen < 0)) {
     if (t_o)
       LOG(WARNING) << "DNS read timed out";
     else
-      LOG(WARNING) << "DNS read failed ";
+      LOG(WARNING) << "DNS read failed";
 
     return pkt{std::make_unique<unsigned char[]>(1), uint16_t(0)};
   }
@@ -700,8 +702,9 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   static_assert(sizeof(edns0_opt_meta_rr) == 11);
   static_assert(sizeof(rr) == 10);
 
-  auto id = std::experimental::randint(uint16_t(0),
-                                       std::numeric_limits<uint16_t>::max());
+  static std::atomic_uint16_t next_id = 0;
+  auto id = ++next_id;
+
   uint16_t cls = ns_c_in;
   q_ = create_question(name, type, cls, id);
 
@@ -726,7 +729,8 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   if (hdr_p->id() != id) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "packet out of order; ids don't match";
+    LOG(WARNING) << "packet out of order; ids don't match, got " << hdr_p->id()
+                 << " expecting " << id;
     return;
   }
 
@@ -743,6 +747,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "name lookup error: " << rcode_c_str(rcode_) << " for "
                  << name << "/" << type;
+    return;
   }
 
   authentic_data_ = hdr_p->authentic_data();
@@ -842,19 +847,21 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     p = rr_p->next_rr_name();
   }
 
-  // check additional for OPT record
+  // check additional records for OPT record
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string name;
     auto enc_len = 0;
     if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in additional section for " << name << "/"
+                   << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in additional section for " << name << "/"
+                   << type;
       return;
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
@@ -862,6 +869,10 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     if (rr_p->rr_type() == ns_t_opt) {
       auto opt_p = reinterpret_cast<edns0_opt_meta_rr const*>(p);
       extended_rcode_ = (opt_p->extended_rcode() << 4) + hdr_p->rcode();
+    }
+    else if ((rr_p->rr_type() == ns_t_a) || (rr_p->rr_type() == ns_t_aaaa)
+             || (rr_p->rr_type() == ns_t_ns)) {
+      // nameserver records often included
     }
     else {
       LOG(INFO) << "unknown additional record, name == " << name;
@@ -876,7 +887,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   auto size_check = p - static_cast<unsigned char const*>(a_.bfr.get());
   if (size_check != a_.sz) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet size";
+    LOG(WARNING) << "bad packet size for " << name << "/" << type;
     return;
   }
 }

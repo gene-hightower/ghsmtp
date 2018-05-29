@@ -58,6 +58,9 @@ public:
   RR_set get_records();
   std::vector<std::string> get_strings();
 
+  uint16_t rcode() const { return rcode_; }
+  uint16_t extended_rcode() const { return extended_rcode_; }
+
 private:
   uint16_t rcode_{0};
   uint16_t extended_rcode_{0};

@@ -9,6 +9,7 @@
 #include <arpa/nameser.h>
 
 #include "DNS-rrs.hpp"
+#include "POSIX.hpp"
 #include "Sock.hpp"
 #include "osutil.hpp"
 
@@ -32,9 +33,15 @@ constexpr nameserver nameservers[]{
         "127.0.0.1",
         "domain",
     },
+/*
     {
         "google-public-dns-a.google.com",
         "8.8.8.8",
+        "domain",
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.1.1.1",
         "domain",
     },
     {
@@ -52,6 +59,7 @@ constexpr nameserver nameservers[]{
         "9.9.9.10",
         "domain-s",
     },
+*/
 };
 
 /*
@@ -628,7 +636,7 @@ int main(int argc, char* argv[])
       }
       auto const& nameserver = nameservers[ns];
 
-      auto const fd{socket(AF_INET, SOCK_STREAM, 0)};
+      auto const fd{socket(AF_INET, SOCK_DGRAM, 0)};
       PCHECK(fd >= 0) << "socket() failed";
 
       uint16_t port = osutil::get_port(nameserver.port);
@@ -646,23 +654,27 @@ int main(int argc, char* argv[])
         continue;
       }
 
-      auto sock = std::make_unique<Sock>(fd, fd);
+      POSIX::set_nonblocking(fd);
 
-      if (port != 53) {
-        DNS::RR_set tlsa_rrs; // empty
-        sock->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
-        if (sock->verified()) {
-          LOG(INFO) << "using TLS " << nameserver.host << '[' << nameserver.addr
-                    << "]:" << nameserver.port;
-          return sock;
-        }
-        close(fd);
-        continue;
-      }
+      // auto sock = std::make_unique<Sock>(fd, fd);
+
+      // if (port != 53) {
+      //   DNS::RR_set tlsa_rrs; // empty
+      //   sock->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
+      //   if (sock->verified()) {
+      //     LOG(INFO) << "using TLS " << nameserver.host << '[' << nameserver.addr
+      //               << "]:" << nameserver.port;
+      //     return sock;
+      //   }
+      //   close(fd);
+      //   continue;
+      // }
 
       LOG(INFO) << "using " << nameserver.host << '[' << nameserver.addr
                 << "]:" << nameserver.port;
-      return sock;
+      // return sock;
+
+      return fd;
     }
 
     LOG(FATAL) << "no nameservers left to try";
@@ -677,20 +689,37 @@ int main(int argc, char* argv[])
   auto [q_buf, q_buflen] = create_question(name, DNS::RR_type::A, id);
   LOG(INFO) << "q_buflen == " << q_buflen;
 
-  uint16_t sz = q_buflen;
-  sz = htons(sz);
 
-  ns_sock->out().write(reinterpret_cast<char*>(&sz), sizeof sz);
-  ns_sock->out().write(reinterpret_cast<char*>(q_buf.get()), q_buflen);
-  ns_sock->out().flush();
+  CHECK_EQ(send(ns_sock, q_buf.get(), q_buflen, 0), q_buflen);
 
-  sz = 0;
-  ns_sock->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
-  sz = ntohs(sz);
-  LOG(INFO) << "read sz == " << sz;
+  auto a_buflen = max_udp_sz;
+  auto a_buf = std::make_unique<char[]>(a_buflen);
 
-  auto rd_bfr = std::make_unique<char[]>(sz);
-  ns_sock->in().read(rd_bfr.get(), sz);
+  // if (!POSIX::input_ready(ns_sock, std::chrono::seconds(3))) {
+  //   LOG(WARNING) << "timeout waiting for reply";
+  // }
 
-  parse_answer(reinterpret_cast<unsigned char const*>(rd_bfr.get()), sz);
+  // a_buflen = recv(ns_sock, a_buf.get(), a_buflen, 0);
+
+  auto constexpr hook{[]() {}};
+  auto t_o{false};
+  a_buflen = POSIX::read(ns_sock, a_buf.get(), a_buflen, hook, std::chrono::seconds(3), t_o);
+
+  CHECK_GE(a_buflen, 0) << "recv/read failed";
+
+  // uint16_t sz = q_buflen;
+  // sz = htons(sz);
+
+  // ns_sock->out().write(reinterpret_cast<char*>(&sz), sizeof sz);
+  // ns_sock->out().write(reinterpret_cast<char*>(q_buf.get()), q_buflen);
+  // ns_sock->out().flush();
+
+  // sz = 0;
+  // ns_sock->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
+  // sz = ntohs(sz);
+  // LOG(INFO) << "read sz == " << sz;
+
+  // ns_sock->in().read(rd_bfr.get(), sz);
+
+  parse_answer(reinterpret_cast<unsigned char const*>(a_buf.get()), a_buflen);
 }
