@@ -281,7 +281,7 @@ RR_set RR_list::get_records() const
         if (rr) {
           auto type = ldns_rr_get_type(rr);
           LOG(WARNING) << "additional record " << i << " type "
-                       << rcode_c_str(type);
+                       << rr_type_c_str_(type);
         }
       }
     }
