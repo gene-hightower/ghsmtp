@@ -606,8 +606,9 @@ Resolver::Resolver()
         DNS::RR_set tlsa_rrs; // empty
         ns_sock_->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
         if (ns_sock_->verified()) {
-          LOG(INFO) << "using TLS " << nameserver.host << '[' << nameserver.addr
-                    << "]:" << nameserver.port;
+          // LOG(INFO) << "using TLS " << nameserver.host << '[' <<
+          // nameserver.addr
+          //           << "]:" << nameserver.port;
           ns_fd_ = -1;
           return;
         }
@@ -616,14 +617,14 @@ Resolver::Resolver()
         continue;
       }
 
-      LOG(INFO) << "using TCP " << nameserver.host << '[' << nameserver.addr
-                << "]:" << nameserver.port;
+      // LOG(INFO) << "using TCP " << nameserver.host << '[' << nameserver.addr
+      //           << "]:" << nameserver.port;
       ns_fd_ = -1;
       return;
     }
     else {
-      LOG(INFO) << "using UDP " << nameserver.host << '[' << nameserver.addr
-                << "]:" << nameserver.port;
+      // LOG(INFO) << "using UDP " << nameserver.host << '[' << nameserver.addr
+      //           << "]:" << nameserver.port;
     }
     return;
   }
