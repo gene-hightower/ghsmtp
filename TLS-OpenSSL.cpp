@@ -91,8 +91,7 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
   CHECK_GE(session_context_index, 0);
 
-  auto const unused = reinterpret_cast<session_context*>(
-      SSL_get_ex_data(ssl, session_context_index));
+  // auto unused = reinterpret_cast<session_context*>(SSL_get_ex_data(ssl, session_context_index));
 
   auto const depth = X509_STORE_CTX_get_error_depth(ctx);
 
