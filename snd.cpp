@@ -25,12 +25,12 @@ DEFINE_bool(rawdog,
             "send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots");
 
-DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO) to send mail");
+DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 
-DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension to send mail");
+DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension");
 DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
-DEFINE_bool(use_chunking, true, "use CHUNKING extension to send mail");
-DEFINE_bool(use_pipelining, true, "use PIPELINING extension to send mail");
+DEFINE_bool(use_chunking, true, "use CHUNKING extension");
+DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
 DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
