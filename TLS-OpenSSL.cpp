@@ -86,12 +86,13 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
   auto err = X509_STORE_CTX_get_error(ctx);
 
-  auto const ssl = reinterpret_cast<SSL*>(
-      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  // auto const ssl = reinterpret_cast<SSL*>(
+  //   X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
 
   CHECK_GE(session_context_index, 0);
 
-  // auto unused = reinterpret_cast<session_context*>(SSL_get_ex_data(ssl, session_context_index));
+  // auto unused = reinterpret_cast<session_context*>(SSL_get_ex_data(ssl,
+  // session_context_index));
 
   auto const depth = X509_STORE_CTX_get_error_depth(ctx);
 
