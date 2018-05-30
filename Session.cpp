@@ -150,7 +150,7 @@ void Session::greeting()
     // Wait a bit of time for pre-greeting traffic.
     if (!(ip_whitelisted_ || fcrdns_whitelisted_)
         && sock_.input_ready(Config::greeting_wait)) {
-      out_() << "554 5.3.2 not accepting network messages\r\n" << std::flush;
+      out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
       // no glog message at this point
       bad_host_("input before greeting");
     }
