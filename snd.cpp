@@ -858,7 +858,7 @@ auto get_sender()
       if (hostname.find('.') != std::string::npos)
         return hostname;
 
-      LOG(FATAL) << "can't determine my server ID";
+      LOG(FATAL) << "can't determine my server ID, set GHSMTP_CLIENT_ID maybe";
     }()};
   };
 
