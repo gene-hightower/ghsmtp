@@ -666,7 +666,7 @@ pkt Resolver::xchg(pkt const& q)
   auto t_o{false};
   auto a_buf = reinterpret_cast<char*>(bfr.get());
   auto a_buflen
-      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(3), t_o);
+      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(5), t_o);
 
   if (t_o || (a_buflen < 0)) {
     if (t_o)
@@ -703,35 +703,49 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   static_assert(sizeof(edns0_opt_meta_rr) == 11);
   static_assert(sizeof(rr) == 10);
 
-  static std::atomic_uint16_t next_id = 0;
+  static std::atomic_uint16_t next_id = 0x1234;
   auto id = ++next_id;
 
   uint16_t cls = ns_c_in;
   q_ = create_question(name, type, cls, id);
 
-  a_ = res.xchg(q_);
+  unsigned char const* p;
+  unsigned char const* pend;
+  header const* hdr_p;
 
-  auto p = static_cast<unsigned char const*>(a_.bfr.get());
-  if (!a_.sz) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "no reply from nameserver";
-    return;
-  }
+  auto tries = 3;
+  while (tries) {
 
-  auto pend = p + a_.sz;
+    a_ = res.xchg(q_);
 
-  if ((p + sizeof(header)) >= pend) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet";
-    return;
-  }
-  auto hdr_p = reinterpret_cast<header const*>(p);
-  p += sizeof(header);
+    p = static_cast<unsigned char const*>(a_.bfr.get());
+    if (!a_.sz) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "no reply from nameserver";
+      return;
+    }
 
-  if (hdr_p->id() != id) {
-    bogus_or_indeterminate_ = true;
+    pend = p + a_.sz;
+
+    if ((p + sizeof(header)) >= pend) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+
+    hdr_p = reinterpret_cast<header const*>(p);
+    p += sizeof(header);
+
+    if (hdr_p->id() == id)
+      break;
+
     LOG(WARNING) << "packet out of order; ids don't match, got " << hdr_p->id()
                  << " expecting " << id;
+    --tries;
+  }
+  if (tries == 0) {
+    bogus_or_indeterminate_ = true;
+    LOG(WARNING) << "giving up";
     return;
   }
 
@@ -867,19 +881,25 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
 
-    if (rr_p->rr_type() == ns_t_opt) {
+    switch (rr_p->rr_type()) {
+    case ns_t_opt: {
       auto opt_p = reinterpret_cast<edns0_opt_meta_rr const*>(p);
       extended_rcode_ = (opt_p->extended_rcode() << 4) + hdr_p->rcode();
+      break;
     }
-    else if ((rr_p->rr_type() == ns_t_a) || (rr_p->rr_type() == ns_t_aaaa)
-             || (rr_p->rr_type() == ns_t_ns)) {
-      // nameserver records often included
-    }
-    else {
+
+    case ns_t_a:
+    case ns_t_aaaa:
+    case ns_t_ns:
+      // nameserver records often included with address info
+      break;
+
+    default:
       LOG(INFO) << "unknown additional record, name == " << name;
       LOG(INFO) << "rr_p->type()  == " << DNS::RR_type_c_str(rr_p->rr_type());
       LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
       LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
+      break;
     }
 
     p = rr_p->next_rr_name();
@@ -1068,42 +1088,50 @@ std::vector<std::string> Query::get_strings()
   std::vector<std::string> ret;
 
   auto rr_set = get_records();
-  for (auto rr : rr_set) {
-    switch (type_) {
-    case RR_type::A:
+  switch (type_) {
+  case RR_type::A:
+    for (auto rr : rr_set) {
       if (std::holds_alternative<RR_A>(rr)) {
         ret.push_back(std::get<RR_A>(rr).c_str());
       }
-      break;
+    }
+    break;
 
-    case RR_type::CNAME:
+  case RR_type::CNAME:
+    for (auto rr : rr_set) {
       if (std::holds_alternative<RR_CNAME>(rr)) {
         ret.push_back(std::get<RR_CNAME>(rr).str());
       }
-      break;
+    }
+    break;
 
-    case RR_type::PTR:
+  case RR_type::PTR:
+    for (auto rr : rr_set) {
       if (std::holds_alternative<RR_PTR>(rr)) {
         ret.push_back(std::get<RR_PTR>(rr).str());
       }
-      break;
+    }
+    break;
 
-    case RR_type::AAAA:
+  case RR_type::AAAA:
+    for (auto rr : rr_set) {
       if (std::holds_alternative<DNS::RR_AAAA>(rr)) {
         ret.push_back(std::get<DNS::RR_AAAA>(rr).c_str());
       }
-      break;
+    }
+    break;
 
-    case RR_type::MX:
+  case RR_type::MX:
+    for (auto rr : rr_set) {
       if (std::holds_alternative<DNS::RR_MX>(rr)) {
         ret.push_back(std::get<DNS::RR_MX>(rr).exchange());
       }
-      break;
-
-    default:
-      // ignore other types
-      break;
     }
+    break;
+
+  default:
+    // ignore other types
+    break;
   }
 
   return ret;
