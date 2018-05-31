@@ -666,7 +666,7 @@ pkt Resolver::xchg(pkt const& q)
   auto t_o{false};
   auto a_buf = reinterpret_cast<char*>(bfr.get());
   auto a_buflen
-      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(5), t_o);
+      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(3), t_o);
 
   if (t_o || (a_buflen < 0)) {
     if (t_o)
