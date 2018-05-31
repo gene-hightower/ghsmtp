@@ -34,48 +34,8 @@ public:
   std::streamsize max_size() const { return max_size_; }
   std::streamsize size_left() const { return max_size() - size(); }
 
-  void save()
-  {
-    if (size_error()) {
-      LOG(WARNING) << "message size error: " << size() << " exceeds "
-                   << max_size();
-    }
-    try {
-      ofs_.close();
-    }
-    catch (std::system_error const& e) {
-      LOG(ERROR) << e.what();
-      return;
-    }
-    catch (std::exception const& e) {
-      LOG(ERROR) << e.what();
-      return;
-    }
-
-    error_code ec;
-    rename(tmpfn_, newfn_, ec);
-    if (ec) {
-      LOG(ERROR) << "can't rename " << tmpfn_ << " to " << newfn_ << ": " << ec;
-    }
-  }
-  void trash()
-  {
-    try {
-      ofs_.close();
-    }
-    catch (std::system_error const& e) {
-      LOG(ERROR) << e.what();
-    }
-    catch (std::exception const& e) {
-      LOG(ERROR) << e.what();
-    }
-
-    error_code ec;
-    fs::remove(tmpfn_, ec);
-    if (ec) {
-      LOG(ERROR) << "can't remove " << tmpfn_ << ": " << ec;
-    }
-  }
+  void save();
+  void trash();
 
 private:
   Pill s_;
