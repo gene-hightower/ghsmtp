@@ -10,7 +10,7 @@ void Message::open(std::string_view fqdn,
 {
   max_size_ = max_size;
 
-  auto const maildir{[&] {
+  auto maildir{[&] {
     auto const maildir_ev{getenv("MAILDIR")};
     if (maildir_ev) {
       return fs::path(maildir_ev);
