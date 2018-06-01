@@ -389,10 +389,10 @@ int name_length(unsigned char const* encoded, DNS::packet const& pkt)
 
 bool expand_name(unsigned char const* encoded,
                  DNS::packet const& pkt,
-                 std::string& s,
-                 int* enclen)
+                 std::string& name,
+                 int& enc_len)
 {
-  s.clear();
+  name.clear();
 
   bool indir = false;
 
@@ -402,7 +402,7 @@ bool expand_name(unsigned char const* encoded,
     return false;
   }
 
-  s.reserve(nlen + 1);
+  name.reserve(nlen + 1);
 
   if (nlen == 0) {
     // RFC2181 says this should be ".": the root of the DNS tree.
@@ -410,9 +410,9 @@ bool expand_name(unsigned char const* encoded,
 
     // indirect root label (like 0xc0 0x0c) is 2 bytes long
     if ((*encoded & NS_CMPRSFLGS) == NS_CMPRSFLGS)
-      *enclen = 2;
+      enc_len = 2;
     else
-      *enclen = 1; // the caller should move one byte to get past this
+      enc_len = 1; // the caller should move one byte to get past this
 
     return true;
   }
@@ -422,7 +422,7 @@ bool expand_name(unsigned char const* encoded,
   while (*p) {
     if ((*p & NS_CMPRSFLGS) == NS_CMPRSFLGS) {
       if (!indir) {
-        *enclen = uztosl(p + 2U - encoded);
+        enc_len = uztosl(p + 2 - encoded);
         indir = true;
       }
       p = pkt.bfr.get() + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
@@ -432,18 +432,19 @@ bool expand_name(unsigned char const* encoded,
       p++;
       while (len--) {
         if (*p == '.' || *p == '\\')
-          s += '\\';
-        s += static_cast<char>(*p);
+          name += '\\';
+        name += static_cast<char>(*p);
         p++;
       }
-      s += '.';
+      name += '.';
     }
   }
-  if (!indir)
-    *enclen = uztosl(p + 1U - encoded);
 
-  if (s.length() && ('.' == s.back())) {
-    s.pop_back();
+  if (!indir)
+    enc_len = uztosl(p + 1 - encoded);
+
+  if (name.length() && ('.' == name.back())) {
+    name.pop_back();
   }
 
   return true;
@@ -542,25 +543,25 @@ namespace DNS {
 Resolver::Resolver()
 {
   auto tries = countof(nameservers);
-  auto ns = std::experimental::randint(
-      0, static_cast<int>(countof(nameservers) - 1));
+
+  ns_ = std::experimental::randint(0,
+                                   static_cast<int>(countof(nameservers) - 1));
 
   while (tries--) {
 
     // try the next one, with wrap
-    if (++ns == countof(nameservers)) {
-      ns = 0;
-    }
-    auto const& nameserver = nameservers[ns];
+    if (++ns_ == countof(nameservers))
+      ns_ = 0;
+
+    auto const& nameserver = nameservers[ns_];
 
     ns_fd_ = -1;
     uint16_t port = osutil::get_port(nameserver.port);
 
+    auto typ = (nameserver.typ == sock_type::stream) ? SOCK_STREAM : SOCK_DGRAM;
+
     if (IP4::is_address(nameserver.addr)) {
-      if (nameserver.typ == sock_type::stream)
-        ns_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-      else
-        ns_fd_ = socket(AF_INET, SOCK_DGRAM, 0);
+      ns_fd_ = socket(AF_INET, typ, 0);
       PCHECK(ns_fd_ >= 0) << "socket() failed";
 
       auto in4{sockaddr_in{}};
@@ -579,10 +580,7 @@ Resolver::Resolver()
       }
     }
     else if (IP6::is_address(nameserver.addr)) {
-      if (nameserver.typ == sock_type::stream)
-        ns_fd_ = socket(AF_INET6, SOCK_STREAM, 0);
-      else
-        ns_fd_ = socket(AF_INET6, SOCK_DGRAM, 0);
+      ns_fd_ = socket(AF_INET6, typ, 0);
       PCHECK(ns_fd_ >= 0) << "socket() failed";
 
       auto in6{sockaddr_in6{}};
@@ -638,7 +636,9 @@ Resolver::Resolver()
 
 packet Resolver::xchg(packet const& q)
 {
-  if (ns_fd_ == -1) {
+  if (nameservers[ns_].typ == sock_type::stream) {
+    CHECK_EQ(ns_fd_, -1);
+
     uint16_t sz = htons(q.sz);
 
     ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
@@ -661,6 +661,9 @@ packet Resolver::xchg(packet const& q)
     return packet{std::move(bfr), sz};
   }
 
+  CHECK(nameservers[ns_].typ == sock_type::dgram);
+  CHECK_GE(ns_fd_, 0);
+
   CHECK_EQ(send(ns_fd_, q.bfr.get(), q.sz, 0), q.sz);
 
   auto sz = max_udp_sz;
@@ -672,13 +675,14 @@ packet Resolver::xchg(packet const& q)
   auto a_buflen
       = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(5), t_o);
 
-  if (t_o || (a_buflen < 0)) {
-    if (t_o)
-      LOG(WARNING) << "DNS read timed out";
-    else
-      LOG(WARNING) << "DNS read failed";
+  if (a_buflen < 0) {
+    LOG(WARNING) << "DNS read failed";
+    return packet{std::make_unique<unsigned char[]>(0), uint16_t(0)};
+  }
 
-    return packet{std::make_unique<unsigned char[]>(1), uint16_t(0)};
+  if (t_o) {
+    LOG(WARNING) << "DNS read timed out";
+    return packet{std::make_unique<unsigned char[]>(0), uint16_t(0)};
   }
 
   sz = a_buflen;
@@ -781,9 +785,9 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   auto const pend = a_.bfr.get() + a_.sz;
 
   std::string qname;
-  auto enc_len = 0;
+  int enc_len = 0;
 
-  if (!expand_name(p, a_, qname, &enc_len)) {
+  if (!expand_name(p, a_, qname, enc_len)) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "bad packet";
     return;
@@ -832,7 +836,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, &enc_len)) {
+    if (!expand_name(p, a_, name, enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return;
@@ -851,7 +855,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->nscount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, &enc_len)) {
+    if (!expand_name(p, a_, name, enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return;
@@ -870,7 +874,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, &enc_len)) {
+    if (!expand_name(p, a_, name, enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet in additional section for " << name << "/"
                    << type;
@@ -934,7 +938,7 @@ RR_set Query::get_records()
     std::string qname;
     auto enc_len = 0;
 
-    CHECK(expand_name(p, a_, qname, &enc_len));
+    CHECK(expand_name(p, a_, qname, enc_len));
     p += enc_len;
     // auto question_p = reinterpret_cast<question const*>(p);
     p += sizeof(question);
@@ -945,7 +949,7 @@ RR_set Query::get_records()
     std::string name;
     auto enc_len = 0;
 
-    CHECK(expand_name(p, a_, name, &enc_len));
+    CHECK(expand_name(p, a_, name, enc_len));
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
@@ -973,7 +977,7 @@ RR_set Query::get_records()
 
     case DNS::RR_type::CNAME: {
       p = rr_p->rddata();
-      if (expand_name(p, a_, name, &enc_len)) {
+      if (expand_name(p, a_, name, enc_len)) {
         ret.emplace_back(RR_CNAME{name});
       }
       else {
@@ -986,7 +990,7 @@ RR_set Query::get_records()
 
     case DNS::RR_type::PTR: {
       p = rr_p->rddata();
-      if (expand_name(p, a_, name, &enc_len)) {
+      if (expand_name(p, a_, name, enc_len)) {
         ret.emplace_back(RR_PTR{name});
       }
       else {
@@ -1006,7 +1010,7 @@ RR_set Query::get_records()
       p = rr_p->rddata();
       uint16_t preference = (p[0] << 8) + p[1];
       p += 2;
-      if (expand_name(p, a_, name, &enc_len)) {
+      if (expand_name(p, a_, name, enc_len)) {
         ret.emplace_back(RR_MX{name, preference});
       }
       else {

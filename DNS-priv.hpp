@@ -36,6 +36,7 @@ public:
 
 private:
   std::unique_ptr<Sock> ns_sock_;
+  int ns_;
   int ns_fd_;
 };
 
