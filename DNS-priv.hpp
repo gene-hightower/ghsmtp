@@ -8,7 +8,7 @@
 
 namespace DNS {
 
-struct pkt {
+struct packet {
   std::unique_ptr<unsigned char[]> bfr;
   uint16_t sz;
 };
@@ -32,7 +32,7 @@ public:
     return get_strings(typ, name.c_str());
   }
 
-  pkt xchg(pkt const& q);
+  packet xchg(packet const& q);
 
 private:
   std::unique_ptr<Sock> ns_sock_;
@@ -62,13 +62,15 @@ public:
   uint16_t extended_rcode() const { return extended_rcode_; }
 
 private:
+  bool xchg_(Resolver& res, uint16_t id);
+
   uint16_t rcode_{0};
   uint16_t extended_rcode_{0};
 
   RR_type type_;
 
-  pkt q_;
-  pkt a_;
+  packet q_;
+  packet a_;
 
   bool authentic_data_{false};
   bool bogus_or_indeterminate_{false};

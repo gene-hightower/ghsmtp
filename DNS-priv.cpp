@@ -328,7 +328,7 @@ auto uztosl(size_t uznum)
 // return the length of the expansion of an encoded domain name, or -1
 // if the encoding is invalid
 
-int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
+int name_length(unsigned char const* encoded, DNS::packet const& pkt)
 {
   auto constexpr max_indirs = 50; // maximum indirections allowed for a name
 
@@ -336,7 +336,7 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
   int nindir = 0; // count indirections
 
   // Allow the caller to pass us buf + len and have us check for it.
-  if (encoded >= buf + len)
+  if (encoded >= pkt.bfr.get() + pkt.sz)
     return -1;
 
   while (*encoded) {
@@ -345,24 +345,24 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
 
     if (top == NS_CMPRSFLGS) {
       // Check the offset and go there.
-      if (encoded + 1 >= buf + len)
+      if (encoded + 1 >= pkt.bfr.get() + pkt.sz)
         return -1;
 
       auto offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
-      if (offset >= len)
+      if (offset >= pkt.sz)
         return -1;
 
-      encoded = buf + offset;
+      encoded = pkt.bfr.get() + offset;
 
       // If we've seen more indirects than the message length,
       // then there's a loop.
       ++nindir;
-      if (nindir > len || nindir > max_indirs)
+      if (nindir > pkt.sz || nindir > max_indirs)
         return -1;
     }
     else if (top == 0) {
       auto offset = *encoded;
-      if (encoded + offset + 1 >= buf + len)
+      if (encoded + offset + 1 >= pkt.bfr.get() + pkt.sz)
         return -1;
 
       ++encoded;
@@ -388,8 +388,7 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
 }
 
 bool expand_name(unsigned char const* encoded,
-                 unsigned char const* buf,
-                 int len,
+                 DNS::packet const& pkt,
                  std::string& s,
                  int* enclen)
 {
@@ -397,7 +396,7 @@ bool expand_name(unsigned char const* encoded,
 
   bool indir = false;
 
-  auto nlen = name_length(encoded, buf, len);
+  auto nlen = name_length(encoded, pkt);
   if (nlen < 0) {
     LOG(WARNING) << "bad name";
     return false;
@@ -426,7 +425,7 @@ bool expand_name(unsigned char const* encoded,
         *enclen = uztosl(p + 2U - encoded);
         indir = true;
       }
-      p = buf + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
+      p = pkt.bfr.get() + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
     }
     else {
       int len = *p;
@@ -505,7 +504,7 @@ int name_put(unsigned char* bfr, char const* name)
 
 // returns a unique_ptr to an array of chars and it's size in q_bfr_sz
 
-DNS::pkt
+DNS::packet
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
 {
   // size to allocate may be larger than needed if backslash escapes
@@ -535,7 +534,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   auto sz = q - bfr.get();
   CHECK_LE(sz, sz_alloc);
 
-  return DNS::pkt{std::move(bfr), static_cast<uint16_t>(sz)};
+  return DNS::packet{std::move(bfr), static_cast<uint16_t>(sz)};
 }
 
 namespace DNS {
@@ -637,7 +636,7 @@ Resolver::Resolver()
   LOG(FATAL) << "no nameservers left to try";
 }
 
-pkt Resolver::xchg(pkt const& q)
+packet Resolver::xchg(packet const& q)
 {
   if (ns_fd_ == -1) {
     uint16_t sz = htons(q.sz);
@@ -659,7 +658,7 @@ pkt Resolver::xchg(pkt const& q)
                    << ns_sock_->in().gcount() << " octets";
     }
 
-    return pkt{std::move(bfr), sz};
+    return packet{std::move(bfr), sz};
   }
 
   CHECK_EQ(send(ns_fd_, q.bfr.get(), q.sz, 0), q.sz);
@@ -679,11 +678,11 @@ pkt Resolver::xchg(pkt const& q)
     else
       LOG(WARNING) << "DNS read failed";
 
-    return pkt{std::make_unique<unsigned char[]>(1), uint16_t(0)};
+    return packet{std::make_unique<unsigned char[]>(1), uint16_t(0)};
   }
 
   sz = a_buflen;
-  return pkt{std::move(bfr), sz};
+  return packet{std::move(bfr), sz};
 }
 
 RR_set Resolver::get_records(RR_type typ, char const* name)
@@ -698,6 +697,45 @@ std::vector<std::string> Resolver::get_strings(RR_type typ, char const* name)
   return q.get_strings();
 }
 
+bool Query::xchg_(Resolver& res, uint16_t id)
+{
+  auto tries = 3;
+
+  while (tries) {
+
+    a_ = res.xchg(q_);
+
+    if (!a_.sz) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "no reply from nameserver";
+      return false;
+    }
+
+    if (a_.sz < sizeof(header)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "packet too small";
+      return false;
+    }
+
+    auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
+
+    if (hdr_p->id() == id)
+      break;
+
+    LOG(WARNING) << "packet out of order; ids don't match, got " << hdr_p->id()
+                 << " expecting " << id;
+    --tries;
+  }
+
+  if (tries)
+    return true;
+
+  bogus_or_indeterminate_ = true;
+  LOG(WARNING) << "no tries left, giving up";
+
+  return false;
+}
+
 Query::Query(Resolver& res, RR_type type, char const* name)
   : type_(type)
 {
@@ -707,45 +745,10 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   uint16_t cls = ns_c_in;
   q_ = create_question(name, type, cls, id);
 
-  unsigned char const* p;
-  unsigned char const* pend;
-  header const* hdr_p;
-
-  auto tries = 3;
-  while (tries) {
-
-    a_ = res.xchg(q_);
-
-    p = static_cast<unsigned char const*>(a_.bfr.get());
-    if (!a_.sz) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "no reply from nameserver";
-      return;
-    }
-
-    pend = p + a_.sz;
-
-    if ((p + sizeof(header)) >= pend) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
-      return;
-    }
-
-    hdr_p = reinterpret_cast<header const*>(p);
-    p += sizeof(header);
-
-    if (hdr_p->id() == id)
-      break;
-
-    LOG(WARNING) << "packet out of order; ids don't match, got " << hdr_p->id()
-                 << " expecting " << id;
-    --tries;
-  }
-  if (tries == 0) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "giving up";
+  if (!xchg_(res, id))
     return;
-  }
+
+  auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
 
   rcode_ = hdr_p->rcode();
   switch (rcode_) {
@@ -774,10 +777,13 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
+  auto p = const_cast<unsigned char const*>(a_.bfr.get()) + sizeof(header);
+  auto const pend = a_.bfr.get() + a_.sz;
+
   std::string qname;
   auto enc_len = 0;
 
-  if (!expand_name(p, a_.bfr.get(), a_.sz, qname, &enc_len)) {
+  if (!expand_name(p, a_, qname, &enc_len)) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "bad packet";
     return;
@@ -826,7 +832,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+    if (!expand_name(p, a_, name, &enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return;
@@ -845,7 +851,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->nscount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+    if (!expand_name(p, a_, name, &enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return;
@@ -864,7 +870,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string name;
     auto enc_len = 0;
-    if (!expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+    if (!expand_name(p, a_, name, &enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet in additional section for " << name << "/"
                    << type;
@@ -918,18 +924,17 @@ RR_set Query::get_records()
   if (bogus_or_indeterminate_) // if ctor() found and error with the packet
     return ret;
 
-  auto p = static_cast<unsigned char const*>(a_.bfr.get());
-  auto pend = p + a_.sz;
+  auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
 
-  auto hdr_p = reinterpret_cast<header const*>(p);
-  p += sizeof(header);
+  auto p = const_cast<unsigned char const*>(a_.bfr.get()) + sizeof(header);
+  auto const pend = a_.bfr.get() + a_.sz;
 
   // skip queries
   for (auto i = 0; i < hdr_p->qdcount(); ++i) {
     std::string qname;
     auto enc_len = 0;
 
-    CHECK(expand_name(p, a_.bfr.get(), a_.sz, qname, &enc_len));
+    CHECK(expand_name(p, a_, qname, &enc_len));
     p += enc_len;
     // auto question_p = reinterpret_cast<question const*>(p);
     p += sizeof(question);
@@ -940,7 +945,7 @@ RR_set Query::get_records()
     std::string name;
     auto enc_len = 0;
 
-    CHECK(expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len));
+    CHECK(expand_name(p, a_, name, &enc_len));
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
@@ -968,7 +973,7 @@ RR_set Query::get_records()
 
     case DNS::RR_type::CNAME: {
       p = rr_p->rddata();
-      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      if (expand_name(p, a_, name, &enc_len)) {
         ret.emplace_back(RR_CNAME{name});
       }
       else {
@@ -981,7 +986,7 @@ RR_set Query::get_records()
 
     case DNS::RR_type::PTR: {
       p = rr_p->rddata();
-      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      if (expand_name(p, a_, name, &enc_len)) {
         ret.emplace_back(RR_PTR{name});
       }
       else {
@@ -1001,7 +1006,7 @@ RR_set Query::get_records()
       p = rr_p->rddata();
       uint16_t preference = (p[0] << 8) + p[1];
       p += 2;
-      if (expand_name(p, a_.bfr.get(), a_.sz, name, &enc_len)) {
+      if (expand_name(p, a_, name, &enc_len)) {
         ret.emplace_back(RR_MX{name, preference});
       }
       else {
