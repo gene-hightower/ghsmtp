@@ -1,5 +1,5 @@
-#include <chrono>
-#include <functional>
+#include "TLS-OpenSSL.hpp"
+
 #include <iomanip>
 #include <string>
 
@@ -13,7 +13,6 @@
 
 #include "DNS.hpp"
 #include "POSIX.hpp"
-#include "TLS-OpenSSL.hpp"
 #include "osutil.hpp"
 
 // <https://tools.ietf.org/html/rfc7919>
