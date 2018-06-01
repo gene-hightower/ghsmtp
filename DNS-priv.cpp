@@ -107,6 +107,11 @@ constexpr nameserver nameservers[]{
     */
 };
 
+using octet = unsigned char;
+
+octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
+octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
+
 /*
                                            1  1  1  1  1  1
              0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -125,11 +130,6 @@ constexpr nameserver nameservers[]{
             +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 
  */
-
-using octet = unsigned char;
-
-octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
-octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
 class header {
   octet id_hi_;
@@ -155,6 +155,7 @@ public:
     : id_hi_(hi(id))
     , id_lo_(lo(id))
   {
+    static_assert(sizeof(header) == 12);
   }
 
   uint16_t id() const { return (id_hi_ << 8) + id_lo_; }
@@ -185,6 +186,7 @@ public:
     , qclass_hi_(hi(qclass))
     , qclass_lo_(lo(qclass))
   {
+    static_assert(sizeof(question) == 4);
   }
 
   uint16_t qtype() const { return (qtype_hi_ << 8) + qtype_lo_; }
@@ -242,6 +244,7 @@ public:
     : class_hi_(hi(max_udp_sz))
     , class_lo_(lo(max_udp_sz))
   {
+    static_assert(sizeof(edns0_opt_meta_rr) == 11);
   }
 
   uint16_t extended_rcode() const { return extended_rcode_; }
@@ -291,6 +294,8 @@ class rr {
   octet rdlength_lo_;
 
 public:
+  rr() { static_assert(sizeof(rr) == 10); }
+
   uint16_t rr_type() const { return (uint16_t(type_hi_) << 8) + type_lo_; }
   uint16_t rr_class() const { return (uint16_t(type_hi_) << 8) + type_lo_; }
   uint32_t rr_ttl() const
@@ -301,18 +306,18 @@ public:
 
   uint16_t rdlength() const { return (rdlength_hi_ << 8) + rdlength_lo_; }
 
-  unsigned char const* rddata() const
-  {
-    return reinterpret_cast<unsigned char const*>(this) + sizeof(rr);
-  }
-
-  char const* cdata() const
+  auto cdata() const
   {
     return reinterpret_cast<char const*>(this) + sizeof(rr);
   }
-
-  unsigned char const* next_rr_name() const { return rddata() + rdlength(); }
+  auto rddata() const
+  {
+    return reinterpret_cast<unsigned char const*>(cdata());
+  }
+  auto next_rr_name() const { return rddata() + rdlength(); }
 };
+
+// name processing code mostly adapted from c-ares
 
 auto uztosl(size_t uznum)
 {
@@ -320,15 +325,15 @@ auto uztosl(size_t uznum)
   return static_cast<long>(uznum);
 }
 
-auto constexpr max_indirs = 50; // maximum indirections allowed for a name
-
 // return the length of the expansion of an encoded domain name, or -1
 // if the encoding is invalid
 
 int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
 {
-  int n = 0;
-  int indir = 0; // count indirections
+  auto constexpr max_indirs = 50; // maximum indirections allowed for a name
+
+  int length = 0;
+  int nindir = 0; // count indirections
 
   // Allow the caller to pass us buf + len and have us check for it.
   if (encoded >= buf + len)
@@ -351,8 +356,8 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
 
       // If we've seen more indirects than the message length,
       // then there's a loop.
-      ++indir;
-      if (indir > len || indir > max_indirs)
+      ++nindir;
+      if (nindir > len || nindir > max_indirs)
         return -1;
     }
     else if (top == 0) {
@@ -363,11 +368,11 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
       ++encoded;
 
       while (offset--) {
-        n += (*encoded == '.' || *encoded == '\\') ? 2 : 1;
+        length += (*encoded == '.' || *encoded == '\\') ? 2 : 1;
         encoded++;
       }
 
-      ++n;
+      ++length;
     }
     else {
       // RFC 1035 4.1.4 says other options (01, 10) for top 2
@@ -379,7 +384,7 @@ int name_length(unsigned char const* encoded, unsigned char const* buf, int len)
   // If there were any labels at all, then the number of dots is one
   // less than the number of labels, so subtract one.
 
-  return n ? n - 1 : n;
+  return length ? length - 1 : length;
 }
 
 bool expand_name(unsigned char const* encoded,
@@ -390,7 +395,7 @@ bool expand_name(unsigned char const* encoded,
 {
   s.clear();
 
-  int indir = 0;
+  bool indir = false;
 
   auto nlen = name_length(encoded, buf, len);
   if (nlen < 0) {
@@ -419,7 +424,7 @@ bool expand_name(unsigned char const* encoded,
     if ((*p & NS_CMPRSFLGS) == NS_CMPRSFLGS) {
       if (!indir) {
         *enclen = uztosl(p + 2U - encoded);
-        indir = 1;
+        indir = true;
       }
       p = buf + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
     }
@@ -696,14 +701,7 @@ std::vector<std::string> Resolver::get_strings(RR_type typ, char const* name)
 Query::Query(Resolver& res, RR_type type, char const* name)
   : type_(type)
 {
-  // LOG(INFO) << "DNS lookup of " << name << '/' << type;
-
-  static_assert(sizeof(header) == 12);
-  static_assert(sizeof(question) == 4);
-  static_assert(sizeof(edns0_opt_meta_rr) == 11);
-  static_assert(sizeof(rr) == 10);
-
-  static std::atomic_uint16_t next_id = 0x1234;
+  static std::atomic_uint16_t next_id;
   auto id = ++next_id;
 
   uint16_t cls = ns_c_in;
@@ -824,7 +822,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
-  // skip answers
+  // answers
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
     std::string name;
     auto enc_len = 0;
@@ -843,7 +841,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     p = rr_p->next_rr_name();
   }
 
-  // skip nameservers
+  // nameservers
   for (auto i = 0; i < hdr_p->nscount(); ++i) {
     std::string name;
     auto enc_len = 0;
@@ -891,7 +889,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     case ns_t_a:
     case ns_t_aaaa:
     case ns_t_ns:
-      // nameserver records often included with address info
+      // nameserver records often included with associated address info
       break;
 
     default:
@@ -1087,51 +1085,16 @@ std::vector<std::string> Query::get_strings()
 {
   std::vector<std::string> ret;
 
-  auto rr_set = get_records();
-  switch (type_) {
-  case RR_type::A:
-    for (auto rr : rr_set) {
-      if (std::holds_alternative<RR_A>(rr)) {
-        ret.push_back(std::get<RR_A>(rr).c_str());
-      }
-    }
-    break;
+  auto const rr_set = get_records();
 
-  case RR_type::CNAME:
-    for (auto rr : rr_set) {
-      if (std::holds_alternative<RR_CNAME>(rr)) {
-        ret.push_back(std::get<RR_CNAME>(rr).str());
-      }
-    }
-    break;
-
-  case RR_type::PTR:
-    for (auto rr : rr_set) {
-      if (std::holds_alternative<RR_PTR>(rr)) {
-        ret.push_back(std::get<RR_PTR>(rr).str());
-      }
-    }
-    break;
-
-  case RR_type::AAAA:
-    for (auto rr : rr_set) {
-      if (std::holds_alternative<DNS::RR_AAAA>(rr)) {
-        ret.push_back(std::get<DNS::RR_AAAA>(rr).c_str());
-      }
-    }
-    break;
-
-  case RR_type::MX:
-    for (auto rr : rr_set) {
-      if (std::holds_alternative<DNS::RR_MX>(rr)) {
-        ret.push_back(std::get<DNS::RR_MX>(rr).exchange());
-      }
-    }
-    break;
-
-  default:
-    // ignore other types
-    break;
+  for (auto rr : rr_set) {
+    std::visit(
+        [&ret](auto const& r) {
+          auto s = r.as_str();
+          if (s)
+            ret.push_back(*s);
+        },
+        rr);
   }
 
   return ret;

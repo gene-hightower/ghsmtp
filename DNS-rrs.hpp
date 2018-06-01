@@ -2,6 +2,7 @@
 #define DNS_RRS_DOT_HPP
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -150,6 +151,8 @@ class RR_A {
 public:
   RR_A(uint8_t const* rd, size_t sz);
 
+  std::optional<std::string> as_str() const { return std::string{str_}; }
+
   sockaddr_in const& addr() const { return addr_; }
   char const* c_str() const { return str_; }
 
@@ -164,6 +167,8 @@ public:
     : cname_(cname)
   {
   }
+
+  std::optional<std::string> as_str() const { return str(); }
 
   std::string const& str() const { return cname_; }
   char const* c_str() const { return str().c_str(); }
@@ -180,6 +185,8 @@ public:
   {
   }
 
+  std::optional<std::string> as_str() const { return str(); }
+
   std::string const& str() const { return ptrdname_; }
   char const* c_str() const { return str().c_str(); }
 
@@ -194,6 +201,8 @@ public:
     , preference_(preference)
   {
   }
+
+  std::optional<std::string> as_str() const { return exchange(); }
 
   std::string const& exchange() const { return exchange_; }
   uint16_t preference() const { return preference_; }
@@ -210,8 +219,10 @@ public:
   {
   }
 
-  std::string const& str() const { return txt_data_; }
+  std::optional<std::string> as_str() const { return str(); }
+
   char const* c_str() const { return str().c_str(); }
+  std::string const& str() const { return txt_data_; }
 
 private:
   std::string txt_data_;
@@ -220,6 +231,8 @@ private:
 class RR_AAAA {
 public:
   RR_AAAA(uint8_t const* rd, size_t sz);
+
+  std::optional<std::string> as_str() const { return std::string{c_str()}; }
 
   sockaddr_in6 const& addr() const { return addr_; }
   char const* c_str() const { return str_; }
@@ -240,6 +253,9 @@ public:
   unsigned selector() const { return selector_; }
   unsigned matching_type() const { return matching_type_; }
   std::vector<unsigned char> const& assoc_data() const { return assoc_data_; }
+
+  // doesn't have a string representation
+  std::optional<std::string> as_str() const { return {}; }
 
 private:
   std::vector<unsigned char> assoc_data_;
