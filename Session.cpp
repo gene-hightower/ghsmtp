@@ -1100,7 +1100,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
         return false;
       }
     }
-    // LOG(INFO) << "IP address " << sock_.them_c_str() << " not blacklisted";
+    LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
   }
 
   return true;
@@ -1238,7 +1238,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     out_() << "501 5.1.8 bad sender\r\n" << std::flush;
-    error_msg = "bad sender";
+    error_msg = sender_str + " bad sender";
     return false;
   }
 
