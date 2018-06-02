@@ -28,8 +28,9 @@ Lib::Lib()
   }()};
 
   lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
-  strncpy(reinterpret_cast<char*>(lib_.tld_source_file), path.string().c_str(),
-          PATH_MAX);
+
+  CHECK_LT(path.string().length(), PATH_MAX);
+  strcpy(reinterpret_cast<char*>(lib_.tld_source_file), path.string().c_str());
 
   auto const status = opendmarc_policy_library_init(&lib_);
   CHECK_EQ(status, DMARC_PARSE_OKAY) << opendmarc_policy_status_to_str(status);
