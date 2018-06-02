@@ -1124,7 +1124,7 @@ bool Session::verify_client_(Domain const& client_identity,
       && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
                     client_identity)
           != client_fcrdns_.end())) {
-    LOG(INFO) << "claimed identity " << client_identity << " matches FCrDNS";
+    // LOG(INFO) << "claimed identity " << client_identity << " matches FCrDNS";
     return true;
   }
 
