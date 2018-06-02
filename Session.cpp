@@ -909,7 +909,7 @@ void Session::starttls()
 
 void Session::exit_()
 {
-  sock_.log_totals();
+  // sock_.log_totals();
 
   auto time_used{timespec{}};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
