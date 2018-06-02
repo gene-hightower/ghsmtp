@@ -11,6 +11,9 @@ namespace DNS {
 struct packet {
   std::unique_ptr<unsigned char[]> bfr;
   uint16_t sz;
+
+  unsigned char const* begin() const { return bfr.get(); }
+  unsigned char const* end() const { return begin() + sz; }
 };
 
 class Resolver {
