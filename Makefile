@@ -206,11 +206,11 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-safty_flags := # nada
+# safty_flags := # nada
 
 # visibility_flags := # nada
 
-lto_flags := # nada
+# lto_flags := # nada
 
 include MKUltra/rules
 
