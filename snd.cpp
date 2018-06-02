@@ -1240,7 +1240,7 @@ bool snd(int fd_in,
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
+    // LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
     cnn.sock.starttls_client(sender.ascii().c_str(), receiver.ascii().c_str(),
                              tlsa_rrs, enforce_dane);
 
