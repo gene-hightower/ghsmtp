@@ -451,6 +451,17 @@ bool Session::msg_new()
       }
     }
 
+    auto const rp_tld{tld_db_.get_registered_domain(rp_dom.ascii().c_str())};
+    for (auto client_fcrdns : client_fcrdns_) {
+      auto const client_tld{
+          tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
+      if (Domain::match(rp_tld, client_tld)) {
+        LOG(INFO) << "ham since reverse_path TLD (" << rp_tld
+                  << ") matches TLD of confirmed DNS name " << client_fcrdns;
+        return Message::SpamStatus::ham;
+      }
+    }
+
     LOG(INFO) << "spam since it's not ham";
     return Message::SpamStatus::spam;
   }()};
