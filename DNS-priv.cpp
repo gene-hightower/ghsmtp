@@ -763,10 +763,19 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     nx_domain_ = true;
     break;
 
+  case ns_r_servfail:
+    bogus_or_indeterminate_ = true;
+    break;
+
   default:
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "name lookup error: " << rcode_c_str(rcode_) << " for "
-                 << name << "/" << type;
+                 << name << '/' << type;
+    break;
+  }
+
+  if (a_.sz == 0) {
+    LOG(INFO) << "no packet for " << name << '/' << type;
     return;
   }
 
@@ -777,7 +786,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   if (hdr_p->qdcount() != 1) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "question not copied into answer for " << name << "/"
+    LOG(WARNING) << "question not copied into answer for " << name << '/'
                  << type;
     return;
   }
@@ -839,14 +848,14 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     auto enc_len = 0;
     if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in answer section for " << name << "/"
+      LOG(WARNING) << "bad packet in answer section for " << name << '/'
                    << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in answer section for " << name << "/"
+      LOG(WARNING) << "bad packet in answer section for " << name << '/'
                    << type;
       return;
     }
@@ -860,14 +869,14 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     auto enc_len = 0;
     if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in nameserver section for " << name << "/"
+      LOG(WARNING) << "bad packet in nameserver section for " << name << '/'
                    << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in nameserver section for " << name << "/"
+      LOG(WARNING) << "bad packet in nameserver section for " << name << '/'
                    << type;
       return;
     }
@@ -881,14 +890,14 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     auto enc_len = 0;
     if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in additional section for " << name << "/"
+      LOG(WARNING) << "bad packet in additional section for " << name << '/'
                    << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in additional section for " << name << "/"
+      LOG(WARNING) << "bad packet in additional section for " << name << '/'
                    << type;
       return;
     }
@@ -921,7 +930,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   auto size_check = p - static_cast<unsigned char const*>(a_.bfr.get());
   if (size_check != a_.sz) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet size for " << name << "/" << type;
+    LOG(WARNING) << "bad packet size for " << name << '/' << type;
     return;
   }
 }
