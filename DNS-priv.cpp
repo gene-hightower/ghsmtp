@@ -777,7 +777,8 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   if (hdr_p->qdcount() != 1) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "question not copied into answer";
+    LOG(WARNING) << "question not copied into answer for " << name << "/"
+                 << type;
     return;
   }
 
@@ -795,7 +796,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   p += enc_len;
   if (p >= pend) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet";
+    LOG(WARNING) << "bad packet, too small";
     return;
   }
 
@@ -828,23 +829,25 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   p += sizeof(question);
   if (p >= pend) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet";
+    LOG(WARNING) << "bad packet, too small";
     return;
   }
 
   // answers
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
-    std::string name;
+    std::string x;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, enc_len)) {
+    if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in answer section for " << name << "/"
+                   << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in answer section for " << name << "/"
+                   << type;
       return;
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
@@ -853,17 +856,19 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   // nameservers
   for (auto i = 0; i < hdr_p->nscount(); ++i) {
-    std::string name;
+    std::string x;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, enc_len)) {
+    if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in nameserver section for " << name << "/"
+                   << type;
       return;
     }
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet";
+      LOG(WARNING) << "bad packet in nameserver section for " << name << "/"
+                   << type;
       return;
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
@@ -872,9 +877,9 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   // check additional records for OPT record
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
-    std::string name;
+    std::string x;
     auto enc_len = 0;
-    if (!expand_name(p, a_, name, enc_len)) {
+    if (!expand_name(p, a_, x, enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet in additional section for " << name << "/"
                    << type;
@@ -948,7 +953,6 @@ RR_set Query::get_records()
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
     std::string name;
     auto enc_len = 0;
-
     CHECK(expand_name(p, a_, name, enc_len));
     p += enc_len;
     if ((p + sizeof(rr)) > pend) {
