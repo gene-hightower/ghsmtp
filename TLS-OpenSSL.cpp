@@ -133,26 +133,20 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
-    LOG(INFO) << "servername requested " << servername;
-    if (cert_ctx->size() == 1) {
-      LOG(INFO) << "we have just the one cert, so whateves";
-      return SSL_TLSEXT_ERR_OK;
-    }
-    else {
-      for (auto const& ctx : *cert_ctx) {
-        if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
-            c != ctx.cn.end()) {
-          LOG(INFO) << "found match, switching context";
+    // LOG(INFO) << "servername requested " << servername;
+    for (auto const& ctx : *cert_ctx) {
+      if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
+          c != ctx.cn.end()) {
+        if (cert_ctx->size() > 1)
           SSL_set_SSL_CTX(s, ctx.ctx);
-          return SSL_TLSEXT_ERR_OK;
-        }
+        return SSL_TLSEXT_ERR_OK;
       }
-      LOG(INFO) << "servername not found";
+      LOG(INFO) << "no cert found for " << servername;
       return SSL_TLSEXT_ERR_ALERT_WARNING;
     }
   }
 
-  LOG(INFO) << "no specific server name requested";
+  // LOG(INFO) << "no specific server name requested";
   return SSL_TLSEXT_ERR_OK;
 }
 
@@ -244,7 +238,7 @@ bool TLS::starttls_client(int fd_in,
         auto e = X509_NAME_get_entry(subj, lastpos);
         ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
         auto str = ASN1_STRING_get0_data(d);
-        LOG(INFO) << "client cert found for " << str;
+        // LOG(INFO) << "client cert found for " << str;
         cn.emplace_back(reinterpret_cast<const char*>(str));
       }
 
@@ -258,7 +252,7 @@ bool TLS::starttls_client(int fd_in,
         if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-          std::string str(
+          std::string const str(
               reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
 
@@ -272,7 +266,7 @@ bool TLS::starttls_client(int fd_in,
               ASN1_STRING_length(asn1_str));
 
           if (find(cn.begin(), cn.end(), str) == cn.end()) {
-            LOG(INFO) << "additional name found " << str;
+            // LOG(INFO) << "additional name found " << str;
             cn.emplace_back(str);
           }
           else {
@@ -305,7 +299,7 @@ bool TLS::starttls_client(int fd_in,
       //.......................................................
 
       if (std::find(cn.begin(), cn.end(), client_name) != cn.end()) {
-        LOG(INFO) << "**** using cert for " << client_name;
+        // LOG(INFO) << "**** using cert for " << client_name;
         cert_ctx_.emplace_back(ctx, cn);
       }
     }
@@ -316,7 +310,7 @@ bool TLS::starttls_client(int fd_in,
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
-  LOG(INFO) << "tlsa_rrs.size() == " << tlsa_rrs.size();
+  // LOG(INFO) << "tlsa_rrs.size() == " << tlsa_rrs.size();
 
   if (tlsa_rrs.size()) {
     CHECK_GE(SSL_dane_enable(ssl_, server_name), 0)
@@ -332,7 +326,7 @@ bool TLS::starttls_client(int fd_in,
                       TLSEXT_NAMETYPE_host_name,
                       const_cast<char*>(server_name)),
              1);
-    LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << server_name;
+    // LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << server_name;
   }
 
   // No partial label wildcards
@@ -556,7 +550,7 @@ bool TLS::starttls_server(int fd_in,
       auto e = X509_NAME_get_entry(subj, lastpos);
       ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
       auto str = ASN1_STRING_get0_data(d);
-      LOG(INFO) << "server cert found for " << str;
+      // LOG(INFO) << "server cert found for " << str;
       cn.emplace_back(reinterpret_cast<const char*>(str));
     }
 
@@ -603,7 +597,7 @@ bool TLS::starttls_server(int fd_in,
             ASN1_STRING_length(asn1_str));
 
         if (find(cn.begin(), cn.end(), str) == cn.end()) {
-          LOG(INFO) << "additional name found " << str;
+          // LOG(INFO) << "additional name found " << str;
           cn.emplace_back(str);
         }
         else {
@@ -618,8 +612,10 @@ bool TLS::starttls_server(int fd_in,
              << '.' << unsigned(p[3]);
 
           LOG(INFO) << "alt name IP4 address " << ip.str();
+          cn.emplace_back(ip.str());
         }
         else if (gen->d.ip->length == 16) {
+          // FIXME!
           LOG(ERROR) << "IPv6 not implemented";
         }
         else {
@@ -731,7 +727,7 @@ bool TLS::starttls_server(int fd_in,
     }
   }
   else {
-    LOG(INFO) << "no client certificate";
+    // LOG(INFO) << "no client certificate offerd to us";
   }
 
   return true;
