@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+#include <experimental/iterator>
+
 using namespace std::string_literals;
 
 void check_dnsrbl(DNS::Resolver& res, char const* a)
@@ -55,9 +57,17 @@ void do_domain(DNS::Resolver& res, char const* dom)
 {
   auto const as = res.get_strings(DNS::RR_type::A, dom);
   for (auto a : as) {
-    std::cout << a << '\n';
-    check_dnsrbl(res, a.c_str());
+    std::cout << a;
+    auto const names = DNS::fcrdns(res, a);
+    if (!names.empty()) {
+      std::cout << " [";
+      std::copy(names.begin(), names.end(),
+                std::experimental::make_ostream_joiner(std::cout, ", "));
+      std::cout << ']';
+    }
+    std::cout << '\n';
   }
+
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom);
   for (auto aaaa : aaaas) {
     std::cout << aaaa << '\n';
