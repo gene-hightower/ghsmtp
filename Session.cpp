@@ -285,8 +285,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   auto error_msg{std::string{}};
   if (!verify_sender_(reverse_path, error_msg)) {
-    LOG(WARNING) << "verify sender " << reverse_path
-                 << " failed: " << error_msg;
+    LOG(WARNING) << "verify sender failed: " << error_msg;
     bad_host_(error_msg.c_str());
   }
 
@@ -1182,7 +1181,7 @@ bool Session::verify_client_(Domain const& client_identity,
   return true;
 }
 
-// check recipient from RCPT TO
+// check recipient from RFC5321 RCPT TO:
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
   if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
@@ -1232,7 +1231,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   return true;
 }
 
-// the sender is the RFC5321 MAIL FROM:
+// check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
   auto const sender_str{std::string{sender}};
@@ -1295,13 +1294,13 @@ bool Session::verify_sender_domain_(Domain const& sender,
   if (labels.size() < 2) { // This is not a valid domain.
     out_() << "550 5.7.1 invalid sender domain " << sender << "\r\n"
            << std::flush;
-    error_msg = "invalid syntax";
+    error_msg = sender.ascii() + " invalid syntax";
     return false;
   }
 
   auto reg_dom{tld_db_.get_registered_domain(sender.ascii())};
   if (!reg_dom) {
-    error_msg = "no registered domain";
+    error_msg = sender.ascii() + " has no registered domain";
     return false;
   }
   if (white_.lookup(reg_dom)) {
@@ -1326,7 +1325,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
       }
       else {
         out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-        error_msg = "blocked by exact match on three-level-tlds list";
+        error_msg
+            = three_level + " blocked by exact match on three-level-tlds list";
         return false;
       }
     }
@@ -1342,7 +1342,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     }
     else {
       out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-      error_msg = "blocked by exact match on two-level-tlds list";
+      error_msg = two_level + " blocked by exact match on two-level-tlds list";
       return false;
     }
   }
@@ -1362,7 +1362,7 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
                std::default_random_engine());
   for (auto uribl : Config::uribls) {
     if (DNS::has_record(res_, DNS::RR_type::A, (sender + ".") + uribl)) {
-      error_msg = "blocked by "s + uribl;
+      error_msg = sender + " blocked on advice of "s + uribl;
       out_() << "550 5.7.1 sender (" << sender << ") blocked on advice of "
              << uribl << "\r\n"
              << std::flush;
