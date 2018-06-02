@@ -1348,7 +1348,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     }
   }
 
-  LOG(INFO) << "looking up " << reg_dom;
+  // LOG(INFO) << "looking up " << reg_dom;
   return verify_sender_domain_uribl_(reg_dom, error_msg);
 }
 
