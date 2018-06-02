@@ -1111,10 +1111,12 @@ std::vector<std::string> Query::get_strings()
 
   for (auto rr : rr_set) {
     std::visit(
-        [&ret](auto const& r) {
-          auto s = r.as_str();
-          if (s)
-            ret.push_back(*s);
+        [&ret, type = type_](auto const& r) {
+          if (type == r.rr_type()) {
+            auto s = r.as_str();
+            if (s)
+              ret.push_back(*s);
+          }
         },
         rr);
   }
