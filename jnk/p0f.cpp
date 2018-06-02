@@ -86,7 +86,10 @@ int main(int argc, char const* argv[])
 
   sockaddr_un addr{};
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, "/run/p0f.sock", sizeof(addr.sun_path) - 1);
+
+  constexpr char socket_path[]{"/run/p0f.sock"};
+  static_assert(sizeof(socket_path) < sizeof(addr.sun_path));
+  strcpy(addr.sun_path, socket_path);
 
   PCHECK(connect(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr))
          == 0)

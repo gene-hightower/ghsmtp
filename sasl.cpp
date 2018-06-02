@@ -191,8 +191,9 @@ int main()
 
   auto addr{sockaddr_un{}};
   addr.sun_family = AF_UNIX;
-  auto const socket_path{"/var/spool/postfix/private/auth"};
-  strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
+  constexpr char socket_path[]{"/var/spool/postfix/private/auth"};
+  static_assert(sizeof(socket_path) < sizeof(addr.sun_path));
+  strcpy(addr.sun_path, socket_path);
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
       << "connect to " << socket_path << " failed";
