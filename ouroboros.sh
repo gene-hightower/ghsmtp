@@ -12,4 +12,4 @@ coproc \
     GLOG_minloglevel=0 \
     ./smtp
 
-ASAN_OPTIONS=detect_odr_violation=0 ./snd -pipe=true <&${COPROC[0]} >&${COPROC[1]}
+ASAN_OPTIONS=detect_odr_violation=0 ./snd -service=smtp -pipe=true <&${COPROC[0]} >&${COPROC[1]}
