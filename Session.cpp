@@ -440,33 +440,8 @@ bool Session::msg_new()
       return Message::SpamStatus::ham;
     }
 
-    if (lookup_domain(white_, client_identity_)) {
-      LOG(INFO) << "ham since client identity (" << client_identity_
-                << ") is whitelisted";
-      return Message::SpamStatus::ham;
-    }
-
-    auto tld_id{tld_db_.get_registered_domain(client_identity_.ascii())};
-    if (tld_id && white_.lookup(tld_id)) {
-      LOG(INFO) << "ham since client identity registered domain (" << tld_id
-                << ") is whitelisted";
-      return Message::SpamStatus::ham;
-    }
-
     auto rp_dom = reverse_path_.domain();
-    if (lookup_domain(white_, rp_dom)) {
-      LOG(INFO) << "ham since reverse path (" << rp_dom << ") is whitelisted";
-      return Message::SpamStatus::ham;
-    }
 
-    auto tld_rp{tld_db_.get_registered_domain(rp_dom.ascii())};
-    if (tld_rp && white_.lookup(tld_rp)) {
-      LOG(INFO) << "ham since reverse path registered domain (" << tld_rp
-                << ") is whitelisted";
-      return Message::SpamStatus::ham;
-    }
-
-    // I will allow this as sort of the gold standard for naming.
     if (!client_fcrdns_.empty()) {
       if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
           != client_fcrdns_.end()) {
