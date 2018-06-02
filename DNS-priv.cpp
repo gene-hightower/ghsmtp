@@ -336,7 +336,7 @@ int name_length(unsigned char const* encoded, DNS::packet const& pkt)
   int nindir = 0; // count indirections
 
   // Allow the caller to pass us buf + len and have us check for it.
-  if (encoded >= pkt.bfr.get() + pkt.sz)
+  if (encoded >= pkt.end())
     return -1;
 
   while (*encoded) {
@@ -345,14 +345,14 @@ int name_length(unsigned char const* encoded, DNS::packet const& pkt)
 
     if (top == NS_CMPRSFLGS) {
       // Check the offset and go there.
-      if (encoded + 1 >= pkt.bfr.get() + pkt.sz)
+      if (encoded + 1 >= pkt.end())
         return -1;
 
       auto offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
       if (offset >= pkt.sz)
         return -1;
 
-      encoded = pkt.bfr.get() + offset;
+      encoded = pkt.begin() + offset;
 
       // If we've seen more indirects than the message length,
       // then there's a loop.
@@ -362,7 +362,7 @@ int name_length(unsigned char const* encoded, DNS::packet const& pkt)
     }
     else if (top == 0) {
       auto offset = *encoded;
-      if (encoded + offset + 1 >= pkt.bfr.get() + pkt.sz)
+      if (encoded + offset + 1 >= pkt.begin() + pkt.sz)
         return -1;
 
       ++encoded;
@@ -425,7 +425,7 @@ bool expand_name(unsigned char const* encoded,
         enc_len = uztosl(p + 2 - encoded);
         indir = true;
       }
-      p = pkt.bfr.get() + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
+      p = pkt.begin() + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
     }
     else {
       int len = *p;
@@ -605,12 +605,9 @@ Resolver::Resolver()
       ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
 
       if (port != 53) {
-        DNS::RR_set tlsa_rrs; // empty
+        DNS::RR_set tlsa_rrs; // empty FIXME!
         ns_sock_->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
         if (ns_sock_->verified()) {
-          // LOG(INFO) << "using TLS " << nameserver.host << '[' <<
-          // nameserver.addr
-          //           << "]:" << nameserver.port;
           ns_fd_ = -1;
           return;
         }
@@ -618,16 +615,11 @@ Resolver::Resolver()
         ns_fd_ = -1;
         continue;
       }
-
-      // LOG(INFO) << "using TCP " << nameserver.host << '[' << nameserver.addr
-      //           << "]:" << nameserver.port;
       ns_fd_ = -1;
+
       return;
     }
-    else {
-      // LOG(INFO) << "using UDP " << nameserver.host << '[' << nameserver.addr
-      //           << "]:" << nameserver.port;
-    }
+
     return;
   }
 
@@ -642,7 +634,7 @@ packet Resolver::xchg(packet const& q)
     uint16_t sz = htons(q.sz);
 
     ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
-    ns_sock_->out().write(reinterpret_cast<char const*>(q.bfr.get()), q.sz);
+    ns_sock_->out().write(reinterpret_cast<char const*>(q.begin()), q.sz);
     ns_sock_->out().flush();
 
     sz = 0;
@@ -664,7 +656,7 @@ packet Resolver::xchg(packet const& q)
   CHECK(nameservers[ns_].typ == sock_type::dgram);
   CHECK_GE(ns_fd_, 0);
 
-  CHECK_EQ(send(ns_fd_, q.bfr.get(), q.sz, 0), q.sz);
+  CHECK_EQ(send(ns_fd_, q.begin(), q.sz, 0), q.sz);
 
   auto sz = max_udp_sz;
   auto bfr = std::make_unique<unsigned char[]>(sz);
@@ -721,7 +713,7 @@ bool Query::xchg_(Resolver& res, uint16_t id)
       return false;
     }
 
-    auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
+    auto const hdr_p = reinterpret_cast<header const*>(a_.begin());
 
     if (hdr_p->id() == id)
       break;
@@ -752,7 +744,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   if (!xchg_(res, id))
     return;
 
-  auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
+  auto const hdr_p = reinterpret_cast<header const*>(a_.begin());
 
   rcode_ = hdr_p->rcode();
   switch (rcode_) {
@@ -775,7 +767,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   }
 
   if (a_.sz == 0) {
-    LOG(INFO) << "no packet for " << name << '/' << type;
+    LOG(INFO) << "no packet returned for " << name << '/' << type;
     return;
   }
 
@@ -791,21 +783,19 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
-  auto p = const_cast<unsigned char const*>(a_.bfr.get()) + sizeof(header);
-  auto const pend = a_.bfr.get() + a_.sz;
+  auto p = a_.begin() + sizeof(header);
 
   std::string qname;
   int enc_len = 0;
-
   if (!expand_name(p, a_, qname, enc_len)) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "bad packet";
     return;
   }
   p += enc_len;
-  if (p >= pend) {
+  if (p >= a_.end()) {
     bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet, too small";
+    LOG(WARNING) << "bad packet";
     return;
   }
 
@@ -815,12 +805,14 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
-  if ((p + sizeof(question)) >= pend) {
+  if ((p + sizeof(question)) >= a_.end()) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "bad packet";
     return;
   }
+
   auto question_p = reinterpret_cast<question const*>(p);
+  p += sizeof(question);
 
   if (question_p->qtype() != static_cast<uint16_t>(type)) {
     bogus_or_indeterminate_ = true;
@@ -835,72 +827,34 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
-  p += sizeof(question);
-  if (p >= pend) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet, too small";
-    return;
-  }
-
-  // answers
-  for (auto i = 0; i < hdr_p->ancount(); ++i) {
+  // answers and nameservers
+  for (auto i = 0; i < (hdr_p->ancount() + hdr_p->nscount()); ++i) {
     std::string x;
     auto enc_len = 0;
-    if (!expand_name(p, a_, x, enc_len)) {
+    if (!expand_name(p, a_, x, enc_len)
+        || ((p + enc_len + sizeof(rr)) > a_.end())) {
       bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in answer section for " << name << '/'
-                   << type;
+      LOG(WARNING) << "bad packet in answer or nameserver section for " << name
+                   << '/' << type;
       return;
     }
     p += enc_len;
-    if ((p + sizeof(rr)) > pend) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in answer section for " << name << '/'
-                   << type;
-      return;
-    }
     auto rr_p = reinterpret_cast<rr const*>(p);
     p = rr_p->next_rr_name();
   }
 
-  // nameservers
-  for (auto i = 0; i < hdr_p->nscount(); ++i) {
-    std::string x;
-    auto enc_len = 0;
-    if (!expand_name(p, a_, x, enc_len)) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in nameserver section for " << name << '/'
-                   << type;
-      return;
-    }
-    p += enc_len;
-    if ((p + sizeof(rr)) > pend) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in nameserver section for " << name << '/'
-                   << type;
-      return;
-    }
-    auto rr_p = reinterpret_cast<rr const*>(p);
-    p = rr_p->next_rr_name();
-  }
-
-  // check additional records for OPT record
+  // check additional section for OPT record
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string x;
     auto enc_len = 0;
-    if (!expand_name(p, a_, x, enc_len)) {
+    if (!expand_name(p, a_, x, enc_len)
+        || ((p + enc_len + sizeof(rr)) > a_.end())) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet in additional section for " << name << '/'
                    << type;
       return;
     }
     p += enc_len;
-    if ((p + sizeof(rr)) > pend) {
-      bogus_or_indeterminate_ = true;
-      LOG(WARNING) << "bad packet in additional section for " << name << '/'
-                   << type;
-      return;
-    }
     auto rr_p = reinterpret_cast<rr const*>(p);
 
     switch (rr_p->rr_type()) {
@@ -927,12 +881,161 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     p = rr_p->next_rr_name();
   }
 
-  auto size_check = p - static_cast<unsigned char const*>(a_.bfr.get());
+  auto size_check = p - a_.begin();
   if (size_check != a_.sz) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "bad packet size for " << name << '/' << type;
     return;
   }
+}
+
+std::optional<RR> get_A(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  if (rr_p->rdlength() != 4) {
+    LOG(WARNING) << "bogus A record";
+    err = true;
+    return {};
+  }
+  return RR_A{rr_p->rddata(), rr_p->rdlength()};
+}
+
+std::optional<RR> get_CNAME(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  std::string name;
+  int enc_len;
+  if (!expand_name(rr_p->rddata(), pkt, name, enc_len)) {
+    LOG(WARNING) << "bogus CNAME record";
+    err = true;
+    return {};
+  }
+  return RR_CNAME{name};
+}
+
+std::optional<RR> get_PTR(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  std::string name;
+  int enc_len;
+  if (!expand_name(rr_p->rddata(), pkt, name, enc_len)) {
+    LOG(WARNING) << "bogus PTR";
+    err = true;
+    return {};
+  }
+  return RR_PTR{name};
+}
+
+std::optional<RR> get_MX(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  std::string name;
+  int enc_len;
+  if (rr_p->rdlength() < 3) {
+    LOG(WARNING) << "bogus MX record";
+    err = true;
+    return {};
+  }
+  auto p = rr_p->rddata();
+  uint16_t preference = (p[0] << 8) + p[1];
+  p += 2;
+  if (!expand_name(p, pkt, name, enc_len)) {
+    LOG(WARNING) << "bogus MX record";
+    err = true;
+    return {};
+  }
+  return RR_MX{name, preference};
+}
+
+std::optional<RR> get_TXT(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  if (rr_p->rdlength() < 1) {
+    LOG(WARNING) << "bogus TXT";
+    err = true;
+    return {};
+  }
+  std::string str;
+  auto p = rr_p->rddata();
+  do {
+    if ((p + 1 + *p) > rr_p->next_rr_name()) {
+      LOG(WARNING) << "bogus string in TXT record";
+      err = true;
+      return {};
+    }
+    str += std::string(reinterpret_cast<char const*>(p) + 1, *p);
+    p = p + *p + 1;
+  } while (p < rr_p->next_rr_name());
+  return RR_TXT{str};
+}
+
+std::optional<RR> get_AAAA(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  if (rr_p->rdlength() != 16) {
+    LOG(WARNING) << "bogus AAAA";
+    err = true;
+    return {};
+  }
+  return RR_AAAA{rr_p->rddata(), rr_p->rdlength()};
+}
+
+std::optional<RR> get_RRSIG(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  // LOG(WARNING) << "#### FIXME! RRSIG";
+  // return RR_RRSIG{rr_p->rddata(), rr_p->rdlength()});
+  return {};
+}
+
+std::optional<RR> get_TLSA(rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  if (rr_p->rdlength() < 4) {
+    LOG(WARNING) << "bogus TLSA record";
+    err = true;
+    return {};
+  }
+
+  auto p = rr_p->rddata();
+
+  uint8_t cert_usage = *p++;
+  uint8_t selector = *p++;
+  uint8_t matching_type = *p++;
+
+  uint8_t const* assoc_data = p;
+  size_t assoc_data_sz = rr_p->rdlength() - 3;
+
+  return RR_TLSA{cert_usage, selector, matching_type, assoc_data,
+                 assoc_data_sz};
+}
+
+std::optional<RR>
+get_rr(DNS::RR_type typ, rr const* rr_p, DNS::packet const& pkt, bool& err)
+{
+  switch (typ) {
+  case DNS::RR_type::A:
+    return get_A(rr_p, pkt, err);
+
+  case DNS::RR_type::CNAME:
+    return get_CNAME(rr_p, pkt, err);
+
+  case DNS::RR_type::PTR:
+    return get_PTR(rr_p, pkt, err);
+
+  case DNS::RR_type::MX:
+    return get_MX(rr_p, pkt, err);
+
+  case DNS::RR_type::TXT:
+    return get_TXT(rr_p, pkt, err);
+
+  case DNS::RR_type::AAAA:
+    return get_AAAA(rr_p, pkt, err);
+
+  case DNS::RR_type::RRSIG:
+    return get_RRSIG(rr_p, pkt, err);
+
+  case DNS::RR_type::TLSA:
+    return get_TLSA(rr_p, pkt, err);
+
+  default:
+    break;
+  }
+
+  LOG(WARNING) << "unknown RR type " << typ;
+  return {};
 }
 
 RR_set Query::get_records()
@@ -945,7 +1048,6 @@ RR_set Query::get_records()
   auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
 
   auto p = const_cast<unsigned char const*>(a_.bfr.get()) + sizeof(header);
-  auto const pend = a_.bfr.get() + a_.sz;
 
   // skip queries
   for (auto i = 0; i < hdr_p->qdcount(); ++i) {
@@ -964,138 +1066,27 @@ RR_set Query::get_records()
     auto enc_len = 0;
     CHECK(expand_name(p, a_, name, enc_len));
     p += enc_len;
-    if ((p + sizeof(rr)) > pend) {
+    if ((p + sizeof(rr)) > a_.end()) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return RR_set{};
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
-    if ((p + rr_p->rdlength()) > pend) {
+    if ((p + rr_p->rdlength()) > a_.end()) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
       return RR_set{};
     }
 
     auto typ = static_cast<DNS::RR_type>(rr_p->rr_type());
-    switch (typ) {
-    case DNS::RR_type::A: {
-      if (rr_p->rdlength() != 4) {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus A";
-        return RR_set{};
-      }
-      ret.emplace_back(RR_A{rr_p->rddata(), rr_p->rdlength()});
-      break;
-    }
 
-    case DNS::RR_type::CNAME: {
-      p = rr_p->rddata();
-      if (expand_name(p, a_, name, enc_len)) {
-        ret.emplace_back(RR_CNAME{name});
-      }
-      else {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus CNAME";
-        return RR_set{};
-      }
-      break;
-    }
+    auto rr_ret = get_rr(typ, rr_p, a_, bogus_or_indeterminate_);
 
-    case DNS::RR_type::PTR: {
-      p = rr_p->rddata();
-      if (expand_name(p, a_, name, enc_len)) {
-        ret.emplace_back(RR_PTR{name});
-      }
-      else {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus PTR";
-        return RR_set{};
-      }
-      break;
-    }
+    if (bogus_or_indeterminate_)
+      return RR_set{};
 
-    case DNS::RR_type::MX: {
-      if (rr_p->rdlength() < 3) {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus MX";
-        return RR_set{};
-      }
-      p = rr_p->rddata();
-      uint16_t preference = (p[0] << 8) + p[1];
-      p += 2;
-      if (expand_name(p, a_, name, enc_len)) {
-        ret.emplace_back(RR_MX{name, preference});
-      }
-      else {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus MX";
-        return RR_set{};
-      }
-      break;
-    }
-
-    case DNS::RR_type::TXT: {
-      if (rr_p->rdlength() < 1) {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus TXT";
-        return RR_set{};
-      }
-      std::string str;
-      p = rr_p->rddata();
-      do {
-        if ((p + 1 + *p) > rr_p->next_rr_name()) {
-          bogus_or_indeterminate_ = true;
-          LOG(WARNING) << "bogus string in TXT record";
-          return RR_set{};
-        }
-        str += std::string(reinterpret_cast<char const*>(p) + 1, *p);
-        p = p + *p + 1;
-      } while (p < rr_p->next_rr_name());
-      ret.emplace_back(RR_TXT{str});
-      break;
-    }
-
-    case DNS::RR_type::AAAA: {
-      if (rr_p->rdlength() != 16) {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus AAAA";
-        return RR_set{};
-      }
-      ret.emplace_back(RR_AAAA{rr_p->rddata(), rr_p->rdlength()});
-      break;
-    }
-
-    case DNS::RR_type::RRSIG: {
-      // LOG(WARNING) << "#### FIXME! RRSIG";
-      // ret.emplace_back(RR_RRSIG{rr_p->rddata(), rr_p->rdlength()});
-      break;
-    }
-
-    case DNS::RR_type::TLSA: {
-      p = rr_p->rddata();
-
-      if ((rr_p->rdlength() < 4) || (p + rr_p->rdlength()) > pend) {
-        bogus_or_indeterminate_ = true;
-        LOG(WARNING) << "bogus TLSA";
-        return RR_set{};
-      }
-
-      uint8_t cert_usage = *p++;
-      uint8_t selector = *p++;
-      uint8_t matching_type = *p++;
-
-      uint8_t const* assoc_data = p;
-      size_t assoc_data_sz = rr_p->rdlength() - 3;
-
-      ret.emplace_back(RR_TLSA{cert_usage, selector, matching_type, assoc_data,
-                               assoc_data_sz});
-      break;
-    }
-
-    default:
-      LOG(WARNING) << "no code to process record type " << typ;
-      break;
-    }
+    if (rr_ret)
+      ret.emplace_back(*rr_ret);
 
     p = rr_p->next_rr_name();
   }
