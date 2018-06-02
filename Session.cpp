@@ -162,10 +162,9 @@ void Session::greeting()
 void Session::log_lo_(char const* verb, std::string_view client_identity) const
 {
   if (sock_.has_peername()) {
-    if (!client_fcrdns_.empty()
-        && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
-                      client_identity_)
-            != client_fcrdns_.end())) {
+    if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
+                  client_identity_)
+        != client_fcrdns_.end()) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -1051,7 +1050,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         return false;
       }
       if (white_.lookup(client_fcrdns.ascii())) {
-        LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
+        // LOG(INFO) << "FCrDNS domain " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
         return true;
       }
@@ -1064,7 +1063,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
           return false;
         }
         if (white_.lookup(tld)) {
-          LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+          // LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
           fcrdns_whitelisted_ = true;
           return true;
         }
@@ -1364,7 +1363,8 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   for (auto uribl : Config::uribls) {
     if (DNS::has_record(res_, DNS::RR_type::A, (sender + ".") + uribl)) {
       error_msg = "blocked by "s + uribl;
-      out_() << "550 5.7.1 sender blocked on advice of " << uribl << "\r\n"
+      out_() << "550 5.7.1 sender (" << sender << ") blocked on advice of "
+             << uribl << "\r\n"
              << std::flush;
       return false;
     }
