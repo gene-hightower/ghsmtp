@@ -1,5 +1,8 @@
 #include "Sock.hpp"
 
+#include "IP4.hpp"
+#include "IP6.hpp"
+
 #include <glog/logging.h>
 
 using namespace std::string_literals;
@@ -51,14 +54,14 @@ Sock::Sock(int fd_in,
       PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in.sin_addr, them_addr_str_,
                        sizeof them_addr_str_)
              != nullptr);
-      them_address_literal_ = "["s + them_addr_str_ + "]"s;
+      them_address_literal_ = IP4::to_address_literal(them_addr_str_);
       break;
 
     case sizeof(sockaddr_in6):
       PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr, them_addr_str_,
                        sizeof them_addr_str_)
              != nullptr);
-      them_address_literal_ = "[IPv6:"s + them_addr_str_ + "]"s;
+      them_address_literal_ = IP6::to_address_literal(them_addr_str_);
       break;
 
     default:
