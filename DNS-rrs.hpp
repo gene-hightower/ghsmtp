@@ -155,6 +155,7 @@ public:
 
   sockaddr_in const& addr() const { return addr_; }
   char const* c_str() const { return str_; }
+  static RR_type rr_type() { return RR_type::A; }
 
 private:
   sockaddr_in addr_;
@@ -172,6 +173,7 @@ public:
 
   std::string const& str() const { return cname_; }
   char const* c_str() const { return str().c_str(); }
+  static RR_type rr_type() { return RR_type::CNAME; }
 
 private:
   std::string cname_;
@@ -189,6 +191,7 @@ public:
 
   std::string const& str() const { return ptrdname_; }
   char const* c_str() const { return str().c_str(); }
+  static RR_type rr_type() { return RR_type::PTR; }
 
 private:
   std::string ptrdname_;
@@ -207,6 +210,8 @@ public:
   std::string const& exchange() const { return exchange_; }
   uint16_t preference() const { return preference_; }
 
+  static RR_type rr_type() { return RR_type::MX; }
+
 private:
   std::string exchange_;
   uint16_t preference_;
@@ -223,6 +228,7 @@ public:
 
   char const* c_str() const { return str().c_str(); }
   std::string const& str() const { return txt_data_; }
+  static RR_type rr_type() { return RR_type::TXT; }
 
 private:
   std::string txt_data_;
@@ -236,6 +242,7 @@ public:
 
   sockaddr_in6 const& addr() const { return addr_; }
   char const* c_str() const { return str_; }
+  static RR_type rr_type() { return RR_type::AAAA; }
 
 private:
   sockaddr_in6 addr_;
@@ -256,6 +263,8 @@ public:
 
   // doesn't have a string representation
   std::optional<std::string> as_str() const { return {}; }
+
+  static RR_type rr_type() { return RR_type::TLSA; }
 
 private:
   std::vector<unsigned char> assoc_data_;
