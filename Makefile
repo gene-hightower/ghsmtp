@@ -12,21 +12,9 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := smtp msg sasl snd dnsprv
+PROGRAMS := smtp msg sasl snd
 
 DNS := DNS-rrs DNS-priv DNS-fcrdns
-
-dnsprv_STEMS := dnsprv \
-	Domain \
-	DNS-rrs \
-	IP4 \
-	IP6 \
-	POSIX \
-	Sock \
-	SockBuffer \
-	TLS-OpenSSL \
-	esc \
-	osutil
 
 msg_STEMS := msg \
 	CDB \
