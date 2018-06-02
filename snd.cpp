@@ -49,9 +49,9 @@ DEFINE_string(service, "smtp-test", "service name");
 DEFINE_string(client_id, "", "client name (ID) for EHLO/HELO");
 
 DEFINE_string(from, "", "RFC5321 MAIL FROM address");
-DEFINE_string(to, "", "RFC5321 RCPT TO address");
-
 DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From: name");
+
+DEFINE_string(to, "", "RFC5321 RCPT TO address");
 DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
@@ -65,6 +65,7 @@ DEFINE_bool(6, false, "use only IP version 6");
 DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
 
+DEFINE_bool(use_dkim, true, "sign with DKIM");
 DEFINE_string(selector, "ghsmtp", "DKIM selector");
 
 #include "Base64.hpp"
@@ -1304,7 +1305,8 @@ bool snd(int fd_in,
 
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
-  sign_eml(eml, from_mbx, bodies);
+  if (FLAGS_use_dkim)
+    sign_eml(eml, from_mbx, bodies);
 
   // Get the header as one big string
   std::stringstream hdr_stream;
@@ -1357,14 +1359,12 @@ bool snd(int fd_in,
 
   LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
   cnn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n";
-
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "MAIL FROM");
   }
 
   LOG(INFO) << "C: RCPT TO:<" << to << ">";
   cnn.sock.out() << "RCPT TO:<" << to << ">\r\n";
-
   if (!ext_pipelining) {
     check_for_fail(in, cnn, "RCPT TO");
   }
