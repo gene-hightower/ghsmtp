@@ -6,7 +6,7 @@
 accept_domains
 bad_recipients
 cdb-gen
-dnsprv
+dns
 ghsmtp.private
 ghsmtp.txt
 mkm

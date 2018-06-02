@@ -12,9 +12,23 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := smtp msg sasl snd
+PROGRAMS := dns smtp msg sasl snd
 
 DNS := DNS-rrs DNS-priv DNS-fcrdns
+
+dns_STEMS := dns \
+	$(DNS) \
+	Domain \
+	IP \
+	IP4 \
+	IP6 \
+	POSIX \
+	SPF \
+	Sock \
+	SockBuffer \
+	TLS-OpenSSL \
+	esc \
+	osutil
 
 msg_STEMS := msg \
 	CDB \
@@ -192,11 +206,11 @@ two-level-tlds three-level-tlds:
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-# safty_flags := # nada
+safty_flags := # nada
 
 # visibility_flags := # nada
 
-# lto_flags := # nada
+lto_flags := # nada
 
 include MKUltra/rules
 
