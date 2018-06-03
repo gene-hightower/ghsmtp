@@ -77,6 +77,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 #include "IP6.hpp"
 #include "Magic.hpp"
 #include "Mailbox.hpp"
+#include "Message.hpp"
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
@@ -1305,8 +1306,9 @@ bool snd(int fd_in,
 
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
-  if (FLAGS_use_dkim)
+  if (FLAGS_use_dkim) {
     sign_eml(eml, from_mbx, bodies);
+  }
 
   // Get the header as one big string
   std::stringstream hdr_stream;
@@ -1389,6 +1391,35 @@ bool snd(int fd_in,
     }
     bad_daddy(in, cnn);
     return true;
+  }
+
+  auto msg = std::make_unique<Message>();
+
+  try {
+    msg->open(sender.ascii(), total_size * 2, ".Sent");
+    msg->write(hdr_str.data(), hdr_str.size());
+    for (auto const& body : bodies) {
+      msg->write(body.data(), body.size());
+    }
+  }
+  catch (std::system_error const& e) {
+    switch (errno) {
+    case ENOSPC:
+      msg->trash();
+      msg.reset();
+      LOG(FATAL) << "no space";
+
+    default:
+      msg->trash();
+      msg.reset();
+      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      LOG(FATAL) << e.what();
+    }
+  }
+  catch (std::exception const& e) {
+    msg->trash();
+    msg.reset();
+    LOG(FATAL) << e.what();
   }
 
   if (ext_chunking) {
@@ -1479,6 +1510,7 @@ bool snd(int fd_in,
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   if (cnn.reply_code.at(0) == '2') {
+    msg->save();
     LOG(INFO) << "mail was sent successfully";
   }
   in.discard();

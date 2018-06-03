@@ -16,9 +16,9 @@
 
 class Message {
 public:
-  enum class SpamStatus : bool { ham, spam };
-
-  void open(std::string_view fqdn, std::streamsize max_size, SpamStatus spam);
+  void open(std::string_view fqdn,
+            std::streamsize max_size,
+            std::string_view folder);
 
   Pill const& id() const { return s_; }
   Now const& when() const { return then_; }

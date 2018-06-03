@@ -6,7 +6,7 @@
 
 void Message::open(std::string_view fqdn,
                    std::streamsize max_size,
-                   SpamStatus spam)
+                   std::string_view folder)
 {
   max_size_ = max_size;
 
@@ -31,8 +31,8 @@ void Message::open(std::string_view fqdn,
     return homedir / "Maildir";
   }()};
 
-  if (spam == SpamStatus::spam) {
-    maildir /= ".Junk";
+  if (!folder.empty()) {
+    maildir /= folder;
   }
 
   // Unique name, see: <https://cr.yp.to/proto/maildir.html>

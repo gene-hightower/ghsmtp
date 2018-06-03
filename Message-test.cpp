@@ -12,14 +12,14 @@ int main(int argc, char* argv[])
   PCHECK(putenv(env) == 0);
 
   Message msg;
-  msg.open("example.com", 4096, Message::SpamStatus::ham);
+  msg.open("example.com", 4096, "");
 
   auto ms = "foo bar baz"s;
   msg.write(ms.data(), ms.size());
   msg.save();
 
   Message msg2;
-  msg2.open("example.com", 4096, Message::SpamStatus::spam);
+  msg2.open("example.com", 4096, ".Junk");
 
   CHECK(msg.id() != msg2.id());
 

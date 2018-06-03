@@ -85,6 +85,7 @@ snd_STEMS := snd \
 	IP \
 	IP4 \
 	IP6 \
+	Message \
 	Magic \
 	POSIX \
 	Pill \

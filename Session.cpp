@@ -421,23 +421,25 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 bool Session::msg_new()
 {
+  enum class SpamStatus : bool { ham, spam };
+
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
   auto const status{[&] {
     if (spf_result_ == SPF::Result::FAIL) {
       LOG(INFO) << "spam since SPF failed";
-      return Message::SpamStatus::spam;
+      return SpamStatus::spam;
     }
 
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls()) {
       LOG(INFO) << "ham since they used TLS";
-      return Message::SpamStatus::ham;
+      return SpamStatus::ham;
     }
 
     if (fcrdns_whitelisted_) {
       LOG(INFO) << "ham since confirmed DNS is whitelisted";
-      return Message::SpamStatus::ham;
+      return SpamStatus::ham;
     }
 
     auto rp_dom = reverse_path_.domain();
@@ -447,7 +449,7 @@ bool Session::msg_new()
           != client_fcrdns_.end()) {
         LOG(INFO) << "ham since reverse_path (" << rp_dom
                   << ") matches confirmed DNS name";
-        return Message::SpamStatus::ham;
+        return SpamStatus::ham;
       }
     }
 
@@ -458,16 +460,16 @@ bool Session::msg_new()
       if (Domain::match(rp_tld, client_tld)) {
         LOG(INFO) << "ham since reverse_path TLD (" << rp_tld
                   << ") matches TLD of confirmed DNS name " << client_fcrdns;
-        return Message::SpamStatus::ham;
+        return SpamStatus::ham;
       }
     }
 
     LOG(INFO) << "spam since it's not ham";
-    return Message::SpamStatus::spam;
+    return SpamStatus::spam;
   }()};
 
   // All sources of ham get a fresh 5 minute timeout per message.
-  if (status == Message::SpamStatus::ham) {
+  if (status == SpamStatus::ham) {
     alarm(5 * 60);
   }
 
@@ -477,7 +479,8 @@ bool Session::msg_new()
     FLAGS_max_write = max_msg_size();
 
   try {
-    msg_->open(server_id_(), FLAGS_max_write, status);
+    msg_->open(server_id_(), FLAGS_max_write,
+               (status == SpamStatus::spam) ? ".Junk" : "");
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
     return true;
