@@ -744,6 +744,11 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   if (!xchg_(res, id))
     return;
 
+  if (a_.sz < sizeof(header)) {
+    LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
+    return;
+  }
+
   auto const hdr_p = reinterpret_cast<header const*>(a_.begin());
 
   rcode_ = hdr_p->rcode();
@@ -764,11 +769,6 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     LOG(WARNING) << "name lookup error: " << rcode_c_str(rcode_) << " for "
                  << name << '/' << type;
     break;
-  }
-
-  if (a_.sz == 0) {
-    LOG(INFO) << "no packet returned for " << name << '/' << type;
-    return;
   }
 
   authentic_data_ = hdr_p->authentic_data();
