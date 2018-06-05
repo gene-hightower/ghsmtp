@@ -12,13 +12,13 @@ ghsmtp.txt
 mkm
 msg
 notes.txt
-p0f
 public_suffix_list.dat
 sasl
 smtp
 smtp.key
 smtp.pem
 snd
+socks5
 test-credentials.ipp
 three-level-black.cdb
 three-level-tlds

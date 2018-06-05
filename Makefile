@@ -12,7 +12,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := dns smtp msg sasl snd
+PROGRAMS := dns smtp msg sasl snd socks5
 
 DNS := DNS-rrs DNS-priv DNS-fcrdns
 
@@ -90,6 +90,20 @@ snd_STEMS := snd \
 	POSIX \
 	Pill \
 	SPF \
+	Sock \
+	SockBuffer \
+	TLS-OpenSSL \
+	esc \
+	osutil
+
+socks5_STEMS := socks5 \
+	$(DNS) \
+	Domain \
+	IP \
+	IP4 \
+	IP6 \
+	POSIX \
+	Pill \
 	Sock \
 	SockBuffer \
 	TLS-OpenSSL \
