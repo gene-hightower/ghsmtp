@@ -431,6 +431,22 @@ bool Session::msg_new()
       return SpamStatus::spam;
     }
 
+    if (spf_result_ == SPF::Result::PASS) {
+      auto const dom{Domain{spf_request_.get_sender_dom()}};
+      if (lookup_domain(white_, dom)) {
+        LOG(INFO) << "ham since SPF sender domain (" << dom
+                  << ") is whitelisted";
+        return SpamStatus::ham;
+      }
+
+      auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
+      if (tld_dom && white_.lookup(tld_dom)) {
+        LOG(INFO) << "ham since SPF sender registered domain (" << tld_dom
+                  << ") is whitelisted";
+        return SpamStatus::ham;
+      }
+    }
+
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls()) {
       LOG(INFO) << "ham since they used TLS";
@@ -1365,15 +1381,13 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  auto const srvr_id{server_id_()};
-
   if (!sock_.has_peername() || ip_whitelisted_) {
     auto ip_addr = sock_.them_c_str();
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
     auto received_spf{std::ostringstream{}};
-    received_spf << "Received-SPF: pass (" << srvr_id << ": " << ip_addr
+    received_spf << "Received-SPF: pass (" << server_id_() << ": " << ip_addr
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
                  << "; helo=" << client_identity_ << ";";
@@ -1381,28 +1395,27 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  auto const sid{std::string(srvr_id.data(), srvr_id.length())};
-  auto const spf_srv{SPF::Server{sid.c_str()}};
-  auto spf_req{SPF::Request{spf_srv}};
+  auto const spf_srv{SPF::Server{server_id_().c_str()}};
+  spf_request_ = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
-    spf_req.set_ipv4_str(sock_.them_c_str());
+    spf_request_.set_ipv4_str(sock_.them_c_str());
   }
   else if (IP6::is_address(sock_.them_c_str())) {
-    spf_req.set_ipv6_str(sock_.them_c_str());
+    spf_request_.set_ipv6_str(sock_.them_c_str());
   }
   else {
     LOG(FATAL) << "bogus address " << sock_.them_address_literal() << ", "
                << sock_.them_c_str();
   }
 
-  spf_req.set_helo_dom(client_identity_.ascii().c_str());
+  spf_request_.set_helo_dom(client_identity_.ascii().c_str());
 
   auto const from{static_cast<std::string>(sender)};
 
-  spf_req.set_env_from(from.c_str());
+  spf_request_.set_env_from(from.c_str());
 
-  auto const spf_res{SPF::Response{spf_req}};
+  auto const spf_res{SPF::Response{spf_request_}};
   spf_result_ = spf_res.result();
   spf_received_ = spf_res.received_spf();
 

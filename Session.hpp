@@ -88,7 +88,7 @@ private:
 
   void bad_host_(char const* msg) const __attribute__((noreturn));
 
-  std::string_view server_id_() const { return server_identity_.ascii(); }
+  std::string const& server_id_() const { return server_identity_.ascii(); }
 
   // clear per transaction data, preserve per connection data
   void reset_();
@@ -134,6 +134,7 @@ private:
 
   int n_unrecognized_cmds_{0};
 
+  SPF::Request spf_request_;
   SPF::Result spf_result_;
 
   // RFC 5321 section 3.3. Mail Transactions
