@@ -93,7 +93,27 @@ public:
   Request(Request const&) = delete;
   Request& operator=(Request const&) = delete;
 
+  Request()
+    : req_(nullptr)
+  {
+  }
   explicit Request(Server const& srv);
+
+  Request(Request&& other)
+    : req_(other.req_)
+  {
+    other.req_ = nullptr;
+  }
+  Request& operator=(Request&& other)
+  {
+    if (this != &other) { // prevent self-move
+      CHECK(req_ == nullptr) << "can only move into default constructed object";
+      req_ = other.req_;
+      other.req_ = nullptr;
+    }
+    return *this;
+  }
+
   ~Request();
 
   void set_ip_str(char const* ip);
@@ -101,6 +121,7 @@ public:
   void set_ipv6_str(char const* ipv6);
   void set_helo_dom(char const* dom);
   void set_env_from(char const* frm);
+  char const* get_sender_dom() const;
 
 private:
   SPF_request_t* req_{nullptr};
@@ -113,7 +134,24 @@ public:
   Response(Response const&) = delete;
   Response& operator=(Response const&) = delete;
 
+  Response();
   explicit Response(Request const& req);
+
+  Response(Response&& other)
+    : res_(other.res_)
+  {
+    other.res_ = nullptr;
+  }
+  Response& operator=(Response&& other)
+  {
+    if (this != &other) { // prevent self-move
+      CHECK(res_ == nullptr) << "can only move into default constructed object";
+      res_ = other.res_;
+      other.res_ = nullptr;
+    }
+    return *this;
+  }
+
   ~Response();
 
   Result result() const;

@@ -63,7 +63,11 @@ Server::Server(char const* fqdn)
   CHECK_EQ(SPF_E_SUCCESS, SPF_server_set_rec_dom(srv_, CHECK_NOTNULL(fqdn)));
 }
 
-Server::~Server() { SPF_server_free(srv_); }
+Server::~Server()
+{
+  if (srv_)
+    SPF_server_free(srv_);
+}
 
 Server::initializer::initializer()
 {
@@ -79,7 +83,11 @@ Request::Request(Server const& srv)
 {
 }
 
-Request::~Request() { SPF_request_free(req_); }
+Request::~Request()
+{
+  if (req_)
+    SPF_request_free(req_);
+}
 
 void Request::set_ip_str(char const* ip)
 {
@@ -110,6 +118,14 @@ void Request::set_env_from(char const* frm)
   CHECK_EQ(SPF_E_SUCCESS, SPF_request_set_env_from(req_, frm));
 }
 
+char const* Request::get_sender_dom() const
+{
+  auto sender_dom = req_->env_from_dp;
+  if (sender_dom == nullptr)
+    sender_dom = req_->helo_dom;
+  return sender_dom;
+}
+
 Response::Response(Request const& req)
 {
   // We ignore the return code from this call, as everything we need
@@ -118,7 +134,11 @@ Response::Response(Request const& req)
   CHECK_NOTNULL(res_);
 }
 
-Response::~Response() { SPF_response_free(res_); }
+Response::~Response()
+{
+  if (res_)
+    SPF_response_free(res_);
+}
 
 Result Response::result() const { return Result(SPF_response_result(res_)); }
 
