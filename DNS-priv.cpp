@@ -799,7 +799,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
-  if (!iequal(qname, name)) {
+  if (!Domain::match(qname, name)) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "names don't match, " << qname << " != " << name;
     return;
