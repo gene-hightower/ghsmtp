@@ -1579,6 +1579,11 @@ int main(int argc, char* argv[])
 
   auto&& [from_mbx, to_mbx] = parse_mailboxes();
 
+  if (to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
+    LOG(ERROR) << "don't know who to send this mail to";
+    return 0;
+  }
+
   auto const port{osutil::get_port(FLAGS_service.c_str())};
 
   auto res{DNS::Resolver{}};
@@ -1686,5 +1691,5 @@ int main(int argc, char* argv[])
     close(fd);
   }
 
-  LOG(WARNING) << "we ran out of hosts to try";
+  LOG(ERROR) << "we ran out of hosts to try";
 }
