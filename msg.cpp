@@ -1772,6 +1772,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "file: " << fn;
     try {
       RFC5322::Ctx ctx;
+      ctx.defined_hdrs.rehash(100);
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
         LOG(ERROR) << "parse returned false";
       }
