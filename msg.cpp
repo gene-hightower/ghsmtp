@@ -37,6 +37,12 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
+template <typename T, std::size_t N>
+constexpr std::size_t countof(T const (&)[N]) noexcept
+{
+  return N;
+}
+
 namespace RFC5322 {
 
 // clang-format off
@@ -1772,7 +1778,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "file: " << fn;
     try {
       RFC5322::Ctx ctx;
-      ctx.defined_hdrs.rehash(100);
+      ctx.defined_hdrs.reserve(countof(RFC5322::defined_fields));
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
         LOG(ERROR) << "parse returned false";
       }
