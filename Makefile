@@ -259,6 +259,10 @@ net-check::
 	  rm $$tmp_out; \
 	done
 
+check::
+	./msg --selftest
+	./snd --selftest
+
 show::
 	llvm-profdata merge -sparse /tmp/smtp-profile/* -o smtp.profdata
 	llvm-cov show ./smtp -instr-profile=smtp.profdata
