@@ -1418,6 +1418,14 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_result_ = spf_res.result();
   spf_received_ = spf_res.received_spf();
 
+  if (spf_result_ == SPF::Result::PASS) {
+    auto const dom{Domain{spf_request_.get_sender_dom()}};
+    if (lookup_domain(black_, dom)) {
+      LOG(INFO) << "SPF sender domain (" << dom << ") is blacklisted";
+      return false;
+    }
+  }
+
   if (spf_result_ == SPF::Result::FAIL) {
     LOG(WARNING) << spf_res.header_comment();
     /*
