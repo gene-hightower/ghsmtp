@@ -11,6 +11,7 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 #include "Session.hpp"
 #include "esc.hpp"
+#include "fs.hpp"
 #include "osutil.hpp"
 
 #include <cstdlib>
@@ -732,6 +733,12 @@ int main(int argc, char* argv[])
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
   alarm(2 * 60); // initial alarm
+
+  auto const log_dir{getenv("GOOGLE_LOG_DIR")};
+  if (log_dir) {
+    error_code ec;
+    fs::create_directories(log_dir, ec);
+  }
 
   google::InitGoogleLogging(argv[0]);
 
