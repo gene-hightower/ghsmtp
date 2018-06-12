@@ -1251,7 +1251,8 @@ bool snd(int fd_in,
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
   else if (FLAGS_force_tls) {
-    LOG(ERROR) << "No TLS extension, won't send mail in plain text.";
+    LOG(ERROR) << "No TLS extension, won't send mail in plain text without "
+                  "--force_tls=false.";
     LOG(INFO) << "C: QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
