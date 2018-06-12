@@ -13,15 +13,12 @@
 
 #include <glog/logging.h>
 
-auto constexpr tor_host{"127.0.0.1"};
-auto constexpr tor_port{9050};
-
-using octet = unsigned char;
+using octet = uint8_t;
 
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
 octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
-enum class auth_method : uint8_t {
+enum class auth_method : octet {
   no_auth = 0,
   none = 0xff,
 };
@@ -235,6 +232,9 @@ int main(int argc, char* argv[])
 {
   auto const fd = socket(AF_INET, SOCK_STREAM, 0);
   PCHECK(fd >= 0) << "socket() failed";
+
+  auto constexpr tor_host{"127.0.0.1"};
+  auto constexpr tor_port{9050};
 
   auto in4{sockaddr_in{}};
   in4.sin_family = AF_INET;
