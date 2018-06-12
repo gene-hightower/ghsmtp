@@ -616,8 +616,6 @@ Resolver::Resolver()
         continue;
       }
       ns_fd_ = -1;
-
-      return;
     }
 
     return;
