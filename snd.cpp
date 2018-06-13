@@ -472,7 +472,11 @@ struct action<ehlo_ok_rsp> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_ok = true;
-    LOG(INFO) << " S: " << in.string();
+    std::istringstream stream(in.string());
+    std::string line;
+    while (std::getline(stream, line)) {
+      LOG(INFO) << " S: " << line;
+    }
   }
 };
 
