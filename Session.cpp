@@ -1104,7 +1104,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
         return false;
       }
     }
-    LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
+    // LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
   }
 
   return true;
