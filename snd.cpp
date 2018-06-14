@@ -516,7 +516,11 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    LOG(INFO) << " S: " << in.string();
+    std::istringstream stream(in.string());
+    std::string line;
+    while (std::getline(stream, line)) {
+      LOG(INFO) << " S: " << line;
+    }
   }
 };
 
