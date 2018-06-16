@@ -462,7 +462,11 @@ struct action<greeting_ok> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.greeting_ok = true;
-    LOG(INFO) << " S: " << in.string();
+    std::istringstream stream(in.string());
+    std::string line;
+    while (std::getline(stream, line)) {
+      LOG(INFO) << " S: " << line;
+    }
   }
 };
 
