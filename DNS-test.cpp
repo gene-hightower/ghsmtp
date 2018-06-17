@@ -53,31 +53,14 @@ int main(int argc, char const* argv[])
     return false;
   });
 
-  for (auto const& mx : mxes) {
-    LOG(INFO) << "mx.preference == " << std::get<DNS::RR_MX>(mx).preference();
-    LOG(INFO) << "mx.exchange   == " << std::get<DNS::RR_MX>(mx).exchange();
-  }
+  CHECK_EQ(std::get<DNS::RR_MX>(mxes[0]).exchange(), "digilicious.com");
+  CHECK_EQ(std::get<DNS::RR_MX>(mxes[0]).preference(), 1);
 
   auto as = res.get_records(DNS::RR_type::A, "amazon.com");
-  for (auto const& a : as) {
-    LOG(INFO) << "a   == " << std::get<DNS::RR_A>(a).c_str();
-  }
+  CHECK_GE(as.size(), 1);
 
   DNS::Query q(res, DNS::RR_type::TLSA, "_25._tcp.digilicious.com");
   CHECK(q.authentic_data()) << "TLSA records must be authenticated";
-  auto tlsas = q.get_records();
-
-  for (auto const& tlsa : tlsas) {
-    unsigned usage = std::get<DNS::RR_TLSA>(tlsa).cert_usage();
-    unsigned selector = std::get<DNS::RR_TLSA>(tlsa).selector();
-    unsigned mtype = std::get<DNS::RR_TLSA>(tlsa).matching_type();
-
-    LOG(INFO) << "tlsa usage     == " << usage;
-    LOG(INFO) << "tlsa selector  == " << selector;
-    LOG(INFO) << "tlsa mtype     == " << mtype;
-
-    break;
-  }
 
   DNS::Query q_noexist(res, DNS::RR_type::A,
                        "does-not-exist.test.digilicious.com");
@@ -87,22 +70,16 @@ int main(int argc, char const* argv[])
   auto cmxes = res.get_records(DNS::RR_type::MX, "cname.test.digilicious.com");
   for (auto const& cmx : cmxes) {
     if (std::holds_alternative<DNS::RR_CNAME>(cmx)) {
-      LOG(INFO) << "cname == " << std::get<DNS::RR_CNAME>(cmx).str();
+      CHECK_EQ(std::get<DNS::RR_CNAME>(cmx).str(), "test.digilicious.com");
     }
     else {
-      LOG(INFO) << "mx.preference == "
-                << std::get<DNS::RR_MX>(cmx).preference();
-      LOG(INFO) << "mx.exchange   == " << std::get<DNS::RR_MX>(cmx).exchange();
+      CHECK_EQ(std::get<DNS::RR_MX>(cmx).preference(), 10);
+      CHECK_EQ(std::get<DNS::RR_MX>(cmx).exchange(), "digilicious.com");
     }
   }
 
   auto txts = res.get_records(DNS::RR_type::TXT, "digilicious.com");
-  for (auto const& txt : txts) {
-    if (std::holds_alternative<DNS::RR_TXT>(txt)) {
-      LOG(INFO) << "len == " << std::get<DNS::RR_TXT>(txt).str().length();
-      LOG(INFO) << "txt == " << std::get<DNS::RR_TXT>(txt).str();
-    }
-  }
+  CHECK_GE(txts.size(), 1);
 
   // These IP addresses might be stable for a while.
 
@@ -115,4 +92,8 @@ int main(int argc, char const* argv[])
   CHECK_EQ(fcrdnses6.size(), 1);
   CHECK(Domain::match(fcrdnses6.front(), "1dot1dot1dot1.cloudflare-dns.com."))
       << "no match for " << fcrdnses6.front();
+
+  auto quad9 = fcrdns4(res, "9.9.9.9");
+  CHECK(Domain::match(quad9.front(), "dns.quad9.net"))
+      << "no match for " << quad9.front();
 }
