@@ -144,8 +144,8 @@ struct Ctx {
   std::map<std::string, std::string, ci_less> spf_info;
   std::string spf_result;
 
-  std::unordered_map<char const*, std::string> defined_hdrs;
-  std::map<std::string, std::string, ci_less> opt_hdrs;
+  // std::unordered_multimap<char const*, std::string> defined_hdrs;
+  // std::multimap<std::string, std::string, ci_less> opt_hdrs;
 
   std::string unstructured;
   std::string id;
@@ -948,10 +948,10 @@ struct action<optional_field> {
         ctx.msg_errors.push_back(err);
         // LOG(ERROR) << err;
       }
-      ctx.defined_hdrs[defined_field(ctx.opt_name)] = ctx.opt_value;
+      // ctx.defined_hdrs.emplace(defined_field(ctx.opt_name), ctx.opt_value);
     }
     else {
-      ctx.opt_hdrs[ctx.opt_name] = ctx.opt_value;
+      // ctx.opt_hdrs.emplace(ctx.opt_name, ctx.opt_value);
     }
     header(in, ctx);
     ctx.unstructured.clear();
@@ -1672,7 +1672,15 @@ struct action<obs_group_list> {
 };
 } // namespace RFC5322
 
-void display(RFC5322::Ctx const& ctx) {}
+void display(RFC5322::Ctx const& ctx)
+{
+  // for (auto const& [name, value] : ctx.defined_hdrs) {
+  //   std::cout << name << ": " << value << '\n';
+  // }
+  // for (auto const& [name, value] : ctx.opt_hdrs) {
+  //   std::cout << name << ": " << value << '\n';
+  // }
+}
 
 void selftest()
 {
@@ -1778,7 +1786,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "file: " << fn;
     try {
       RFC5322::Ctx ctx;
-      ctx.defined_hdrs.reserve(countof(RFC5322::defined_fields));
+      // ctx.defined_hdrs.reserve(countof(RFC5322::defined_fields));
       if (!parse<RFC5322::message, RFC5322::action>(in, ctx)) {
         LOG(ERROR) << "parse returned false";
       }
