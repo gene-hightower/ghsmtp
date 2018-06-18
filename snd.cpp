@@ -398,7 +398,10 @@ struct ehlo_greet : plus<ranges<0, 9, 11, 12, 14, 127>> {};
 //                  ; additional syntax of ehlo-params depends on
 //                  ; ehlo-keyword
 
-struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
+// The '.' we also allow in ehlo-keyword since it has been seen in the
+// wild at least at 263.net.
+
+struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash, dot>>> {};
 
 // ehlo-param     = 1*(%d33-126)
 //                  ; any CHAR excluding <SP> and all
@@ -842,6 +845,16 @@ void selftest()
       "250 SMTPUTF8\r\n",
 
       "500 5.5.1 command unrecognized: \"EHLO digilicious.com\\r\\n\"\r\n",
+
+      "250-263xmail at your service\r\n"
+      "250-STARTTLS\r\n"
+      "250-MAE-SMTP\r\n"
+      "250-263.net\r\n" // the '.' is not RFC complaint
+      "250-SIZE 104857600\r\n"
+      "250-ETRN\r\n"
+      "250-ENHANCEDSTATUSCODES\r\n"
+      "250-8BITMIME\r\n"
+      "250 DSN\r\n",
   };
 
   for (auto i : ehlo_rsp_list) {
