@@ -90,10 +90,9 @@ std::streamsize POSIX::io_fd_(char const* fnm,
     return static_cast<std::streamsize>(-1);
   }
 
-  if (0 == n_ret) { // This happens for "normal" files.
-    LOG(WARNING) << fnm << " returned zero";
-    // return static_cast<std::streamsize>(-1);
-  }
+  // if (0 == n_ret) { // This happens for "normal" files.
+  //   LOG(WARNING) << fnm << " returned zero";
+  // }
 
   // The stream buffer code above us can deal with a short read, but
   // not a short write.
