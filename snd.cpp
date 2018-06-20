@@ -1271,6 +1271,8 @@ bool snd(int fd_in,
     cnn.sock.starttls_client(sender.ascii().c_str(), receiver.ascii().c_str(),
                              tlsa_rrs, enforce_dane);
 
+    LOG(INFO) << "TLS: " << cnn.sock.tls_info();
+
     LOG(INFO) << "C: EHLO " << sender.ascii();
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
