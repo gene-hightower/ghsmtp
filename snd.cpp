@@ -13,6 +13,7 @@ DEFINE_bool(selftest, false, "run a self test");
 
 DEFINE_bool(pipe, false, "send to stdin/stdout");
 
+DEFINE_bool(to_the_neck, false, "shove data forever");
 DEFINE_bool(slow_strangle, false, "super slow mo");
 DEFINE_bool(long_line, false, "super long text line");
 DEFINE_bool(bare_lf, false, "send a bare LF");
@@ -876,7 +877,7 @@ void selftest()
 auto get_sender()
 {
   if (FLAGS_sender.empty()) {
-    FLAGS_sender = {[&] {
+    FLAGS_sender = {[] {
       auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
       if (id_from_env)
         return std::string{id_from_env};
@@ -1149,6 +1150,15 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
   if (FLAGS_bare_lf)
     cnn.sock.out() << "\n.\n\r\n";
 
+  if (FLAGS_to_the_neck) {
+    for (;;) {
+      cnn.sock.out() << "####################"
+                        "####################"
+                        "####################"
+                     << std::flush;
+    }
+  }
+
   if (FLAGS_long_line) {
     for (auto i = 0; i < 10000; ++i) {
       cnn.sock.out() << 'X';
@@ -1230,6 +1240,13 @@ bool snd(int fd_in,
   }
 
   // Check extensions
+
+  auto bad_dad = FLAGS_bare_lf || FLAGS_slow_strangle || FLAGS_to_the_neck;
+
+  if (bad_dad) {
+    FLAGS_use_chunking = false;
+    FLAGS_use_size = false;
+  }
 
   auto const ext_8bitmime{
       FLAGS_use_8bitmime
@@ -1411,7 +1428,7 @@ bool snd(int fd_in,
     exit(EXIT_SUCCESS);
   }
 
-  if (FLAGS_bare_lf || FLAGS_slow_strangle) {
+  if (bad_dad) {
     if (ext_pipelining) {
       cnn.sock.out() << std::flush;
       check_for_fail(in, cnn, "MAIL FROM");
@@ -1423,6 +1440,7 @@ bool snd(int fd_in,
 
   auto msg = std::make_unique<Message>();
 
+  // if service is smtp (i.e. sending real mail, not smtp-test)
   try {
     msg->open(sender.ascii(), total_size * 2, ".Sent");
     msg->write(hdr_str.data(), hdr_str.size());
