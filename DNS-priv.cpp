@@ -743,6 +743,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
 
   if (a_.sz < sizeof(header)) {
+    bogus_or_indeterminate_ = true;
     LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
     return;
   }
