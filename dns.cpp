@@ -53,22 +53,29 @@ void do_addr(DNS::Resolver& res, char const* a)
   }
 }
 
-void do_domain(DNS::Resolver& res, char const* dom)
+void do_domain(DNS::Resolver& res, char const* dom_cp)
 {
-  auto const as = res.get_strings(DNS::RR_type::A, dom);
+  auto const dom{Domain{dom_cp}};
+
+  auto const as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
   for (auto a : as) {
     std::cout << a;
     auto const names = DNS::fcrdns(res, a);
-    if (!names.empty()) {
+    std::vector<Domain> doms;
+    for (auto const& name : names) {
+      doms.emplace_back(name);
+    }
+    if (!doms.empty()) {
       std::cout << " [";
-      std::copy(names.begin(), names.end(),
+      std::copy(doms.begin(), doms.end(),
                 std::experimental::make_ostream_joiner(std::cout, ", "));
       std::cout << ']';
     }
+
     std::cout << '\n';
   }
 
-  auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom);
+  auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
   for (auto aaaa : aaaas) {
     std::cout << aaaa << '\n';
   }
