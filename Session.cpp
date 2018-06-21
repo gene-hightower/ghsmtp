@@ -429,39 +429,54 @@ bool Session::msg_new()
       return {SpamStatus::spam, "SPF failed"s};
     }
 
+    auto reason{std::ostringstream{}};
+    auto status{SpamStatus{}};
+
     if (spf_result_ == SPF::Result::PASS) {
       auto const dom{Domain{spf_request_.get_sender_dom()}};
       if (lookup_domain(white_, dom)) {
-        auto const reason{"SPF sender domain ("s + dom.utf8()
-                          + ") is whitelisted"s};
-        return {SpamStatus::ham, reason};
+        reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted"s;
+        status = SpamStatus::ham;
       }
 
       auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
       if (tld_dom && white_.lookup(tld_dom)) {
-        auto const reason{"SPF sender registered domain ("s + tld_dom
-                          + ") is whitelisted"s};
-        return {SpamStatus::ham, reason};
+        if (!reason.str().empty()) {
+          reason << ", ";
+        }
+        reason << "SPF sender registered domain (" << tld_dom
+               << ") is whitelisted";
+        status = SpamStatus::ham;
       }
     }
 
     // Anything enciphered tastes a lot like ham.
     if (sock_.tls()) {
-      return {SpamStatus::ham, "they used TLS"s};
+      if (!reason.str().empty()) {
+        reason << ", ";
+      }
+      reason << "they used TLS";
+      status = SpamStatus::ham;
     }
 
     if (fcrdns_whitelisted_) {
-      return {SpamStatus::ham, "FCrDNS whitelisted"s};
+      if (!reason.str().empty()) {
+        reason << ", ";
+      }
+      reason << "FCrDNS is whitelisted";
+      status = SpamStatus::ham;
     }
 
     auto rp_dom = reverse_path_.domain();
-
     if (!client_fcrdns_.empty()) {
       if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
           != client_fcrdns_.end()) {
-        auto const reason{"reverse_path ("s + rp_dom.utf8()
-                          + ") matches confirmed DNS name"s};
-        return {SpamStatus::ham, reason};
+        if (!reason.str().empty()) {
+          reason << ", ";
+        }
+        reason << "reverse_path ("s << rp_dom.utf8()
+               << ") matches confirmed DNS name";
+        status = SpamStatus::ham;
       }
     }
 
@@ -470,14 +485,20 @@ bool Session::msg_new()
       auto const client_tld{
           tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
       if (Domain::match(rp_tld, client_tld)) {
-        auto reason{"reverse_path TLD ("s + rp_tld
-                    + ") matches TLD of confirmed DNS name "s
-                    + client_fcrdns.utf8()};
-        return {SpamStatus::ham, reason};
+        if (!reason.str().empty()) {
+          reason << ", ";
+        }
+        reason << "reverse_path TLD (" << rp_tld
+               << ") matches TLD of confirmed DNS name " << client_fcrdns;
+        status = SpamStatus::ham;
+        break;
       }
     }
 
-    return {SpamStatus::spam, "it's not ham"s};
+    if (status != SpamStatus::ham)
+      return {SpamStatus::spam, "it's not ham"s};
+
+    return {status, reason.str()};
   }()};
 
   LOG(INFO) << ((status == SpamStatus::ham) ? "ham since " : "spam since ")
