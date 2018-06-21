@@ -81,6 +81,9 @@ public:
 private:
   friend struct Session_test;
 
+  enum class SpamStatus : bool { ham, spam };
+  std::tuple<SpamStatus, std::string> spam_status_();
+
   std::string added_headers_(Message const& msg);
 
   std::ostream& out_() { return sock_.out(); }
