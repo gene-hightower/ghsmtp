@@ -67,6 +67,7 @@ public:
 
 private:
   bool xchg_(Resolver& res, uint16_t id);
+  void check_answer_(Resolver& res, RR_type type, char const* name);
 
   uint16_t rcode_{0};
   uint16_t extended_rcode_{0};

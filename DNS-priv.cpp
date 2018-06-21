@@ -112,6 +112,8 @@ using octet = unsigned char;
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
 octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
+uint16_t constexpr as_u16(octet hi, octet lo) { return (uint16_t(hi) << 8) + lo; }
+
 /*
                                            1  1  1  1  1  1
              0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
@@ -158,12 +160,12 @@ public:
     static_assert(sizeof(header) == 12);
   }
 
-  uint16_t id() const { return (id_hi_ << 8) + id_lo_; }
+  uint16_t id() const { return as_u16(id_hi_, id_lo_); }
 
-  uint16_t qdcount() const { return (qdcount_hi_ << 8) + qdcount_lo_; }
-  uint16_t ancount() const { return (ancount_hi_ << 8) + ancount_lo_; }
-  uint16_t nscount() const { return (nscount_hi_ << 8) + nscount_lo_; }
-  uint16_t arcount() const { return (arcount_hi_ << 8) + arcount_lo_; }
+  uint16_t qdcount() const { return as_u16(qdcount_hi_, qdcount_lo_); }
+  uint16_t ancount() const { return as_u16(ancount_hi_, ancount_lo_); }
+  uint16_t nscount() const { return as_u16(nscount_hi_, nscount_lo_); }
+  uint16_t arcount() const { return as_u16(arcount_hi_, arcount_lo_); }
 
   bool checking_disabled() const { return (flags_1_ & 0x10) != 0; }
   bool authentic_data() const { return (flags_1_ & 0x20) != 0; }
@@ -189,8 +191,12 @@ public:
     static_assert(sizeof(question) == 4);
   }
 
-  uint16_t qtype() const { return (qtype_hi_ << 8) + qtype_lo_; }
-  uint16_t qclass() const { return (qclass_hi_ << 8) + qclass_lo_; }
+  DNS::RR_type qtype() const
+  {
+    auto typ = as_u16(qtype_hi_, qtype_lo_);
+    return static_cast<DNS::RR_type>(typ);
+  }
+  uint16_t qclass() const { return as_u16(qclass_hi_, qclass_lo_); }
 };
 
 /*
@@ -296,15 +302,15 @@ class rr {
 public:
   rr() { static_assert(sizeof(rr) == 10); }
 
-  uint16_t rr_type() const { return (uint16_t(type_hi_) << 8) + type_lo_; }
-  uint16_t rr_class() const { return (uint16_t(type_hi_) << 8) + type_lo_; }
+  uint16_t rr_type() const { return as_u16(type_hi_, type_lo_); }
+  uint16_t rr_class() const { return as_u16(class_hi_, class_lo_); }
   uint32_t rr_ttl() const
   {
     return (uint32_t(ttl_0_) << 24) + (uint32_t(ttl_1_) << 16)
            + (uint32_t(ttl_2_) << 8) + (uint32_t(ttl_3_));
   }
 
-  uint16_t rdlength() const { return (rdlength_hi_ << 8) + rdlength_lo_; }
+  uint16_t rdlength() const { return as_u16(rdlength_hi_, rdlength_lo_); }
 
   auto cdata() const
   {
@@ -748,6 +754,29 @@ Query::Query(Resolver& res, RR_type type, char const* name)
     return;
   }
 
+  check_answer_(res, type, name);
+}
+
+void Query::check_answer_(Resolver& res, RR_type type, char const* name)
+{
+  // We grab some stuff from the question we generated.  This is not
+  // an un-trusted datum from afar.
+
+  auto cls{[this, type = type]() {
+    auto q = q_.begin();
+    auto const q_hdr_p = reinterpret_cast<header const*>(q);
+    CHECK_EQ(q_hdr_p->qdcount(), uint16_t(1));
+    q += sizeof(header);
+    std::string qname;
+    int name_len;
+    CHECK(expand_name(q, q_, qname, name_len));
+    q += name_len;
+    auto const question_p = reinterpret_cast<question const*>(q);
+    CHECK(question_p->qtype() == type)
+        << question_p->qtype() << " != " << type << '\n';
+    return question_p->qclass();
+  }()};
+
   auto const hdr_p = reinterpret_cast<header const*>(a_.begin());
 
   rcode_ = hdr_p->rcode();
@@ -813,7 +842,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   auto question_p = reinterpret_cast<question const*>(p);
   p += sizeof(question);
 
-  if (question_p->qtype() != static_cast<uint16_t>(type)) {
+  if (question_p->qtype() != type) {
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "qtypes don't match, " << question_p->qtype()
                  << " != " << type;
@@ -932,7 +961,7 @@ std::optional<RR> get_MX(rr const* rr_p, DNS::packet const& pkt, bool& err)
     return {};
   }
   auto p = rr_p->rddata();
-  uint16_t preference = (p[0] << 8) + p[1];
+  auto const preference = as_u16(p[0], p[1]);
   p += 2;
   if (!expand_name(p, pkt, name, enc_len)) {
     LOG(WARNING) << "bogus MX record";
