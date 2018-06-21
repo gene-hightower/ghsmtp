@@ -6,12 +6,6 @@
 
 #include <glog/logging.h>
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type)
-{
-  os << DNS::RR_type_c_str(type);
-  return os;
-}
-
 namespace DNS {
 
 RR_A::RR_A(uint8_t const* rd, size_t sz)

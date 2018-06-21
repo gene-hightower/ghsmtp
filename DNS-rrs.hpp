@@ -2,6 +2,7 @@
 #define DNS_RRS_DOT_HPP
 
 #include <cstddef>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <variant>
@@ -280,6 +281,9 @@ using RR_set = std::vector<RR>;
 
 } // namespace DNS
 
-std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type);
+inline std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type)
+{
+  return os << DNS::RR_type_c_str(type);
+}
 
 #endif // DNS_RRS_DOT_HPP
