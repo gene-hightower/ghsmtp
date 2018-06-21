@@ -147,6 +147,31 @@ void Session::greeting()
       bad_host_(error_msg.c_str());
     }
 
+    /*
+    <https://tools.ietf.org/html/rfc5321#section-4.3.1> says:
+
+    4.3.  Sequencing of Commands and Replies
+
+    4.3.1.  Sequencing Overview
+
+    The communication between the sender and receiver is an alternating
+    dialogue, controlled by the sender.  As such, the sender issues a
+    command and the receiver responds with a reply.  Unless other
+    arrangements are negotiated through service extensions, the sender
+    MUST wait for this response before sending further commands.  One
+    important reply is the connection greeting.  Normally, a receiver
+    will send a 220 "Service ready" reply when the connection is
+    completed.  The sender SHOULD wait for this greeting message before
+    sending any commands.
+
+    So which is it?
+
+    “…the receiver responds with a reply.”
+    “…the sender MUST wait for this response…”
+    “One important reply is the connection greeting.”
+    “The sender SHOULD wait for this greeting…”
+    */
+
     // Wait a bit of time for pre-greeting traffic.
     if (!(ip_whitelisted_ || fcrdns_whitelisted_)
         && sock_.input_ready(Config::greeting_wait)) {
