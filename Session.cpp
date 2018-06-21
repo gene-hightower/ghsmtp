@@ -430,7 +430,7 @@ bool Session::msg_new()
     }
 
     auto reason{std::ostringstream{}};
-    auto status{SpamStatus{}};
+    auto status{SpamStatus::spam};
 
     if (spf_result_ == SPF::Result::PASS) {
       auto const dom{Domain{spf_request_.get_sender_dom()}};
