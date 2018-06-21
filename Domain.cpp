@@ -50,8 +50,8 @@ void Domain::set(std::string_view dom)
   }
 
   // Since all Domains are fully qualified and not just some bag of
-  // labels, the dot provides no real information and will mess up
-  // name matching on certs and stuff.
+  // labels, the trailing dot provides no real information and will
+  // mess up name matching on certs and stuff.
 
   dom = remove_trailing_dot(dom);
 
