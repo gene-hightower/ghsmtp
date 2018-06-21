@@ -60,7 +60,7 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
     }
   }
 
-  auto const our_id{[&] {
+  auto const our_id{[this] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
     if (id_from_env)
       return std::string{id_from_env};
@@ -74,8 +74,9 @@ Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
       return server_fcrdns_.front().ascii();
     }
 
-    if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
-      return IP::to_address_literal(sock_.us_c_str());
+    auto const us_c_str = sock_.us_c_str();
+    if (us_c_str && !IP::is_private(us_c_str)) {
+      return IP::to_address_literal(us_c_str);
     }
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
@@ -352,7 +353,7 @@ std::string Session::added_headers_(Message const& msg)
 {
   // The headers Return-Path, Received-SPF, and Received are returned
   // as a string.
-  auto const protocol{[&]() {
+  auto const protocol{[this]() {
     if (smtputf8_)
       return sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
     else if (extensions_)
@@ -424,7 +425,7 @@ bool Session::msg_new()
 
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
-  auto const [status, reason]{[&]() -> std::tuple<SpamStatus, std::string> {
+  auto const [status, reason]{[this]() -> std::tuple<SpamStatus, std::string> {
     if (spf_result_ == SPF::Result::FAIL) {
       return {SpamStatus::spam, "SPF failed"s};
     }
@@ -1224,28 +1225,30 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return true;
   }
 
-  auto const accepted_domain{[&] {
+  auto const accepted_domain{[this, &recipient] {
     if (recipient.domain().is_address_literal()) {
-      if (recipient.domain() == sock_.us_address_literal()) {
+      if (recipient.domain() != sock_.us_address_literal()) {
+        LOG(WARNING) << "recipient.domain address " << recipient.domain()
+                     << " does not match ours " << sock_.us_address_literal();
+        return false;
+      }
+    }
+
+    // Domains we accept mail for.
+    CDB accept_domains{"accept_domains"};
+    if (accept_domains.is_open()) {
+      if (accept_domains.lookup(recipient.domain().ascii())
+          || accept_domains.lookup(recipient.domain().utf8())) {
         return true;
       }
     }
     else {
-      // Domains we accept mail for.
-      CDB accept_domains{"accept_domains"};
-      if (accept_domains.is_open()) {
-        if (accept_domains.lookup(recipient.domain().ascii())
-            || accept_domains.lookup(recipient.domain().utf8())) {
-          return true;
-        }
-      }
-      else {
-        // If we have no list of domains to accept, at least take our own.
-        if (recipient.domain() == server_identity_) {
-          return true;
-        }
+      // If we have no list of domains to accept, at least take our own.
+      if (recipient.domain() == server_identity_) {
+        return true;
       }
     }
+
     return false;
   }()};
 
