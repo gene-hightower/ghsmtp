@@ -438,15 +438,16 @@ bool Session::msg_new()
         reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted"s;
         status = SpamStatus::ham;
       }
-
-      auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
-      if (tld_dom && white_.lookup(tld_dom)) {
-        if (!reason.str().empty()) {
-          reason << ", ";
+      else {
+        auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
+        if (tld_dom && white_.lookup(tld_dom)) {
+          if (!reason.str().empty()) {
+            reason << ", ";
+          }
+          reason << "SPF sender registered domain (" << tld_dom
+                 << ") is whitelisted";
+          status = SpamStatus::ham;
         }
-        reason << "SPF sender registered domain (" << tld_dom
-               << ") is whitelisted";
-        status = SpamStatus::ham;
       }
     }
 
@@ -467,6 +468,8 @@ bool Session::msg_new()
       status = SpamStatus::ham;
     }
 
+    auto rp_match = false;
+
     auto rp_dom = reverse_path_.domain();
     if (!client_fcrdns_.empty()) {
       if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
@@ -474,24 +477,26 @@ bool Session::msg_new()
         if (!reason.str().empty()) {
           reason << ", ";
         }
-        reason << "reverse_path ("s << rp_dom.utf8()
-               << ") matches confirmed DNS name";
+        reason << "reverse_path ("s << rp_dom << ") matches FCrDNS name";
         status = SpamStatus::ham;
+        rp_match = true;
       }
     }
 
-    auto const rp_tld{tld_db_.get_registered_domain(rp_dom.ascii().c_str())};
-    for (auto client_fcrdns : client_fcrdns_) {
-      auto const client_tld{
-          tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
-      if (Domain::match(rp_tld, client_tld)) {
-        if (!reason.str().empty()) {
-          reason << ", ";
+    if (!rp_match) {
+      auto const rp_tld{tld_db_.get_registered_domain(rp_dom.ascii().c_str())};
+      for (auto client_fcrdns : client_fcrdns_) {
+        auto const client_tld{
+            tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
+        if (Domain::match(rp_tld, client_tld)) {
+          if (!reason.str().empty()) {
+            reason << ", ";
+          }
+          reason << "reverse_path TLD (" << rp_tld
+                 << ") matches TLD of FCrDNS name";
+          status = SpamStatus::ham;
+          break;
         }
-        reason << "reverse_path TLD (" << rp_tld
-               << ") matches TLD of confirmed DNS name " << client_fcrdns;
-        status = SpamStatus::ham;
-        break;
       }
     }
 
