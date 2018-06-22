@@ -147,7 +147,7 @@ void Session::greeting()
       bad_host_(error_msg.c_str());
     }
 
-    /*
+    /******************************************************************
     <https://tools.ietf.org/html/rfc5321#section-4.3.1> says:
 
     4.3.  Sequencing of Commands and Replies
@@ -172,7 +172,7 @@ void Session::greeting()
     “The sender SHOULD wait for this greeting…”
 
     So is it MUST or SHOULD?  I enforce MUST.
-    */
+    *******************************************************************/
 
     // Wait a bit of time for pre-greeting traffic.
     if (!(ip_whitelisted_ || fcrdns_whitelisted_)
