@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-typedef struct magic_set* magic_t;
+typedef struct magic_set* magic_t; // local or forward declaration
 
 class Magic {
 public:
