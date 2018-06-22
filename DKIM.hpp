@@ -4,10 +4,9 @@
 #include <functional>
 #include <string_view>
 
-typedef struct dkim_lib DKIM_LIB;
-typedef struct dkim DKIM;
-
-typedef int DKIM_STAT;
+typedef struct dkim_lib DKIM_LIB; // local or forward declaration
+typedef struct dkim DKIM;         // local or forward declaration
+typedef int DKIM_STAT;            // local or forward declaration
 
 namespace OpenDKIM {
 
