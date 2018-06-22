@@ -1270,6 +1270,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
                      << " does not match ours " << sock_.us_address_literal();
         return false;
       }
+      return true;
     }
 
     // Domains we accept mail for.
