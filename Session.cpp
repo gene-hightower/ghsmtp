@@ -170,6 +170,8 @@ void Session::greeting()
     “…the sender MUST wait for this response…”
     “One important reply is the connection greeting.”
     “The sender SHOULD wait for this greeting…”
+
+    So is it MUST or SHOULD?  I enforce MUST.
     */
 
     // Wait a bit of time for pre-greeting traffic.
