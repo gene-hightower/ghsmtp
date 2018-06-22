@@ -466,7 +466,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   if (spf_result_ == SPF::Result::PASS) {
     auto const dom{Domain{spf_request_.get_sender_dom()}};
     if (lookup_domain(white_, dom)) {
-      reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted"s;
+      reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted";
       status = SpamStatus::ham;
     }
     else {
@@ -508,7 +508,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
       if (!reason.str().empty()) {
         reason << ", ";
       }
-      reason << "reverse_path ("s << rp_dom << ") matches FCrDNS name";
+      reason << "reverse_path (" << rp_dom << ") matches FCrDNS name";
       status = SpamStatus::ham;
       rp_match = true;
     }
