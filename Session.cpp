@@ -36,8 +36,8 @@ char const* uribls[]{
 };
 
 constexpr auto greeting_wait = std::chrono::seconds{3};
-constexpr auto max_recipients_per_message{100};
-constexpr auto max_unrecognized_cmds{20};
+constexpr int max_recipients_per_message = 100;
+constexpr int max_unrecognized_cmds = 20;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
@@ -460,8 +460,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     return {SpamStatus::spam, "SPF failed"s};
   }
 
-  auto reason{std::ostringstream{}};
   auto status{SpamStatus::spam};
+  std::ostringstream reason;
 
   if (spf_result_ == SPF::Result::PASS) {
     auto const dom{Domain{spf_request_.get_sender_dom()}};
@@ -983,7 +983,7 @@ void Session::exit_()
 {
   // sock_.log_totals();
 
-  auto time_used{timespec{}};
+  timespec time_used{};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
 
   LOG(INFO) << "CPU time " << time_used.tv_sec << "." << std::setw(9)
@@ -1183,7 +1183,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
 // check the identity from HELO/EHLO
 void Session::verify_client_()
 {
-  auto error_msg{std::string{}};
+  std::string error_msg;
   if (!verify_client_(client_identity_, error_msg)) {
     // LOG(WARNING) << "verify client failed for " << client_ << " : "
     //              << error_msg;
@@ -1458,7 +1458,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    auto received_spf{std::ostringstream{}};
+    std::ostringstream received_spf;
     received_spf << "Received-SPF: pass (" << server_id_() << ": " << ip_addr
                  << " is whitelisted.) client-ip=" << ip_addr
                  << "; envelope-from=" << sender
