@@ -185,7 +185,7 @@ void Session::greeting()
       out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
-        LOG(INFO) << "half greeting got them";
+        LOG(INFO) << "half greeting got " << client_;
         bad_host_("input before greeting");
       }
     }
@@ -1094,6 +1094,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     LOG(INFO) << "IP4 loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
+    client_ = "localhost "s + IP4::loopback_literal;
     return true;
   }
 
@@ -1101,6 +1102,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     LOG(INFO) << "IP6 loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
+    client_ = "localhost "s + IP6::loopback_literal;
     return true;
   }
 
