@@ -141,7 +141,7 @@ void Session::greeting()
   if (sock_.has_peername()) {
     close(2); // if we're a networked program, never send to stderr
 
-    auto error_msg{std::string{}};
+    std::string error_msg;
     if (!verify_ip_address_(error_msg)) {
       // no glog message at this point
       bad_host_(error_msg.c_str());
@@ -313,12 +313,12 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  auto params{std::ostringstream{}};
+  std::ostringstream params;
   for (auto const& [name, value] : parameters) {
     params << " " << name << (value.empty() ? "" : "=") << value;
   }
 
-  auto error_msg{std::string{}};
+  std::string error_msg;
   if (!verify_sender_(reverse_path, error_msg)) {
     LOG(WARNING) << "verify sender failed: " << error_msg;
     bad_host_(error_msg.c_str());
@@ -397,7 +397,7 @@ std::string Session::added_headers_(Message const& msg)
       return sock_.tls() ? "SMTPS" : "SMTP";
   }()};
 
-  auto headers{std::ostringstream{}};
+  std::ostringstream headers;
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
 
   // STD 3 section 5.2.8
@@ -410,10 +410,10 @@ std::string Session::added_headers_(Message const& msg)
           << protocol << " id " << msg.id();
 
   if (forward_path_.size()) {
-    auto len{12};
+    int len = 12;
     headers << "\r\n        for ";
     for (size_t i = 0; i < forward_path_.size(); ++i) {
-      auto fwd{std::string{forward_path_[i]}};
+      auto const fwd = static_cast<std::string>(forward_path_[i]);
       if (i) {
         headers << ',';
         ++len;
@@ -427,7 +427,7 @@ std::string Session::added_headers_(Message const& msg)
     }
   }
 
-  const std::string tls_info{sock_.tls_info()};
+  std::string const tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     headers << "\r\n        (" << tls_info << ')';
   }
@@ -463,9 +463,18 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   auto status{SpamStatus::spam};
   std::ostringstream reason;
 
+  // Anything enciphered tastes a lot like ham.
+  if (sock_.tls()) {
+    reason << "they used TLS";
+    status = SpamStatus::ham;
+  }
+
   if (spf_result_ == SPF::Result::PASS) {
     auto const dom{Domain{spf_request_.get_sender_dom()}};
     if (lookup_domain(white_, dom)) {
+      if (!reason.str().empty()) {
+        reason << ", and ";
+      }
       reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted";
       status = SpamStatus::ham;
     }
@@ -473,7 +482,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
       auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
       if (tld_dom && white_.lookup(tld_dom)) {
         if (!reason.str().empty()) {
-          reason << ", ";
+          reason << ", and ";
         }
         reason << "SPF sender registered domain (" << tld_dom
                << ") is whitelisted";
@@ -482,18 +491,9 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     }
   }
 
-  // Anything enciphered tastes a lot like ham.
-  if (sock_.tls()) {
-    if (!reason.str().empty()) {
-      reason << ", ";
-    }
-    reason << "they used TLS";
-    status = SpamStatus::ham;
-  }
-
   if (fcrdns_whitelisted_) {
     if (!reason.str().empty()) {
-      reason << ", ";
+      reason << ", and ";
     }
     reason << "FCrDNS is whitelisted";
     status = SpamStatus::ham;
@@ -506,7 +506,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
         != client_fcrdns_.end()) {
       if (!reason.str().empty()) {
-        reason << ", ";
+        reason << ", and ";
       }
       reason << "reverse_path (" << rp_dom << ") matches FCrDNS name";
       status = SpamStatus::ham;
@@ -521,7 +521,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
           tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
       if (Domain::match(rp_tld, client_tld)) {
         if (!reason.str().empty()) {
-          reason << ", ";
+          reason << ", and ";
         }
         reason << "reverse_path TLD (" << rp_tld
                << ") matches TLD of FCrDNS name";
