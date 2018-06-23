@@ -10,14 +10,14 @@
 class Mailbox {
 public:
   Mailbox() = default;
-  Mailbox(std::string local_part, std::string domain)
+  Mailbox(std::string_view local_part, std::string_view domain)
   {
     set_local(local_part);
     set_domain(domain);
   }
 
-  void set_local(std::string local_part) { local_part_ = local_part; }
-  void set_domain(std::string d) { domain_.set(d); }
+  void set_local(std::string_view local_part) { local_part_ = local_part; }
+  void set_domain(std::string_view d) { domain_.set(d); }
   void clear()
   {
     local_part_.clear();
