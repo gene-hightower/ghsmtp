@@ -31,10 +31,12 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
     }
   }
 
-  // Sort by name length: short to long.
+  // Sort 1st by name length: short to long.
   std::sort(fcrdns.begin(), fcrdns.end(),
-            [](std::string const& a, std::string const& b) {
-              return a.length() < b.length();
+            [](std::string_view a, std::string_view b) {
+              if (a.length() != b.length())
+                return a.length() < b.length();
+              return a < b;
             });
 
   return fcrdns;
@@ -62,8 +64,10 @@ std::vector<std::string> fcrdns6(Resolver& res, std::string_view addr)
 
   // Sort by name length: short to long.
   std::sort(fcrdns.begin(), fcrdns.end(),
-            [](std::string const& a, std::string const& b) {
-              return a.length() < b.length();
+            [](std::string_view a, std::string_view b) {
+              if (a.length() != b.length())
+                return a.length() < b.length();
+              return a < b;
             });
 
   return fcrdns;
