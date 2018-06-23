@@ -414,10 +414,10 @@ std::string Session::added_headers_(Message const& msg)
           << " id " << msg.id();
 
   if (forward_path_.size()) {
-    auto constexpr fr = "for ";
-    auto constexpr fr_sz = sizeof(fr) - 1;
-    headers << "\r\n" << indent << fr;
-    int len = indent_sz + fr_sz;
+    auto constexpr phor = "for ";
+    auto constexpr phor_sz = sizeof(phor) - 1;
+    headers << "\r\n" << indent << phor;
+    int len = indent_sz + phor_sz;
     for (size_t i = 0; i < forward_path_.size(); ++i) {
       auto const fwd = static_cast<std::string>(forward_path_[i]);
       if (i) {
