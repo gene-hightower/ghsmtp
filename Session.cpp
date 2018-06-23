@@ -401,26 +401,32 @@ std::string Session::added_headers_(Message const& msg)
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
 
   // STD 3 section 5.2.8
+  auto constexpr indent = "        ";
+  auto constexpr indent_sz = sizeof(indent) - 1;
+  auto constexpr break_col = 80;
 
   headers << "Received: from " << client_identity_.utf8();
   if (sock_.has_peername()) {
     headers << " (" << client_ << ')';
   }
-  headers << "\r\n        by " << server_identity_.utf8() << " with "
-          << protocol << " id " << msg.id();
+  headers << "\r\n"
+          << indent << "by " << server_identity_.utf8() << " with " << protocol
+          << " id " << msg.id();
 
   if (forward_path_.size()) {
-    int len = 12;
-    headers << "\r\n        for ";
+    auto constexpr fr = "for ";
+    auto constexpr fr_sz = sizeof(fr) - 1;
+    headers << "\r\n" << indent << fr;
+    int len = indent_sz + fr_sz;
     for (size_t i = 0; i < forward_path_.size(); ++i) {
       auto const fwd = static_cast<std::string>(forward_path_[i]);
       if (i) {
         headers << ',';
         ++len;
       }
-      if ((len + fwd.length() + 2) > 80) {
-        headers << "\r\n        ";
-        len = 8;
+      if ((len + fwd.length() + 2) > break_col) {
+        headers << "\r\n" << indent;
+        len = indent_sz;
       }
       headers << '<' << fwd << '>';
       len += fwd.length() + 2;
@@ -429,9 +435,9 @@ std::string Session::added_headers_(Message const& msg)
 
   std::string const tls_info{sock_.tls_info()};
   if (tls_info.length()) {
-    headers << "\r\n        (" << tls_info << ')';
+    headers << "\r\n" << indent << '(' << tls_info << ')';
   }
-  headers << ";\r\n        " << msg.when() << "\r\n";
+  headers << ";\r\n" << indent << msg.when() << "\r\n";
 
   // Received-SPF:
   if (!spf_received_.empty()) {
