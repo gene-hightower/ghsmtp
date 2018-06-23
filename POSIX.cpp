@@ -50,8 +50,8 @@ bool POSIX::output_ready(int fd_out, milliseconds wait)
 
 std::streamsize POSIX::io_fd_(char const* fnm,
                               time_point<system_clock> start,
-                              std::function<ssize_t(int, void*, size_t)> io_fnc,
-                              std::function<bool(int, milliseconds)> rdy_fnc,
+                              ssize_t (*io_fnc)(int, void*, size_t),
+                              bool (*rdy_fnc)(int, milliseconds),
                               std::function<void(void)> read_hook,
                               int fd,
                               char* s,

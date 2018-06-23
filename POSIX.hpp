@@ -37,7 +37,9 @@ public:
                                bool& t_o)
   {
     auto s = const_cast<char*>(c_s);
-    return io_fd_("write", std::chrono::system_clock::now(), ::write,
+    return io_fd_("write", std::chrono::system_clock::now(),
+                  // this casts away the const on "buf"
+                  reinterpret_cast<ssize_t (*)(int, void*, size_t)>(::write),
                   output_ready, null_hook, fd_out, s, n, timeout, t_o);
   }
 
@@ -45,8 +47,8 @@ private:
   static std::streamsize
   io_fd_(char const* fnm,
          std::chrono::time_point<std::chrono::system_clock> start,
-         std::function<ssize_t(int, void*, size_t)> io_fnc,
-         std::function<bool(int, std::chrono::milliseconds)> rdy_fnc,
+         ssize_t (*io_fnc)(int, void*, size_t),
+         bool (*rdy_fnc)(int, std::chrono::milliseconds),
          std::function<void(void)> read_hook,
          int fd,
          char* s,
