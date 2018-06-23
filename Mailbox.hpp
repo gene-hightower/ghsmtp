@@ -30,7 +30,13 @@ public:
 
   operator std::string() const
   {
-    return local_part() + (domain().empty() ? "" : ("@" + domain().utf8()));
+    std::string s;
+    s.reserve(local_part_.length() + domain().utf8().length() + 1);
+    s = local_part();
+    if (!domain().empty()) {
+      s += "@" + domain().utf8();
+    }
+    return s;
   }
 
 private:
