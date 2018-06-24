@@ -13,6 +13,9 @@ DEFINE_bool(selftest, false, "run a self test");
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
@@ -1006,12 +1009,13 @@ struct action<from> {
   static void apply(const Input& in, Ctx& ctx)
   {
     if (!ctx.from_list.empty()) {
-      auto msg = "multiple 'From:' address headers, previous list: \n"s;
+      fmt::memory_buffer msg;
+      fmt::format_to(msg, "multiple 'From:' address headers, previous:\n");
       for (auto const& add : ctx.from_list) {
-        msg += " "s + static_cast<std::string>(add) + "\n"s;
+        fmt::format_to(msg, " {}\n", add);
       }
-      msg += "new: " + in.string();
-      ctx.msg_errors.push_back(msg);
+      fmt::format_to(msg, "new: {}", in.string());
+      ctx.msg_errors.push_back(fmt::to_string(msg));
     }
 
     header(in, ctx);
