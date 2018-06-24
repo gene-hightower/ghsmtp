@@ -34,8 +34,8 @@ public:
                    int fd_out = STDOUT_FILENO);
 
   void greeting();
-  void ehlo(std::string_view client_identity);
-  void helo(std::string_view client_identity);
+  void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
+  void helo(std::string_view client_identity) { lo_("HELO", client_identity); }
   void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
   void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
@@ -87,7 +87,7 @@ private:
   std::string added_headers_(Message const& msg);
 
   std::ostream& out_() { return sock_.out(); }
-  void log_lo_(char const* verb, std::string_view client_identity) const;
+  void lo_(char const* verb, std::string_view client_identity);
 
   void bad_host_(char const* msg) const __attribute__((noreturn));
 
@@ -98,7 +98,6 @@ private:
 
   bool verify_ip_address_(std::string& error_msg);
   bool verify_ip_address_dnsbl_(std::string& error_msg);
-  void verify_client_();
   bool verify_client_(Domain const& client_identity, std::string& error_msg);
   bool verify_recipient_(Mailbox const& recipient);
   bool verify_sender_(Mailbox const& sender, std::string& error_msg);
