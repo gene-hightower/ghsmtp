@@ -881,6 +881,9 @@ auto get_sender()
 {
   if (FLAGS_sender.empty()) {
     FLAGS_sender = {[] {
+      if (!FLAGS_client_id.empty())
+        return FLAGS_client_id;
+
       auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
       if (id_from_env)
         return std::string{id_from_env};
@@ -1599,13 +1602,13 @@ int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
 
-  auto sender = get_sender();
-
   { // Need to work with either namespace.
     using namespace gflags;
     using namespace google;
     ParseCommandLineFlags(&argc, &argv, true);
   }
+
+  auto sender = get_sender();
 
   if (FLAGS_selftest) {
     selftest();
