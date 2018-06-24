@@ -1114,8 +1114,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.lookup(client_fcrdns.ascii())) {
-        error_msg
-            = "FCrDNS "s + client_fcrdns.ascii() + " on static blacklist"s;
+        error_msg = fmt::format("FCrDNS {} on static blacklist",
+                                client_fcrdns.ascii());
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
@@ -1128,7 +1128,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
         if (black_.lookup(tld)) {
-          error_msg = "FCrDNS domain "s + tld + " on static blacklist"s;
+          error_msg = fmt::format("FCrDNS domain {} on static blacklist", tld);
           out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
           return false;
         }
@@ -1166,8 +1166,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
       if (has_record(res_, RR_type::A, reversed + rbl)) {
         error_msg = "blocked on advice from "s + rbl;
         // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
-        out_() << "554 5.7.1 blocked on advice from " << rbl << "\r\n"
-               << std::flush;
+        out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
         return false;
       }
     }
