@@ -143,7 +143,7 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
           SSL_set_SSL_CTX(s, ctx.ctx);
         return SSL_TLSEXT_ERR_OK;
       }
-      LOG(INFO) << "no cert found for " << servername;
+      LOG(INFO) << "no cert found for server " << servername;
       return SSL_TLSEXT_ERR_ALERT_WARNING;
     }
   }
@@ -169,25 +169,7 @@ bool TLS::starttls_client(int fd_in,
 
   auto const config_path = osutil::get_config_dir();
 
-  if (client_name == nullptr) {
-    auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
-    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
-        << "unable to enable DANE on SSL context";
-
-    // you'd think if it's the default, you'd not have to call this
-    CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
-
-    SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
-                       verify_callback);
-
-    LOG(INFO) << "**** using no client cert";
-
-    std::vector<Domain> cn;
-    cert_ctx_.emplace_back(ctx, cn);
-  }
-  else {
-
+  if (client_name) {
     auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
     CHECK_GE(certs.size(), 1) << "no client cert(s) found";
@@ -303,6 +285,26 @@ bool TLS::starttls_client(int fd_in,
         cert_ctx_.emplace_back(ctx, cn);
       }
     }
+  }
+
+  if (cert_ctx_.empty()) {
+    LOG(INFO) << "no cert found for client " << client_name;
+
+    auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+    CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
+        << "unable to enable DANE on SSL context";
+
+    // you'd think if it's the default, you'd not have to call this
+    CHECK_EQ(SSL_CTX_set_default_verify_paths(ctx), 1);
+
+    SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
+                       verify_callback);
+
+    LOG(INFO) << "**** using no client cert";
+
+    std::vector<Domain> cn;
+    cert_ctx_.emplace_back(ctx, cn);
   }
 
   ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
