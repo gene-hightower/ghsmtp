@@ -511,7 +511,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     if (status == SpamStatus::ham) {
       fmt::format_to(reason, ", and ");
     }
-    fmt::format_to(reason, "FCrDNS is whitelisted");
+    fmt::format_to(reason, "FCrDNS (or it's registered domain) is whitelisted");
     status = SpamStatus::ham;
   }
 
@@ -1133,7 +1133,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
           return false;
         }
         if (white_.lookup(tld)) {
-          // LOG(INFO) << "FCrDNS TLD domain " << tld << " whitelisted";
+          // LOG(INFO) << "FCrDNS registered domain " << tld << " whitelisted";
           fcrdns_whitelisted_ = true;
           return true;
         }
@@ -1238,12 +1238,12 @@ bool Session::verify_client_(Domain const& client_identity,
   if (!tld) {
     // Sometimes we may want to look at mail from misconfigured
     // sending systems.
-    LOG(WARNING) << "claimed identity has no TLD";
+    LOG(WARNING) << "claimed identity has no registered domain";
     return true;
   }
   if (black_.lookup(tld)) {
-    error_msg = "claimed identity has blacklisted TLD "s + tld;
-    out_() << "550 4.7.1 blacklisted TLD\r\n" << std::flush;
+    error_msg = "claimed identity has blacklisted registered domain "s + tld;
+    out_() << "550 4.7.1 blacklisted registered domain\r\n" << std::flush;
     return false;
   }
 
