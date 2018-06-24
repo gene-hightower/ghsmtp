@@ -947,7 +947,8 @@ struct action<optional_field> {
         // LOG(INFO) << in.string();
       }
       else {
-        auto err = "syntax error in: \""s + esc(in.string()) + "\""s;
+        auto const err
+            = fmt::format("syntax error in: \"{}\"", esc(in.string()));
         ctx.msg_errors.push_back(err);
         // LOG(ERROR) << err;
       }
@@ -1030,10 +1031,10 @@ struct action<sender> {
   static void apply(const Input& in, Ctx& ctx)
   {
     if (!ctx.sender.empty()) {
-      auto err = "multiple 'Sender:' headers, previous: "s
-                 + static_cast<std::string>(ctx.sender);
+      auto const err
+          = fmt::format("multiple 'Sender:' headers, previous: {}, this: {}",
+                        static_cast<std::string>(ctx.sender), in.string());
       ctx.msg_errors.push_back(err);
-      err += ", this: "s + in.string();
     }
     header(in, ctx);
     CHECK_EQ(ctx.mb_list.size(), 1);
