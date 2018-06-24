@@ -4,6 +4,9 @@
 
 #include <sys/stat.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 void Message::open(std::string_view fqdn,
                    std::streamsize max_size,
                    std::string_view folder)
@@ -36,8 +39,7 @@ void Message::open(std::string_view fqdn,
   }
 
   // Unique name, see: <https://cr.yp.to/proto/maildir.html>
-  auto uniq{std::ostringstream{}};
-  uniq << then_.sec() << '.' << 'R' << s_ << '.' << fqdn;
+  auto const uniq{fmt::format("{}.R{}.{}", then_.sec(), s_, fqdn)};
 
   tmpfn_ = maildir;
   newfn_ = maildir;
@@ -52,8 +54,8 @@ void Message::open(std::string_view fqdn,
   create_directories(tmpfn_, ec);
   create_directories(newfn_, ec);
 
-  tmpfn_ /= uniq.str();
-  newfn_ /= uniq.str();
+  tmpfn_ /= uniq;
+  newfn_ /= uniq;
 
   // open
   ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
