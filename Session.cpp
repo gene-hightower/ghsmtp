@@ -233,6 +233,9 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     }
     out_() << "\r\n";
 
+
+    out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
+    out_() << "250-8BITMIME\r\n";                      // RFC 6152
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
@@ -241,9 +244,6 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       // If we're not already TLS, offer TLS, à la RFC 3207
       out_() << "250-STARTTLS\r\n";
     }
-
-    out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
-    out_() << "250-8BITMIME\r\n";                      // RFC 6152
     out_() << "250-ENHANCEDSTATUSCODES\r\n";           // RFC 2034
     out_() << "250-PIPELINING\r\n";                    // RFC 2920
     out_() << "250-BINARYMIME\r\n"                     // RFC 3030
@@ -1182,7 +1182,7 @@ bool Session::verify_client_(Domain const& client_identity,
     LOG(INFO) << "claimed identity " << client_identity
               << " does NOT match any FCrDNS: ";
     for (auto const& client_fcrdns : client_fcrdns_) {
-      LOG(INFO) << client_fcrdns;
+      LOG(INFO) << "                 " << client_fcrdns;
     }
   }
 
