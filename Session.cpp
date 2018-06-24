@@ -334,7 +334,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
       fmt::format_to(params, "={}", value);
     }
   }
-  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.data();
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
 
   state_ = xact_step::rcpt;
 }
@@ -531,7 +531,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   if (status != SpamStatus::ham)
     return {SpamStatus::spam, "it's not ham"s};
 
-  return {status, std::string{reason.data(), reason.size()}};
+  return {status, fmt::to_string(reason)};
 }
 
 bool Session::msg_new()
@@ -1459,7 +1459,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
                    "Received-SPF: pass ({}: whitelisted) client-ip={}; "
                    "envelope-from={}; helo={};",
                    server_id_(), ip_addr, sender, client_identity_);
-    spf_received_ = std::string(received_spf.data(), received_spf.size());
+    spf_received_ = fmt::to_string(received_spf);
     return true;
   }
 
