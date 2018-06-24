@@ -2,6 +2,8 @@
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+
 using namespace std::string_literals;
 
 #include <tao/pegtl.hpp>
@@ -95,10 +97,7 @@ bool is_address_literal(std::string_view addr)
 std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
-  CHECK(is_address(addr));
-  auto ss{std::stringstream{}};
-  ss << lit_pfx << addr << lit_sfx;
-  return ss.str();
+  return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
 std::string reverse(std::string_view addr)
@@ -109,9 +108,6 @@ std::string reverse(std::string_view addr)
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   CHECK((parse<ipv4_address, action>(in, a)));
 
-  auto reverse{std::ostringstream{}};
-  reverse << a[3] << '.' << a[2] << '.' << a[1] << '.' << a[0] << '.';
-
-  return reverse.str();
+  return fmt::format("{}.{}.{}.{}.", a[3], a[2], a[1], a[0]);
 }
 } // namespace IP4

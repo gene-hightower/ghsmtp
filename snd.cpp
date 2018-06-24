@@ -102,6 +102,9 @@ using namespace std::string_literals;
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -1030,10 +1033,8 @@ auto create_eml(Domain const& sender,
   auto const date{Now{}};
   auto const pill{Pill{}};
 
-  auto mid_str{std::stringstream{}};
-  mid_str << '<' << date.sec() << '.' << pill << '@' << sender.utf8() << '>';
-  eml.add_hdr("Message-ID", mid_str.str());
-
+  auto mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill, sender.utf8());
+  eml.add_hdr("Message-ID", mid_str.c_str());
   eml.add_hdr("Date", date.c_str());
   eml.add_hdr("From", FLAGS_from_name + " <" + from + ">");
   eml.add_hdr("To", FLAGS_to_name + " <" + to + ">");
@@ -1101,6 +1102,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
       != auth->second.end()) {
     LOG(INFO) << "C: AUTH PLAIN";
     auto tok{std::stringstream{}};
+    tok.str().reserve(FLAGS_username.length() + FLAGS_password.length() + 2);
     tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
                    << std::flush;
@@ -1357,8 +1359,9 @@ bool snd(int fd_in,
 
   // Get the header as one big string
   std::stringstream hdr_stream;
+  hdr_stream.str().reserve(2 * 1024);
   hdr_stream << eml;
-  auto hdr_str = hdr_stream.str();
+  auto const& hdr_str = hdr_stream.str();
 
   // In the case of DATA style transfer, this total_size number is an
   // *estimate* only, as line endings may be translated or added
@@ -1378,6 +1381,7 @@ bool snd(int fd_in,
   }
 
   std::stringstream param_stream;
+  param_stream.str().reserve(100);
   if (FLAGS_huge_size && ext_size) {
     // Claim some huge size.
     param_stream << " SIZE=" << std::numeric_limits<std::streamsize>::max();
@@ -1470,6 +1474,7 @@ bool snd(int fd_in,
 
   if (ext_chunking) {
     std::stringstream bdat_stream;
+    bdat_stream.str().reserve(30);
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "C: " << bdat_stream.str();
 

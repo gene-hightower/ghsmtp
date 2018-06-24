@@ -13,6 +13,8 @@
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+
 using octet = uint8_t;
 
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
@@ -209,10 +211,9 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   CHECK(!domain.ascii().empty());
 
-  std::ostringstream tlsa;
-  tlsa << '_' << port << "._tcp." << domain.ascii();
+  auto tlsa = fmt::format("_{:d}._tcp.{}", port, domain.ascii());
 
-  DNS::Query q(res, DNS::RR_type::TLSA, tlsa.str());
+  DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
   if (q.nx_domain()) {
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;

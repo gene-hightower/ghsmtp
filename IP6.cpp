@@ -2,6 +2,8 @@
 
 #include "DNS.hpp"
 
+#include <fmt/format.h>
+
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 
@@ -80,9 +82,7 @@ bool is_address_literal(std::string_view addr)
 std::string to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
-  auto ss{std::stringstream{}};
-  ss << lit_pfx << addr << lit_sfx;
-  return ss.str();
+  return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
 std::string reverse(std::string_view addr_str)

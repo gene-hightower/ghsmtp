@@ -215,6 +215,7 @@ int main()
   }
 
   auto tok{std::stringstream{}};
+  tok.str().reserve(sizeof(test::username) + sizeof(test::password));
   tok << '\0' << test::username << '\0' << test::password;
   auto const init{Base64::enc(tok.str())};
 

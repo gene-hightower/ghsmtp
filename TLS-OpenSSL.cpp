@@ -11,6 +11,8 @@
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+
 #include "DNS.hpp"
 #include "POSIX.hpp"
 #include "osutil.hpp"
@@ -276,11 +278,9 @@ bool TLS::starttls_client(int fd_in,
         else if (gen->type == GEN_IPADD) {
           unsigned char* p = gen->d.ip->data;
           if (gen->d.ip->length == 4) {
-            std::stringstream ip;
-            ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.'
-               << unsigned(p[2]) << '.' << unsigned(p[3]);
-
-            LOG(INFO) << "alt name IP4 address " << ip.str();
+            auto const ip = fmt::format(fmt("{:d}.{:d}.{:d}.{:d}"), p[0], p[1],
+                                        p[2], p[3]);
+            LOG(INFO) << "alt name IP4 address " << ip;
           }
           else if (gen->d.ip->length == 16) {
             LOG(ERROR) << "IPv6 not implemented";
@@ -326,7 +326,8 @@ bool TLS::starttls_client(int fd_in,
                       TLSEXT_NAMETYPE_host_name,
                       const_cast<char*>(server_name)),
              1);
-    // LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " << server_name;
+    // LOG(INFO) << "SSL_set1_host and SSL_set_tlsext_host_name " <<
+    // server_name;
   }
 
   // No partial label wildcards
@@ -607,12 +608,10 @@ bool TLS::starttls_server(int fd_in,
       else if (gen->type == GEN_IPADD) {
         unsigned char* p = gen->d.ip->data;
         if (gen->d.ip->length == 4) {
-          std::stringstream ip;
-          ip << unsigned(p[0]) << '.' << unsigned(p[1]) << '.' << unsigned(p[2])
-             << '.' << unsigned(p[3]);
-
-          LOG(INFO) << "alt name IP4 address " << ip.str();
-          cn.emplace_back(ip.str());
+          auto const ip
+              = fmt::format(fmt("{:d}.{:d}.{:d}.{:d}"), p[0], p[1], p[2], p[3]);
+          LOG(INFO) << "alt name IP4 address " << ip;
+          cn.emplace_back(ip);
         }
         else if (gen->d.ip->length == 16) {
           // FIXME!
@@ -735,24 +734,19 @@ bool TLS::starttls_server(int fd_in,
 
 std::string TLS::info() const
 {
-  auto info{std::ostringstream{}};
-
   // same as SSL_CIPHER_get_version() below
   // info << SSL_get_version(ssl_);
 
   auto const c = SSL_get_current_cipher(ssl_);
   if (c) {
-    info << "version=" << SSL_CIPHER_get_version(c);
-    info << " cipher=" << SSL_CIPHER_get_name(c);
     int alg_bits;
     int bits = SSL_CIPHER_get_bits(c, &alg_bits);
-    info << " bits=" << bits << "/" << alg_bits;
-    if (verified_) {
-      info << " verified";
-    }
+    return fmt::format("version={} cipher={} bits={}/{}{}",
+                       SSL_CIPHER_get_version(c), SSL_CIPHER_get_name(c), bits,
+                       alg_bits, (verified_ ? " verified" : ""));
   }
 
-  return info.str();
+  return "";
 }
 
 std::streamsize TLS::io_tls_(char const* fnm,

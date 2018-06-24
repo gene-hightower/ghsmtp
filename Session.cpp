@@ -16,6 +16,9 @@
 #include "iequal.hpp"
 #include "osutil.hpp"
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
@@ -313,11 +316,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
-  std::ostringstream params;
-  for (auto const& [name, value] : parameters) {
-    params << " " << name << (value.empty() ? "" : "=") << value;
-  }
-
   std::string error_msg;
   if (!verify_sender_(reverse_path, error_msg)) {
     LOG(WARNING) << "verify sender failed: " << error_msg;
@@ -328,7 +326,15 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
-  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.str();
+
+  fmt::memory_buffer params;
+  for (auto const& [name, value] : parameters) {
+    fmt::format_to(params, " {}", name);
+    if (!value.empty()) {
+      fmt::format_to(params, "={}", value);
+    }
+  }
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params.data();
 
   state_ = xact_step::rcpt;
 }
@@ -397,7 +403,10 @@ std::string Session::added_headers_(Message const& msg)
       return sock_.tls() ? "SMTPS" : "SMTP";
   }()};
 
+  std::string const tls_info{sock_.tls_info()};
+
   std::ostringstream headers;
+  headers.str().reserve(500);
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
 
   // STD 3 section 5.2.8
@@ -433,7 +442,6 @@ std::string Session::added_headers_(Message const& msg)
     }
   }
 
-  std::string const tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     headers << "\r\n" << indent << '(' << tls_info << ')';
   }
@@ -467,80 +475,63 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   }
 
   auto status{SpamStatus::spam};
-  std::ostringstream reason;
+  fmt::memory_buffer reason;
 
   // Anything enciphered tastes a lot like ham.
   if (sock_.tls()) {
-    reason << "they used TLS";
+    fmt::format_to(reason, "they used TLS");
     status = SpamStatus::ham;
   }
 
   if (spf_result_ == SPF::Result::PASS) {
     auto const dom{Domain{spf_request_.get_sender_dom()}};
     if (lookup_domain(white_, dom)) {
-      if (!reason.str().empty()) {
-        reason << ", and ";
+      if (status == SpamStatus::ham) {
+        fmt::format_to(reason, ", and ");
       }
-      reason << "SPF sender domain (" << dom.utf8() << ") is whitelisted";
+      fmt::format_to(reason, "SPF sender domain ({}) is whitelisted",
+                     dom.utf8());
       status = SpamStatus::ham;
     }
     else {
       auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
       if (tld_dom && white_.lookup(tld_dom)) {
-        if (!reason.str().empty()) {
-          reason << ", and ";
+        if (status == SpamStatus::ham) {
+          fmt::format_to(reason, ", and ");
         }
-        reason << "SPF sender registered domain (" << tld_dom
-               << ") is whitelisted";
+        fmt::format_to(reason,
+                       "SPF sender registered domain ({}) is whitelisted",
+                       tld_dom);
         status = SpamStatus::ham;
       }
     }
   }
 
   if (fcrdns_whitelisted_) {
-    if (!reason.str().empty()) {
-      reason << ", and ";
+    if (status == SpamStatus::ham) {
+      fmt::format_to(reason, ", and ");
     }
-    reason << "FCrDNS is whitelisted";
+    fmt::format_to(reason, "FCrDNS is whitelisted");
     status = SpamStatus::ham;
   }
-
-  auto rp_match = false;
 
   auto rp_dom = reverse_path_.domain();
   if (!client_fcrdns_.empty()) {
     if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
         != client_fcrdns_.end()) {
-      if (!reason.str().empty()) {
-        reason << ", and ";
+      if (status == SpamStatus::ham) {
+        fmt::format_to(reason, ", and ");
       }
-      reason << "reverse_path (" << rp_dom << ") matches FCrDNS name";
+      fmt::format_to(reason, "reverse_path domain ({}) matches FCrDNS name",
+                     rp_dom);
       status = SpamStatus::ham;
-      rp_match = true;
-    }
-  }
-
-  if (!rp_match) {
-    auto const rp_tld{tld_db_.get_registered_domain(rp_dom.ascii().c_str())};
-    for (auto client_fcrdns : client_fcrdns_) {
-      auto const client_tld{
-          tld_db_.get_registered_domain(client_fcrdns.ascii().c_str())};
-      if (Domain::match(rp_tld, client_tld)) {
-        if (!reason.str().empty()) {
-          reason << ", and ";
-        }
-        reason << "reverse_path TLD (" << rp_tld
-               << ") matches TLD of FCrDNS name";
-        status = SpamStatus::ham;
-        break;
-      }
     }
   }
 
   if (status != SpamStatus::ham)
     return {SpamStatus::spam, "it's not ham"s};
 
-  return {status, reason.str()};
+  return {status, std::string{reason.data(), reason.size()}};
 }
 
 bool Session::msg_new()
@@ -567,11 +558,11 @@ bool Session::msg_new()
                (status == SpamStatus::spam) ? ".Junk" : "");
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
-    auto spam_status{std::ostringstream{}};
-    spam_status << "X-Spam-Status: "
-                << ((status == SpamStatus::spam) ? "Yes, " : "No, ") << reason
-                << "\r\n";
-    msg_->write(spam_status.str());
+
+    fmt::memory_buffer spam_status;
+    fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
+                   ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
+    msg_->write(spam_status.data(), spam_status.size());
     return true;
   }
   catch (std::system_error const& e) {
@@ -1435,7 +1426,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
 }
 
 // check sender domain on dynamic URI black lists
-bool Session::verify_sender_domain_uribl_(std::string const& sender,
+bool Session::verify_sender_domain_uribl_(std::string_view sender,
                                           std::string& error_msg)
 {
   if (!sock_.has_peername()) // short circuit
@@ -1444,11 +1435,10 @@ bool Session::verify_sender_domain_uribl_(std::string const& sender,
   std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
                std::default_random_engine());
   for (auto uribl : Config::uribls) {
-    if (DNS::has_record(res_, DNS::RR_type::A, (sender + ".") + uribl)) {
-      error_msg = sender + " blocked on advice of "s + uribl;
-      out_() << "550 5.7.1 sender (" << sender << ") blocked on advice of "
-             << uribl << "\r\n"
-             << std::flush;
+    auto const lookup = fmt::format("{}.{}", sender, uribl);
+    if (DNS::has_record(res_, DNS::RR_type::A, lookup)) {
+      error_msg = fmt::format("{} blocked on advice of {}", sender, uribl);
+      out_() << "550 5.7.1 sender " << error_msg << "\r\n" << std::flush;
       return false;
     }
   }
@@ -1464,12 +1454,12 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    std::ostringstream received_spf;
-    received_spf << "Received-SPF: pass (" << server_id_() << ": " << ip_addr
-                 << " is whitelisted.) client-ip=" << ip_addr
-                 << "; envelope-from=" << sender
-                 << "; helo=" << client_identity_ << ";";
-    spf_received_ = received_spf.str();
+    fmt::memory_buffer received_spf;
+    fmt::format_to(received_spf,
+                   "Received-SPF: pass ({}: whitelisted) client-ip={}; "
+                   "envelope-from={}; helo={};",
+                   server_id_(), ip_addr, sender, client_identity_);
+    spf_received_ = std::string(received_spf.data(), received_spf.size());
     return true;
   }
 

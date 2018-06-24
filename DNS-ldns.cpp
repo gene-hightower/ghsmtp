@@ -12,6 +12,8 @@
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+
 namespace DNS {
 
 std::string rr_name_str(ldns_rdf const* rdf)
@@ -31,30 +33,31 @@ std::string rr_name_str(ldns_rdf const* rdf)
   unsigned char src_pos = 0;
   unsigned char len = data[src_pos];
 
-  std::ostringstream str;
+  std::string str;
+  str.reserve(64);
   while ((len > 0) && (src_pos < sz)) {
     src_pos++;
     for (unsigned char i = 0; i < len; ++i) {
       unsigned char c = data[src_pos];
       if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
-        str << '\\' << c;
+        str += '\\';
+        str += c;
       }
       else if (!(isascii(c) && isgraph(c))) {
-        str << "0x" << std::hex << std::setfill('0') << std::setw(2)
-            << static_cast<unsigned>(c);
+        str += fmt::format("0x{:02x}", static_cast<unsigned char>(c));
       }
       else {
-        str << c;
+        str += c;
       }
       src_pos++;
     }
     if (src_pos < sz) {
-      str << '.';
+      str += '.';
     }
     len = data[src_pos];
   }
 
-  return str.str();
+  return str;
 }
 
 std::string rr_str(ldns_rdf const* rdf)

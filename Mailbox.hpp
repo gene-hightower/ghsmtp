@@ -26,15 +26,21 @@ public:
   std::string const& local_part() const { return local_part_; }
   Domain const& domain() const { return domain_; }
 
-  bool empty() const { return local_part().empty() && domain().empty(); }
+  size_t length() const
+  {
+    return local_part_.length()
+           + (domain().utf8().length() ? (domain().utf8().length() + 1) : 0);
+  }
+  bool empty() const { return length() == 0; }
 
   operator std::string() const
   {
     std::string s;
-    s.reserve(local_part_.length() + domain().utf8().length() + 1);
+    s.reserve(length());
     s = local_part();
     if (!domain().empty()) {
-      s += "@" + domain().utf8();
+      s += '@';
+      s += domain().utf8();
     }
     return s;
   }

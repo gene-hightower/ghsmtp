@@ -1,5 +1,7 @@
 #include "esc.hpp"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -50,10 +52,7 @@ std::string esc(std::string_view str, esc_line_option line_option)
         ret += c;
       }
       else {
-        std::stringstream ss;
-        ss << "\\x" << std::hex << std::setw(2) << std::setfill('0')
-           << static_cast<unsigned>(static_cast<unsigned char>(c));
-        ret += ss.str();
+        ret += fmt::format("\\x{:02x}", static_cast<unsigned char>(c));
       }
     }
   }
