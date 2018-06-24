@@ -28,13 +28,13 @@ Sock::Sock(int fd_in,
       PCHECK(inet_ntop(AF_INET, &us_addr_.addr_in.sin_addr, us_addr_str_,
                        sizeof us_addr_str_)
              != nullptr);
-      us_address_literal_ = "["s + us_addr_str_ + "]"s;
+      us_address_literal_ = IP4::to_address_literal(us_addr_str_);
       break;
     case sizeof(sockaddr_in6):
       PCHECK(inet_ntop(AF_INET6, &us_addr_.addr_in6.sin6_addr, us_addr_str_,
                        sizeof us_addr_str_)
              != nullptr);
-      us_address_literal_ = "[IPv6:"s + us_addr_str_ + "]"s;
+      us_address_literal_ = IP6::to_address_literal(us_addr_str_);
       break;
     default:
       LOG(FATAL) << "bogus address length (" << us_addr_len_
