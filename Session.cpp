@@ -233,7 +233,6 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     }
     out_() << "\r\n";
 
-
     out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
     out_() << "250-8BITMIME\r\n";                      // RFC 6152
     if (sock_.tls()) {
@@ -244,11 +243,11 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       // If we're not already TLS, offer TLS, à la RFC 3207
       out_() << "250-STARTTLS\r\n";
     }
-    out_() << "250-ENHANCEDSTATUSCODES\r\n";           // RFC 2034
-    out_() << "250-PIPELINING\r\n";                    // RFC 2920
-    out_() << "250-BINARYMIME\r\n"                     // RFC 3030
-              "250-CHUNKING\r\n";                      // same
-    out_() << "250 SMTPUTF8\r\n" << std::flush;        // RFC 6531
+    out_() << "250-ENHANCEDSTATUSCODES\r\n";    // RFC 2034
+    out_() << "250-PIPELINING\r\n";             // RFC 2920
+    out_() << "250-BINARYMIME\r\n"              // RFC 3030
+              "250-CHUNKING\r\n";               // same
+    out_() << "250 SMTPUTF8\r\n" << std::flush; // RFC 6531
   }
 
   if (sock_.has_peername()) {
@@ -1066,19 +1065,12 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   client_fcrdns_.clear();
 
-  if (sock_.them_address_literal() == IP4::loopback_literal) {
-    LOG(INFO) << "IP4 loopback address whitelisted";
+  if ((sock_.them_address_literal() == IP4::loopback_literal)
+      || (sock_.them_address_literal() == IP6::loopback_literal)) {
+    LOG(INFO) << "loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
-    client_ = "localhost "s + IP4::loopback_literal;
-    return true;
-  }
-
-  if (sock_.them_address_literal() == IP6::loopback_literal) {
-    LOG(INFO) << "IP6 loopback address whitelisted";
-    ip_whitelisted_ = true;
-    client_fcrdns_.emplace_back("localhost");
-    client_ = "localhost "s + IP6::loopback_literal;
+    client_ = "localhost "s + sock_.them_address_literal();
     return true;
   }
 
@@ -1088,9 +1080,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
   }
 
   if (!client_fcrdns_.empty()) {
-    client_
-        = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
-
+    client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
+                          sock_.them_address_literal());
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.lookup(client_fcrdns.ascii())) {
@@ -1129,7 +1120,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     }
   }
   else {
-    client_ = "unknown "s + sock_.them_address_literal();
+    client_ = fmt::format("unknown {}", sock_.them_address_literal());
   }
 
   if (IP4::is_address(sock_.them_c_str())
@@ -1176,7 +1167,7 @@ bool Session::verify_client_(Domain const& client_identity,
         std::rotate(client_fcrdns_.begin(), id, id + 1);
       }
       client_
-        = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
+          = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
       return true;
     }
     LOG(INFO) << "claimed identity " << client_identity
