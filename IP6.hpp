@@ -23,11 +23,11 @@ constexpr auto lit_add_sz{lit_pfx_sz + lit_sfx_sz};
 
 constexpr auto loopback_literal{"[IPv6:::1]"};
 
-std::string_view constexpr as_address(std::string_view addr)
+std::string_view constexpr as_address(std::string_view address_literal)
 {
-  // CHECK(is_address_literal(addr));
-  return std::string_view(addr.begin() + lit_pfx_sz,
-                          addr.length() - lit_add_sz);
+  // CHECK(is_address_literal(address_literal));
+  return std::string_view(address_literal.begin() + lit_pfx_sz,
+                          address_literal.length() - lit_add_sz);
 }
 
 } // namespace IP6
