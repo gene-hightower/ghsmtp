@@ -423,6 +423,7 @@ bool TLS::starttls_client(int fd_in,
     char const* const peername = SSL_get0_peername(ssl_);
     if (peername != nullptr) {
       // Name checks were in scope and matched the peername
+      verified_peername_ = peername;
       LOG(INFO) << "verified peername: " << peername;
     }
     else {
@@ -698,6 +699,7 @@ bool TLS::starttls_server(int fd_in,
       char const* const peername = SSL_get0_peername(ssl_);
       if (peername != nullptr) {
         // name checks were in scope and matched the peername
+        verified_peername_ = peername;
         LOG(INFO) << "verified peername: " << peername;
       }
       else {

@@ -53,7 +53,8 @@ public:
 
   std::string info() const;
 
-  bool verified() const { return verified_; };
+  std::string const& verified_peername() const { return verified_peername_; }
+  bool verified() const { return verified_; }
 
   struct per_cert_ctx {
     explicit per_cert_ctx(SSL_CTX* ctx_, std::vector<Domain> cn_)
@@ -83,6 +84,7 @@ private:
 
   std::function<void(void)> read_hook_;
 
+  std::string verified_peername_;
   bool verified_{false};
 };
 
