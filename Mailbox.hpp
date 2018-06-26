@@ -26,24 +26,41 @@ public:
   std::string const& local_part() const { return local_part_; }
   Domain const& domain() const { return domain_; }
 
-  size_t length() const
+  enum class encoding : bool { ascii, utf8 };
+
+  size_t length(encoding enc = encoding::utf8) const
   {
-    return local_part_.length()
-           + (domain().utf8().length() ? (domain().utf8().length() + 1) : 0);
+    if (enc == encoding::ascii) {
+      for (auto ch : local_part_) {
+        if (!isascii(static_cast<unsigned char>(ch))) {
+          using namespace std::string_literals;
+          throw std::range_error("non ascii chars in local part "s
+                                 + local_part_);
+        }
+      }
+    }
+    auto const& d
+        = (enc == encoding::utf8) ? domain().utf8() : domain().ascii();
+    return local_part_.length() + (d.length() ? (d.length() + 1) : 0);
   }
+
   bool empty() const { return length() == 0; }
 
-  operator std::string() const
+  std::string as_string(encoding enc = encoding::utf8) const
   {
     std::string s;
-    s.reserve(length());
+    s.reserve(length(enc));
     s = local_part();
-    if (!domain().empty()) {
+    auto const& d
+        = (enc == encoding::utf8) ? domain().utf8() : domain().ascii();
+    if (!d.empty()) {
       s += '@';
-      s += domain().utf8();
+      s += d;
     }
     return s;
   }
+
+  operator std::string() const { return as_string(encoding::utf8); }
 
 private:
   std::string local_part_;
