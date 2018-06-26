@@ -49,11 +49,14 @@ DEFINE_string(mx_host, "", "FQDN of receiving node");
 DEFINE_string(service, "smtp-test", "service name");
 DEFINE_string(client_id, "", "client name (ID) for EHLO/HELO");
 
-DEFINE_string(from, "", "RFC5321 MAIL FROM address");
-DEFINE_string(from_name, "\"Mr. Test It\"", "RFC5322 From: name");
+DEFINE_string(from, "", "RFC5322 From: address");
+DEFINE_string(from_name, "", "RFC5322 From: name");
 
-DEFINE_string(to, "", "RFC5321 RCPT TO address");
-DEFINE_string(to_name, "\"Mr. Test It\"", "RFC5322 To: name");
+DEFINE_string(to, "", "RFC5322 To: address");
+DEFINE_string(to_name, "", "RFC5322 To: name");
+
+DEFINE_string(smtp_from, "", "RFC5321 MAIL FROM address");
+DEFINE_string(smtp_to, "", "RFC5321 RCPT TO address");
 
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
 DEFINE_string(keywords, "", "RFC5322 Keywords: header");
@@ -68,6 +71,7 @@ DEFINE_string(password, "", "AUTH password");
 
 DEFINE_bool(use_dkim, true, "sign with DKIM");
 DEFINE_string(selector, "ghsmtp", "DKIM selector");
+DEFINE_string(dkim_key_file, "", "DKIM key file");
 
 #include "Base64.hpp"
 #include "DKIM.hpp"
@@ -790,6 +794,8 @@ std::string connectable_host(std::string_view dom)
 
 static bool validate_name(const char* flagname, std::string const& value)
 {
+  if (value.empty()) // empty name needs to validate, but
+    return true;     // will not be used
   memory_input<> name_in(value.c_str(), "name");
   if (!parse<RFC5322::display_name_only, RFC5322::inaction>(name_in)) {
     LOG(ERROR) << "bad name syntax " << value;
@@ -801,8 +807,37 @@ static bool validate_name(const char* flagname, std::string const& value)
 DEFINE_validator(from_name, &validate_name);
 DEFINE_validator(to_name, &validate_name);
 
+static bool validate_address(const char* flagname, std::string const& value)
+{
+  if (value.empty()) // empty name needs to validate, but
+    return true;     // will not be used
+  memory_input<> name_in(value.c_str(), "name");
+  if (!parse<RFC5322::addr_spec_only, RFC5322::inaction>(name_in)) {
+    LOG(ERROR) << "bad address syntax " << value;
+    return false;
+  }
+  return true;
+}
+
+DEFINE_validator(from, &validate_address);
+DEFINE_validator(to, &validate_address);
+
+DEFINE_validator(smtp_from, &validate_address);
+DEFINE_validator(smtp_to, &validate_address);
+
 void selftest()
 {
+  CHECK(validate_name("selftest", ""s));
+  CHECK(validate_name("selftest", "Elmer J Fudd"s));
+  CHECK(validate_name("selftest", "\"Elmer J. Fudd\""s));
+  CHECK(validate_name("selftest", "Elmer! J! Fudd!"s));
+
+  CHECK(validate_address("selftest", "foo@digilicious.com"s));
+  CHECK(validate_address("selftest", "\"foo\"@digilicious.com"s));
+  CHECK(validate_address(
+      "selftest",
+      "\"very.(),:;<>[]\\\".VERY.\\\"very@\\\\ \\\"very\\\".unusual\"@digilicious.com"s));
+
   auto const read_hook{[]() {}};
 
   const char* greet_list[]{
@@ -1023,7 +1058,34 @@ auto parse_mailboxes()
   auto local_to{memory_input<>{to_mbx.local_part(), "to.local"}};
   FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_to);
 
-  return std::make_tuple(from_mbx, to_mbx);
+  auto smtp_from_mbx{Mailbox{}};
+  auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "from"}};
+  if (!FLAGS_smtp_from.empty()) {
+    if (!parse<RFC5322::addr_spec_only, RFC5322::action>(smtp_from_in,
+                                                         smtp_from_mbx)) {
+      LOG(FATAL) << "bad MAIL FROM: address syntax <" << FLAGS_smtp_from << ">";
+    }
+    LOG(INFO) << " smtp_from_mbx == " << smtp_from_mbx;
+    auto local_smtp_from{
+        memory_input<>{smtp_from_mbx.local_part(), "SMTP.from.local"}};
+    FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_from);
+  }
+
+  auto smtp_to_mbx{Mailbox{}};
+  auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "to"}};
+  if (!FLAGS_smtp_to.empty()) {
+    if (!parse<RFC5322::addr_spec_only, RFC5322::action>(smtp_to_in,
+                                                         smtp_to_mbx)) {
+      LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to << ">";
+    }
+    LOG(INFO) << " smtp_to_mbx == " << smtp_to_mbx;
+
+    auto local_smtp_to{
+        memory_input<>{smtp_to_mbx.local_part(), "SMTP.to.local"}};
+    FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to);
+  }
+
+  return std::make_tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
 }
 
 auto create_eml(Domain const& sender,
@@ -1039,8 +1101,17 @@ auto create_eml(Domain const& sender,
   auto mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill, sender.utf8());
   eml.add_hdr("Message-ID", mid_str.c_str());
   eml.add_hdr("Date", date.c_str());
-  eml.add_hdr("From", FLAGS_from_name + " <" + from + ">");
-  eml.add_hdr("To", FLAGS_to_name + " <" + to + ">");
+
+  if (!FLAGS_from_name.empty())
+    eml.add_hdr("From", fmt::format("{} <{}>", FLAGS_from_name, from));
+  else
+    eml.add_hdr("From", from);
+
+  if (!FLAGS_to_name.empty())
+    eml.add_hdr("To", fmt::format("{} <{}>", FLAGS_to_name, to));
+  else
+    eml.add_hdr("To", to);
+
   eml.add_hdr("Subject", FLAGS_subject);
 
   if (!FLAGS_keywords.empty())
@@ -1070,7 +1141,8 @@ void sign_eml(Eml& eml,
                              ? OpenDKIM::Sign::body_type::binary
                              : OpenDKIM::Sign::body_type::text;
 
-  auto key_file = FLAGS_selector + ".private";
+  auto key_file = FLAGS_dkim_key_file.empty() ? (FLAGS_selector + ".private")
+                                              : FLAGS_dkim_key_file;
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
@@ -1199,6 +1271,8 @@ bool snd(int fd_in,
          bool enforce_dane,
          Mailbox const& from_mbx,
          Mailbox const& to_mbx,
+         Mailbox const& smtp_from_mbx,
+         Mailbox const& smtp_to_mbx,
          std::vector<content> const& bodies)
 {
   auto constexpr read_hook{[]() {}};
@@ -1342,17 +1416,13 @@ bool snd(int fd_in,
 
   in.discard();
 
-  auto from{static_cast<std::string>(from_mbx)};
-  if (!ext_smtputf8) {
-    from = from_mbx.local_part()
-           + (from_mbx.domain().empty() ? ""
-                                        : ("@" + from_mbx.domain().ascii()));
-  }
-  auto to{static_cast<std::string>(to_mbx)};
-  if (!ext_smtputf8) {
-    to = to_mbx.local_part()
-         + (to_mbx.domain().empty() ? "" : ("@" + to_mbx.domain().ascii()));
-  }
+  auto enc = FLAGS_force_smtputf8 ? Mailbox::encoding::utf8
+                                  : Mailbox::encoding::ascii;
+
+  std::string from = smtp_from_mbx.empty() ? from_mbx.as_string(enc)
+                                           : smtp_from_mbx.as_string(enc);
+  std::string to = smtp_to_mbx.empty() ? to_mbx.as_string(enc)
+                                       : smtp_to_mbx.as_string(enc);
 
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
@@ -1631,7 +1701,7 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto&& [from_mbx, to_mbx] = parse_mailboxes();
+  auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx] = parse_mailboxes();
 
   if (to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
     LOG(ERROR) << "don't know who to send this mail to";
@@ -1645,7 +1715,7 @@ int main(int argc, char* argv[])
 
   if (FLAGS_pipe) {
     return snd(STDIN_FILENO, STDOUT_FILENO, sender, to_mbx.domain(), tlsa_rrs,
-               false, from_mbx, to_mbx, bodies)
+               false, from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
@@ -1729,7 +1799,7 @@ int main(int argc, char* argv[])
 
     if (to_mbx.domain() == receiver) {
       if (snd(fd, fd, sender, receiver, tlsa_rrs, enforce_dane, from_mbx,
-              to_mbx, bodies)) {
+              to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }
@@ -1737,7 +1807,7 @@ int main(int argc, char* argv[])
       auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
       tlsa_rrs_mx.insert(tlsa_rrs_mx.end(), tlsa_rrs.begin(), tlsa_rrs.end());
       if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
-              to_mbx, bodies)) {
+              to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }
