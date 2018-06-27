@@ -1038,7 +1038,7 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 
   // […] then the sender-SMTP MUST randomize them to spread the load
   // across multiple mail exchangers for a specific organization.
-  std::shuffle(mxs.begin(), mxs.end(), std::default_random_engine());
+  std::shuffle(mxs.begin(), mxs.end(), std::random_device());
   std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {

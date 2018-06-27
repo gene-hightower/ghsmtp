@@ -28,13 +28,14 @@ using namespace std::string_literals;
 
 namespace Config {
 char const* rbls[]{
-    "zen.spamhaus.org",
     "b.barracudacentral.org",
+    "psbl.surriel.com",
+    "zen.spamhaus.org",
 };
 
 char const* uribls[]{
-    "dbl.spamhaus.org",
     "black.uribl.com",
+    "dbl.spamhaus.org",
     "multi.surbl.org",
 };
 
@@ -1140,7 +1141,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
-                 std::default_random_engine());
+                 std::random_device());
     for (auto rbl : Config::rbls) {
       if (has_record(res_, RR_type::A, reversed + rbl)) {
         error_msg = "blocked on advice from "s + rbl;
@@ -1411,7 +1412,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
     return true;
 
   std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
-               std::default_random_engine());
+               std::random_device());
   for (auto uribl : Config::uribls) {
     auto const lookup = fmt::format("{}.{}", sender, uribl);
     if (DNS::has_record(res_, DNS::RR_type::A, lookup)) {

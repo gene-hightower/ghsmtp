@@ -42,7 +42,7 @@ int main(int argc, char const* argv[])
   auto mxes = res.get_records(DNS::RR_type::MX, "anyold.host");
 
   // RFC 5321 section 5.1 “Locating the Target Host”
-  std::shuffle(mxes.begin(), mxes.end(), std::default_random_engine());
+  std::shuffle(mxes.begin(), mxes.end(), std::random_device());
   std::sort(mxes.begin(), mxes.end(), [](DNS::RR const& a, DNS::RR const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {
