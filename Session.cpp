@@ -1217,10 +1217,10 @@ bool Session::verify_client_(Domain const& client_identity,
   if (!tld) {
     // Sometimes we may want to look at mail from misconfigured
     // sending systems.
-    LOG(WARNING) << "claimed identity has no registered domain";
-    return true;
+    // LOG(WARNING) << "claimed identity has no registered domain";
+    // return true;
   }
-  if (black_.lookup(tld)) {
+  else if (black_.lookup(tld)) {
     error_msg = "claimed identity has blacklisted registered domain "s + tld;
     out_() << "550 4.7.1 blacklisted registered domain\r\n" << std::flush;
     return false;
