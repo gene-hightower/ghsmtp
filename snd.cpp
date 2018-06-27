@@ -953,6 +953,19 @@ bool is_localhost(DNS::RR const& rr)
   return false;
 }
 
+bool starts_with(std::string_view str, std::string_view prefix)
+{
+  if (str.size() >= prefix.size())
+    if (str.compare(0, prefix.size(), prefix) == 0)
+      return true;
+  return false;
+}
+
+bool not_sts_rec(std::string const& sts_rec)
+{
+  return !starts_with(sts_rec, "v=STSv1");
+}
+
 std::vector<Domain>
 get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 {
@@ -974,6 +987,20 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   // the CNAME and MX records all together.
 
   auto const& domain = to_mbx.domain().ascii();
+
+  auto q_sts{DNS::Query{res, DNS::RR_type::TXT, "_mta-sts."s + domain}};
+  if (q_sts.has_record()) {
+    auto sts_records = q_sts.get_strings();
+    sts_records.erase(
+        std::remove_if(sts_records.begin(), sts_records.end(), not_sts_rec),
+        sts_records.end());
+    if (sts_records.size() == 1) {
+      LOG(INFO) << "### This domain implements MTA-STS ###";
+    }
+  }
+  else {
+    LOG(INFO) << "MTA-STS record not found for domain " << domain;
+  }
 
   auto q{DNS::Query{res, DNS::RR_type::MX, domain}};
   if (q.authentic_data()) {
@@ -1657,11 +1684,14 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
   if (q.nx_domain()) {
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
   }
+  else {
+    LOG(INFO) << "TLSA data found for " << domain << ':' << port;
+  }
 
   auto tlsa_rrs = q.get_records();
 
   if (q.bogus_or_indeterminate()) {
-    LOG(WARNING) << "TLSA data bogus_or_indeterminate";
+    LOG(WARNING) << "TLSA data is bogus or indeterminate";
     tlsa_rrs.clear();
   }
 
