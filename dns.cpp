@@ -92,7 +92,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   for (auto uribl : uribls) {
     auto const lookup = fmt::format("{}.{}", dom.ascii(), uribl);
     if (DNS::has_record(res, DNS::RR_type::A, lookup)) {
-      std::cout << dom << " blocked on advice of " << uribl << '\n';
+      std::cout << dom << " blocked on advice from " << uribl << '\n';
     }
   }
 }
