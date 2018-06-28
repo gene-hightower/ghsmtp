@@ -32,7 +32,7 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
 void do_addr(DNS::Resolver& res, char const* a)
 {
   auto const names = DNS::fcrdns(res, a);
-  for (auto name : names) {
+  for (auto const& name : names) {
     std::cout << name << '\n';
   }
   if (names.empty()) {
@@ -40,7 +40,7 @@ void do_addr(DNS::Resolver& res, char const* a)
       auto const reversed{IP4::reverse(a)};
       auto const ptrs
           = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
-      for (auto ptr : ptrs) {
+      for (auto const& ptr : ptrs) {
         std::cout << "is a PTR to " << ptr << '\n';
       }
       check_dnsrbl(res, a);
@@ -49,7 +49,7 @@ void do_addr(DNS::Resolver& res, char const* a)
       auto const reversed{IP6::reverse(a)};
       auto const ptrs
           = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
-      for (auto ptr : ptrs) {
+      for (auto const& ptr : ptrs) {
         std::cout << "is a PTR to " << ptr << '\n';
       }
     }
@@ -61,7 +61,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto const dom{Domain{dom_cp}};
 
   auto const as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
-  for (auto a : as) {
+  for (auto const& a : as) {
     std::cout << a;
     auto const names = DNS::fcrdns(res, a);
     std::vector<Domain> doms;
@@ -79,7 +79,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   }
 
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
-  for (auto aaaa : aaaas) {
+  for (auto const& aaaa : aaaas) {
     std::cout << aaaa << '\n';
   }
 
