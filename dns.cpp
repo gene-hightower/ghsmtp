@@ -8,13 +8,16 @@
 
 #include <experimental/iterator>
 
+#include <fmt/format.h>
+
 using namespace std::string_literals;
 
 void check_dnsrbl(DNS::Resolver& res, char const* a)
 {
   char const* rbls[]{
-      "zen.spamhaus.org",
       "b.barracudacentral.org",
+      "psbl.surriel.com",
+      "zen.spamhaus.org",
   };
 
   auto const reversed{IP4::reverse(a)};
@@ -78,6 +81,19 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
   for (auto aaaa : aaaas) {
     std::cout << aaaa << '\n';
+  }
+
+  char const* uribls[]{
+      "black.uribl.com",
+      "dbl.spamhaus.org",
+      "multi.surbl.org",
+  };
+
+  for (auto uribl : uribls) {
+    auto const lookup = fmt::format("{}.{}", dom.ascii(), uribl);
+    if (DNS::has_record(res, DNS::RR_type::A, lookup)) {
+      std::cout << dom << " blocked on advice of " << uribl << '\n';
+    }
   }
 }
 
