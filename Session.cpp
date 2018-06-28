@@ -34,6 +34,7 @@ char const* rbls[]{
 };
 
 char const* uribls[]{
+    "black.uribl.com",
     "dbl.spamhaus.org",
     "multi.surbl.org",
 };
