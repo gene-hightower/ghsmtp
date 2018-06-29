@@ -14,7 +14,7 @@
 
 #include <fmt/format.h>
 
-namespace DNS {
+namespace DNS_ldns {
 
 std::string rr_name_str(ldns_rdf const* rdf)
 {
@@ -44,7 +44,7 @@ std::string rr_name_str(ldns_rdf const* rdf)
         str += c;
       }
       else if (!(isascii(c) && isgraph(c))) {
-        str += fmt::format("0x{:02x}", static_cast<unsigned char>(c));
+        str += fmt::format("0x{:02x}", c);
       }
       else {
         str += c;
@@ -380,4 +380,4 @@ std::vector<std::string> Resolver::get_strings(RR_type typ,
   return rrlst.get_strings();
 }
 
-} // namespace DNS
+} // namespace DNS_ldns

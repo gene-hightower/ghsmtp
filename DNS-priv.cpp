@@ -1,5 +1,6 @@
 #include "DNS-priv.hpp"
 
+#include "DNS-iostream.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "Sock.hpp"
@@ -112,7 +113,10 @@ using octet = unsigned char;
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
 octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
-uint16_t constexpr as_u16(octet hi, octet lo) { return (uint16_t(hi) << 8) + lo; }
+uint16_t constexpr as_u16(octet hi, octet lo)
+{
+  return (uint16_t(hi) << 8) + lo;
+}
 
 /*
                                            1  1  1  1  1  1

@@ -39,6 +39,8 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
               return a < b;
             });
 
+  std::unique(fcrdns.begin(), fcrdns.end());
+
   return fcrdns;
 }
 

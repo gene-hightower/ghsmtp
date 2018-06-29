@@ -1,5 +1,7 @@
 #include "DNS-rrs.hpp"
 
+#include "DNS-iostream.hpp"
+
 #include <cstring>
 
 #include <arpa/inet.h>

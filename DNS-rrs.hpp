@@ -2,7 +2,7 @@
 #define DNS_RRS_DOT_HPP
 
 #include <cstddef>
-#include <iostream>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <variant>
@@ -158,6 +158,8 @@ public:
   char const* c_str() const { return str_; }
   static RR_type rr_type() { return RR_type::A; }
 
+  bool operator==(RR_A const& rhs) const { return strcmp(str_, rhs.str_) == 0; }
+
 private:
   sockaddr_in addr_;
   char str_[INET_ADDRSTRLEN];
@@ -176,6 +178,8 @@ public:
   char const* c_str() const { return str().c_str(); }
   static RR_type rr_type() { return RR_type::CNAME; }
 
+  bool operator==(RR_CNAME const& rhs) const { return str() == rhs.str(); }
+
 private:
   std::string cname_;
 };
@@ -193,6 +197,8 @@ public:
   std::string const& str() const { return ptrdname_; }
   char const* c_str() const { return str().c_str(); }
   static RR_type rr_type() { return RR_type::PTR; }
+
+  bool operator==(RR_PTR const& rhs) const { return str() == rhs.str(); }
 
 private:
   std::string ptrdname_;
@@ -213,6 +219,11 @@ public:
 
   static RR_type rr_type() { return RR_type::MX; }
 
+  bool operator==(RR_MX const& rhs) const
+  {
+    return (preference() == rhs.preference()) && (exchange() == rhs.exchange());
+  }
+
 private:
   std::string exchange_;
   uint16_t preference_;
@@ -231,6 +242,8 @@ public:
   std::string const& str() const { return txt_data_; }
   static RR_type rr_type() { return RR_type::TXT; }
 
+  bool operator==(RR_TXT const& rhs) const { return str() == rhs.str(); }
+
 private:
   std::string txt_data_;
 };
@@ -244,6 +257,11 @@ public:
   sockaddr_in6 const& addr() const { return addr_; }
   char const* c_str() const { return str_; }
   static RR_type rr_type() { return RR_type::AAAA; }
+
+  bool operator==(RR_AAAA const& rhs) const
+  {
+    return strcmp(c_str(), rhs.c_str()) == 0;
+  }
 
 private:
   sockaddr_in6 addr_;
@@ -280,10 +298,5 @@ using RR
 using RR_set = std::vector<RR>;
 
 } // namespace DNS
-
-inline std::ostream& operator<<(std::ostream& os, DNS::RR_type const& type)
-{
-  return os << DNS::RR_type_c_str(type);
-}
 
 #endif // DNS_RRS_DOT_HPP

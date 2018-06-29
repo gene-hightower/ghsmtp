@@ -10,13 +10,15 @@
 
 #include "DNS-rrs.hpp"
 
+using namespace DNS;
+
 // forward decl
 typedef struct ldns_struct_pkt ldns_pkt;
 typedef struct ldns_struct_rdf ldns_rdf;
 typedef struct ldns_struct_resolver ldns_resolver;
 typedef struct ldns_struct_rr_list ldns_rr_list;
 
-namespace DNS {
+namespace DNS_ldns {
 
 class Domain {
 public:
@@ -133,6 +135,6 @@ has_record(Resolver const& res, RR_type type, std::string const& domain)
   return has_record(res, type, domain.c_str());
 }
 
-} // namespace DNS
+} // namespace DNS_ldns
 
 #endif // DNS_LDNS_DOT_HPP

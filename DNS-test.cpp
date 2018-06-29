@@ -1,4 +1,6 @@
 #include "DNS-fcrdns.hpp"
+#include "DNS-iostream.hpp"
+#include "DNS-ldns.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
 
@@ -10,26 +12,41 @@
 int main(int argc, char const* argv[])
 {
   DNS::Resolver res;
+  DNS_ldns::Resolver res_ldns;
 
   DNS::Query q_dee(res, DNS::RR_type::A, "dee.test.digilicious.com");
   CHECK(!q_dee.nx_domain());
   CHECK(q_dee.bogus_or_indeterminate());
 
+  DNS_ldns::Query q_dee_ldns(res_ldns, DNS::RR_type::A,
+                             "dee.test.digilicious.com");
+  CHECK(!q_dee_ldns.nx_domain());
+  CHECK(q_dee_ldns.bogus_or_indeterminate());
+
   auto goog_a{"google-public-dns-a.google.com"};
   auto goog_b{"google-public-dns-b.google.com"};
 
   auto addrs_a = res.get_records(DNS::RR_type::A, goog_a);
+  auto addrs_a_ldns = res_ldns.get_records(DNS::RR_type::A, goog_a);
 
-  CHECK_EQ(addrs_a.size(), 1U);
-  CHECK_EQ(strcmp(std::get<DNS::RR_A>(addrs_a[0]).c_str(), "8.8.8.8"), 0);
+  CHECK_EQ(addrs_a.size(), addrs_a_ldns.size());
+  for (auto i = 0U; i < addrs_a.size(); ++i)
+    CHECK_EQ(std::get<DNS::RR_A>(addrs_a[i]),
+             std::get<DNS::RR_A>(addrs_a_ldns[i]));
 
   auto addrs_b = res.get_records(DNS::RR_type::A, goog_b);
-  CHECK_EQ(addrs_b.size(), 1U);
+  auto addrs_b_ldns = res_ldns.get_records(DNS::RR_type::A, goog_b);
+  CHECK_EQ(addrs_b.size(), addrs_b_ldns.size());
   CHECK_EQ(strcmp(std::get<DNS::RR_A>(addrs_b[0]).c_str(), "8.8.4.4"), 0);
 
   auto aaaaddrs_a = res.get_records(DNS::RR_type::AAAA, goog_a);
+  auto aaaaddrs_a_ldns = res_ldns.get_records(DNS::RR_type::AAAA, goog_a);
   CHECK_EQ(aaaaddrs_a.size(), 1U);
+  CHECK_EQ(aaaaddrs_a.size(), aaaaddrs_a_ldns.size());
   CHECK_EQ(strcmp(std::get<DNS::RR_AAAA>(aaaaddrs_a[0]).c_str(),
+                  "2001:4860:4860::8888"),
+           0);
+  CHECK_EQ(strcmp(std::get<DNS::RR_AAAA>(aaaaddrs_a_ldns[0]).c_str(),
                   "2001:4860:4860::8888"),
            0);
 
