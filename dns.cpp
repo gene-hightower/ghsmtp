@@ -95,6 +95,16 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
       std::cout << dom << " blocked on advice from " << uribl << '\n';
     }
   }
+
+  auto mxs = res.get_records(DNS::RR_type::MX, dom.ascii().c_str());
+  if (!mxs.empty())
+    std::cout << "mail is handled by\n";
+  for (auto const& mx : mxs) {
+    if (std::holds_alternative<DNS::RR_MX>(mx)) {
+      auto x = std::get<DNS::RR_MX>(mx);
+      std::cout << x.preference() << ' ' << x.exchange() << '\n';
+    }
+  }
 }
 
 int main(int argc, char* argv[])
