@@ -3,6 +3,7 @@
 #include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
+#include "TLD.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -80,6 +81,12 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
   for (auto const& aaaa : aaaas) {
     std::cout << aaaa << '\n';
+  }
+
+  TLD tld_db;
+  auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
+  if (dom != reg_dom) {
+    std::cout << "registerd domain " << reg_dom << '\n';
   }
 
   char const* uribls[]{
