@@ -67,13 +67,10 @@ constexpr char const* c_str(command cmd)
   switch (cmd) {
   case command::connect:
     return "connect";
-    break;
   case command::bind:
     return "bind";
-    break;
   case command::udp_associate:
     return "UDP associate";
-    break;
   }
   return "*** unknown command ***";
 }
@@ -94,13 +91,10 @@ constexpr char const* c_str(address_type at)
   switch (at) {
   case address_type::ip4_address:
     return "IPv4 address";
-    break;
   case address_type::domain_name:
     return "domain name";
-    break;
   case address_type::ip6_address:
     return "IPv6 address";
-    break;
   }
   return "*** unknown address type ***";
 }
@@ -148,31 +142,22 @@ constexpr char const* c_str(reply_field rp)
   switch (rp) {
   case reply_field::succeeded:
     return "succeeded";
-    break;
   case reply_field::server_failure:
     return "server_failure";
-    break;
   case reply_field::not_allowed:
     return "not_allowed";
-    break;
   case reply_field::network_unreachable:
     return "network_unreachable";
-    break;
   case reply_field::host_unreachable:
     return "host_unreachable";
-    break;
   case reply_field::connection_refused:
     return "connection_refused";
-    break;
   case reply_field::TTL_expired:
     return "TTL_expired";
-    break;
   case reply_field::command_not_supported:
     return "command_not_supported";
-    break;
   case reply_field::address_type_not_supported:
     return "address_type_not_supported";
-    break;
   }
   return "*** unknown reply field ***";
 }
