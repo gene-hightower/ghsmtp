@@ -285,6 +285,13 @@ public:
 
   static RR_type rr_type() { return RR_type::TLSA; }
 
+  bool operator==(RR_TLSA const& rhs) const
+  {
+    return (cert_usage() == rhs.cert_usage()) && (selector() == rhs.selector())
+           && (matching_type() == rhs.matching_type())
+           && (assoc_data() == rhs.assoc_data());
+  }
+
 private:
   std::vector<unsigned char> assoc_data_;
   uint8_t cert_usage_;
