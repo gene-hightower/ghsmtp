@@ -4,6 +4,7 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
+#include <iomanip>
 #include <iostream>
 
 #include <experimental/iterator>
@@ -96,13 +97,30 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     }
   }
 
-  auto mxs = res.get_records(DNS::RR_type::MX, dom.ascii().c_str());
+  auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
+  if (q.authentic_data()) {
+    std::cout << "MX records authentic for domain " << dom << '\n';
+  }
+
+  auto mxs{q.get_records()};
+
   if (!mxs.empty())
     std::cout << "mail is handled by\n";
+
+  std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
+    if (std::holds_alternative<DNS::RR_MX>(a)
+        && std::holds_alternative<DNS::RR_MX>(b)) {
+      return std::get<DNS::RR_MX>(a).preference()
+             < std::get<DNS::RR_MX>(b).preference();
+    }
+    return false;
+  });
+
   for (auto const& mx : mxs) {
     if (std::holds_alternative<DNS::RR_MX>(mx)) {
       auto x = std::get<DNS::RR_MX>(mx);
-      std::cout << x.preference() << ' ' << x.exchange() << '\n';
+      std::cout << std::setfill(' ') << std::setw(3) << x.preference() << ' '
+                << x.exchange() << '\n';
     }
   }
 }
