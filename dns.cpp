@@ -11,8 +11,6 @@
 
 #include <fmt/format.h>
 
-using namespace std::string_literals;
-
 void check_dnsrbl(DNS::Resolver& res, char const* a)
 {
   char const* rbls[]{
@@ -61,7 +59,9 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 {
   auto const dom{Domain{dom_cp}};
 
-  auto const as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
+  auto as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
+  std::sort(std::begin(as), std::end(as));
+  std::unique(std::begin(as), std::end(as));
   for (auto const& a : as) {
     std::cout << a;
     auto const names = DNS::fcrdns(res, a);
@@ -80,6 +80,8 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   }
 
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
+  std::sort(std::begin(aaaas), std::end(aaaas));
+  std::unique(std::begin(aaaas), std::end(aaaas));
   for (auto const& aaaa : aaaas) {
     std::cout << aaaa << '\n';
   }
