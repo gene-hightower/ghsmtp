@@ -60,8 +60,6 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto const dom{Domain{dom_cp}};
 
   auto as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
-  std::sort(std::begin(as), std::end(as));
-  std::unique(std::begin(as), std::end(as));
   for (auto const& a : as) {
     std::cout << a;
     auto const names = DNS::fcrdns(res, a);
@@ -80,8 +78,6 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   }
 
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
-  std::sort(std::begin(aaaas), std::end(aaaas));
-  std::unique(std::begin(aaaas), std::end(aaaas));
   for (auto const& aaaa : aaaas) {
     std::cout << aaaa << '\n';
   }
@@ -112,6 +108,10 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {
+      if (std::get<DNS::RR_MX>(a).preference()
+          == std::get<DNS::RR_MX>(b).preference())
+        return std::get<DNS::RR_MX>(a).exchange()
+               < std::get<DNS::RR_MX>(b).exchange();
       return std::get<DNS::RR_MX>(a).preference()
              < std::get<DNS::RR_MX>(b).preference();
     }
