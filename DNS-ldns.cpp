@@ -1,5 +1,7 @@
 #include "DNS-ldns.hpp"
 
+#include "DNS-iostream.hpp"
+
 #include <algorithm>
 #include <iomanip>
 
@@ -25,7 +27,7 @@ std::string rr_name_str(ldns_rdf const* rdf)
     return "<too long>";
   }
   if (sz == 1) {
-    return "."; // root label
+    return ""; // root label
   }
 
   auto const data = ldns_rdf_data(rdf);
@@ -55,6 +57,10 @@ std::string rr_name_str(ldns_rdf const* rdf)
       str += '.';
     }
     len = data[src_pos];
+  }
+
+  if (str.length() && ('.' == str.back())) {
+    str.erase(str.length() - 1);
   }
 
   return str;
