@@ -1,4 +1,4 @@
-USES := libglog libidn2 opendkim openssl
+USES := ldns libglog libidn2 libnghttp2_asio opendkim openssl
 
 CXXFLAGS += -IGSL/include
 
@@ -137,7 +137,7 @@ TESTS := \
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
 
-DNS-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+DNS-test_STEMS := $(DNS) DNS-ldns Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 
 Domain-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 IP4-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
