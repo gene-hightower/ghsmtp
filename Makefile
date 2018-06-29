@@ -1,4 +1,4 @@
-USES := ldns libglog libidn2 libnghttp2_asio opendkim openssl
+USES := ldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -IGSL/include
 
