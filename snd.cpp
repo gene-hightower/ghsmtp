@@ -36,7 +36,7 @@ DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
 
-DEFINE_bool(force_tls, true, "use STARTTLS or die");
+DEFINE_bool(require_tls, true, "use STARTTLS or die");
 
 // To force it, set if you have UTF8 in the local part of any RFC5321
 // address.
@@ -1400,9 +1400,9 @@ bool snd(int fd_in,
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
   }
-  else if (FLAGS_force_tls) {
+  else if (FLAGS_require_tls) {
     LOG(ERROR) << "No TLS extension, won't send mail in plain text without "
-                  "--force_tls=false.";
+                  "--require_tls=false.";
     LOG(INFO) << "C: QUIT";
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
