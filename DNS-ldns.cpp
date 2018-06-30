@@ -41,16 +41,17 @@ std::string rr_name_str(ldns_rdf const* rdf)
     src_pos++;
     for (unsigned char i = 0; i < len; ++i) {
       unsigned char c = data[src_pos];
-      if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
+      // if (c == '.' || c == ';' || c == '(' || c == ')' || c == '\\') {
+      if (c == '.' || c == '\\') {
         str += '\\';
-        str += c;
+        // str += c;
       }
-      else if (!(isascii(c) && isgraph(c))) {
-        str += fmt::format("0x{:02x}", c);
-      }
-      else {
-        str += c;
-      }
+      // else if (!(isascii(c) && isgraph(c))) {
+      //   str += fmt::format("0x{:02x}", c);
+      // }
+      // else {
+      str += c;
+      // }
       src_pos++;
     }
     if (src_pos < sz) {
