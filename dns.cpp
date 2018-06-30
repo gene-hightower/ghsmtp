@@ -60,6 +60,14 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 {
   auto const dom{Domain{dom_cp}};
 
+  auto cnames = res.get_strings(DNS::RR_type::CNAME, dom.ascii().c_str());
+  if (!cnames.empty()) {
+    std::cout << "is an alias for ";
+    std::copy(cnames.begin(), cnames.end(),
+              std::experimental::make_ostream_joiner(std::cout, ", "));
+    std::cout << '\n';
+  }
+
   auto as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
   for (auto const& a : as) {
     std::cout << a;
@@ -108,6 +116,12 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   }
 
   auto mxs{q.get_records()};
+
+  mxs.erase(std::remove_if(mxs.begin(), mxs.end(),
+                           [](auto const& rr) -> bool {
+                             return !std::holds_alternative<DNS::RR_MX>(rr);
+                           }),
+            mxs.end());
 
   if (!mxs.empty())
     std::cout << "mail is handled by\n";
