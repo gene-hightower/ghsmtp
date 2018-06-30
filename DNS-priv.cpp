@@ -673,7 +673,7 @@ packet Resolver::xchg(packet const& q)
   auto t_o{false};
   auto a_buf = reinterpret_cast<char*>(bfr.get());
   auto a_buflen
-      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(5), t_o);
+      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(7), t_o);
 
   if (a_buflen < 0) {
     LOG(WARNING) << "DNS read failed";
