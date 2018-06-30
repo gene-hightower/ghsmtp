@@ -452,7 +452,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  if (spf_result_ == SPF::Result::FAIL) {
+  if (spf_result_ == SPF::Result::FAIL && !ip_whitelisted_) {
     return {SpamStatus::spam, "SPF failed"s};
   }
 
