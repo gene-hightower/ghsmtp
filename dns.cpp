@@ -31,17 +31,27 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
 
 void do_addr(DNS::Resolver& res, char const* a)
 {
+  std::cout << a;
+
   auto const names = DNS::fcrdns(res, a);
+  std::vector<Domain> doms;
   for (auto const& name : names) {
-    std::cout << name << '\n';
+    doms.emplace_back(name);
   }
+  if (!doms.empty()) {
+    std::cout << " [";
+    std::copy(begin(doms), end(doms),
+              std::experimental::make_ostream_joiner(std::cout, ", "));
+    std::cout << ']';
+  }
+
   if (names.empty()) {
     if (IP4::is_address(a)) {
       auto const reversed{IP4::reverse(a)};
       auto const ptrs
           = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
       for (auto const& ptr : ptrs) {
-        std::cout << "is a PTR to " << ptr << '\n';
+        std::cout << " has a PTR to " << ptr;
       }
       check_dnsrbl(res, a);
     }
@@ -50,10 +60,12 @@ void do_addr(DNS::Resolver& res, char const* a)
       auto const ptrs
           = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
       for (auto const& ptr : ptrs) {
-        std::cout << "is a PTR to " << ptr << '\n';
+        std::cout << " has a PTR to " << ptr;
       }
     }
   }
+
+  std::cout << '\n';
 }
 
 void do_domain(DNS::Resolver& res, char const* dom_cp)
@@ -70,25 +82,12 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   auto as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
   for (auto const& a : as) {
-    std::cout << a;
-    auto const names = DNS::fcrdns(res, a);
-    std::vector<Domain> doms;
-    for (auto const& name : names) {
-      doms.emplace_back(name);
-    }
-    if (!doms.empty()) {
-      std::cout << " [";
-      std::copy(begin(doms), end(doms),
-                std::experimental::make_ostream_joiner(std::cout, ", "));
-      std::cout << ']';
-    }
-
-    std::cout << '\n';
+    do_addr(res, a.c_str());
   }
 
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
   for (auto const& aaaa : aaaas) {
-    std::cout << aaaa << '\n';
+    do_addr(res, aaaa.c_str());
   }
 
   TLD tld_db;
@@ -124,7 +123,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
             end(mxs));
 
   if (!mxs.empty())
-    std::cout << "mail is handled by\n";
+    std::cout << "mail for " << dom << " is handled by\n";
 
   std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
