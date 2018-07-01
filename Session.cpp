@@ -304,7 +304,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     bad_host_(error_msg.c_str());
   }
 
-  reverse_path_ = std::move(reverse_path);
+  reverse_path_ = reverse_path; // move
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
@@ -364,7 +364,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // no check for dups, postfix doesn't
-  forward_path_.push_back(std::move(forward_path));
+  forward_path_.emplace_back(forward_path); // move
   out_() << "250 2.1.5 RCPT TO OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
