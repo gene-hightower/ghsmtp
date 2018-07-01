@@ -29,21 +29,21 @@ int main(int argc, char const* argv[])
 
   lkp lookups[] = {
       {DNS::RR_type::A, "amazon.com"},
-      {DNS::RR_type::TXT, "digilicious.com"},
-      {DNS::RR_type::CNAME, "cname4.digilicious.com"},
-      {DNS::RR_type::CNAME, "com.digilicious.in-addr.arpa"},
-      {DNS::RR_type::PTR, "com.digilicious.in-addr.arpa"},
-      {DNS::RR_type::PTR, "com.google.in-addr.arpa"},
       {DNS::RR_type::A, "dee.test.digilicious.com"},
+      {DNS::RR_type::A, "does-not-exist.test.digilicious.com"},
       {DNS::RR_type::A, "google-public-dns-a.google.com"},
       {DNS::RR_type::A, "google-public-dns-b.google.com"},
       {DNS::RR_type::AAAA, "google-public-dns-a.google.com"},
       {DNS::RR_type::AAAA, "google-public-dns-b.google.com"},
+      {DNS::RR_type::CNAME, "cname4.digilicious.com"},
+      {DNS::RR_type::CNAME, "com.digilicious.in-addr.arpa"},
       {DNS::RR_type::MX, "anyold.host"},
       {DNS::RR_type::MX, "cname.test.digilicious.com"},
+      {DNS::RR_type::PTR, "com.digilicious.in-addr.arpa"},
+      {DNS::RR_type::PTR, "com.google.in-addr.arpa"},
       {DNS::RR_type::TLSA, "_25._tcp.digilicious.com"},
-      {DNS::RR_type::A, "does-not-exist.test.digilicious.com"},
-
+      {DNS::RR_type::TLSA, "_443._tcp.digilicious.com"},
+      {DNS::RR_type::TXT, "digilicious.com"},
   };
 
   auto failure = false;
@@ -72,6 +72,10 @@ int main(int argc, char const* argv[])
     }
   }
 
+  CHECK(!failure);
+
+  // These IP addresses might be stable for a while.
+
   auto goog_a{"google-public-dns-a.google.com"};
   auto goog_b{"google-public-dns-b.google.com"};
 
@@ -86,8 +90,6 @@ int main(int argc, char const* argv[])
   auto aaaaddrs_b = res.get_strings(DNS::RR_type::AAAA, goog_b);
   CHECK_EQ(aaaaddrs_b.size(), 1U);
   CHECK_EQ(aaaaddrs_b[0], "2001:4860:4860::8844");
-
-  // These IP addresses might be stable for a while.
 
   auto fcrdnses4 = fcrdns4(res, "1.1.1.1");
   CHECK_EQ(fcrdnses4.size(), 1);
