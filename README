@@ -27,7 +27,7 @@ RFC 6152: 8-bit MIME Transport
 RFC 6531: Internationalized Email
 
 I wrote this to experiment with and learn about Internet mail.  I do
-use it as my every day SNTP server for a number of my personal
+use it as my every day SMTP server for a number of my personal
 domains.
 
 As far as I know, nobody else has ever used this software.
