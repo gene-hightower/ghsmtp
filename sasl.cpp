@@ -148,9 +148,7 @@ struct action<mech> {
   template <typename Input>
   static void apply(Input const& in, Context& ctx)
   {
-    ctx.mech[ctx.sasl_mech] = std::move(ctx.parameter);
-    ctx.parameter.clear();
-    ctx.sasl_mech.clear();
+    ctx.mech.emplace(std::move(ctx.sasl_mech), std::move(ctx.parameter));
   }
 };
 
