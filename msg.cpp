@@ -8,7 +8,6 @@ namespace gflags {
 DEFINE_bool(selftest, false, "run a self test");
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <glog/logging.h>
