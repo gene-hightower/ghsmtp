@@ -107,7 +107,8 @@ public:
   Request& operator=(Request&& other)
   {
     if (this != &other) { // prevent self-move
-      CHECK(req_ == nullptr) << "can only move into default constructed object";
+      CHECK((req_ == nullptr) || (req_ == other.req_))
+          << "can only move into default constructed object";
       req_ = other.req_;
       other.req_ = nullptr;
     }
