@@ -95,7 +95,7 @@ std::string get_hostname()
 
 uint16_t get_port(char const* const service)
 {
-  auto ep{(char*){}};
+  char* ep = nullptr;
   auto const service_no{strtoul(service, &ep, 10)};
   if (ep && (*ep == '\0')) {
     CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());

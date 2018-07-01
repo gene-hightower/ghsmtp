@@ -520,9 +520,7 @@ struct action<ehlo_line> {
   static void apply(Input const& in, Connection& cnn)
   {
     boost::to_upper(cnn.ehlo_keyword);
-    cnn.ehlo_params[cnn.ehlo_keyword] = cnn.ehlo_param;
-    cnn.ehlo_keyword.clear();
-    cnn.ehlo_param.clear();
+    cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword), std::move(cnn.ehlo_param));
   }
 };
 
@@ -1430,7 +1428,7 @@ bool snd(int fd_in,
   auto max_msg_size{0u};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
-      auto ep{(char*){}};
+      char* ep = nullptr;
       max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in SIZE argument: "
