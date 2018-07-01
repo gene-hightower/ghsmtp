@@ -1077,9 +1077,9 @@ RR_set Query::get_records()
   if (bogus_or_indeterminate_) // if ctor() found and error with the packet
     return ret;
 
-  auto const hdr_p = reinterpret_cast<header const*>(a_.bfr.get());
+  auto const hdr_p = reinterpret_cast<header const*>(a_.begin());
 
-  auto p = const_cast<unsigned char const*>(a_.bfr.get()) + sizeof(header);
+  auto p = a_.begin() + sizeof(header);
 
   // skip queries
   for (auto i = 0; i < hdr_p->qdcount(); ++i) {
