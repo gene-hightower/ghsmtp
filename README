@@ -26,6 +26,8 @@ RFC 3463: Enhanced Mail System Status Codes
 RFC 6152: 8-bit MIME Transport
 RFC 6531: Internationalized Email
 
+The software works with IPv4 and IPv6, mostly.
+
 I wrote this to experiment with and learn about Internet mail.  I do
 use it as my every day SMTP server for a number of my personal
 domains.
