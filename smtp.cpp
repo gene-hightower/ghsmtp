@@ -476,7 +476,7 @@ template <>
 struct action<mail_from> {
   static void apply0(Ctx& ctx)
   {
-    ctx.session.mail_from(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
+    ctx.session.mail_from(Mailbox{ctx.mb_loc, ctx.mb_dom}, ctx.parameters);
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
@@ -487,7 +487,7 @@ template <>
 struct action<rcpt_to> {
   static void apply0(Ctx& ctx)
   {
-    ctx.session.rcpt_to(::Mailbox(ctx.mb_loc, ctx.mb_dom), ctx.parameters);
+    ctx.session.rcpt_to(Mailbox{ctx.mb_loc, ctx.mb_dom}, ctx.parameters);
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
