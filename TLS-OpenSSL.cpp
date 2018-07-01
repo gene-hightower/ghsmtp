@@ -143,9 +143,9 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
           SSL_set_SSL_CTX(s, ctx.ctx);
         return SSL_TLSEXT_ERR_OK;
       }
-      LOG(INFO) << "no cert found for server " << servername;
-      return SSL_TLSEXT_ERR_ALERT_WARNING;
     }
+    LOG(INFO) << "no cert found for server " << servername;
+    return SSL_TLSEXT_ERR_ALERT_WARNING;
   }
 
   // LOG(INFO) << "no specific server name requested";
