@@ -473,7 +473,7 @@ struct action<greeting_ok> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.greeting_ok = true;
-    std::istringstream stream(in.string());
+    imemstream stream{in.begin(), in.size()};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -487,7 +487,7 @@ struct action<ehlo_ok_rsp> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_ok = true;
-    std::istringstream stream(in.string());
+    imemstream stream{in.begin(), in.size()};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -529,7 +529,7 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    std::istringstream stream(in.string());
+    imemstream stream{in.begin(), in.size()};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -1201,7 +1201,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
       != auth->second.end()) {
     LOG(INFO) << "C: AUTH PLAIN";
-    auto tok{std::stringstream{}};
+    auto tok{std::ostringstream{}};
     tok.str().reserve(FLAGS_username.length() + FLAGS_password.length() + 2);
     tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
@@ -1456,7 +1456,7 @@ bool snd(int fd_in,
   }
 
   // Get the header as one big string
-  std::stringstream hdr_stream;
+  std::ostringstream hdr_stream;
   hdr_stream.str().reserve(2 * 1024);
   hdr_stream << eml;
   auto const& hdr_str = hdr_stream.str();
@@ -1478,7 +1478,7 @@ bool snd(int fd_in,
     exit(EXIT_FAILURE);
   }
 
-  std::stringstream param_stream;
+  std::ostringstream param_stream;
   param_stream.str().reserve(100);
   if (FLAGS_huge_size && ext_size) {
     // Claim some huge size.
@@ -1571,7 +1571,7 @@ bool snd(int fd_in,
   }
 
   if (ext_chunking) {
-    std::stringstream bdat_stream;
+    std::ostringstream bdat_stream;
     bdat_stream.str().reserve(30);
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "C: " << bdat_stream.str();
