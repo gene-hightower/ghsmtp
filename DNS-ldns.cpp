@@ -100,12 +100,12 @@ Domain::Domain(std::string const& domain)
 
 Domain::~Domain() { ldns_rdf_deep_free(rdfp_); }
 
-Query::Query(Resolver const& res, RR_type type, std::string const& dom)
+Query::Query(Resolver const& res, DNS::RR_type type, std::string const& dom)
   : Query(res, type, dom.c_str())
 {
 }
 
-Query::Query(Resolver const& res, RR_type type, char const* domain)
+Query::Query(Resolver const& res, DNS::RR_type type, char const* domain)
 {
   Domain dom(domain);
 
@@ -149,7 +149,7 @@ Query::Query(Resolver const& res, RR_type type, char const* domain)
     default:
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "DNS unknown error (" << dom.str() << "/" << type
-                   << "), rcode = " << rcode_c_str(rcode) << " (" << rcode
+                   << "), rcode = " << DNS::rcode_c_str(rcode) << " (" << rcode
                    << ")";
       break;
     }
@@ -162,7 +162,7 @@ Query::~Query()
     ldns_pkt_free(p_);
 }
 
-RR_set Query::get_records() const
+DNS::RR_set Query::get_records() const
 {
   RR_list rrlst(*this);
   return rrlst.get_records();
@@ -185,9 +185,9 @@ RR_list::RR_list(Query const& q)
 
 RR_list::~RR_list() {}
 
-RR_set RR_list::get_records() const
+DNS::RR_set RR_list::get_records() const
 {
-  RR_set ret;
+  DNS::RR_set ret;
 
   if (rrlst_answer_) {
 
@@ -204,21 +204,21 @@ RR_set RR_list::get_records() const
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_A);
-          ret.emplace_back(RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
+          ret.emplace_back(DNS::RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
           break;
         }
         case LDNS_RR_TYPE_CNAME: {
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_DNAME);
-          ret.emplace_back(RR_CNAME{rr_name_str(rdf)});
+          ret.emplace_back(DNS::RR_CNAME{rr_name_str(rdf)});
           break;
         }
         case LDNS_RR_TYPE_PTR: {
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_DNAME);
-          ret.emplace_back(RR_PTR{rr_name_str(rdf)});
+          ret.emplace_back(DNS::RR_PTR{rr_name_str(rdf)});
           break;
         }
         case LDNS_RR_TYPE_MX: {
@@ -228,21 +228,22 @@ RR_set RR_list::get_records() const
           auto const rdf_1 = ldns_rr_rdf(rr, 1);
           CHECK_EQ(ldns_rdf_get_type(rdf_1), LDNS_RDF_TYPE_DNAME);
           ret.emplace_back(
-              RR_MX{rr_name_str(rdf_1), ldns_rdf2native_int16(rdf_0)});
+              DNS::RR_MX{rr_name_str(rdf_1), ldns_rdf2native_int16(rdf_0)});
           break;
         }
         case LDNS_RR_TYPE_TXT: {
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_STR);
-          ret.emplace_back(RR_TXT{rr_str(rdf)});
+          ret.emplace_back(DNS::RR_TXT{rr_str(rdf)});
           break;
         }
         case LDNS_RR_TYPE_AAAA: {
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_AAAA);
-          ret.emplace_back(RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
+          ret.emplace_back(
+              DNS::RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
           break;
         }
         case LDNS_RR_TYPE_TLSA: {
@@ -269,8 +270,9 @@ RR_set RR_list::get_records() const
           auto const rdf = ldns_rr_rdf(rr, 3);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_HEX);
 
-          ret.emplace_back(RR_TLSA{usage, selector, matching_type,
-                                   ldns_rdf_data(rdf), ldns_rdf_size(rdf)});
+          ret.emplace_back(DNS::RR_TLSA{usage, selector, matching_type,
+                                        ldns_rdf_data(rdf),
+                                        ldns_rdf_size(rdf)});
           break;
         }
 
@@ -291,7 +293,7 @@ RR_set RR_list::get_records() const
         if (rr) {
           auto type = ldns_rr_get_type(rr);
           LOG(WARNING) << "additional record " << i << " type "
-                       << RR_type_c_str(type);
+                       << DNS::RR_type_c_str(type);
         }
       }
     }
@@ -319,7 +321,7 @@ std::vector<std::string> RR_list::get_strings() const
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_A);
-          auto const a{RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+          auto const a{DNS::RR_A{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
           ret.emplace_back(a.c_str());
           break;
         }
@@ -357,7 +359,7 @@ std::vector<std::string> RR_list::get_strings() const
           CHECK_EQ(ldns_rr_rd_count(rr), 1);
           auto const rdf = ldns_rr_rdf(rr, 0);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_AAAA);
-          auto const a{RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
+          auto const a{DNS::RR_AAAA{ldns_rdf_data(rdf), ldns_rdf_size(rdf)}};
           ret.emplace_back(a.c_str());
           break;
         }
@@ -372,14 +374,14 @@ std::vector<std::string> RR_list::get_strings() const
   return ret;
 }
 
-RR_set Resolver::get_records(RR_type typ, char const* domain) const
+DNS::RR_set Resolver::get_records(DNS::RR_type typ, char const* domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);
   return rrlst.get_records();
 }
 
-std::vector<std::string> Resolver::get_strings(RR_type typ,
+std::vector<std::string> Resolver::get_strings(DNS::RR_type typ,
                                                char const* domain) const
 {
   Query q(*this, typ, domain);
