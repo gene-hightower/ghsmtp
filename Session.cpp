@@ -255,9 +255,8 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   }
 
   if (sock_.has_peername()) {
-    if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
-                  client_identity_)
-        != client_fcrdns_.end()) {
+    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), client_identity_)
+        != end(client_fcrdns_)) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -499,8 +498,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 
   auto rp_dom = reverse_path_.domain();
   if (!client_fcrdns_.empty()) {
-    if (std::find(client_fcrdns_.begin(), client_fcrdns_.end(), rp_dom)
-        != client_fcrdns_.end()) {
+    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), rp_dom)
+        != end(client_fcrdns_)) {
       if (status == SpamStatus::ham) {
         fmt::format_to(reason, ", and ");
       }
@@ -573,11 +572,11 @@ bool Session::msg_new()
     return false;
   }
 
-  out_() << "550 5.0.0 mail error\r\n" << std::flush;
-  LOG(ERROR) << "msg_new failed with no exception thrown";
-  msg_->trash();
-  msg_.reset();
-  return false;
+  // out_() << "550 5.0.0 mail error\r\n" << std::flush;
+  // LOG(ERROR) << "msg_new failed with no exception thrown";
+  // msg_->trash();
+  // msg_.reset();
+  // return false;
 }
 
 bool Session::msg_write(char const* s, std::streamsize count)
@@ -1164,11 +1163,11 @@ bool Session::verify_client_(Domain const& client_identity,
                              std::string& error_msg)
 {
   if (!client_fcrdns_.empty()) {
-    if (auto id = std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
+    if (auto id = std::find(begin(client_fcrdns_), end(client_fcrdns_),
                             client_identity);
-        id != client_fcrdns_.end()) {
-      if (id != client_fcrdns_.begin()) {
-        std::rotate(client_fcrdns_.begin(), id, id + 1);
+        id != end(client_fcrdns_)) {
+      if (id != begin(client_fcrdns_)) {
+        std::rotate(begin(client_fcrdns_), id, id + 1);
       }
       client_
           = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
@@ -1309,9 +1308,8 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // If the reverse path domain matches the Forward-confirmed reverse
   // DNS of the sending IP address, we skip the uribl check.
   if (!client_fcrdns_.empty()
-      && (std::find(client_fcrdns_.begin(), client_fcrdns_.end(),
-                    sender.domain())
-          != client_fcrdns_.end())) {
+      && (std::find(begin(client_fcrdns_), end(client_fcrdns_), sender.domain())
+          != end(client_fcrdns_))) {
     LOG(INFO) << "MAIL FROM: domain matches sender's FCrDNS";
   }
   else if (!verify_sender_domain_(sender.domain(), error_msg)) {

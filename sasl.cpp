@@ -217,7 +217,7 @@ int main()
   tok << '\0' << test::username << '\0' << test::password;
   auto const init{Base64::enc(tok.str())};
 
-  if (ctx.mech.find("PLAIN") != ctx.mech.end()) {
+  if (ctx.mech.find("PLAIN") != end(ctx.mech)) {
     auto id{uint32_t{0x12345678}};
 
     ios << "AUTH\t" << id << "\tPLAIN"

@@ -63,7 +63,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto cnames = res.get_strings(DNS::RR_type::CNAME, dom.ascii().c_str());
   if (!cnames.empty()) {
     std::cout << "is an alias for ";
-    std::copy(cnames.begin(), cnames.end(),
+    std::copy(begin(cnames), end(cnames),
               std::experimental::make_ostream_joiner(std::cout, ", "));
     std::cout << '\n';
   }
@@ -78,7 +78,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     }
     if (!doms.empty()) {
       std::cout << " [";
-      std::copy(doms.begin(), doms.end(),
+      std::copy(begin(doms), end(doms),
                 std::experimental::make_ostream_joiner(std::cout, ", "));
       std::cout << ']';
     }
@@ -117,16 +117,16 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   auto mxs{q.get_records()};
 
-  mxs.erase(std::remove_if(mxs.begin(), mxs.end(),
-                           [](auto const& rr) -> bool {
+  mxs.erase(std::remove_if(begin(mxs), end(mxs),
+                           [](auto const& rr) {
                              return !std::holds_alternative<DNS::RR_MX>(rr);
                            }),
-            mxs.end());
+            end(mxs));
 
   if (!mxs.empty())
     std::cout << "mail is handled by\n";
 
-  std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
+  std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {
       if (std::get<DNS::RR_MX>(a).preference()

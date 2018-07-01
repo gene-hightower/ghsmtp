@@ -40,12 +40,7 @@ inline std::ostream& operator<<(std::ostream& os, DNS::RR_TLSA const& rr_tlsa)
   os << "TLSA " << rr_tlsa.cert_usage() << ' ' << rr_tlsa.selector() << ' '
      << rr_tlsa.matching_type() << ' ';
 
-  auto const data = rr_tlsa.assoc_data().data();
-  auto const length = rr_tlsa.assoc_data().size();
-
-  for (size_t n = 0u; n < length; ++n) {
-    auto const ch = data[n];
-
+  for (auto const ch : rr_tlsa.assoc_data()) {
     auto const lo = ch & 0xF;
     auto const hi = (ch >> 4) & 0xF;
 

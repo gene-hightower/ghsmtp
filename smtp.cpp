@@ -455,9 +455,9 @@ struct action<helo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const beg = in.begin() + 5; // +5 for the length of "HELO "
-    auto const end = std::find(beg, in.end() - 2, ' '); // -2 for the CRLF
-    ctx.session.helo(std::string_view(beg, end - beg));
+    auto const b = begin(in) + 5; // +5 for the length of "HELO "
+    auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
+    ctx.session.helo(std::string_view(b, e - b));
   }
 };
 
@@ -466,9 +466,9 @@ struct action<ehlo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const beg = in.begin() + 5; // +5 for the length of "EHLO "
-    auto const end = std::find(beg, in.end() - 2, ' '); // -2 for the CRLF
-    ctx.session.ehlo(std::string_view(beg, end - beg));
+    auto const b = begin(in) + 5; // +5 for the length of "EHLO "
+    auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
+    ctx.session.ehlo(std::string_view(b, e - b));
   }
 };
 
@@ -580,8 +580,8 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const len{in.end() - in.begin()};
-    ctx.session.msg_write(in.begin(), len);
+    auto const len{end(in) - begin(in)};
+    ctx.session.msg_write(begin(in), len);
   }
 };
 
@@ -590,8 +590,8 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const len{std::streamsize{in.end() - in.begin() - 1}};
-    ctx.session.msg_write(in.begin() + 1, len);
+    auto const len{end(in) - begin(in) - 1};
+    ctx.session.msg_write(begin(in) + 1, len);
   }
 };
 
@@ -609,9 +609,9 @@ struct data_action<anything_else> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
-    auto const len{std::streamsize{in.end() - in.begin()}};
+    auto const len{end(in) - begin(in)};
     if (len)
-      ctx.session.msg_write(in.begin(), len);
+      ctx.session.msg_write(begin(in), len);
   }
 };
 
@@ -651,11 +651,11 @@ struct action<rset> {
 };
 
 template <typename Input>
-std::string_view get_string(Input const& in)
+std::string_view get_string_view(Input const& in)
 {
-  auto const beg = in.begin() + 4;
-  auto const len = in.end() - beg;
-  auto str = std::string_view(beg, len);
+  auto const b = begin(in) + 4;
+  auto const len = end(in) - b;
+  auto str = std::string_view(b, len);
   if (str.front() == ' ')
     str.remove_prefix(1);
   return str;
@@ -666,7 +666,7 @@ struct action<noop> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const str = get_string(in);
+    auto const str = get_string_view(in);
     ctx.session.noop(str);
   }
 };
@@ -676,7 +676,7 @@ struct action<vrfy> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const str = get_string(in);
+    auto const str = get_string_view(in);
     ctx.session.vrfy(str);
   }
 };
@@ -686,7 +686,7 @@ struct action<help> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const str = get_string(in);
+    auto const str = get_string_view(in);
     ctx.session.help(str);
   }
 };

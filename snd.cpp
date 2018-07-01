@@ -473,7 +473,7 @@ struct action<greeting_ok> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.greeting_ok = true;
-    imemstream stream{in.begin(), in.size()};
+    imemstream stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -487,7 +487,7 @@ struct action<ehlo_ok_rsp> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_ok = true;
-    imemstream stream{in.begin(), in.size()};
+    imemstream stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -520,7 +520,8 @@ struct action<ehlo_line> {
   static void apply(Input const& in, Connection& cnn)
   {
     boost::to_upper(cnn.ehlo_keyword);
-    cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword), std::move(cnn.ehlo_param));
+    cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword),
+                            std::move(cnn.ehlo_param));
   }
 };
 
@@ -529,7 +530,7 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    imemstream stream{in.begin(), in.size()};
+    imemstream stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -990,9 +991,9 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   if (q_sts.has_record()) {
     auto sts_records = q_sts.get_strings();
     sts_records.erase(
-        std::remove_if(sts_records.begin(), sts_records.end(), not_sts_rec),
-        sts_records.end());
-    if (sts_records.size() == 1) {
+        std::remove_if(begin(sts_records), end(sts_records), not_sts_rec),
+        end(sts_records));
+    if (size(sts_records) == 1) {
       LOG(INFO) << "### This domain implements MTA-STS ###";
     }
   }
@@ -1010,9 +1011,9 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   }
   auto mxs{q.get_records()};
 
-  mxs.erase(std::remove_if(mxs.begin(), mxs.end(), is_localhost), mxs.end());
+  mxs.erase(std::remove_if(begin(mxs), end(mxs), is_localhost), end(mxs));
 
-  auto const nmx = std::count_if(mxs.begin(), mxs.end(), [](DNS::RR const& rr) {
+  auto const nmx = std::count_if(begin(mxs), end(mxs), [](auto const& rr) {
     return std::holds_alternative<DNS::RR_MX>(rr);
   });
 
@@ -1036,8 +1037,8 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 
   // […] then the sender-SMTP MUST randomize them to spread the load
   // across multiple mail exchangers for a specific organization.
-  std::shuffle(mxs.begin(), mxs.end(), std::random_device());
-  std::sort(mxs.begin(), mxs.end(), [](auto const& a, auto const& b) {
+  std::shuffle(begin(mxs), end(mxs), std::random_device());
+  std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {
       return std::get<DNS::RR_MX>(a).preference()
@@ -1192,14 +1193,14 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
     return;
 
   auto const auth = cnn.ehlo_params.find("AUTH");
-  if (auth == cnn.ehlo_params.end()) {
+  if (auth == end(cnn.ehlo_params)) {
     LOG(ERROR) << "server doesn't support AUTH";
     fail(in, cnn);
   }
 
   // Perfer PLAIN mechanism.
-  if (std::find(auth->second.begin(), auth->second.end(), "PLAIN")
-      != auth->second.end()) {
+  if (std::find(begin(auth->second), end(auth->second), "PLAIN")
+      != end(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
     auto tok{std::ostringstream{}};
     tok.str().reserve(FLAGS_username.length() + FLAGS_password.length() + 2);
@@ -1213,8 +1214,8 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
     }
   }
   // The LOGIN SASL mechanism is obsolete.
-  else if (std::find(auth->second.begin(), auth->second.end(), "LOGIN")
-           != auth->second.end()) {
+  else if (std::find(begin(auth->second), end(auth->second), "LOGIN")
+           != end(auth->second)) {
     LOG(INFO) << "C: AUTH LOGIN";
     cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
     CHECK((parse<RFC5321::auth_login_username>(in)));
@@ -1354,29 +1355,29 @@ bool snd(int fd_in,
 
   auto const ext_8bitmime{
       FLAGS_use_8bitmime
-      && (cnn.ehlo_params.find("8BITMIME") != cnn.ehlo_params.end())};
+      && (cnn.ehlo_params.find("8BITMIME") != end(cnn.ehlo_params))};
 
   auto const ext_chunking{FLAGS_use_chunking
                           && cnn.ehlo_params.find("CHUNKING")
-                                 != cnn.ehlo_params.end()};
+                                 != end(cnn.ehlo_params)};
 
   auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking
                             && cnn.ehlo_params.find("BINARYMIME")
-                                   != cnn.ehlo_params.end()};
+                                   != end(cnn.ehlo_params)};
   auto const ext_pipelining{
       FLAGS_use_pipelining
-      && (cnn.ehlo_params.find("PIPELINING") != cnn.ehlo_params.end())};
+      && (cnn.ehlo_params.find("PIPELINING") != end(cnn.ehlo_params))};
 
   auto const ext_size{FLAGS_use_size
-                      && cnn.ehlo_params.find("SIZE") != cnn.ehlo_params.end()};
+                      && cnn.ehlo_params.find("SIZE") != end(cnn.ehlo_params)};
 
   auto const ext_smtputf8{
       FLAGS_use_smtputf8
-      && (cnn.ehlo_params.find("SMTPUTF8") != cnn.ehlo_params.end())};
+      && (cnn.ehlo_params.find("SMTPUTF8") != end(cnn.ehlo_params))};
 
   auto const ext_starttls{
       FLAGS_use_tls
-      && (cnn.ehlo_params.find("STARTTLS") != cnn.ehlo_params.end())};
+      && (cnn.ehlo_params.find("STARTTLS") != end(cnn.ehlo_params))};
 
   if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "no SMTPUTF8, skipping";
@@ -1833,7 +1834,7 @@ int main(int argc, char* argv[])
     }
     else {
       auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
-      tlsa_rrs_mx.insert(tlsa_rrs_mx.end(), tlsa_rrs.begin(), tlsa_rrs.end());
+      tlsa_rrs_mx.insert(end(tlsa_rrs_mx), begin(tlsa_rrs), end(tlsa_rrs));
       if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
               to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
         return EXIT_SUCCESS;

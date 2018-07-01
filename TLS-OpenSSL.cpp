@@ -64,7 +64,7 @@ TLS::TLS(std::function<void(void)> read_hook)
 
 TLS::~TLS()
 {
-  for (auto&& ctx : cert_ctx_) {
+  for (auto& ctx : cert_ctx_) {
     if (ctx.ctx) {
       SSL_CTX_free(ctx.ctx);
     }
@@ -130,16 +130,18 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
 static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 {
-  auto cert_ctx = static_cast<std::vector<TLS::per_cert_ctx>*>(arg);
+  auto cert_ctx_ptr
+      = CHECK_NOTNULL(static_cast<std::vector<TLS::per_cert_ctx>*>(arg));
+  auto const& cert_ctx = *cert_ctx_ptr;
 
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
     // LOG(INFO) << "servername requested " << servername;
-    for (auto const& ctx : *cert_ctx) {
-      if (auto&& c = std::find(ctx.cn.begin(), ctx.cn.end(), servername);
-          c != ctx.cn.end()) {
-        if (cert_ctx->size() > 1)
+    for (auto const& ctx : cert_ctx) {
+      if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), servername);
+          c != end(ctx.cn)) {
+        if (size(cert_ctx) > 1)
           SSL_set_SSL_CTX(s, ctx.ctx);
         return SSL_TLSEXT_ERR_OK;
       }
@@ -249,7 +251,7 @@ bool TLS::starttls_client(int fd_in,
               reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
 
-          if (find(cn.begin(), cn.end(), str) == cn.end()) {
+          if (find(begin(cn), end(cn), str) == end(cn)) {
             // LOG(INFO) << "additional name found " << str;
             cn.emplace_back(str);
           }
@@ -280,7 +282,7 @@ bool TLS::starttls_client(int fd_in,
 
       //.......................................................
 
-      if (std::find(cn.begin(), cn.end(), client_name) != cn.end()) {
+      if (std::find(begin(cn), end(cn), client_name) != end(cn)) {
         // LOG(INFO) << "**** using cert for " << client_name;
         cert_ctx_.emplace_back(ctx, cn);
       }
@@ -412,7 +414,6 @@ bool TLS::starttls_client(int fd_in,
 
     default:
       ssl_error();
-      return false;
     }
   }
 
@@ -600,7 +601,7 @@ bool TLS::starttls_server(int fd_in,
             reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
-        if (find(cn.begin(), cn.end(), str) == cn.end()) {
+        if (find(begin(cn), end(cn), str) == end(cn)) {
           // LOG(INFO) << "additional name found " << str;
           cn.emplace_back(str);
         }
@@ -687,7 +688,6 @@ bool TLS::starttls_server(int fd_in,
 
     default:
       ssl_error();
-      return false;
     }
   }
 
@@ -810,7 +810,6 @@ std::streamsize TLS::io_tls_(char const* fnm,
 
     default:
       ssl_error();
-      return static_cast<std::streamsize>(-1);
     }
   }
 

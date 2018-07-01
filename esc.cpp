@@ -10,13 +10,13 @@ using namespace std::string_literals;
 
 std::string esc(std::string_view str, esc_line_option line_option)
 {
-  auto nesc{std::count_if(str.begin(), str.end(), [](unsigned char c) {
+  auto nesc{std::count_if(begin(str), end(str), [](unsigned char c) {
     return (!std::isprint(c)) || (c == '\\');
   })};
   if (!nesc)
     return std::string(str);
   if (line_option == esc_line_option::multi)
-    nesc += std::count(str.begin(), str.end(), '\n');
+    nesc += std::count(begin(str), end(str), '\n');
   std::string ret;
   ret.reserve(str.length() + nesc);
   for (auto c : str) {

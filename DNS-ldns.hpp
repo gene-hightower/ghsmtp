@@ -10,8 +10,6 @@
 
 #include "DNS-rrs.hpp"
 
-using namespace DNS;
-
 // forward decl
 typedef struct ldns_struct_pkt ldns_pkt;
 typedef struct ldns_struct_rdf ldns_rdf;

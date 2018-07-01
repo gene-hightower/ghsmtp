@@ -26,8 +26,8 @@ constexpr auto loopback_literal{"[IPv6:::1]"};
 std::string_view constexpr as_address(std::string_view address_literal)
 {
   // CHECK(is_address_literal(address_literal));
-  return std::string_view(address_literal.begin() + lit_pfx_sz,
-                          address_literal.length() - lit_add_sz);
+  return std::string_view(begin(address_literal) + lit_pfx_sz,
+                          size(address_literal) - lit_add_sz);
 }
 
 } // namespace IP6

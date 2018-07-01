@@ -930,7 +930,7 @@ struct action<field_value> {
 template <typename Input>
 static void header(Input const& in, Ctx& ctx)
 {
-  ctx.dkv.header(std::string_view(in.begin(), in.end() - in.begin()));
+  ctx.dkv.header(std::string_view(begin(in), end(in) - begin(in)));
 }
 
 template <>
@@ -1329,7 +1329,7 @@ struct action<received_spf> {
     spf_req.set_ip_str(ctx.spf_info["client-ip"].c_str());
 
     spf_req.set_helo_dom(ctx.spf_info["helo"].c_str());
-    if (ctx.spf_info.find("envelope-from") != ctx.spf_info.end()) {
+    if (ctx.spf_info.find("envelope-from") != end(ctx.spf_info)) {
       spf_req.set_env_from(ctx.spf_info["envelope-from"].c_str());
     }
 
@@ -1369,14 +1369,14 @@ struct action<received_spf> {
       pol_spf = DMARC_POLICY_SPF_OUTCOME_FAIL;
     }
 
-    if (ctx.spf_info.find("client-ip") != ctx.spf_info.end()) {
+    if (ctx.spf_info.find("client-ip") != end(ctx.spf_info)) {
       ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
       // LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
       //           << ctx.spf_result;
     }
 
     // Google sometimes doesn't put in anything but client-ip
-    if (ctx.spf_info.find("envelope-from") != ctx.spf_info.end()) {
+    if (ctx.spf_info.find("envelope-from") != end(ctx.spf_info)) {
       auto dom = ctx.spf_info["envelope-from"];
       auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
@@ -1536,7 +1536,7 @@ struct action<body> {
   static void apply(const Input& in, Ctx& ctx)
   {
     // LOG(INFO) << "Message body:";
-    auto body = std::string_view(in.begin(), in.end() - in.begin());
+    auto const body = std::string_view(begin(in), end(in) - begin(in));
 
     ctx.dkv.eoh();
     ctx.dkv.body(body);

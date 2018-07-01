@@ -20,26 +20,26 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
 
   std::vector<std::string> fcrdns;
 
-  for (auto&& ptr : ptrs) {
+  for (auto const& ptr : ptrs) {
     if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
       // The forward part, check each PTR for matching A record.
       auto const addrs
           = res.get_strings(RR_type::A, std::get<DNS::RR_PTR>(ptr).str());
-      if (std::find(addrs.begin(), addrs.end(), addr) != addrs.end()) {
+      if (std::find(begin(addrs), end(addrs), addr) != end(addrs)) {
         fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
       }
     }
   }
 
   // Sort 1st by name length: short to long.
-  std::sort(fcrdns.begin(), fcrdns.end(),
+  std::sort(begin(fcrdns), end(fcrdns),
             [](std::string_view a, std::string_view b) {
               if (a.length() != b.length())
                 return a.length() < b.length();
               return a < b;
             });
 
-  std::unique(fcrdns.begin(), fcrdns.end());
+  std::unique(begin(fcrdns), end(fcrdns));
 
   return fcrdns;
 }
@@ -53,24 +53,23 @@ std::vector<std::string> fcrdns6(Resolver& res, std::string_view addr)
 
   std::vector<std::string> fcrdns;
 
-  for (auto&& ptr : ptrs) {
+  for (auto const& ptr : ptrs) {
     if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
       // The forward part, check each PTR for matching AAAA record.
       auto const addrs
           = res.get_strings(RR_type::AAAA, std::get<DNS::RR_PTR>(ptr).str());
-      if (std::find(addrs.begin(), addrs.end(), addr) != addrs.end()) {
+      if (std::find(begin(addrs), end(addrs), addr) != end(addrs)) {
         fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
       }
     }
   }
 
-  // Sort by name length: short to long.
-  std::sort(fcrdns.begin(), fcrdns.end(),
-            [](std::string_view a, std::string_view b) {
-              if (a.length() != b.length())
-                return a.length() < b.length();
-              return a < b;
-            });
+  // Sort 1st by name length: short to long.
+  std::sort(begin(fcrdns), end(fcrdns), [](auto a, auto b) {
+    if (size(a) != size(b))
+      return size(a) < size(b);
+    return a < b;
+  });
 
   return fcrdns;
 }

@@ -60,48 +60,44 @@ int main(int argc, char const* argv[])
     auto const rrs{q.get_records()};
     auto const rrs_ldns{q_ldns.get_records()};
 
-    CHECK_EQ(rrs.size(), rrs_ldns.size());
+    CHECK_EQ(size(rrs), size(rrs_ldns));
 
-    for (auto i = 0U; i < rrs.size(); ++i) {
-      if (!(rrs[i] == rrs_ldns[i])) {
-        LOG(ERROR) << i << " data element from " << lookup.name << "/"
-                   << lookup.typ;
-        LOG(ERROR) << rrs[i] << " != " << rrs_ldns[i];
-        failure = true;
-      }
+    auto [rr, rr_ldns]
+        = std::mismatch(begin(rrs), end(rrs), begin(rrs_ldns), end(rrs_ldns));
+    if (rr != end(rrs)) {
+      LOG(FATAL) << rr << " != " << rr_ldns;
     }
   }
+}
 
-  CHECK(!failure);
+// These IP addresses might be stable for a while.
 
-  // These IP addresses might be stable for a while.
+auto goog_a{"google-public-dns-a.google.com"};
+auto goog_b{"google-public-dns-b.google.com"};
 
-  auto goog_a{"google-public-dns-a.google.com"};
-  auto goog_b{"google-public-dns-b.google.com"};
+auto addrs_b = res.get_strings(DNS::RR_type::A, goog_b);
+CHECK_EQ(addrs_b.size(), 1U);
+CHECK_EQ(addrs_b[0], "8.8.4.4");
 
-  auto addrs_b = res.get_strings(DNS::RR_type::A, goog_b);
-  CHECK_EQ(addrs_b.size(), 1U);
-  CHECK_EQ(addrs_b[0], "8.8.4.4");
+auto aaaaddrs_a = res.get_strings(DNS::RR_type::AAAA, goog_a);
+CHECK_EQ(aaaaddrs_a.size(), 1U);
+CHECK_EQ(aaaaddrs_a[0], "2001:4860:4860::8888");
 
-  auto aaaaddrs_a = res.get_strings(DNS::RR_type::AAAA, goog_a);
-  CHECK_EQ(aaaaddrs_a.size(), 1U);
-  CHECK_EQ(aaaaddrs_a[0], "2001:4860:4860::8888");
+auto aaaaddrs_b = res.get_strings(DNS::RR_type::AAAA, goog_b);
+CHECK_EQ(aaaaddrs_b.size(), 1U);
+CHECK_EQ(aaaaddrs_b[0], "2001:4860:4860::8844");
 
-  auto aaaaddrs_b = res.get_strings(DNS::RR_type::AAAA, goog_b);
-  CHECK_EQ(aaaaddrs_b.size(), 1U);
-  CHECK_EQ(aaaaddrs_b[0], "2001:4860:4860::8844");
+auto fcrdnses4 = fcrdns4(res, "1.1.1.1");
+CHECK_EQ(fcrdnses4.size(), 1);
+CHECK(Domain::match(fcrdnses4.front(), "1dot1dot1dot1.cloudflare-dns.com."))
+    << "no match for " << fcrdnses4.front();
 
-  auto fcrdnses4 = fcrdns4(res, "1.1.1.1");
-  CHECK_EQ(fcrdnses4.size(), 1);
-  CHECK(Domain::match(fcrdnses4.front(), "1dot1dot1dot1.cloudflare-dns.com."))
-      << "no match for " << fcrdnses4.front();
+auto fcrdnses6 = fcrdns6(res, "2606:4700:4700::1111");
+CHECK_EQ(fcrdnses6.size(), 1);
+CHECK(Domain::match(fcrdnses6.front(), "1dot1dot1dot1.cloudflare-dns.com."))
+    << "no match for " << fcrdnses6.front();
 
-  auto fcrdnses6 = fcrdns6(res, "2606:4700:4700::1111");
-  CHECK_EQ(fcrdnses6.size(), 1);
-  CHECK(Domain::match(fcrdnses6.front(), "1dot1dot1dot1.cloudflare-dns.com."))
-      << "no match for " << fcrdnses6.front();
-
-  auto quad9 = fcrdns4(res, "9.9.9.9");
-  CHECK(Domain::match(quad9.front(), "dns.quad9.net"))
-      << "no match for " << quad9.front();
+auto quad9 = fcrdns4(res, "9.9.9.9");
+CHECK(Domain::match(quad9.front(), "dns.quad9.net"))
+    << "no match for " << quad9.front();
 }

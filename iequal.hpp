@@ -14,8 +14,8 @@ inline bool iequal_char(char a, char b)
 
 inline bool iequal(std::string_view a, std::string_view b)
 {
-  if (a.length() == b.length()) {
-    return std::equal(b.begin(), b.end(), a.begin(), iequal_char);
+  if (size(a) == size(b)) {
+    return std::equal(begin(b), end(b), begin(a), iequal_char);
   }
   return false;
 }

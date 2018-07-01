@@ -38,9 +38,9 @@ Lib::~Lib()
 
 void Lib::header(std::string_view header)
 {
-  if (header.size() && header.back() == '\n')
+  if (size(header) && header.back() == '\n')
     header.remove_suffix(1);
-  if (header.size() && header.back() == '\r')
+  if (size(header) && header.back() == '\r')
     header.remove_suffix(1);
 
   CHECK_EQ((status_ = dkim_header(dkim_, uc(header.data()), header.length())),
@@ -99,8 +99,8 @@ void Lib::eom()
 void Verify::foreach_sig(
     std::function<void(char const* domain, bool passed)> func)
 {
-  auto nsigs{0};
-  auto sigs{(DKIM_SIGINFO**){}};
+  int nsigs = 0;
+  DKIM_SIGINFO** sigs = nullptr;
   status_ = dkim_getsiglist(dkim_, &sigs, &nsigs);
   if (status_ == DKIM_STAT_INVALID) {
     LOG(WARNING) << "skipping DKIM sigs";
@@ -156,8 +156,8 @@ Verify::Verify()
 
 bool Verify::check()
 {
-  auto nsigs{0};
-  auto sigs{(DKIM_SIGINFO**){}};
+  int nsigs = 0;
+  DKIM_SIGINFO** sigs = nullptr;
   status_ = dkim_getsiglist(dkim_, &sigs, &nsigs);
   CHECK_EQ(status_, DKIM_STAT_OK);
 
@@ -246,8 +246,8 @@ Sign::Sign(char const* secretkey,
 std::string Sign::getsighdr()
 {
   auto const initial{strlen(DKIM_SIGNHEADER) + 2};
-  auto buf{(unsigned char*){}};
-  auto len{size_t{0}};
+  unsigned char* buf = nullptr;
+  size_t len = 0;
   status_ = dkim_getsighdr_d(dkim_, initial, &buf, &len);
   return std::string(c(buf), len);
 }

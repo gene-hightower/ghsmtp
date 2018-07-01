@@ -8,13 +8,27 @@
 
 namespace DNS {
 
-struct packet {
-  std::unique_ptr<unsigned char[]> bfr;
-  uint16_t sz;
+class packet {
+public:
+  packet() {}
+  packet(std::unique_ptr<unsigned char[]>&& bfr, uint16_t sz)
+    : bfr_{std::move(bfr)}
+    , sz_{sz}
+  {
+  }
 
-  unsigned char const* begin() const { return bfr.get(); }
-  unsigned char const* end() const { return begin() + sz; }
+  auto size() const { return sz_; }
+  unsigned char const* begin() const { return bfr_.get(); }
+  unsigned char const* end() const { return begin() + size(); }
+
+private:
+  std::unique_ptr<unsigned char[]> bfr_;
+  uint16_t sz_;
 };
+
+inline auto begin(packet const& pkt) { return pkt.begin(); }
+inline auto end(packet const& pkt) { return pkt.end(); }
+inline auto size(packet const& pkt) { return pkt.size(); }
 
 class Resolver {
 public:

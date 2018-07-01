@@ -103,7 +103,8 @@ uint16_t get_port(char const* const service)
   }
 
   auto result_buf{servent{}};
-  auto result_ptr{(servent*){}};
+
+  servent* result_ptr = nullptr;
   auto str_buf{std::vector<char>(1024)}; // 1024 suggested by getservbyname_r(3)
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
