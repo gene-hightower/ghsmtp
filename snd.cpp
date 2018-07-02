@@ -92,6 +92,7 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -960,9 +961,9 @@ bool starts_with(std::string_view str, std::string_view prefix)
   return false;
 }
 
-bool not_sts_rec(std::string const& sts_rec)
+bool sts_rec(std::string const& sts_rec)
 {
-  return !starts_with(sts_rec, "v=STSv1");
+  return starts_with(sts_rec, "v=STSv1");
 }
 
 std::vector<Domain>
@@ -990,9 +991,9 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   auto q_sts{DNS::Query{res, DNS::RR_type::TXT, "_mta-sts."s + domain}};
   if (q_sts.has_record()) {
     auto sts_records = q_sts.get_strings();
-    sts_records.erase(
-        std::remove_if(begin(sts_records), end(sts_records), not_sts_rec),
-        end(sts_records));
+    sts_records.erase(std::remove_if(begin(sts_records), end(sts_records),
+                                     std::not_fn(sts_rec)),
+                      end(sts_records));
     if (size(sts_records) == 1) {
       LOG(INFO) << "### This domain implements MTA-STS ###";
     }
