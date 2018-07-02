@@ -20,7 +20,15 @@
 
 #include "osutil.hpp"
 
+namespace Config {
 auto constexpr max_udp_sz{uint16_t(4 * 1024)};
+
+// The default timeout in glibc is 5 seconds.  My setupwith with
+// unbound in front of stubby with DNSSEC checking and all that seems
+// to work better with just a little more time.
+
+auto constexpr read_timeout{std::chrono::seconds(7)};
+} // namespace Config
 
 template <typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept
@@ -538,7 +546,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   new (q) question(type, cls);
   q += sizeof(question);
 
-  new (q) edns0_opt_meta_rr(max_udp_sz);
+  new (q) edns0_opt_meta_rr(Config::max_udp_sz);
   q += sizeof(edns0_opt_meta_rr);
 
   // verify constructed size is less than or equal to allocated size
@@ -666,14 +674,14 @@ packet Resolver::xchg(packet const& q)
 
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
 
-  auto sz = max_udp_sz;
+  auto sz = Config::max_udp_sz;
   auto bfr = std::make_unique<unsigned char[]>(sz);
 
   auto constexpr hook{[]() {}};
   auto t_o{false};
   auto a_buf = reinterpret_cast<char*>(bfr.get());
   auto a_buflen
-      = POSIX::read(ns_fd_, a_buf, int(sz), hook, std::chrono::seconds(7), t_o);
+      = POSIX::read(ns_fd_, a_buf, int(sz), hook, Config::read_timeout, t_o);
 
   if (a_buflen < 0) {
     LOG(WARNING) << "DNS read failed";
@@ -684,6 +692,8 @@ packet Resolver::xchg(packet const& q)
     LOG(WARNING) << "DNS read timed out";
     return packet{std::make_unique<unsigned char[]>(0), uint16_t(0)};
   }
+
+  // No way to shrink an allocation from std::make_unique. FIXME!
 
   sz = a_buflen;
   return packet{std::move(bfr), sz};
