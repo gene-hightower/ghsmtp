@@ -82,7 +82,7 @@ struct u_label : seq<u_let_dig, opt<u_ldh_str>> {};
 struct let_dig : sor<ALPHA, DIGIT> {};
 
 struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
-  // verify last char is a U_Let_dig
+  // verify last char is a Let_dig
 };
 
 struct label : seq<let_dig, opt<ldh_str>> {};
