@@ -1,6 +1,7 @@
 #ifndef SESSION_DOT_HPP
 #define SESSION_DOT_HPP
 
+#include <random>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -127,6 +128,8 @@ private:
   std::unique_ptr<Message> msg_;
 
   TLD tld_db_;
+
+  std::random_device random_device_;
 
   // White and black lists for domains.
   CDB white_{"white"};
