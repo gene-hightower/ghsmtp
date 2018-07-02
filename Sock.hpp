@@ -3,10 +3,8 @@
 
 #include <string>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
 #include "SockBuffer.hpp"
+#include "sa.hpp"
 
 namespace Config {
 constexpr auto read_timeout_default = std::chrono::seconds(30);
@@ -69,15 +67,8 @@ private:
   socklen_t us_addr_len_{sizeof us_addr_};
   socklen_t them_addr_len_{sizeof them_addr_};
 
-  union sa {
-    struct sockaddr addr;
-    struct sockaddr_in addr_in;
-    struct sockaddr_in6 addr_in6;
-    struct sockaddr_storage addr_storage;
-  };
-
-  sa us_addr_{};
-  sa them_addr_{};
+  sa::sockaddrs us_addr_{};
+  sa::sockaddrs them_addr_{};
 
   char us_addr_str_[INET6_ADDRSTRLEN]{'\0'};
   char them_addr_str_[INET6_ADDRSTRLEN]{'\0'};
