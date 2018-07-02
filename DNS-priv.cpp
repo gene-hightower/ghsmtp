@@ -743,8 +743,12 @@ bool Query::xchg_(Resolver& res, uint16_t id)
 Query::Query(Resolver& res, RR_type type, char const* name)
   : type_(type)
 {
-  static std::atomic_uint16_t next_id;
-  auto id = ++next_id;
+  static_assert(std::numeric_limits<uint16_t>::min() == 0);
+  static_assert(std::numeric_limits<uint16_t>::max() == 65535);
+
+  uint16_t id
+      = std::experimental::randint(std::numeric_limits<uint16_t>::min(),
+                                   std::numeric_limits<uint16_t>::max());
 
   uint16_t cls = ns_c_in;
   q_ = create_question(name, type, cls, id);
