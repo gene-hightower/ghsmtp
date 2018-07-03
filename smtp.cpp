@@ -146,16 +146,16 @@ struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
 struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
 
 struct atext : sor<ALPHA, DIGIT,
-                   one<'!'>, one<'#'>,
-                   one<'$'>, one<'%'>,
-                   one<'&'>, one<'\''>,
-                   one<'*'>, one<'+'>,
-                   one<'-'>, one<'/'>,
-                   one<'='>, one<'?'>,
-                   one<'^'>, one<'_'>,
-                   one<'`'>, one<'{'>,
-                   one<'|'>, one<'}'>,
-                   one<'~'>,
+                   one<'!', '#',
+                       '$', '%',
+                       '&', '\'',
+                       '*', '+',
+                       '-', '/',
+                       '=', '?',
+                       '^', '_',
+                       '`', '{',
+                       '|', '}',
+                       '~'>,
                    UTF8_non_ascii> {};
 
 struct atom : plus<atext> {};
@@ -276,7 +276,7 @@ struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
 // base64-char     = ALPHA / DIGIT / "+" / "/"
 //                   ;; Case-sensitive
 
-struct base64_char : sor<ALPHA, DIGIT, one<'+'>, one<'/'>> {};
+struct base64_char : sor<ALPHA, DIGIT, one<'+', '/'>> {};
 
 // base64-terminal = (2base64-char "==") / (3base64-char "=")
 

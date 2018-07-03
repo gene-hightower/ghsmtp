@@ -180,16 +180,16 @@ struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, chars::non_ascii> {};
 struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
 
 struct atext : sor<ALPHA, DIGIT,
-                   one<'!'>, one<'#'>,
-                   one<'$'>, one<'%'>,
-                   one<'&'>, one<'\''>,
-                   one<'*'>, one<'+'>,
-                   one<'-'>, one<'/'>,
-                   one<'='>, one<'?'>,
-                   one<'^'>, one<'_'>,
-                   one<'`'>, one<'{'>,
-                   one<'|'>, one<'}'>,
-                   one<'~'>,
+                   one<'!', '#',
+                       '$', '%',
+                       '&', '\'',
+                       '*', '+',
+                       '-', '/',
+                       '=', '?',
+                       '^', '_',
+                       '`', '{',
+                       '|', '}',
+                       '~'>,
                    chars::non_ascii> {};
 
 // ctext is ASCII not '(' or ')' or '\\'
