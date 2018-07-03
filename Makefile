@@ -263,7 +263,7 @@ net-check::
 
 check::
 	./msg --selftest
-	./snd --selftest
+	GHSMTP_CLIENT_ID=digilicious.com ./snd --selftest
 
 show::
 	llvm-profdata merge -sparse /tmp/smtp-profile/* -o smtp.profdata
