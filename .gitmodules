@@ -1,6 +1,6 @@
 [submodule "MKUltra"]
 	path = MKUltra
-	url = git@github.com:gene-hightower/MKUltra.git
+	url = https://github.com/gene-hightower/MKUltra.git
 [submodule "GSL"]
 	path = GSL
 	url = https://github.com/Microsoft/GSL.git
