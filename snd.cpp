@@ -343,7 +343,7 @@ struct dcolon : two<':'> {};
 
 struct IPv6address : sor<seq<                                          rep<6, h16, colon>, ls32>,
                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
-                         seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
+                         seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>,
                          seq<opt<h16,     opt<   colon, h16>>, dcolon, rep<3, h16, colon>, ls32>,
                          seq<opt<h16, rep_opt<2, colon, h16>>, dcolon, rep<2, h16, colon>, ls32>,
                          seq<opt<h16, rep_opt<3, colon, h16>>, dcolon,        h16, colon,  ls32>,
