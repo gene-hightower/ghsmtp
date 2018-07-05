@@ -32,6 +32,44 @@ char const* rbls[]{
     "zen.spamhaus.org",
 };
 
+/*** Last octet from A record returned by blacklists ***
+
+From <http://uribl.com/about.shtml#implementation>
+
+X   Binary    On List
+---------------------------------------------------------
+1   00000001  Query blocked, possibly due to high volume
+2   00000010  black
+4   00000100  grey
+8   00001000  red
+14  00001110  black,grey,red (for testpoints)
+
+From <https://www.spamhaus.org/faq/section/Spamhaus%20DBL#291>
+
+Return Codes 	Data Source
+127.0.1.2 	spam domain
+127.0.1.4 	phish domain
+127.0.1.5 	malware domain
+127.0.1.6 	botnet C&C domain
+127.0.1.102 	abused legit spam
+127.0.1.103 	abused spammed redirector domain
+127.0.1.104 	abused legit phish
+127.0.1.105 	abused legit malware
+127.0.1.106 	abused legit botnet C&C
+127.0.1.255 	IP queries prohibited!
+
+From <http://www.surbl.org/lists#multi>
+
+last octet indicates which lists it belongs to. The bit positions in
+that last octet for membership in the different lists are:
+
+  8 = listed on PH
+ 16 = listed on MW
+ 64 = listed on ABUSE
+128 = listed on CR
+
+*/
+
 char const* uribls[]{
     "black.uribl.com",
     "dbl.spamhaus.org",
@@ -1415,7 +1453,10 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
                random_device_);
   for (auto uribl : Config::uribls) {
     auto const lookup = fmt::format("{}.{}", sender, uribl);
-    if (DNS::has_record(res_, DNS::RR_type::A, lookup)) {
+    auto as = DNS::get_strings(res_, DNS::RR_type::A, lookup);
+    if (!as.empty()) {
+      if (as.front() == "127.0.0.1")
+        continue;
       error_msg = fmt::format("{} blocked on advice of {}", sender, uribl);
       out_() << "550 5.7.1 sender " << error_msg << "\r\n" << std::flush;
       return false;
