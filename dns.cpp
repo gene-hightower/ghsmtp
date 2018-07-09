@@ -24,7 +24,8 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
 
   for (auto rbl : rbls) {
     if (has_record(res, DNS::RR_type::A, reversed + rbl)) {
-      std::cout << a << " blocked on advice from " << rbl << '\n';
+      std::cout << a << " blocked on advice from " << rbl;
+      std::cout << '\n';
     }
   }
 }
@@ -43,6 +44,7 @@ void do_addr(DNS::Resolver& res, char const* a)
     std::copy(begin(doms), end(doms),
               std::experimental::make_ostream_joiner(std::cout, ", "));
     std::cout << ']';
+    std::cout << '\n';
   }
 
   if (names.empty()) {
@@ -52,6 +54,7 @@ void do_addr(DNS::Resolver& res, char const* a)
           = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
       for (auto const& ptr : ptrs) {
         std::cout << " has a PTR to " << ptr;
+        std::cout << '\n';
       }
       check_dnsrbl(res, a);
     }
@@ -61,11 +64,11 @@ void do_addr(DNS::Resolver& res, char const* a)
           = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
       for (auto const& ptr : ptrs) {
         std::cout << " has a PTR to " << ptr;
+        std::cout << '\n';
       }
     }
   }
 
-  std::cout << '\n';
 }
 
 void do_domain(DNS::Resolver& res, char const* dom_cp)
