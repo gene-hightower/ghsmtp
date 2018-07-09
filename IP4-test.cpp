@@ -34,7 +34,9 @@ int main(int argc, char const* argv[])
   CHECK(!is_address(""));
 
   // This is acceptable:
-  CHECK(is_address("001.0.0.0"));
+  CHECK(is_address("001.001.001.001"));
+  // and this
+  CHECK(is_address("01.01.01.01"));
   // but not:
   CHECK(!is_address("0001.0.0.0"));
   // or:
