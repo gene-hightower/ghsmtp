@@ -17,10 +17,10 @@ namespace IP4 {
 using dot = one<'.'>;
 
 // clang-format off
-struct dec_octet : sor<rep_min_max<1, 2, DIGIT>,
-                       seq<range<'0', '1'>, DIGIT, DIGIT>,
+struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0', '4'>, DIGIT>,
-                       seq<string<'2','5'>, range<'0','5'>>> {};
+                       seq<one<'1'>, DIGIT, DIGIT>,
+                       rep_min_max<1, 2, DIGIT>> {};
 // clang-format on
 
 struct ipv4_address
