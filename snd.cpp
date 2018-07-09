@@ -326,11 +326,11 @@ struct sub_domain : sor<label, u_label> {};
 
 struct domain : list<sub_domain, dot> {};
 
-struct dec_octet : sor<one<'0'>,
-                       rep_min_max<1, 2, DIGIT>,
-                       seq<one<'1'>, DIGIT, DIGIT>,
-                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
-                       seq<string<'2','5'>, range<'0','5'>>> {};
+struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
+                       seq<one<'2'>, range<'0','4'>, DIGIT>,
+                       seq<range<'0', '1'>, DIGIT, DIGIT>,
+                       seq<DIGIT, DIGIT>,
+                       DIGIT> {};
 
 struct IPv4_address_literal
 : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
