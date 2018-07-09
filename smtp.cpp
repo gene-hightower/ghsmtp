@@ -21,6 +21,7 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
+#include <tao/pegtl/contrib/tracer.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -91,11 +92,11 @@ struct sub_domain : sor<label, u_label> {};
 
 struct domain : list<sub_domain, dot> {};
 
-struct dec_octet : sor<DIGIT,
-                       seq<range<'1','9'>, DIGIT>,
-                       seq<one<'1'>, DIGIT, DIGIT>,
+struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<string<'2','5'>, range<'0','5'>>> {};
+                       seq<one<'1'>, DIGIT, DIGIT>,
+                       seq<range<'1','9'>, DIGIT>,
+                       DIGIT> {};
 
 struct IPv4_address_literal
     : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
