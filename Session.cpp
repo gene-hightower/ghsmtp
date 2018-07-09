@@ -223,14 +223,14 @@ void Session::greeting()
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         // no glog message at this point
-        bad_host_("input before greeting");
+        bad_host_("input before any greeting");
       }
       // Give a half greeting and wait again.
       out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         // LOG(INFO) << "half greeting got " << client_;
-        bad_host_("input before greeting");
+        bad_host_("input before full greeting");
       }
     }
   }
