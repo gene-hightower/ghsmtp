@@ -56,7 +56,6 @@ void do_addr(DNS::Resolver& res, char const* a)
         std::cout << " has a PTR to " << ptr;
         std::cout << '\n';
       }
-      check_dnsrbl(res, a);
     }
     if (IP6::is_address(a)) {
       auto const reversed{IP6::reverse(a)};
@@ -68,7 +67,8 @@ void do_addr(DNS::Resolver& res, char const* a)
       }
     }
   }
-
+  std::cout << '\n';
+  check_dnsrbl(res, a);
 }
 
 void do_domain(DNS::Resolver& res, char const* dom_cp)
