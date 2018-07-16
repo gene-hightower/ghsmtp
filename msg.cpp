@@ -116,7 +116,7 @@ char const* defined_field(std::string_view name)
   return "";
 }
 
-struct ci_less : public std::binary_function<std::string, std::string, bool> {
+struct ci_less {
   bool operator()(std::string const& lhs, std::string const& rhs) const
   {
     return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
