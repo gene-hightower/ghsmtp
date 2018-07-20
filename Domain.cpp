@@ -18,12 +18,14 @@
 
 std::string nfkc(std::string_view str)
 {
-  size_t length = 0;
-  auto udata = reinterpret_cast<const uint8_t*>(str.data());
-  auto norm = u8_normalize(UNINORM_NFKC, udata, str.size(), nullptr, &length);
-  std::string str_norm(reinterpret_cast<const char*>(norm), length);
-  free(norm);
-  return str_norm;
+  size_t constexpr max_length = 255;
+  size_t length = max_length;
+  char bfr[max_length];
+  CHECK_LE(str.length(), max_length);
+  auto udata = reinterpret_cast<uint8_t const*>(str.data());
+  auto ubfr = reinterpret_cast<uint8_t*>(bfr);
+  CHECK_NOTNULL(u8_normalize(UNINORM_NFKC, udata, str.size(), ubfr, &length));
+  return std::string{bfr, length};
 }
 
 void Domain::set(std::string_view dom)
