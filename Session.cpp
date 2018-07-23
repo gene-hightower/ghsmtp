@@ -1206,8 +1206,8 @@ bool Session::verify_client_(Domain const& client_identity,
       if (id != begin(client_fcrdns_)) {
         std::rotate(begin(client_fcrdns_), id, id + 1);
       }
-      client_
-          = client_fcrdns_.front().ascii() + " " + sock_.them_address_literal();
+      client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
+                            sock_.them_address_literal());
       return true;
     }
     LOG(INFO) << "claimed identity " << client_identity
