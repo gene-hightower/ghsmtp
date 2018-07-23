@@ -30,39 +30,56 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
   }
 }
 
+void check_uribls(DNS::Resolver& res, char const* dom)
+{
+  char const* uribls[]{
+      "black.uribl.com",
+      "dbl.spamhaus.org",
+      "multi.surbl.org",
+  };
+
+  for (auto uribl : uribls) {
+    auto const lookup = fmt::format("{}.{}", dom, uribl);
+    if (DNS::has_record(res, DNS::RR_type::A, lookup)) {
+      std::cout << dom << " blocked on advice from " << uribl << '\n';
+    }
+  }
+}
+
 void do_addr(DNS::Resolver& res, char const* a)
 {
-  std::cout << a;
-
   auto const names = DNS::fcrdns(res, a);
   std::vector<Domain> doms;
   for (auto const& name : names) {
     doms.emplace_back(name);
   }
   if (!doms.empty()) {
-    std::cout << " [";
-    std::copy(begin(doms), end(doms), std::experimental::make_ostream_joiner(std::cout, ", "));
+    std::cout << a << " [";
+    std::copy(begin(doms), end(doms),
+              std::experimental::make_ostream_joiner(std::cout, ", "));
     std::cout << "]\n";
   }
-
-  if (names.empty()) {
+  else {
     if (IP4::is_address(a)) {
       auto const reversed{IP4::reverse(a)};
-      auto const ptrs = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
+      auto const ptrs
+          = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
       for (auto const& ptr : ptrs) {
-        std::cout << " has a PTR to " << ptr << '\n';
+        std::cout << a << " has a PTR to " << ptr << '\n';
       }
     }
     if (IP6::is_address(a)) {
       auto const reversed{IP6::reverse(a)};
-      auto const ptrs = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
+      auto const ptrs
+          = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
       for (auto const& ptr : ptrs) {
-        std::cout << " has a PTR to " << ptr << '\n';
+        std::cout << a << " has a PTR to " << ptr << '\n';
       }
     }
-  }
-  if (IP4::is_address(a)) {
-    check_dnsrbl(res, a);
+    if (IP4::is_address(a)) {
+      check_dnsrbl(res, a);
+    }
+    std::cout << a << '\n';
   }
 }
 
@@ -72,21 +89,17 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   auto cnames = res.get_strings(DNS::RR_type::CNAME, dom.ascii().c_str());
   if (!cnames.empty()) {
-    std::cout << "is an alias for ";
-    std::copy(begin(cnames), end(cnames), std::experimental::make_ostream_joiner(std::cout, ", "));
-    std::cout << '\n';
+    // RFC 2181 section 10.1. CNAME resource records
+    CHECK_EQ(cnames.size(), 1);
+    std::cout << dom << " is an alias for " << cnames.front() << '\n';
   }
 
   auto as = res.get_strings(DNS::RR_type::A, dom.ascii().c_str());
-  std::sort(begin(as), end(as));
-  std::unique(begin(as), end(as));
   for (auto const& a : as) {
     do_addr(res, a.c_str());
   }
 
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
-  std::sort(begin(aaaas), end(aaaas));
-  std::unique(begin(aaaas), end(aaaas));
   for (auto const& aaaa : aaaas) {
     do_addr(res, aaaa.c_str());
   }
@@ -94,21 +107,10 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   TLD tld_db;
   auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
   if (dom != reg_dom) {
-    std::cout << "registerd domain " << reg_dom << '\n';
+    std::cout << "registered domain is " << reg_dom << '\n';
   }
 
-  char const* uribls[]{
-      "black.uribl.com",
-      "dbl.spamhaus.org",
-      "multi.surbl.org",
-  };
-
-  for (auto uribl : uribls) {
-    auto const lookup = fmt::format("{}.{}", dom.ascii(), uribl);
-    if (DNS::has_record(res, DNS::RR_type::A, lookup)) {
-      std::cout << dom << " blocked on advice from " << uribl << '\n';
-    }
-  }
+  check_uribls(res, dom.ascii().c_str());
 
   auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
   if (q.authentic_data()) {
@@ -117,26 +119,28 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   auto mxs{q.get_records()};
 
-  mxs.erase(
-      std::remove_if(begin(mxs), end(mxs), [](auto const& rr) { return !std::holds_alternative<DNS::RR_MX>(rr); }),
-      end(mxs));
+  mxs.erase(std::remove_if(begin(mxs), end(mxs),
+                           [](auto const& rr) {
+                             return !std::holds_alternative<DNS::RR_MX>(rr);
+                           }),
+            end(mxs));
 
   if (!mxs.empty())
     std::cout << "mail for " << dom << " is handled by\n";
 
   std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
-    if (std::holds_alternative<DNS::RR_MX>(a) && std::holds_alternative<DNS::RR_MX>(b)) {
-      if (std::get<DNS::RR_MX>(a).preference() == std::get<DNS::RR_MX>(b).preference())
-        return std::get<DNS::RR_MX>(a).exchange() < std::get<DNS::RR_MX>(b).exchange();
-      return std::get<DNS::RR_MX>(a).preference() < std::get<DNS::RR_MX>(b).preference();
-    }
-    return false;
+    auto mxa = std::get<DNS::RR_MX>(a);
+    auto mxb = std::get<DNS::RR_MX>(b);
+    if (mxa.preference() == mxb.preference())
+      return mxa.exchange() < mxb.exchange();
+    return mxa.preference() < mxb.preference();
   });
 
   for (auto const& mx : mxs) {
     if (std::holds_alternative<DNS::RR_MX>(mx)) {
       auto x = std::get<DNS::RR_MX>(mx);
-      std::cout << std::setfill(' ') << std::setw(3) << x.preference() << ' ' << x.exchange() << '\n';
+      std::cout << std::setfill(' ') << std::setw(3) << x.preference() << ' '
+                << x.exchange() << '\n';
     }
   }
 }
