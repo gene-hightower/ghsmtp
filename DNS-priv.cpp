@@ -36,6 +36,8 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
   return N;
 }
 
+namespace {
+
 enum class sock_type : bool { stream, dgram };
 
 struct nameserver {
@@ -555,6 +557,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
 
   return DNS::packet{std::move(bfr), static_cast<uint16_t>(sz)};
 }
+} // namespace
 
 namespace DNS {
 
