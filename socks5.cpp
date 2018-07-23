@@ -15,6 +15,7 @@
 
 #include <fmt/format.h>
 
+namespace {
 using octet = uint8_t;
 
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
@@ -73,11 +74,6 @@ constexpr char const* c_str(command cmd)
     return "UDP associate";
   }
   return "*** unknown command ***";
-}
-
-std::ostream& operator<<(std::ostream& os, command const& cmd)
-{
-  return os << c_str(cmd);
 }
 
 enum class address_type : octet {
@@ -213,6 +209,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 
   return tlsa_rrs;
 }
+} // namespace
 
 int main(int argc, char* argv[])
 {
