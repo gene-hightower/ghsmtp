@@ -473,6 +473,7 @@ std::string Session::added_headers_(Message const& msg)
   return headers.str();
 }
 
+namespace {
 bool lookup_domain(CDB& cdb, Domain const& domain)
 {
   if (!domain.empty()) {
@@ -485,6 +486,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
   }
   return false;
 }
+} // namespace
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
@@ -1007,6 +1009,7 @@ void Session::exit_()
   std::exit(EXIT_SUCCESS);
 }
 
+namespace {
 bool ip4_whitelisted(char const* addr)
 {
   struct nw {
@@ -1088,6 +1091,7 @@ bool ip4_whitelisted(char const* addr)
 
   return false;
 }
+} // namespace
 
 /////////////////////////////////////////////////////////////////////////////
 
