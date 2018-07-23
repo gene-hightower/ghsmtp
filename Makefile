@@ -17,7 +17,7 @@ LDLIBS += \
 
 PROGRAMS := dns smtp msg sasl snd socks5
 
-DNS := DNS-rrs DNS-priv DNS-fcrdns
+DNS := DNS DNS-rrs DNS-fcrdns
 
 dns_STEMS := dns \
 	$(DNS) \

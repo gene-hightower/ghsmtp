@@ -1,8 +1,7 @@
 #include "DNS-fcrdns.hpp"
 #include "DNS-iostream.hpp"
 #include "DNS-ldns.hpp"
-#include "DNS-priv.hpp"
-#include "DNS-rrs.hpp"
+#include "DNS.hpp"
 #include "Domain.hpp"
 
 #include <algorithm>

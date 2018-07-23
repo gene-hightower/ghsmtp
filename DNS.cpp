@@ -1,4 +1,4 @@
-#include "DNS-priv.hpp"
+#include "DNS.hpp"
 
 #include "DNS-iostream.hpp"
 #include "IP4.hpp"
@@ -60,18 +60,6 @@ constexpr nameserver nameservers[]{
         "::1",
         "domain",
         sock_type::dgram,
-    },
-    {
-        "digilicious.com",
-        "127.0.0.1",
-        "domain-s",
-        sock_type::stream,
-    },
-    {
-        "digilicious.com",
-        "::1",
-        "domain-s",
-        sock_type::stream,
     },
     {
         "1dot1dot1dot1.cloudflare-dns.com",
