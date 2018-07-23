@@ -90,6 +90,7 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include "fs.hpp"
 #include "imemstream.hpp"
 #include "osutil.hpp"
+#include "sa.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -1773,14 +1774,7 @@ int main(int argc, char* argv[])
 
     // Get our local IP address as "us".
 
-    union sa {
-      struct sockaddr addr;
-      struct sockaddr_in addr_in;
-      struct sockaddr_in6 addr_in6;
-      struct sockaddr_storage addr_storage;
-    };
-
-    sa us_addr{};
+    sa::sockaddrs us_addr{};
     socklen_t us_addr_len{sizeof us_addr};
     char us_addr_str[INET6_ADDRSTRLEN]{'\0'};
     std::vector<std::string> fcrdns;
