@@ -551,6 +551,8 @@ struct action<reply_code> {
 };
 } // namespace RFC5321
 
+namespace {
+
 int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 {
   auto const use_4{!FLAGS_6};
@@ -775,26 +777,7 @@ void check_for_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
   in.discard();
 }
 
-std::string connectable_host(Domain const& dom)
-{
-  if (IP4::is_address_literal(dom.ascii()))
-    return std::string(IP4::as_address(dom.ascii()));
-  if (IP6::is_address_literal(dom.ascii()))
-    return std::string(IP6::as_address(dom.ascii()));
-  return dom.ascii();
-}
-
-std::string connectable_host(Mailbox mbx)
-{
-  return connectable_host(mbx.domain());
-}
-
-std::string connectable_host(std::string_view dom)
-{
-  return connectable_host(Domain(dom));
-}
-
-static bool validate_name(const char* flagname, std::string const& value)
+bool validate_name(const char* flagname, std::string const& value)
 {
   if (value.empty()) // empty name needs to validate, but
     return true;     // will not be used
@@ -809,7 +792,7 @@ static bool validate_name(const char* flagname, std::string const& value)
 DEFINE_validator(from_name, &validate_name);
 DEFINE_validator(to_name, &validate_name);
 
-static bool validate_address(const char* flagname, std::string const& value)
+bool validate_address(const char* flagname, std::string const& value)
 {
   if (value.empty()) // empty name needs to validate, but
     return true;     // will not be used
@@ -1702,6 +1685,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 
   return tlsa_rrs;
 }
+} // namespace
 
 int main(int argc, char* argv[])
 {
