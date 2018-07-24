@@ -23,20 +23,11 @@
 namespace Config {
 auto constexpr max_udp_sz{uint16_t(4 * 1024)};
 
-// The default timeout in glibc is 5 seconds.  My setupwith with
-// unbound in front of stubby with DNSSEC checking and all that seems
-// to work better with just a little more time.
+// The default timeout in glibc is 5 seconds.  My setup with unbound
+// in front of stubby with DNSSEC checking and all that seems to work
+// better with just a little more time.
 
 auto constexpr read_timeout{std::chrono::seconds(7)};
-} // namespace Config
-
-template <typename T, std::size_t N>
-constexpr std::size_t countof(T const (&)[N]) noexcept
-{
-  return N;
-}
-
-namespace {
 
 enum class sock_type : bool { stream, dgram };
 
@@ -105,6 +96,15 @@ constexpr nameserver nameservers[]{
     },
     */
 };
+} // namespace Config
+
+template <typename T, std::size_t N>
+constexpr std::size_t countof(T const (&)[N]) noexcept
+{
+  return N;
+}
+
+namespace {
 
 using octet = unsigned char;
 
@@ -551,23 +551,24 @@ namespace DNS {
 
 Resolver::Resolver()
 {
-  auto tries = countof(nameservers);
+  auto tries = countof(Config::nameservers);
 
-  ns_ = std::experimental::randint(0,
-                                   static_cast<int>(countof(nameservers) - 1));
+  ns_ = std::experimental::randint(
+      0, static_cast<int>(countof(Config::nameservers) - 1));
 
   while (tries--) {
 
     // try the next one, with wrap
-    if (++ns_ == countof(nameservers))
+    if (++ns_ == countof(Config::nameservers))
       ns_ = 0;
 
-    auto const& nameserver = nameservers[ns_];
+    auto const& nameserver = Config::nameservers[ns_];
 
     ns_fd_ = -1;
     uint16_t port = osutil::get_port(nameserver.port);
 
-    auto typ = (nameserver.typ == sock_type::stream) ? SOCK_STREAM : SOCK_DGRAM;
+    auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
+                                                             : SOCK_DGRAM;
 
     if (IP4::is_address(nameserver.addr)) {
       ns_fd_ = socket(AF_INET, typ, 0);
@@ -610,7 +611,7 @@ Resolver::Resolver()
 
     POSIX::set_nonblocking(ns_fd_);
 
-    if (nameserver.typ == sock_type::stream) {
+    if (nameserver.typ == Config::sock_type::stream) {
       ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
 
       if (port != 53) {
@@ -635,7 +636,7 @@ Resolver::Resolver()
 
 packet Resolver::xchg(packet const& q)
 {
-  if (nameservers[ns_].typ == sock_type::stream) {
+  if (Config::nameservers[ns_].typ == Config::sock_type::stream) {
     CHECK_EQ(ns_fd_, -1);
 
     uint16_t sz = htons(std::size(q));
@@ -660,7 +661,7 @@ packet Resolver::xchg(packet const& q)
     return packet{std::move(bfr), sz};
   }
 
-  CHECK(nameservers[ns_].typ == sock_type::dgram);
+  CHECK(Config::nameservers[ns_].typ == Config::sock_type::dgram);
   CHECK_GE(ns_fd_, 0);
 
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
