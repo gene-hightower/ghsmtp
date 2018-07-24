@@ -24,7 +24,8 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
   auto const reversed{IP4::reverse(a)};
 
   for (auto rbl : rbls) {
-    if (has_record(res, DNS::RR_type::A, reversed + rbl)) {
+    auto as = DNS::get_strings(res, DNS::RR_type::A, reversed + rbl);
+    if (!as.empty()) {
       std::cout << a << " blocked on advice from " << rbl << '\n';
     }
   }
@@ -40,7 +41,10 @@ void check_uribls(DNS::Resolver& res, char const* dom)
 
   for (auto uribl : uribls) {
     auto const lookup = fmt::format("{}.{}", dom, uribl);
-    if (DNS::has_record(res, DNS::RR_type::A, lookup)) {
+    auto as = DNS::get_strings(res, DNS::RR_type::A, lookup);
+    if (!as.empty()) {
+      if (as.front() == "127.0.0.1")
+        continue;
       std::cout << dom << " blocked on advice from " << uribl << '\n';
     }
   }
