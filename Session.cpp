@@ -71,7 +71,7 @@ that last octet for membership in the different lists are:
 */
 
 char const* uribls[]{
-    "black.uribl.com",
+    "multi.uribl.com",
     "dbl.spamhaus.org",
     "multi.surbl.org",
 };

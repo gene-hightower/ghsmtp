@@ -34,7 +34,7 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
 void check_uribls(DNS::Resolver& res, char const* dom)
 {
   char const* uribls[]{
-      "black.uribl.com",
+      "multi.uribl.com",
       "dbl.spamhaus.org",
       "multi.surbl.org",
   };
