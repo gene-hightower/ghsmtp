@@ -311,17 +311,17 @@ using dash = one<'-'>;
 
 struct u_let_dig : sor<ALPHA, DIGIT, chars::non_ascii> {};
 
-// should verify last char is a U_Let_dig
-struct u_ldh_str : plus<sor<ALPHA, DIGIT, chars::non_ascii, dash>> {};
+struct u_ldh_tail : star<sor<seq<one<'-'>, u_let_dig>, u_let_dig>> {};
 
-struct u_label : seq<u_let_dig, opt<u_ldh_str>> {};
+struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
 struct let_dig : sor<ALPHA, DIGIT> {};
 
-// should verify last char is a U_Let_dig
-struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {};
+struct ldh_tail : star<sor<seq<one<'-'>, let_dig>, let_dig>> {};
 
-struct label : seq<let_dig, opt<ldh_str>> {};
+struct ldh_str : seq<let_dig, ldh_tail> {};
+
+struct label : ldh_str {};
 
 struct sub_domain : sor<label, u_label> {};
 

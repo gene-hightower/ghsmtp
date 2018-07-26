@@ -74,23 +74,21 @@ using dash = one<'-'>;
 
 struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
 
-struct u_ldh_str : plus<sor<ALPHA, DIGIT, UTF8_non_ascii, dash>> {
-  // verify last char is a U_Let_dig
-};
+struct u_ldh_tail : star<sor<seq<one<'-'>, u_let_dig>, u_let_dig>> {};
 
-struct u_label : seq<u_let_dig, opt<u_ldh_str>> {};
+struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
 struct let_dig : sor<ALPHA, DIGIT> {};
 
-struct ldh_str : plus<sor<ALPHA, DIGIT, dash>> {
-  // verify last char is a Let_dig
-};
+struct ldh_tail : star<sor<seq<one<'-'>, let_dig>, let_dig>> {};
 
-struct label : seq<let_dig, opt<ldh_str>> {};
+struct ldh_str : seq<let_dig, ldh_tail> {};
 
-struct sub_domain : sor<label, u_label> {};
+// struct label : seq<let_dig, opt<ldh_str>> {};
 
-struct domain : list<sub_domain, dot> {};
+struct sub_domain : u_label {};
+
+struct domain : list_tail<sub_domain, dot> {};
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
