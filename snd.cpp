@@ -317,7 +317,7 @@ struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
 struct let_dig : sor<ALPHA, DIGIT> {};
 
-struct ldh_tail : star<sor<seq<one<'-'>, let_dig>, let_dig>> {};
+struct ldh_tail : star<sor<seq<plus<one<'-'>>, let_dig>, let_dig>> {};
 
 struct ldh_str : seq<let_dig, ldh_tail> {};
 
