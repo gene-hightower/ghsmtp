@@ -13,12 +13,15 @@
 
 #include <stdexcept>
 
+namespace {
+size_t constexpr max_length = 255;
+}
+
 // Normalization Form KC (NFKC) Compatibility Decomposition, followed
 // by Canonical Composition, see <http://unicode.org/reports/tr15/>
 
 std::string nfkc(std::string_view str)
 {
-  size_t constexpr max_length = 255;
   size_t length = max_length;
   char bfr[max_length];
   CHECK_LE(str.length(), max_length);
@@ -30,6 +33,10 @@ std::string nfkc(std::string_view str)
 
 void Domain::set(std::string_view dom)
 {
+  if (dom.length() > max_length) {
+    throw std::runtime_error("domain name too long");
+  }
+
   // Handle "bare" IP addresses, without the brackets.
   if (IP4::is_address(dom)) {
     ascii_ = IP4::to_address_literal(dom);
