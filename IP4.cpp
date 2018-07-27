@@ -4,8 +4,6 @@
 
 #include <fmt/format.h>
 
-using namespace std::string_literals;
-
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
