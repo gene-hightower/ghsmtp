@@ -257,16 +257,17 @@ struct display_name_only : seq<display_name, eof> {};
 
 // clang-format on
 
-
 // struct name_addr : seq<opt<display_name>, angle_addr> {};
 
 // struct mailbox : sor<name_addr, addr_spec> {};
 
 template <typename Rule>
-struct inaction : nothing<Rule> {};
+struct inaction : nothing<Rule> {
+};
 
 template <typename Rule>
-struct action : nothing<Rule> {};
+struct action : nothing<Rule> {
+};
 
 template <>
 struct action<local_part> {
@@ -285,7 +286,7 @@ struct action<domain> {
     mbx.set_domain(in.string());
   }
 };
-}
+} // namespace RFC5322
 
 namespace RFC5321 {
 
@@ -304,8 +305,10 @@ struct Connection {
   bool ehlo_ok{false};
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
-    : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
-  {}
+    : sock(
+          fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+  {
+  }
 };
 
 // clang-format off
