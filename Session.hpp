@@ -139,8 +139,8 @@ private:
 
   int n_unrecognized_cmds_{0};
 
-  SPF::Request spf_request_;
   SPF::Result spf_result_;
+  Domain spf_sender_domain_;
 
   // RFC 5321 section 3.3. Mail Transactions
   enum class xact_step : int8_t {

@@ -504,17 +504,16 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   }
 
   if (spf_result_ == SPF::Result::PASS) {
-    auto const dom{Domain{spf_request_.get_sender_dom()}};
-    if (lookup_domain(white_, dom)) {
+    if (lookup_domain(white_, spf_sender_domain_)) {
       if (status == SpamStatus::ham) {
         fmt::format_to(reason, ", and ");
       }
       fmt::format_to(reason, "SPF sender domain ({}) is whitelisted",
-                     dom.utf8());
+                     spf_sender_domain_.utf8());
       status = SpamStatus::ham;
     }
     else {
-      auto tld_dom{tld_db_.get_registered_domain(dom.ascii())};
+      auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
       if (tld_dom && white_.lookup(tld_dom)) {
         if (status == SpamStatus::ham) {
           fmt::format_to(reason, ", and ");
@@ -1484,37 +1483,39 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
                    "envelope-from={}; helo={};",
                    server_id_(), ip_addr, sender, client_identity_);
     spf_received_ = fmt::to_string(received_spf);
+    spf_sender_domain_ = "localhost";
     return true;
   }
 
   auto const spf_srv{SPF::Server{server_id_().c_str()}};
-  spf_request_ = SPF::Request{spf_srv};
+  auto spf_request = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
-    spf_request_.set_ipv4_str(sock_.them_c_str());
+    spf_request.set_ipv4_str(sock_.them_c_str());
   }
   else if (IP6::is_address(sock_.them_c_str())) {
-    spf_request_.set_ipv6_str(sock_.them_c_str());
+    spf_request.set_ipv6_str(sock_.them_c_str());
   }
   else {
     LOG(FATAL) << "bogus address " << sock_.them_address_literal() << ", "
                << sock_.them_c_str();
   }
 
-  spf_request_.set_helo_dom(client_identity_.ascii().c_str());
+  spf_request.set_helo_dom(client_identity_.ascii().c_str());
 
   auto const from{static_cast<std::string>(sender)};
 
-  spf_request_.set_env_from(from.c_str());
+  spf_request.set_env_from(from.c_str());
 
-  auto const spf_res{SPF::Response{spf_request_}};
+  auto const spf_res{SPF::Response{spf_request}};
   spf_result_ = spf_res.result();
   spf_received_ = spf_res.received_spf();
+  spf_sender_domain_ = Domain{spf_request.get_sender_dom()};
 
   if (spf_result_ == SPF::Result::PASS) {
-    auto const dom{Domain{spf_request_.get_sender_dom()}};
-    if (lookup_domain(black_, dom)) {
-      LOG(INFO) << "SPF sender domain (" << dom << ") is blacklisted";
+    if (lookup_domain(black_, spf_sender_domain_)) {
+      LOG(INFO) << "SPF sender domain (" << spf_sender_domain_
+                << ") is blacklisted";
       return false;
     }
   }

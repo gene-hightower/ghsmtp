@@ -98,23 +98,6 @@ public:
   {
   }
   explicit Request(Server const& srv);
-
-  Request(Request&& other)
-    : req_(other.req_)
-  {
-    other.req_ = nullptr;
-  }
-  Request& operator=(Request&& other)
-  {
-    if (this != &other) { // prevent self-move
-      CHECK((req_ == nullptr) || (req_ == other.req_))
-          << "can only move into default constructed object";
-      req_ = other.req_;
-      other.req_ = nullptr;
-    }
-    return *this;
-  }
-
   ~Request();
 
   void set_ip_str(char const* ip);
@@ -137,22 +120,6 @@ public:
 
   Response();
   explicit Response(Request const& req);
-
-  Response(Response&& other)
-    : res_(other.res_)
-  {
-    other.res_ = nullptr;
-  }
-  Response& operator=(Response&& other)
-  {
-    if (this != &other) { // prevent self-move
-      CHECK(res_ == nullptr) << "can only move into default constructed object";
-      res_ = other.res_;
-      other.res_ = nullptr;
-    }
-    return *this;
-  }
-
   ~Response();
 
   Result result() const;
