@@ -74,7 +74,7 @@ using dash = one<'-'>;
 
 struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
 
-struct u_ldh_tail : star<sor<seq<one<'-'>, u_let_dig>, u_let_dig>> {};
+struct u_ldh_tail : star<sor<seq<plus<one<'-'>>, u_let_dig>, u_let_dig>> {};
 
 struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
