@@ -230,6 +230,8 @@ struct phrase : plus<word> {};
 
 struct local_part : sor<dot_atom, quoted_string> {};
 
+// from '!' to '~' excluding 91 92 93 '[' '\\' ']'
+
 struct dtext : ranges<33, 90, 94, 126> {};
 
 struct domain_literal : seq<opt<CFWS>,
@@ -252,6 +254,9 @@ struct addr_spec_only : seq<addr_spec_or_postmaster, eof> {};
 struct display_name : phrase {};
 
 struct display_name_only : seq<display_name, eof> {};
+
+// clang-format on
+
 
 // struct name_addr : seq<opt<display_name>, angle_addr> {};
 
@@ -302,6 +307,8 @@ struct Connection {
     : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
   {}
 };
+
+// clang-format off
 
 struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
 
