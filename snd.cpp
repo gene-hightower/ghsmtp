@@ -376,6 +376,33 @@ struct address_literal : seq<one<'['>,
                                  general_address_literal>,
                              one<']'>> {};
 
+
+struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, chars::non_ascii> {};
+struct graphic : range<32, 126> {};
+struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
+struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
+
+// excluded from atext: "(),.@[]"
+struct atext : sor<ALPHA, DIGIT,
+                   one<'!', '#',
+                       '$', '%',
+                       '&', '\'',
+                       '*', '+',
+                       '-', '/',
+                       '=', '?',
+                       '^', '_',
+                       '`', '{',
+                       '|', '}',
+                       '~'>,
+                   chars::non_ascii> {};
+struct atom : plus<atext> {};
+struct dot_string : list<atom, dot> {};
+struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
+struct local_part : sor<dot_string, quoted_string> {};
+struct non_local_part : sor<domain, address_literal> {};
+struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
+struct mailbox_only : seq<mailbox, eof> {};
+
 // textstring     = 1*(%d09 / %d32-126) ; HT, SP, Printable US-ASCII
 
 struct textstring : plus<sor<one<9>, range<32, 126>>> {};
@@ -467,6 +494,10 @@ struct auth_login_password
 // clang-format on
 
 template <typename Rule>
+struct inaction : nothing<Rule> {
+};
+
+template <typename Rule>
 struct action : nothing<Rule> {
 };
 
@@ -476,6 +507,24 @@ struct action<server_id> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.server_id = in.string();
+  }
+};
+
+template <>
+struct action<local_part> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox& mbx)
+  {
+    mbx.set_local(in.string());
+  }
+};
+
+template <>
+struct action<non_local_part> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox& mbx)
+  {
+    mbx.set_domain(in.string());
   }
 };
 
@@ -801,11 +850,11 @@ bool validate_name(const char* flagname, std::string const& value)
 DEFINE_validator(from_name, &validate_name);
 DEFINE_validator(to_name, &validate_name);
 
-bool validate_address(const char* flagname, std::string const& value)
+bool validate_address_RFC5322(const char* flagname, std::string const& value)
 {
   if (value.empty()) // empty name needs to validate, but
     return true;     // will not be used
-  memory_input<> name_in(value.c_str(), "name");
+  memory_input<> name_in(value.c_str(), "address");
   if (!parse<RFC5322::addr_spec_only, RFC5322::inaction>(name_in)) {
     LOG(ERROR) << "bad address syntax " << value;
     return false;
@@ -813,11 +862,23 @@ bool validate_address(const char* flagname, std::string const& value)
   return true;
 }
 
-DEFINE_validator(from, &validate_address);
-DEFINE_validator(to, &validate_address);
+DEFINE_validator(from, &validate_address_RFC5322);
+DEFINE_validator(to, &validate_address_RFC5322);
 
-DEFINE_validator(smtp_from, &validate_address);
-DEFINE_validator(smtp_to, &validate_address);
+bool validate_address_RFC5321(const char* flagname, std::string const& value)
+{
+  if (value.empty()) // empty name needs to validate, but
+    return true;     // will not be used
+  memory_input<> name_in(value.c_str(), "mailbox");
+  if (!parse<RFC5321::mailbox_only, RFC5321::inaction>(name_in)) {
+    LOG(ERROR) << "bad address syntax " << value;
+    return false;
+  }
+  return true;
+}
+
+DEFINE_validator(smtp_from, &validate_address_RFC5321);
+DEFINE_validator(smtp_to, &validate_address_RFC5321);
 
 void selftest()
 {
@@ -826,9 +887,15 @@ void selftest()
   CHECK(validate_name("selftest", "\"Elmer J. Fudd\""s));
   CHECK(validate_name("selftest", "Elmer! J! Fudd!"s));
 
-  CHECK(validate_address("selftest", "foo@digilicious.com"s));
-  CHECK(validate_address("selftest", "\"foo\"@digilicious.com"s));
-  CHECK(validate_address(
+  CHECK(validate_address_RFC5321("selftest", "foo@digilicious.com"s));
+  CHECK(validate_address_RFC5321("selftest", "\"foo\"@digilicious.com"s));
+  CHECK(validate_address_RFC5321(
+      "selftest",
+      "\"very.(),:;<>[]\\\".VERY.\\\"very@\\\\ \\\"very\\\".unusual\"@digilicious.com"s));
+
+  CHECK(validate_address_RFC5322("selftest", "foo@digilicious.com"s));
+  CHECK(validate_address_RFC5322("selftest", "\"foo\"@digilicious.com"s));
+  CHECK(validate_address_RFC5322(
       "selftest",
       "\"very.(),:;<>[]\\\".VERY.\\\"very@\\\\ \\\"very\\\".unusual\"@digilicious.com"s));
 
@@ -971,6 +1038,12 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
     return receivers;
   }
 
+  // Non-local part is an address literal.
+  if (to_mbx.domain().is_address_literal()) {
+    receivers.emplace_back(to_mbx.domain());
+    return receivers;
+  }
+
   // RFC 5321 section 5.1 "Locating the Target Host"
 
   // “The lookup first attempts to locate an MX record associated with
@@ -998,7 +1071,7 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
 
   auto q{DNS::Query{res, DNS::RR_type::MX, domain}};
   if (q.authentic_data()) {
-    LOG(INFO) << "MX records authentic for domain " << domain;
+    LOG(INFO) << "### MX records authentic for domain " << domain << " ###";
   }
   else {
     LOG(INFO) << "MX records can't be authenticated for domain " << domain;
@@ -1080,10 +1153,10 @@ auto parse_mailboxes()
   FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_to);
 
   auto smtp_from_mbx{Mailbox{}};
-  auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "from"}};
+  auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "SMTP.from"}};
   if (!FLAGS_smtp_from.empty()) {
-    if (!parse<RFC5322::addr_spec_only, RFC5322::action>(smtp_from_in,
-                                                         smtp_from_mbx)) {
+    if (!parse<RFC5321::mailbox_only, RFC5321::action>(smtp_from_in,
+                                                       smtp_from_mbx)) {
       LOG(FATAL) << "bad MAIL FROM: address syntax <" << FLAGS_smtp_from << ">";
     }
     LOG(INFO) << " smtp_from_mbx == " << smtp_from_mbx;
@@ -1093,10 +1166,10 @@ auto parse_mailboxes()
   }
 
   auto smtp_to_mbx{Mailbox{}};
-  auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "to"}};
+  auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "SMTP.to"}};
   if (!FLAGS_smtp_to.empty()) {
-    if (!parse<RFC5322::addr_spec_only, RFC5322::action>(smtp_to_in,
-                                                         smtp_to_mbx)) {
+    if (!parse<RFC5321::mailbox_only, RFC5321::action>(smtp_to_in,
+                                                       smtp_to_mbx)) {
       LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to << ">";
     }
     LOG(INFO) << " smtp_to_mbx == " << smtp_to_mbx;
@@ -1681,15 +1754,14 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
   if (q.nx_domain()) {
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
   }
-  else {
-    LOG(INFO) << "TLSA data found for " << domain << ':' << port;
-  }
-
-  auto tlsa_rrs = q.get_records();
 
   if (q.bogus_or_indeterminate()) {
     LOG(WARNING) << "TLSA data is bogus or indeterminate";
-    tlsa_rrs.clear();
+  }
+
+  auto tlsa_rrs = q.get_records();
+  if (!tlsa_rrs.empty()) {
+    LOG(INFO) << "### TLSA data found for " << domain << ':' << port << " ###";
   }
 
   return tlsa_rrs;
