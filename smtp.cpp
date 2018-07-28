@@ -92,9 +92,8 @@ struct domain : list_tail<sub_domain, dot> {};
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<range<'0', '1'>, DIGIT, DIGIT>,
-                       seq<DIGIT, DIGIT>,
-                       DIGIT> {};
+                       seq<range<'0', '1'>, rep<2, DIGIT>>,
+                       rep_min_max<1, 2, DIGIT>> {};
 
 struct IPv4_address_literal
     : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
