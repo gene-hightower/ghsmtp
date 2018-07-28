@@ -133,6 +133,16 @@ struct at_domain : seq<one<'@'>, domain> {};
 
 struct a_d_l : list<at_domain, one<','>> {};
 
+// The qtextSMTP rule explained: it's ASCII...
+// excluding all the control chars below SPACE
+//           34 '"' the double quote
+//           92 '\\' the back slash
+//           DEL
+// So including:
+// 32-33:  ' ' and '!'
+// 35-91:  "#$%&'()*+,-./" 0-9 ":;<=>?@"  A-Z  '['
+// 93-126: "]^_`"  a-z  "{|}~"
+
 struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, UTF8_non_ascii> {};
 
 struct graphic : range<32, 126> {};
@@ -142,6 +152,8 @@ struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
 struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
 
 struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
+
+// excluded from atext: "(),.@[]"
 
 struct atext : sor<ALPHA, DIGIT,
                    one<'!', '#',
