@@ -11,6 +11,12 @@ int main(int argc, char const* argv[])
   CHECK(is_address("::1"));
   CHECK(is_address_literal("[IPv6:::1]"));
 
+  CHECK(is_address("::ffff:0.0.0.0"));
+  CHECK(is_address("::ffff:255.255.255.255"));
+
+  CHECK(is_address("::ffff:0:0.0.0.0"));
+  CHECK(is_address("::ffff:0:255.255.255.255"));
+
   auto const addr{"2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
   auto const addr_lit{"[IPv6:2001:0db8:85a3:0000:0000:8a2e:0370:7334]"};
 
