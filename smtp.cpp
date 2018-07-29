@@ -153,7 +153,7 @@ struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
 
 struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
 
-// excluded from atext: "(),.@[]"
+// excluded from atext are the “specials”: "()<>[]:;@\\,."
 
 struct atext : sor<ALPHA, DIGIT,
                    one<'!', '#',
