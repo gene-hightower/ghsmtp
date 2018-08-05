@@ -3,7 +3,6 @@
 
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace IP {
 bool is_private(std::string_view addr);
