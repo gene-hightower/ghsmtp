@@ -953,7 +953,7 @@ std::optional<RR> get_PTR(rr const* rr_p, DNS::packet const& pkt, bool& err)
   std::string name;
   int enc_len;
   if (!expand_name(rr_p->rddata(), pkt, name, enc_len)) {
-    LOG(WARNING) << "bogus PTR";
+    LOG(WARNING) << "bogus PTR record";
     err = true;
     return {};
   }
@@ -983,7 +983,7 @@ std::optional<RR> get_MX(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR> get_TXT(rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
   if (rr_p->rdlength() < 1) {
-    LOG(WARNING) << "bogus TXT";
+    LOG(WARNING) << "bogus TXT record";
     err = true;
     return {};
   }
@@ -1004,7 +1004,7 @@ std::optional<RR> get_TXT(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR> get_AAAA(rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
   if (rr_p->rdlength() != 16) {
-    LOG(WARNING) << "bogus AAAA";
+    LOG(WARNING) << "bogus AAAA record";
     err = true;
     return {};
   }
