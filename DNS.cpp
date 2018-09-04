@@ -995,7 +995,7 @@ std::optional<RR> get_TXT(rr const* rr_p, DNS::packet const& pkt, bool& err)
       err = true;
       return {};
     }
-    str += std::string(reinterpret_cast<char const*>(p) + 1, *p);
+    str.append(reinterpret_cast<char const*>(p) + 1, *p);
     p = p + *p + 1;
   } while (p < rr_p->next_rr_name());
   return RR_TXT{str};
