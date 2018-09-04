@@ -159,6 +159,7 @@ public:
   static RR_type rr_type() { return RR_type::A; }
 
   bool operator==(RR_A const& rhs) const { return strcmp(str_, rhs.str_) == 0; }
+  bool operator<(RR_A const& rhs) const { return strcmp(str_, rhs.str_) < 0; }
 
 private:
   sockaddr_in addr_;
@@ -179,6 +180,7 @@ public:
   static RR_type rr_type() { return RR_type::CNAME; }
 
   bool operator==(RR_CNAME const& rhs) const { return str() == rhs.str(); }
+  bool operator<(RR_CNAME const& rhs) const { return str() < rhs.str(); }
 
 private:
   std::string cname_;
@@ -199,6 +201,7 @@ public:
   static RR_type rr_type() { return RR_type::PTR; }
 
   bool operator==(RR_PTR const& rhs) const { return str() == rhs.str(); }
+  bool operator<(RR_PTR const& rhs) const { return str() < rhs.str(); }
 
 private:
   std::string ptrdname_;
@@ -223,6 +226,14 @@ public:
   {
     return (preference() == rhs.preference()) && (exchange() == rhs.exchange());
   }
+  bool operator<(RR_MX const& rhs) const
+  {
+    if (preference() < rhs.preference())
+      return true;
+    if (preference() == rhs.preference())
+      return exchange() < rhs.exchange();
+    return false;
+  }
 
 private:
   std::string exchange_;
@@ -243,6 +254,7 @@ public:
   static RR_type rr_type() { return RR_type::TXT; }
 
   bool operator==(RR_TXT const& rhs) const { return str() == rhs.str(); }
+  bool operator<(RR_TXT const& rhs) const { return str() < rhs.str(); }
 
 private:
   std::string txt_data_;
@@ -261,6 +273,10 @@ public:
   bool operator==(RR_AAAA const& rhs) const
   {
     return strcmp(c_str(), rhs.c_str()) == 0;
+  }
+  bool operator<(RR_AAAA const& rhs) const
+  {
+    return strcmp(c_str(), rhs.c_str()) < 0;
   }
 
 private:
@@ -290,6 +306,10 @@ public:
     return (cert_usage() == rhs.cert_usage()) && (selector() == rhs.selector())
            && (matching_type() == rhs.matching_type())
            && (assoc_data() == rhs.assoc_data());
+  }
+  bool operator<(RR_TLSA const& rhs) const
+  {
+    return assoc_data() < rhs.assoc_data();
   }
 
 private:

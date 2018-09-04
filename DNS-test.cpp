@@ -54,10 +54,13 @@ int main(int argc, char const* argv[])
 
     CHECK_EQ(q.authentic_data(), q_ldns.authentic_data());
 
-    auto const rrs{q.get_records()};
-    auto const rrs_ldns{q_ldns.get_records()};
+    auto rrs{q.get_records()};
+    auto rrs_ldns{q_ldns.get_records()};
 
     CHECK_EQ(size(rrs), size(rrs_ldns));
+
+    std::sort(begin(rrs), end(rrs));
+    std::sort(begin(rrs_ldns), end(rrs_ldns));
 
     auto [rr, rr_ldns]
         = std::mismatch(begin(rrs), end(rrs), begin(rrs_ldns), end(rrs_ldns));
