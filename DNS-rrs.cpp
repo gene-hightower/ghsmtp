@@ -36,7 +36,7 @@ RR_TLSA::RR_TLSA(uint8_t cert_usage,
   , matching_type_(matching_type)
 {
   assoc_data_.resize(assoc_data_sz);
-  memcpy(&assoc_data_[0], assoc_data, assoc_data_sz);
+  std::memcpy(&assoc_data_[0], assoc_data, assoc_data_sz);
 }
 
 } // namespace DNS
