@@ -338,33 +338,34 @@ auto uztosl(size_t uznum)
 
 int name_length(unsigned char const* encoded, DNS::packet const& pkt)
 {
-  auto constexpr max_indirs = 50; // maximum indirections allowed for a name
-
-  int length = 0;
-  int nindir = 0; // count indirections
-
   // Allow the caller to pass us buf + len and have us check for it.
   if (encoded >= end(pkt))
     return -1;
 
+  int length = 0;
+  int nindir = 0; // count indirections
+
   while (*encoded) {
 
-    auto top = (*encoded & NS_CMPRSFLGS);
+    auto const top = (*encoded & NS_CMPRSFLGS);
 
     if (top == NS_CMPRSFLGS) {
       // Check the offset and go there.
       if (encoded + 1 >= end(pkt))
         return -1;
 
-      auto offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
+      auto const offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
       if (offset >= size(pkt))
         return -1;
 
       encoded = begin(pkt) + offset;
 
-      // If we've seen more indirects than the message length,
-      // then there's a loop.
       ++nindir;
+
+      auto constexpr max_indirs = 50; // maximum indirections allowed for a name
+
+      // If we've seen more indirects than the message length, or over
+      // some limit, then there's a loop.
       if (nindir > size(pkt) || nindir > max_indirs)
         return -1;
     }
@@ -402,9 +403,9 @@ bool expand_name(unsigned char const* encoded,
 {
   name.clear();
 
-  bool indir = false;
+  auto indir = false;
 
-  auto nlen = name_length(encoded, pkt);
+  auto const nlen = name_length(encoded, pkt);
   if (nlen < 0) {
     LOG(WARNING) << "bad name";
     return false;
@@ -413,7 +414,7 @@ bool expand_name(unsigned char const* encoded,
   name.reserve(nlen + 1);
 
   if (nlen == 0) {
-    // RFC2181 says this should be ".": the root of the DNS tree.
+    // RFC 2181 says this should be ".": the root of the DNS tree.
     // Since this function strips trailing dots though, it becomes ""s
 
     // indirect root label (like 0xc0 0x0c) is 2 bytes long
@@ -511,8 +512,6 @@ int name_put(unsigned char* bfr, char const* name)
   return sz;
 }
 
-// returns a unique_ptr to an array of chars and it's size in q_bfr_sz
-
 DNS::packet
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
 {
@@ -540,7 +539,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   q += sizeof(edns0_opt_meta_rr);
 
   // verify constructed size is less than or equal to allocated size
-  auto sz = q - bfr.get();
+  auto const sz = q - bfr.get();
   CHECK_LE(sz, sz_alloc);
 
   return DNS::packet{std::move(bfr), static_cast<uint16_t>(sz)};
@@ -671,8 +670,8 @@ packet Resolver::xchg(packet const& q)
 
   auto constexpr hook{[]() {}};
   auto t_o{false};
-  auto a_buf = reinterpret_cast<char*>(bfr.get());
-  auto a_buflen
+  auto const a_buf = reinterpret_cast<char*>(bfr.get());
+  auto const a_buflen
       = POSIX::read(ns_fd_, a_buf, int(sz), hook, Config::read_timeout, t_o);
 
   if (a_buflen < 0) {
@@ -1080,7 +1079,7 @@ RR_set Query::get_records()
 {
   RR_set ret;
 
-  if (bogus_or_indeterminate_) // if ctor() found and error with the packet
+  if (bogus_or_indeterminate_)
     return ret;
 
   auto const hdr_p = reinterpret_cast<header const*>(begin(a_));
@@ -1142,7 +1141,7 @@ std::vector<std::string> Query::get_strings()
     std::visit(
         [&ret, type = type_](auto const& r) {
           if (type == r.rr_type()) {
-            auto s = r.as_str();
+            auto const s = r.as_str();
             if (s)
               ret.push_back(*s);
           }
