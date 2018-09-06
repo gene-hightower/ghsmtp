@@ -29,7 +29,7 @@ Lib::Lib()
 
   lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
 
-  CHECK_LT(path.string().length(), PATH_MAX);
+  CHECK_LT(path.string().length(), sizeof(lib_.tld_source_file));
   strcpy(reinterpret_cast<char*>(lib_.tld_source_file), path.string().c_str());
 
   auto const status = opendmarc_policy_library_init(&lib_);
