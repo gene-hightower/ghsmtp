@@ -4,7 +4,7 @@
 #include <cctype>
 #include <string_view>
 
-// Like boost, but ASCII only.  No locale required.
+// Like boost, but ASCII only.  Only C locale required.
 
 inline bool iequal_char(char a, char b)
 {
