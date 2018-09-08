@@ -822,24 +822,25 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
 
   auto p = begin(a_) + sizeof(header);
 
-  std::string qname;
-  int enc_len = 0;
-  if (!expand_name(p, a_, qname, enc_len)) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet";
-    return;
-  }
-  p += enc_len;
-  if (p >= end(a_)) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "bad packet";
-    return;
-  }
-
-  if (!Domain::match(qname, name)) {
-    bogus_or_indeterminate_ = true;
-    LOG(WARNING) << "names don't match, " << qname << " != " << name;
-    return;
+  { // make sure the question name matches
+    std::string qname;
+    auto enc_len = 0;
+    if (!expand_name(p, a_, qname, enc_len)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    p += enc_len;
+    if (p >= end(a_)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "bad packet";
+      return;
+    }
+    if (!Domain::match(qname, name)) {
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "names don't match, " << qname << " != " << name;
+      return;
+    }
   }
 
   if ((p + sizeof(question)) >= end(a_)) {
