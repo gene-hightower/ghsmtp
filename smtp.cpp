@@ -1,6 +1,6 @@
 #include <gflags/gflags.h>
 namespace gflags {
-};
+}
 
 // This needs to be at least the length of each string it's trying to match.
 DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");

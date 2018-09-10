@@ -7,7 +7,7 @@
 
 #include <gflags/gflags.h>
 namespace gflags {
-};
+}
 
 DEFINE_string(config_dir, "", "path to support/config files");
 
