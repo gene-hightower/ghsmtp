@@ -322,7 +322,7 @@ private:
 using RR
     = std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA, RR_TLSA>;
 
-using RR_set = std::vector<RR>;
+using RR_collection = std::vector<RR>;
 
 } // namespace DNS
 

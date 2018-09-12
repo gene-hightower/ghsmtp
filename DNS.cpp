@@ -614,7 +614,7 @@ Resolver::Resolver()
       ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
 
       if (port != 53) {
-        DNS::RR_set tlsa_rrs; // empty FIXME!
+        DNS::RR_collection tlsa_rrs; // empty FIXME!
         ns_sock_->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
         if (ns_sock_->verified()) {
           ns_fd_ = -1;
@@ -690,7 +690,7 @@ packet Resolver::xchg(packet const& q)
   return packet{std::move(bfr), sz};
 }
 
-RR_set Resolver::get_records(RR_type typ, char const* name)
+RR_collection Resolver::get_records(RR_type typ, char const* name)
 {
   Query q(*this, typ, name);
   return q.get_records();
@@ -1078,9 +1078,9 @@ get_rr(DNS::RR_type typ, rr const* rr_p, DNS::packet const& pkt, bool& err)
   return {};
 }
 
-RR_set Query::get_records()
+RR_collection Query::get_records()
 {
-  RR_set ret;
+  RR_collection ret;
 
   if (bogus_or_indeterminate_)
     return ret;
@@ -1109,13 +1109,13 @@ RR_set Query::get_records()
     if ((p + sizeof(rr)) > end(a_)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
-      return RR_set{};
+      return RR_collection{};
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
     if ((p + rr_p->rdlength()) > end(a_)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
-      return RR_set{};
+      return RR_collection{};
     }
 
     auto typ = static_cast<DNS::RR_type>(rr_p->rr_type());
@@ -1123,7 +1123,7 @@ RR_set Query::get_records()
     auto rr_ret = get_rr(typ, rr_p, a_, bogus_or_indeterminate_);
 
     if (bogus_or_indeterminate_)
-      return RR_set{};
+      return RR_collection{};
 
     if (rr_ret)
       ret.emplace_back(*rr_ret);

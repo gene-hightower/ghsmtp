@@ -62,7 +62,7 @@ public:
   }
   bool starttls_client(char const* client_name,
                        char const* server_name,
-                       DNS::RR_set const& tlsa_rrs,
+                       DNS::RR_collection const& tlsa_rrs,
                        bool enforce_dane)
   {
     return tls_active_

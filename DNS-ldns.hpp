@@ -48,11 +48,12 @@ public:
   Resolver();
   ~Resolver();
 
-  DNS::RR_set get_records(DNS::RR_type typ, std::string const& domain) const
+  DNS::RR_collection get_records(DNS::RR_type typ,
+                                 std::string const& domain) const
   {
     return get_records(typ, domain.c_str());
   }
-  DNS::RR_set get_records(DNS::RR_type typ, char const* domain) const;
+  DNS::RR_collection get_records(DNS::RR_type typ, char const* domain) const;
 
   std::vector<std::string> get_strings(DNS::RR_type typ,
                                        std::string const& domain) const
@@ -83,7 +84,7 @@ public:
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
 
-  DNS::RR_set get_records() const;
+  DNS::RR_collection get_records() const;
   std::vector<std::string> get_strings() const;
 
 private:
@@ -102,7 +103,7 @@ public:
   explicit RR_list(Query const& q);
   ~RR_list();
 
-  DNS::RR_set get_records() const;
+  DNS::RR_collection get_records() const;
   std::vector<std::string> get_strings() const;
 
 private:

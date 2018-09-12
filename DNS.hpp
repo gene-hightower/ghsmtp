@@ -37,8 +37,8 @@ public:
 
   Resolver();
 
-  RR_set get_records(RR_type typ, char const* name);
-  RR_set get_records(RR_type typ, std::string const& name)
+  RR_collection get_records(RR_type typ, char const* name);
+  RR_collection get_records(RR_type typ, std::string const& name)
   {
     return get_records(typ, name.c_str());
   }
@@ -73,7 +73,7 @@ public:
   bool nx_domain() const { return nx_domain_; }
 
   bool has_record() const { return has_record_; }
-  RR_set get_records();
+  RR_collection get_records();
   std::vector<std::string> get_strings();
 
   uint16_t rcode() const { return rcode_; }

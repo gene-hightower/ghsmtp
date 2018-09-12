@@ -158,7 +158,7 @@ bool TLS::starttls_client(int fd_in,
                           int fd_out,
                           char const* client_name,
                           char const* server_name,
-                          DNS::RR_set const& tlsa_rrs,
+                          DNS::RR_collection const& tlsa_rrs,
                           bool enforce_dane,
                           std::chrono::milliseconds timeout)
 {

@@ -162,7 +162,7 @@ Query::~Query()
     ldns_pkt_free(p_);
 }
 
-DNS::RR_set Query::get_records() const
+DNS::RR_collection Query::get_records() const
 {
   RR_list rrlst(*this);
   return rrlst.get_records();
@@ -185,9 +185,9 @@ RR_list::RR_list(Query const& q)
 
 RR_list::~RR_list() {}
 
-DNS::RR_set RR_list::get_records() const
+DNS::RR_collection RR_list::get_records() const
 {
-  DNS::RR_set ret;
+  DNS::RR_collection ret;
 
   if (rrlst_answer_) {
 
@@ -374,7 +374,8 @@ std::vector<std::string> RR_list::get_strings() const
   return ret;
 }
 
-DNS::RR_set Resolver::get_records(DNS::RR_type typ, char const* domain) const
+DNS::RR_collection Resolver::get_records(DNS::RR_type typ,
+                                         char const* domain) const
 {
   Query q(*this, typ, domain);
   RR_list rrlst(q);
