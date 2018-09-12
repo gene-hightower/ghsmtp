@@ -132,6 +132,7 @@ TESTS := \
 	SockBuffer-test \
 	TLD-test \
 	TLS-OpenSSL-test \
+	default_init_allocator-test \
 	esc-test
 
 Base64-test_STEMS := Base64
