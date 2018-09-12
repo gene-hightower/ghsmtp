@@ -10,6 +10,8 @@
 
 #include <netinet/in.h>
 
+#include "default_init_allocator.hpp"
+
 namespace DNS {
 
 enum class RR_type : uint16_t {
@@ -286,6 +288,10 @@ private:
 
 class RR_TLSA {
 public:
+  using octet = unsigned char;
+
+  using container_t = std::vector<octet, default_init_allocator<octet>>;
+
   RR_TLSA(uint8_t cert_usage,
           uint8_t selector,
           uint8_t matching_type,
@@ -294,7 +300,7 @@ public:
   unsigned cert_usage() const { return cert_usage_; }
   unsigned selector() const { return selector_; }
   unsigned matching_type() const { return matching_type_; }
-  std::vector<unsigned char> const& assoc_data() const { return assoc_data_; }
+  container_t const& assoc_data() const { return assoc_data_; }
 
   // doesn't have a string representation
   std::optional<std::string> as_str() const { return {}; }
@@ -313,7 +319,7 @@ public:
   }
 
 private:
-  std::vector<unsigned char> assoc_data_;
+  container_t assoc_data_;
   uint8_t cert_usage_;
   uint8_t selector_;
   uint8_t matching_type_;
