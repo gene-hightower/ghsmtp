@@ -320,7 +320,7 @@ public:
   }
   auto rddata() const
   {
-    return reinterpret_cast<unsigned char const*>(cdata());
+    return reinterpret_cast<octet const*>(cdata());
   }
   auto next_rr_name() const { return rddata() + rdlength(); }
 };
@@ -336,7 +336,7 @@ auto uztosl(size_t uznum)
 // return the length of the expansion of an encoded domain name, or -1
 // if the encoding is invalid
 
-int name_length(unsigned char const* encoded, DNS::packet const& pkt)
+int name_length(octet const* encoded, DNS::packet const& pkt)
 {
   // Allow the caller to pass us buf + len and have us check for it.
   if (encoded >= end(pkt))
@@ -396,7 +396,7 @@ int name_length(unsigned char const* encoded, DNS::packet const& pkt)
   return length ? length - 1 : length;
 }
 
-bool expand_name(unsigned char const* encoded,
+bool expand_name(octet const* encoded,
                  DNS::packet const& pkt,
                  std::string& name,
                  int& enc_len)
@@ -461,7 +461,7 @@ bool expand_name(unsigned char const* encoded,
 
 // return the length of the encoded name
 
-int name_put(unsigned char* bfr, char const* name)
+int name_put(octet* bfr, char const* name)
 {
   auto q = bfr;
 
@@ -521,9 +521,9 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   auto const sz_alloc = strlen(name) + 2 + sizeof(header) + sizeof(question)
                         + sizeof(edns0_opt_meta_rr);
 
-  auto bfr = std::make_unique<unsigned char[]>(sz_alloc);
+  DNS::packet::container_t bfr(sz_alloc);
 
-  auto q = bfr.get();
+  auto q = bfr.data();
 
   new (q) header(id);
   q += sizeof(header);
@@ -539,10 +539,12 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   q += sizeof(edns0_opt_meta_rr);
 
   // verify constructed size is less than or equal to allocated size
-  auto const sz = q - bfr.get();
+  auto const sz = q - bfr.data();
   CHECK_LE(sz, sz_alloc);
 
-  return DNS::packet{std::move(bfr), static_cast<uint16_t>(sz)};
+  bfr.resize(sz);
+
+  return DNS::packet{std::move(bfr)};
 }
 } // namespace
 
@@ -649,15 +651,15 @@ packet Resolver::xchg(packet const& q)
     ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
     sz = ntohs(sz);
 
-    auto bfr = std::make_unique<unsigned char[]>(sz);
-    ns_sock_->in().read(reinterpret_cast<char*>(bfr.get()), sz);
+    DNS::packet::container_t bfr(sz);
+    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
 
     if (!ns_sock_->in()) {
       LOG(WARNING) << "Resolver::xchg was able to read only "
                    << ns_sock_->in().gcount() << " octets";
     }
 
-    return packet{std::move(bfr), sz};
+    return packet{std::move(bfr)};
   }
 
   CHECK(Config::nameservers[ns_].typ == Config::sock_type::dgram);
@@ -666,28 +668,27 @@ packet Resolver::xchg(packet const& q)
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
 
   auto sz = Config::max_udp_sz;
-  auto bfr = std::make_unique<unsigned char[]>(sz);
+  DNS::packet::container_t bfr(sz);
 
   auto constexpr hook{[]() {}};
   auto t_o{false};
-  auto const a_buf = reinterpret_cast<char*>(bfr.get());
+  auto const a_buf = reinterpret_cast<char*>(bfr.data());
   auto const a_buflen
       = POSIX::read(ns_fd_, a_buf, int(sz), hook, Config::read_timeout, t_o);
 
   if (a_buflen < 0) {
     LOG(WARNING) << "DNS read failed";
-    return packet{std::make_unique<unsigned char[]>(0), uint16_t(0)};
+    return packet{0};
   }
 
   if (t_o) {
     LOG(WARNING) << "DNS read timed out";
-    return packet{std::make_unique<unsigned char[]>(0), uint16_t(0)};
+    return packet{0};
   }
 
-  // No way to shrink an allocation from std::make_unique. FIXME!
-
   sz = a_buflen;
-  return packet{std::move(bfr), sz};
+  bfr.resize(sz);
+  return packet{std::move(bfr)};
 }
 
 RR_collection Resolver::get_records(RR_type typ, char const* name)

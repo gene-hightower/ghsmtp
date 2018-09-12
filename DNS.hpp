@@ -5,25 +5,40 @@
 
 #include "DNS-rrs.hpp"
 #include "Sock.hpp"
+#include "default_init_allocator.hpp"
+
+#include <glog/logging.h>
 
 namespace DNS {
 
 class packet {
 public:
+  using octet = unsigned char;
+
+  using container_t
+      = std::vector<octet, default_init_allocator<octet>>;
+
   packet() {}
-  packet(std::unique_ptr<unsigned char[]>&& bfr, uint16_t sz)
-    : bfr_{std::move(bfr)}
-    , sz_{sz}
+
+  explicit packet(container_t::size_type sz)
+    : bfr_(sz)
   {
+    CHECK_LE(sz, std::numeric_limits<uint16_t>::max());
   }
 
-  auto size() const { return sz_; }
-  unsigned char const* begin() const { return bfr_.get(); }
-  unsigned char const* end() const { return begin() + size(); }
+  explicit packet(container_t&& bfr)
+    : bfr_{std::move(bfr)}
+  {
+    CHECK_LE(size(), std::numeric_limits<uint16_t>::max());
+  }
+
+  uint16_t size() const { return bfr_.size(); }
+
+  auto begin() const { return bfr_.data(); }
+  auto end() const { return bfr_.data() + bfr_.size(); }
 
 private:
-  std::unique_ptr<unsigned char[]> bfr_;
-  uint16_t sz_;
+  container_t bfr_;
 };
 
 inline auto begin(packet const& pkt) { return pkt.begin(); }
