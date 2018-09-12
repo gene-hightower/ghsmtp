@@ -1,3 +1,6 @@
+#ifndef DEFAULT_INIT_ALLOCATOR_DOT_HPP
+#define DEFAULT_INIT_ALLOCATOR_DOT_HPP
+
 // Allocator adaptor that interposes construct() calls to convert
 // value initialization into default initialization.
 
@@ -31,3 +34,5 @@ public:
     a_t::construct(static_cast<A&>(*this), ptr, std::forward<Args>(args)...);
   }
 };
+
+#endif // DEFAULT_INIT_ALLOCATOR_DOT_HPP
