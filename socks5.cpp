@@ -187,7 +187,7 @@ public:
   uint16_t port() const { return (port_hi_ << 8) + port_lo_; }
 };
 
-DNS::RR_set
+DNS::RR_collection
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   CHECK(!domain.ascii().empty());

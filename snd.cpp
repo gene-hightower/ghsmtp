@@ -1364,7 +1364,7 @@ bool snd(int fd_in,
          int fd_out,
          Domain const& sender,
          Domain const& receiver,
-         DNS::RR_set const& tlsa_rrs,
+         DNS::RR_collection const& tlsa_rrs,
          bool enforce_dane,
          Mailbox const& from_mbx,
          Mailbox const& to_mbx,
@@ -1743,7 +1743,7 @@ bool snd(int fd_in,
   return true;
 }
 
-DNS::RR_set
+DNS::RR_collection
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   std::ostringstream tlsa;
