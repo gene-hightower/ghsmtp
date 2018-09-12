@@ -820,6 +820,8 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
     return;
   }
 
+  // p is a pointer that pushes forward in the packet as we process
+  // each section
   auto p = begin(a_) + sizeof(header);
 
   { // make sure the question name matches
