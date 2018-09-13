@@ -10,6 +10,7 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 #include <fstream>
 
 #include "Session.hpp"
+#include "default_init_allocator.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
 #include "osutil.hpp"
@@ -520,12 +521,12 @@ bool bdat_act(Ctx& ctx)
   auto to_xfer = ctx.chunk_size;
 
   auto const bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
-  auto bfr = std::make_unique<char[]>(bfr_size);
+  std::vector<char, default_init_allocator<char>> bfr(bfr_size);
 
   while (to_xfer) {
     auto const xfer_sz{std::min(to_xfer, bfr_size)};
 
-    ctx.session.in().read(&bfr[0], xfer_sz);
+    ctx.session.in().read(bfr.data(), xfer_sz);
     if (!ctx.session.in()) {
       LOG(ERROR) << "attempt to read " << xfer_sz << " octets but only got "
                  << ctx.session.in().gcount();
@@ -543,7 +544,7 @@ bool bdat_act(Ctx& ctx)
       ctx.session.bdat_error();
       return false;
     }
-    if (!ctx.session.msg_write(&bfr[0], xfer_sz))
+    if (!ctx.session.msg_write(bfr.data(), xfer_sz))
       ret = false;
 
     to_xfer -= xfer_sz;
