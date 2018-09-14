@@ -543,6 +543,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   CHECK_LE(sz, sz_alloc);
 
   bfr.resize(sz);
+  bfr.shrink_to_fit();
 
   return DNS::packet{std::move(bfr)};
 }
@@ -688,6 +689,8 @@ packet Resolver::xchg(packet const& q)
 
   sz = a_buflen;
   bfr.resize(sz);
+  bfr.shrink_to_fit();
+
   return packet{std::move(bfr)};
 }
 
