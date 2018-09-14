@@ -400,7 +400,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   }
 
   // no check for dups, postfix doesn't
-  forward_path_.emplace_back(forward_path); // move
+  forward_path_.emplace_back(std::move(forward_path));
   out_() << "250 2.1.5 RCPT TO OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
