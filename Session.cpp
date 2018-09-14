@@ -340,7 +340,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     bad_host_(error_msg.c_str());
   }
 
-  reverse_path_ = reverse_path; // move
+  reverse_path_ = std::move(reverse_path);
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
