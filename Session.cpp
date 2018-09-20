@@ -534,19 +534,6 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     status = SpamStatus::ham;
   }
 
-  auto rp_dom = reverse_path_.domain();
-  if (!client_fcrdns_.empty()) {
-    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), rp_dom)
-        != end(client_fcrdns_)) {
-      if (status == SpamStatus::ham) {
-        fmt::format_to(reason, ", and ");
-      }
-      fmt::format_to(reason, "reverse_path domain ({}) matches FCrDNS name",
-                     rp_dom);
-      status = SpamStatus::ham;
-    }
-  }
-
   if (status != SpamStatus::ham)
     return {SpamStatus::spam, "it's not ham"s};
 
