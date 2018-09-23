@@ -1018,7 +1018,6 @@ bool ip4_whitelisted(char const* addr)
   nw const networks[]{
     // a few special cases
     {"108.83.36.112",   "255.255.255.248", "108.83.36.112/29"},
-    {"172.249.180.22",  "255.255.255.255", "cpe-172-249-180-22.socal.res.rr.com"},
 
     // accept from major providers:
     {"5.45.198.0",      "255.255.254.0",   "5.45.198.0/23 YANDEX-5-45-198"},
