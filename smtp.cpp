@@ -623,6 +623,9 @@ struct data_action<anything_else> {
     auto const len{end(in) - begin(in)};
     if (len)
       ctx.session.msg_write(begin(in), len);
+    if (len > 1000) {
+      LOG(WARNING) << "line too long at " << len << " octets";
+    }
   }
 };
 
