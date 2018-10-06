@@ -29,7 +29,4 @@ RFC 6531: Internationalized Email
 The software works with IPv4 and IPv6, mostly.
 
 I wrote this to experiment with and learn about Internet mail.  I do
-use it as my every day SMTP server for a number of my personal
-domains.
-
-As far as I know, nobody else has ever used this software.
+use it as my every day SMTP server for a number of domains.
