@@ -1279,10 +1279,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
 
     // Domains we accept mail for.
-    CDB accept_domains{"accept_domains"};
-    if (accept_domains.is_open()) {
-      if (accept_domains.lookup(recipient.domain().ascii())
-          || accept_domains.lookup(recipient.domain().utf8())) {
+    if (accept_domains_.is_open()) {
+      if (accept_domains_.lookup(recipient.domain().ascii())
+          || accept_domains_.lookup(recipient.domain().utf8())) {
         return true;
       }
     }
@@ -1316,12 +1315,32 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 // check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
+  fmt::memory_buffer reason;
+
   auto const sender_str{std::string{sender}};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     out_() << "501 5.1.8 bad sender\r\n" << std::flush;
-    error_msg = sender_str + " bad sender";
+    fmt::format_to(reason, "{} bad sender", sender_str);
+    error_msg = fmt::to_string(reason);
     return false;
+  }
+
+  // We don't accept mail /from/ a domain we are expecting to accept
+  // mail for on an external network connection.
+
+  if ((sock_.them_address_literal() != sock_.us_address_literal())
+      && (sock_.them_address_literal() != IP4::loopback_literal)
+      && (sock_.them_address_literal() != IP6::loopback_literal)) {
+    if ((accept_domains_.is_open()
+         && (accept_domains_.lookup(sender.domain().ascii())
+             || accept_domains_.lookup(sender.domain().utf8())))
+        || (sender.domain() == server_identity_)) {
+      out_() << "550 5.7.1 liar\r\n" << std::flush;
+      fmt::format_to(reason, "liar, claimed to be {}", sender.domain());
+      error_msg = fmt::to_string(reason);
+      return false;
+    }
   }
 
   if (sender.domain().is_address_literal()) {

@@ -135,6 +135,9 @@ private:
   CDB white_{"white"};
   CDB black_{"black"};
 
+  // Domains we receive mail for.
+  CDB accept_domains_{"accept_domains"};
+
   size_t max_msg_size_;
 
   int n_unrecognized_cmds_{0};
