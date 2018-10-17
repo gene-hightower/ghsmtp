@@ -1277,9 +1277,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // We don't accept mail /from/ a domain we are expecting to accept
   // mail for on an external network connection.
 
-  if ((sock_.them_address_literal() != sock_.us_address_literal())
-      && (sock_.them_address_literal() != IP4::loopback_literal)
-      && (sock_.them_address_literal() != IP6::loopback_literal)) {
+  if (sock_.them_address_literal() != sock_.us_address_literal()) {
     if ((accept_domains_.is_open()
          && (accept_domains_.lookup(sender.domain().ascii())
              || accept_domains_.lookup(sender.domain().utf8())))
