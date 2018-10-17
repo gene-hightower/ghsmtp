@@ -1260,58 +1260,6 @@ bool Session::verify_client_(Domain const& client_identity,
   return true;
 }
 
-// check recipient from RFC5321 RCPT TO:
-bool Session::verify_recipient_(Mailbox const& recipient)
-{
-  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
-    LOG(INFO) << "magic Postmaster address";
-    return true;
-  }
-
-  auto const accepted_domain{[this, &recipient] {
-    if (recipient.domain().is_address_literal()) {
-      if (recipient.domain() != sock_.us_address_literal()) {
-        LOG(WARNING) << "recipient.domain address " << recipient.domain()
-                     << " does not match ours " << sock_.us_address_literal();
-        return false;
-      }
-      return true;
-    }
-
-    // Domains we accept mail for.
-    if (accept_domains_.is_open()) {
-      if (accept_domains_.lookup(recipient.domain().ascii())
-          || accept_domains_.lookup(recipient.domain().utf8())) {
-        return true;
-      }
-    }
-    else {
-      // If we have no list of domains to accept, at least take our own.
-      if (recipient.domain() == server_identity_) {
-        return true;
-      }
-    }
-
-    return false;
-  }()};
-
-  if (!accepted_domain) {
-    out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
-    LOG(WARNING) << "relay access denied for domain " << recipient.domain();
-    return false;
-  }
-
-  // Check for local addresses we reject.
-  CDB bad_recipients{"bad_recipients"};
-  if (bad_recipients.lookup(recipient.local_part())) {
-    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
-    LOG(WARNING) << "bad recipient " << recipient;
-    return false;
-  }
-
-  return true;
-}
-
 // check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
@@ -1587,6 +1535,58 @@ bool Session::verify_from_params_(parameters_t const& parameters)
       LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "="
                    << value;
     }
+  }
+
+  return true;
+}
+
+// check recipient from RFC5321 RCPT TO:
+bool Session::verify_recipient_(Mailbox const& recipient)
+{
+  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
+    LOG(INFO) << "magic Postmaster address";
+    return true;
+  }
+
+  auto const accepted_domain{[this, &recipient] {
+    if (recipient.domain().is_address_literal()) {
+      if (recipient.domain() != sock_.us_address_literal()) {
+        LOG(WARNING) << "recipient.domain address " << recipient.domain()
+                     << " does not match ours " << sock_.us_address_literal();
+        return false;
+      }
+      return true;
+    }
+
+    // Domains we accept mail for.
+    if (accept_domains_.is_open()) {
+      if (accept_domains_.lookup(recipient.domain().ascii())
+          || accept_domains_.lookup(recipient.domain().utf8())) {
+        return true;
+      }
+    }
+    else {
+      // If we have no list of domains to accept, at least take our own.
+      if (recipient.domain() == server_identity_) {
+        return true;
+      }
+    }
+
+    return false;
+  }()};
+
+  if (!accepted_domain) {
+    out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
+    LOG(WARNING) << "relay access denied for domain " << recipient.domain();
+    return false;
+  }
+
+  // Check for local addresses we reject.
+  CDB bad_recipients{"bad_recipients"};
+  if (bad_recipients.lookup(recipient.local_part())) {
+    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
+    LOG(WARNING) << "bad recipient " << recipient;
+    return false;
   }
 
   return true;
