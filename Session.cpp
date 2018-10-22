@@ -233,6 +233,7 @@ void Session::greeting()
         bad_host_("input before full greeting");
       }
     }
+    LOG(INFO) << "connect from " << client_;
   }
 
   out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
