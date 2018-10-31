@@ -11,6 +11,7 @@
 
 #include <glog/logging.h>
 
+#define FMT_STRING_ALIAS 1
 #include <fmt/format.h>
 
 #include "DNS.hpp"
