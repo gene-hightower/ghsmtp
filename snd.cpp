@@ -1090,8 +1090,10 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
       if (std::holds_alternative<DNS::RR_MX>(mx)) {
         // RFC 7505 null MX record
         if ((std::get<DNS::RR_MX>(mx).preference() == 0)
-            && (std::get<DNS::RR_MX>(mx).exchange() == ".")) {
-          LOG(FATAL) << "domain " << domain << " does not accept mail";
+            && (std::get<DNS::RR_MX>(mx).exchange().empty()
+                || (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
+          LOG(INFO) << "domain " << domain << " does not accept mail";
+          return receivers;
         }
       }
     }
@@ -1822,6 +1824,11 @@ int main(int argc, char* argv[])
 
   bool enforce_dane = true;
   auto receivers = get_receivers(res, to_mbx, enforce_dane);
+
+  if (receivers.empty()) {
+    LOG(INFO) << "noplace to send this mail";
+    return 0;
+  }
 
   for (auto const& receiver : receivers) {
     LOG(INFO) << "trying " << receiver << ":" << FLAGS_service;
