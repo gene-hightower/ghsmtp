@@ -1827,7 +1827,7 @@ int main(int argc, char* argv[])
 
   if (receivers.empty()) {
     LOG(INFO) << "noplace to send this mail";
-    return 0;
+    return EXIT_SUCCESS;
   }
 
   for (auto const& receiver : receivers) {
