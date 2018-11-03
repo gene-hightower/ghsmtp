@@ -7,7 +7,7 @@
 
 int main(int argc, char* argv[])
 {
-  auto width = 0ul;
+  size_t width = 0;
   for (auto arg = 1; arg < argc; ++arg) {
     auto const len = strlen(argv[arg]);
     width = std::max(width, len);
