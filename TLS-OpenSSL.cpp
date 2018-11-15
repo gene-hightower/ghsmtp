@@ -138,7 +138,7 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
-    // LOG(INFO) << "servername requested " << servername;
+    LOG(INFO) << "servername requested " << servername;
     for (auto const& ctx : cert_ctx) {
       if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), servername);
           c != end(ctx.cn)) {
