@@ -767,7 +767,8 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  auto in{istream_input<eol::crlf>{ctx->session.in(), FLAGS_bfr_size, "ses"}};
+  auto in{istream_input<eol::crlf>{ctx->session.in(),
+                                   std::size_t(FLAGS_bfr_size), "ses"}};
   auto ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
