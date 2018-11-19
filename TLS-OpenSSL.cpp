@@ -490,7 +490,7 @@ bool TLS::starttls_server(int fd_in,
   for (auto const& cert : certs) {
 
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
-    std::vector<Domain> cn;
+    std::vector<Domain> names;
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
@@ -557,7 +557,7 @@ bool TLS::starttls_server(int fd_in,
       ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
       auto str = ASN1_STRING_get0_data(d);
       // LOG(INFO) << "server cert found for " << str;
-      cn.emplace_back(reinterpret_cast<const char*>(str));
+      names.emplace_back(reinterpret_cast<const char*>(str));
     }
 
     // auto ext_stack = X509_get0_extensions(x509);
@@ -602,9 +602,9 @@ bool TLS::starttls_server(int fd_in,
             reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
-        if (find(begin(cn), end(cn), str) == end(cn)) {
+        if (find(begin(names), end(names), str) == end(names)) {
           // LOG(INFO) << "additional name found " << str;
-          cn.emplace_back(str);
+          names.emplace_back(str);
         }
         else {
           // LOG(INFO) << "duplicate name " << str << " ignored";
@@ -616,7 +616,7 @@ bool TLS::starttls_server(int fd_in,
           auto const ip
               = fmt::format(fmt("{:d}.{:d}.{:d}.{:d}"), p[0], p[1], p[2], p[3]);
           LOG(INFO) << "alt name IP4 address " << ip;
-          cn.emplace_back(ip);
+          names.emplace_back(ip);
         }
         else if (gen->d.ip->length == 16) {
           // FIXME!
@@ -635,7 +635,7 @@ bool TLS::starttls_server(int fd_in,
 
     //.......................................................
 
-    cert_ctx_.emplace_back(ctx, cn);
+    cert_ctx_.emplace_back(ctx, names);
   }
 
   DH_free(dh);
