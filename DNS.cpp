@@ -911,6 +911,7 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
     case ns_t_a:
     case ns_t_aaaa:
     case ns_t_ns:
+    case ns_t_rrsig:
       // nameserver records often included with associated address info
       break;
 
