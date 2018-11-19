@@ -446,7 +446,7 @@ struct action<non_local_part> {
   {
     ctx.mb_dom = in.string();
     // RFC 5321, section 4.5.3.1.2.
-    if (ctx.mb_loc.length() > 255) {
+    if (ctx.mb_dom.length() > 255) {
       LOG(WARNING) << "domain name or number too long " << ctx.mb_dom;
     }
   }
