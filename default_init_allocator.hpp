@@ -5,7 +5,7 @@
 // value initialization into default initialization.
 
 // <https://en.cppreference.com/w/cpp/container/vector/resize>
-// <http://stackoverflow.com/a/21028912/273767>
+// <https://stackoverflow.com/a/21028912/273767>
 
 #include <memory>
 
