@@ -64,7 +64,22 @@ struct ipv6_address_only : seq<ipv6_address, eof> {
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {
 };
 
-bool is_private(std::string_view addr) { return false; } // Lie! FIXME!
+namespace {
+bool istarts_with(std::string_view str, std::string_view prefix)
+{
+  if (str.size() >= prefix.size())
+    return iequal(str.substr(0, prefix.size()), prefix);
+  return false;
+}
+}
+
+bool is_private(std::string_view addr)
+{
+  CHECK(is_address(addr));
+
+  // <https://en.wikipedia.org/wiki/Private_network#Private_IPv6_addresses>
+  return istarts_with(addr, "fd");
+}
 
 bool is_address(std::string_view addr)
 {
