@@ -545,7 +545,7 @@ bool Session::msg_new()
 {
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
 
-  auto const [status, reason]{spam_status_()};
+  auto const& [status, reason]{spam_status_()};
 
   LOG(INFO) << ((status == SpamStatus::ham) ? "ham since " : "spam since ")
             << reason;
