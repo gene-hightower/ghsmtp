@@ -1,5 +1,7 @@
 #include "IP4.hpp"
 
+#include <charconv>
+
 #include <glog/logging.h>
 
 #include <fmt/format.h>
@@ -68,7 +70,11 @@ bool is_private(std::string_view addr)
     return true;
 
   if (a[0] == "172") {
-    auto oct = atoi(a[1].c_str());
+    // auto oct = atoi(a[1].c_str());
+
+    uint8_t oct{};
+    std::from_chars(a[1].data(), a[1].data() + a[1].size(), oct);
+
     if ((16 <= oct) && (oct <= 31))
       return true;
     return false;
