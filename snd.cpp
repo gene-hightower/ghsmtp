@@ -471,12 +471,15 @@ struct ehlo_line
 //                 *( "250-" ehlo-line CRLF )
 //                    "250 " ehlo-line CRLF )
 
+// The last line having the optional ehlo_line is not strictly correct.
+// Was added to work with postfix/src/smtpstone/smtp-sink.c.
+
 struct ehlo_ok_rsp
 : sor<seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF>,
 
       seq<TAOCPP_PEGTL_ISTRING("250-"), server_id, opt<ehlo_greet>, CRLF,
  star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
-      seq<TAOCPP_PEGTL_ISTRING("250 "), ehlo_line, CRLF>>
+      seq<TAOCPP_PEGTL_ISTRING("250 "), opt<ehlo_line>, CRLF>>
       > {};
 
 struct ehlo_rsp
