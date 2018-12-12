@@ -33,9 +33,7 @@ public:
     if (enc == encoding::ascii) {
       for (auto ch : local_part_) {
         if (!isascii(static_cast<unsigned char>(ch))) {
-          using namespace std::string_literals;
-          throw std::range_error("non ascii chars in local part "s
-                                 + local_part_);
+          throw std::range_error("non ascii chars in local part of mailbox");
         }
       }
     }
