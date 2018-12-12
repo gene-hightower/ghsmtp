@@ -23,8 +23,6 @@
 
 #include <syslog.h>
 
-using namespace std::string_literals;
-
 namespace Config {
 char const* rbls[]{
     "b.barracudacentral.org",
@@ -492,7 +490,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
   if (spf_result_ == SPF::Result::FAIL && !ip_whitelisted_) {
-    return {SpamStatus::spam, "SPF failed"s};
+    return {SpamStatus::spam, "SPF failed"};
   }
 
   auto status{SpamStatus::spam};
@@ -536,7 +534,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   }
 
   if (status != SpamStatus::ham)
-    return {SpamStatus::spam, "it's not ham"s};
+    return {SpamStatus::spam, "it's not ham"};
 
   return {status, fmt::to_string(reason)};
 }
@@ -1101,7 +1099,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     LOG(INFO) << "loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
-    client_ = "localhost "s + sock_.them_address_literal();
+    client_ = fmt::format("localhost {}", sock_.them_address_literal());
     return true;
   }
 
@@ -1166,15 +1164,13 @@ bool Session::verify_ip_address_(std::string& error_msg)
 bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
 {
   if (IP4::is_address(sock_.them_c_str())) {
-    using namespace DNS;
-
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  random_device_);
     for (auto rbl : Config::rbls) {
-      if (has_record(res_, RR_type::A, reversed + rbl)) {
-        error_msg = "blocked on advice from "s + rbl;
+      if (has_record(res_, DNS::RR_type::A, reversed + rbl)) {
+        error_msg = fmt::format("blocked on advice from {}", rbl);
         // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
         out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
         return false;
@@ -1219,7 +1215,7 @@ bool Session::verify_client_(Domain const& client_identity,
       return true;
     }
 
-    error_msg = "liar, claimed to be "s + client_identity.ascii();
+    error_msg = fmt::format("liar, claimed to be {}", client_identity.ascii());
     out_() << "550 5.7.1 liar\r\n" << std::flush;
     return false;
   }
@@ -1228,7 +1224,8 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg = "claimed bogus identity "s + client_identity.ascii();
+    error_msg
+        = fmt::format("claimed bogus identity {}", client_identity.ascii());
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1239,7 +1236,8 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = "claimed blacklisted identity "s + client_identity.ascii();
+    error_msg = fmt::format("claimed blacklisted identity {}",
+                            client_identity.ascii());
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -1252,7 +1250,8 @@ bool Session::verify_client_(Domain const& client_identity,
     // return true;
   }
   else if (black_.lookup(tld)) {
-    error_msg = "claimed identity has blacklisted registered domain "s + tld;
+    error_msg = fmt::format(
+        "claimed identity has blacklisted registered domain {}", tld);
     out_() << "550 4.7.1 blacklisted registered domain\r\n" << std::flush;
     return false;
   }
@@ -1264,14 +1263,11 @@ bool Session::verify_client_(Domain const& client_identity,
 // check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
-  fmt::memory_buffer reason;
-
   auto const sender_str{std::string{sender}};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     out_() << "501 5.1.8 bad sender\r\n" << std::flush;
-    fmt::format_to(reason, "{} bad sender", sender_str);
-    error_msg = fmt::to_string(reason);
+    error_msg = fmt::format("{} bad sender", sender_str);
     return false;
   }
 
@@ -1284,8 +1280,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
              || accept_domains_.lookup(sender.domain().utf8())))
         || (sender.domain() == server_identity_)) {
       out_() << "550 5.7.1 liar\r\n" << std::flush;
-      fmt::format_to(reason, "liar, claimed to be {}", sender.domain());
-      error_msg = fmt::to_string(reason);
+      error_msg = fmt::format("liar, claimed to be {}", sender.domain());
       return false;
     }
   }
@@ -1423,12 +1418,10 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    fmt::memory_buffer received_spf;
-    fmt::format_to(received_spf,
-                   "Received-SPF: pass ({}: whitelisted) client-ip={}; "
-                   "envelope-from={}; helo={};",
-                   server_id_(), ip_addr, sender, client_identity_);
-    spf_received_ = fmt::to_string(received_spf);
+    spf_received_
+        = fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
+                      "envelope-from={}; helo={};",
+                      server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
     return true;
   }
