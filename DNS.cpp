@@ -318,10 +318,7 @@ public:
   {
     return reinterpret_cast<char const*>(this) + sizeof(rr);
   }
-  auto rddata() const
-  {
-    return reinterpret_cast<octet const*>(cdata());
-  }
+  auto rddata() const { return reinterpret_cast<octet const*>(cdata()); }
   auto next_rr_name() const { return rddata() + rdlength(); }
 };
 
