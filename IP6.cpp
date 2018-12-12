@@ -10,10 +10,22 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
-using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
+using tao::pegtl::eof;
+using tao::pegtl::memory_input;
+using tao::pegtl::one;
+using tao::pegtl::opt;
+using tao::pegtl::parse;
+using tao::pegtl::range;
+using tao::pegtl::rep;
+using tao::pegtl::rep_min_max;
+using tao::pegtl::rep_opt;
+using tao::pegtl::seq;
+using tao::pegtl::sor;
+using tao::pegtl::string;
+using tao::pegtl::two;
 
-using namespace std::string_literals;
+using tao::pegtl::abnf::DIGIT;
+using tao::pegtl::abnf::HEXDIG;
 
 #include <glog/logging.h>
 

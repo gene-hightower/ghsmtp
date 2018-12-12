@@ -6,7 +6,12 @@
 
 int main(int argc, char const* argv[])
 {
-  using namespace IP4;
+  using IP4::as_address;
+  using IP4::is_address;
+  using IP4::is_address_literal;
+  using IP4::is_private;
+  using IP4::reverse;
+  using IP4::to_address_literal;
 
   CHECK(is_address_literal("[69.0.0.0]"));
   CHECK(!is_address_literal("69.0.0.0]"));

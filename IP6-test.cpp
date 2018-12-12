@@ -6,7 +6,11 @@
 
 int main(int argc, char const* argv[])
 {
-  using namespace IP6;
+  using IP6::as_address;
+  using IP6::is_address;
+  using IP6::is_address_literal;
+  using IP6::is_private;
+  using IP6::to_address_literal;
 
   CHECK(is_address("::1"));
   CHECK(is_address_literal("[IPv6:::1]"));
