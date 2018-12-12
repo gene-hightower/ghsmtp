@@ -382,19 +382,19 @@ bool TLS::starttls_client(int fd_in,
   session_context context;
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
-  using namespace std::chrono;
-  auto start = system_clock::now();
+  auto const start = std::chrono::system_clock::now();
 
   ERR_clear_error();
 
   int rc;
   while ((rc = SSL_connect(ssl_)) < 0) {
 
-    auto now = system_clock::now();
+    auto const now = std::chrono::system_clock::now();
 
     CHECK(now < (start + timeout)) << "starttls timed out";
 
-    auto time_left = duration_cast<milliseconds>((start + timeout) - now);
+    auto time_left = std::chrono::duration_cast<std::chrono::milliseconds>(
+        (start + timeout) - now);
 
     switch (SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
@@ -655,20 +655,20 @@ bool TLS::starttls_server(int fd_in,
   session_context context;
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
-  using namespace std::chrono;
-  auto const start = system_clock::now();
+  auto const start = std::chrono::system_clock::now();
 
   ERR_clear_error();
 
   int rc;
   while ((rc = SSL_accept(ssl_)) < 0) {
 
-    time_point<system_clock> now = system_clock::now();
+    auto const now = std::chrono::system_clock::now();
 
     CHECK(now < (start + timeout)) << "starttls timed out";
 
-    milliseconds time_left
-        = duration_cast<milliseconds>((start + timeout) - now);
+    auto const time_left
+        = std::chrono::duration_cast<std::chrono::milliseconds>(
+            (start + timeout) - now);
 
     switch (SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
@@ -761,8 +761,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
                              std::chrono::milliseconds timeout,
                              bool& t_o)
 {
-  using namespace std::chrono;
-  auto const start = system_clock::now();
+  auto const start = std::chrono::system_clock::now();
   auto const end_time = start + timeout;
 
   ERR_clear_error();
@@ -770,14 +769,15 @@ std::streamsize TLS::io_tls_(char const* fnm,
   int n_ret;
   while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
          < 0) {
-    time_point<system_clock> now = system_clock::now();
+    auto const now = std::chrono::system_clock::now();
     if (now > end_time) {
       LOG(WARNING) << fnm << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
     }
 
-    auto const time_left = duration_cast<milliseconds>(end_time - now);
+    auto const time_left
+        = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - now);
 
     switch (SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {
