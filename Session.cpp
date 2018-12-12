@@ -74,7 +74,7 @@ char const* uribls[]{
     "multi.surbl.org",
 };
 
-constexpr auto greeting_wait = std::chrono::seconds{3};
+constexpr auto greeting_wait = std::chrono::seconds{2};
 constexpr int max_recipients_per_message = 100;
 constexpr int max_unrecognized_cmds = 20;
 
