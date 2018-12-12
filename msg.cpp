@@ -37,8 +37,6 @@ DEFINE_bool(selftest, false, "run a self test");
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
-using namespace std::string_literals;
-
 template <typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept
 {
