@@ -27,8 +27,6 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
-using namespace std::string_literals;
-
 namespace RFC5321 {
 
 struct Ctx {
