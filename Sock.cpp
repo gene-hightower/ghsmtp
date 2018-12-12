@@ -5,8 +5,6 @@
 
 #include <glog/logging.h>
 
-using namespace std::string_literals;
-
 Sock::Sock(int fd_in,
            int fd_out,
            std::function<void(void)> read_hook,
