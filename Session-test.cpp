@@ -6,8 +6,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-using namespace std::string_literals;
-
 struct Session_test {
   static void test()
   {
@@ -54,7 +52,7 @@ struct Session_test {
     CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar"), error_msg));
 
     // SPF
-    auto mb{Mailbox{"foo"s, "digilicious.com"s}};
+    auto mb{Mailbox{"foo", "digilicious.com"}};
     CHECK(sess.verify_sender_spf_(mb));
 
     // IP address
