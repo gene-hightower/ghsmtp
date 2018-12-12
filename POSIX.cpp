@@ -5,7 +5,11 @@
 #include <fcntl.h>
 #include <sys/select.h>
 
-using namespace std::chrono;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::seconds;
+using std::chrono::system_clock;
+using std::chrono::time_point;
 
 void POSIX::set_nonblocking(int fd)
 {
