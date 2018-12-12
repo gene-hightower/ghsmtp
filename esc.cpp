@@ -6,8 +6,6 @@
 #include <iomanip>
 #include <sstream>
 
-using namespace std::string_literals;
-
 std::string esc(std::string_view str, esc_line_option line_option)
 {
   auto nesc{std::count_if(begin(str), end(str), [](unsigned char c) {
@@ -22,30 +20,30 @@ std::string esc(std::string_view str, esc_line_option line_option)
   for (auto c : str) {
     switch (c) {
     case '\a':
-      ret += "\\a"s;
+      ret += "\\a";
       break;
     case '\b':
-      ret += "\\b"s;
+      ret += "\\b";
       break;
     case '\f':
-      ret += "\\f"s;
+      ret += "\\f";
       break;
     case '\n':
-      ret += "\\n"s;
+      ret += "\\n";
       if (line_option == esc_line_option::multi)
         ret += '\n';
       break;
     case '\r':
-      ret += "\\r"s;
+      ret += "\\r";
       break;
     case '\t':
-      ret += "\\t"s;
+      ret += "\\t";
       break;
     case '\v':
-      ret += "\\v"s;
+      ret += "\\v";
       break;
     case '\\':
-      ret += "\\\\"s;
+      ret += "\\\\";
       break;
     default:
       if (isprint(static_cast<unsigned char>(c))) {
