@@ -4,8 +4,6 @@
 
 #include <cstdlib>
 
-using namespace std::string_literals;
-
 int main(int argc, char* argv[])
 {
   char env[] = "MAILDIR=/tmp/Maildir";
@@ -14,7 +12,7 @@ int main(int argc, char* argv[])
   Message msg;
   msg.open("example.com", 4096, "");
 
-  auto ms = "foo bar baz"s;
+  std::string ms{"foo bar baz"};
   msg.write(ms.data(), ms.size());
   msg.save();
 
