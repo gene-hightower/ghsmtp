@@ -1,0 +1,3 @@
+HELO example.com
+MAIL FROM:<postmaster@[IPv6:1::]>
+QUIT
