@@ -202,13 +202,11 @@ struct string : sor<quoted_string, atom> {};
 struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"),
                   SP,
                   sor<domain, address_literal>,
-                  opt<sor<SP, string>>,
                   CRLF> {};
 
 struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
                   SP,
                   sor<domain, address_literal>,
-                  opt<sor<SP, string>>,
                   CRLF> {};
 
 struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
