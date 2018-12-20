@@ -1087,8 +1087,9 @@ bool Session::verify_ip_address_(std::string& error_msg)
 {
   CDB ip_black{"ip-black"};
   if (ip_black.lookup(sock_.them_c_str())) {
-    error_msg = "IP on static blacklist";
-    out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+    error_msg
+        = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
+    out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
@@ -1266,8 +1267,8 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   auto const sender_str{std::string{sender}};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
-    out_() << "501 5.1.8 bad sender\r\n" << std::flush;
     error_msg = fmt::format("{} bad sender", sender_str);
+    out_() << "501 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
@@ -1322,20 +1323,20 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
   // Break sender domain into labels:
 
-  auto labels{std::vector<std::string>{}};
+  std::vector<std::string> labels;
   boost::algorithm::split(labels, sender.ascii(),
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    out_() << "550 5.7.1 invalid sender domain " << sender << "\r\n"
-           << std::flush;
-    error_msg = sender.ascii() + " invalid syntax";
+    error_msg = fmt::format("{} invalid syntax", sender.ascii());
+    out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
-  auto reg_dom{tld_db_.get_registered_domain(sender.ascii())};
+  auto const reg_dom{tld_db_.get_registered_domain(sender.ascii())};
   if (!reg_dom) {
-    error_msg = sender.ascii() + " has no registered domain";
+    error_msg = fmt::format("{} has no registered domain", sender.ascii());
+    out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
   if (white_.lookup(reg_dom)) {
@@ -1345,23 +1346,27 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
   // Based on <http://www.surbl.org/guidelines>
 
-  auto two_level{labels[labels.size() - 2] + "." + labels[labels.size() - 1]};
+  auto const two_level = fmt::format("{}.{}", labels[labels.size() - 2],
+                                     labels[labels.size() - 1]);
+  ;
 
   if (labels.size() > 2) {
-    auto three_level{labels[labels.size() - 3] + "." + two_level};
+    auto const three_level
+        = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
 
     CDB three_tld{"three-level-tlds"};
     if (three_tld.lookup(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
-        auto look_up = labels[labels.size() - 4] + "." + three_level;
+        auto const look_up
+            = fmt::format("{}.{}", labels[labels.size() - 4], three_level);
         LOG(INFO) << "looking up " << look_up;
         return verify_sender_domain_uribl_(look_up, error_msg);
       }
       else {
         out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-        error_msg
-            = three_level + " blocked by exact match on three-level-tlds list";
+        error_msg = fmt::format(
+            "{} blocked by exact match on three-level-tlds list", three_level);
         return false;
       }
     }
@@ -1371,13 +1376,15 @@ bool Session::verify_sender_domain_(Domain const& sender,
   if (two_tld.lookup(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
-      auto look_up = labels[labels.size() - 3] + "." + two_level;
+      auto const look_up
+          = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
       LOG(INFO) << "looking up " << look_up;
       return verify_sender_domain_uribl_(look_up, error_msg);
     }
     else {
       out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-      error_msg = two_level + " blocked by exact match on two-level-tlds list";
+      error_msg = fmt::format(
+          "{} blocked by exact match on two-level-tlds list", two_level);
       return false;
     }
   }
