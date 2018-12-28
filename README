@@ -7,8 +7,8 @@ user's ~/Maildir.
 Free software — AGPLv3 with OpenSSL exception.
 
 Written using Standard C++ — plus PEGTL, (at one time Ragel, before
-that Bison), OpenSSL, boost, ldns, spf2, regdom, TinyCDB, glog etc.
-Compiles with recent GCC and Clang.
+that Bison), OpenSSL, boost-iostreams, ldns, spf2, regdom, TinyCDB,
+glog etc.  Compiles with recent GCC and Clang.
 
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
