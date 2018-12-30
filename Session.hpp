@@ -107,6 +107,7 @@ private:
                                    std::string& error_msg);
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
+  bool verify_rcpt_params_(parameters_t const& parameters);
 
   void exit_() __attribute__((noreturn));
 

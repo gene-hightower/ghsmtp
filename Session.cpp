@@ -278,6 +278,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
+      out_() << "250-REQUIRETLS\r\n";
     }
     else {
       // If we're not already TLS, offer TLS, à la RFC 3207
@@ -384,9 +385,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     return;
   }
 
-  // Take a look at the optional parameters, we don't accept any:
-  for (auto const& [name, value] : parameters) {
-    LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "=" << value;
+  if (!verify_rcpt_params_(parameters)) {
+    return;
   }
 
   if (!verify_recipient_(forward_path))
@@ -1530,8 +1530,32 @@ bool Session::verify_from_params_(parameters_t const& parameters)
         // I guess we just ignore bad size parameters.
       }
     }
+    else if (iequal(name, "REQUIRETLS")) {
+      if (!sock_.tls()) {
+        out_() << "554 5.7.1 REQUIRETLS needed\r\n" << std::flush;
+        LOG(WARNING) << "REQUIRETLS needed";
+        return false;
+      }
+    }
     else {
-      LOG(WARNING) << "unrecognized MAIL FROM parameter " << name << "="
+      LOG(WARNING) << "unrecognized 'MAIL FROM' parameter " << name << "="
+                   << value;
+    }
+  }
+
+  return true;
+}
+
+bool Session::verify_rcpt_params_(parameters_t const& parameters)
+{
+  // Take a look at the optional parameters:
+  for (auto const& [name, value] : parameters) {
+    if (iequal(name, "RRVS")) {
+      // rrvs-param = "RRVS=" date-time [ ";" ( "C" / "R" ) ]
+      LOG(INFO) << name << "=" << value;
+    }
+    else {
+      LOG(WARNING) << "unrecognized 'RCPT TO' parameter " << name << "="
                    << value;
     }
   }
