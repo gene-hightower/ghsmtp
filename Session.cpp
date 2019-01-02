@@ -275,6 +275,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 
     out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
     out_() << "250-8BITMIME\r\n";                      // RFC 6152
+    out_() << "250-RRVS\r\n";                          // RFC 7293
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
