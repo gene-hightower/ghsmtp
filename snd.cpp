@@ -1080,12 +1080,14 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   }
 
   auto q{DNS::Query{res, DNS::RR_type::MX, domain}};
-  if (q.authentic_data()) {
-    LOG(INFO) << "### MX records authentic for domain " << domain << " ###";
-  }
-  else {
-    LOG(INFO) << "MX records can't be authenticated for domain " << domain;
-    enforce_dane = false;
+  if (q.has_record()) {
+    if (q.authentic_data()) {
+      LOG(INFO) << "### MX records authentic for domain " << domain << " ###";
+    }
+    else {
+      LOG(INFO) << "MX records can't be authenticated for domain " << domain;
+      enforce_dane = false;
+    }
   }
   auto mxs{q.get_records()};
 
@@ -1849,7 +1851,7 @@ int main(int argc, char* argv[])
 
     auto fd = conn(res, receiver, port);
     if (fd == -1) {
-      LOG(WARNING) << "bad connection, skipping";
+      LOG(WARNING) << "no connection, skipping";
       continue;
     }
 
