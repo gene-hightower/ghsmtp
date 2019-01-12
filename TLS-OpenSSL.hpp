@@ -68,7 +68,7 @@ public:
   };
 
 private:
-  std::streamsize io_tls_(char const* fnm,
+  std::streamsize io_tls_(char const* fn,
                           std::function<int(SSL*, void*, int)> io_fnc,
                           char* s,
                           std::streamsize n,

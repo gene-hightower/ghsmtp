@@ -754,7 +754,7 @@ std::string TLS::info() const
   return "";
 }
 
-std::streamsize TLS::io_tls_(char const* fnm,
+std::streamsize TLS::io_tls_(char const* fn,
                              std::function<int(SSL*, void*, int)> io_fnc,
                              char* s,
                              std::streamsize n,
@@ -771,7 +771,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
          < 0) {
     auto const now = std::chrono::system_clock::now();
     if (now > end_time) {
-      LOG(WARNING) << fnm << " timed out";
+      LOG(WARNING) << fn << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
     }
@@ -788,7 +788,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
         ERR_clear_error();
         continue; // try io_fnc again
       }
-      LOG(WARNING) << fnm << " timed out";
+      LOG(WARNING) << fn << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
     }
@@ -800,7 +800,7 @@ std::streamsize TLS::io_tls_(char const* fnm,
         ERR_clear_error();
         continue; // try io_fnc again
       }
-      LOG(WARNING) << fnm << " timed out";
+      LOG(WARNING) << fn << " timed out";
       t_o = true;
       return static_cast<std::streamsize>(-1);
     }
@@ -818,16 +818,16 @@ std::streamsize TLS::io_tls_(char const* fnm,
   if (0 == n_ret) {
     switch (SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_NONE:
-      LOG(INFO) << fnm << " returned SSL_ERROR_NONE";
+      LOG(INFO) << fn << " returned SSL_ERROR_NONE";
       break;
 
     case SSL_ERROR_ZERO_RETURN:
       // This is a close, not at all sure this is the right thing to do.
-      LOG(INFO) << fnm << " returned SSL_ERROR_ZERO_RETURN";
+      LOG(INFO) << fn << " returned SSL_ERROR_ZERO_RETURN";
       break;
 
     default:
-      LOG(INFO) << fnm << " returned zero";
+      LOG(INFO) << fn << " returned zero";
       ssl_error();
     }
   }
