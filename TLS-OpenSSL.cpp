@@ -396,7 +396,8 @@ bool TLS::starttls_client(int fd_in,
     auto time_left = std::chrono::duration_cast<std::chrono::milliseconds>(
         (start + timeout) - now);
 
-    switch (SSL_get_error(ssl_, rc)) {
+    int n_get_err;
+    switch (n_get_err = SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
           << "starttls timed out on input_ready";
@@ -414,7 +415,7 @@ bool TLS::starttls_client(int fd_in,
       [[fallthrough]];
 
     default:
-      ssl_error();
+      ssl_error(n_get_err);
     }
   }
 
@@ -670,7 +671,8 @@ bool TLS::starttls_server(int fd_in,
         = std::chrono::duration_cast<std::chrono::milliseconds>(
             (start + timeout) - now);
 
-    switch (SSL_get_error(ssl_, rc)) {
+    int n_get_err;
+    switch (n_get_err = SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
           << "starttls timed out on input_ready";
@@ -688,7 +690,7 @@ bool TLS::starttls_server(int fd_in,
       [[fallthrough]];
 
     default:
-      ssl_error();
+      ssl_error(n_get_err);
     }
   }
 
@@ -779,7 +781,8 @@ std::streamsize TLS::io_tls_(char const* fn,
     auto const time_left
         = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - now);
 
-    switch (SSL_get_error(ssl_, n_ret)) {
+    int n_get_err;
+    switch (n_get_err = SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_WANT_READ: {
       int fd = SSL_get_rfd(ssl_);
       CHECK_NE(-1, fd);
@@ -810,13 +813,14 @@ std::streamsize TLS::io_tls_(char const* fn,
       [[fallthrough]];
 
     default:
-      ssl_error();
+      ssl_error(n_get_err);
     }
   }
 
   // The strange (and never before seen) case of 0 return.
   if (0 == n_ret) {
-    switch (SSL_get_error(ssl_, n_ret)) {
+    int n_get_err;
+    switch (n_get_err = SSL_get_error(ssl_, n_ret)) {
     case SSL_ERROR_NONE:
       LOG(INFO) << fn << " returned SSL_ERROR_NONE";
       break;
@@ -828,15 +832,42 @@ std::streamsize TLS::io_tls_(char const* fn,
 
     default:
       LOG(INFO) << fn << " returned zero";
-      ssl_error();
+      ssl_error(n_get_err);
     }
   }
 
   return static_cast<std::streamsize>(n_ret);
 }
 
-void TLS::ssl_error()
+void TLS::ssl_error(int n_get_err)
 {
+  LOG(WARNING) << "n_get_err == " << n_get_err;
+  switch (n_get_err) {
+  case SSL_ERROR_NONE:
+    LOG(WARNING) << "SSL_ERROR_NONE";
+    break;
+  case SSL_ERROR_ZERO_RETURN:
+    LOG(WARNING) << "SSL_ERROR_ZERO_RETURN";
+    break;
+  case SSL_ERROR_WANT_READ:
+    LOG(WARNING) << "SSL_ERROR_WANT_READ";
+    break;
+  case SSL_ERROR_WANT_WRITE:
+    LOG(WARNING) << "SSL_ERROR_WANT_WRITE";
+    break;
+  case SSL_ERROR_WANT_CONNECT:
+    LOG(WARNING) << "SSL_ERROR_WANT_CONNECT";
+    break;
+  case SSL_ERROR_WANT_ACCEPT:
+    LOG(WARNING) << "SSL_ERROR_WANT_ACCEPT";
+    break;
+  case SSL_ERROR_WANT_X509_LOOKUP:
+    LOG(WARNING) << "SSL_ERROR_WANT_X509_LOOKUP";
+    break;
+  case SSL_ERROR_SSL:
+    LOG(WARNING) << "SSL_ERROR_SSL";
+    break;
+  }
   unsigned long er;
   while (0 != (er = ERR_get_error()))
     LOG(WARNING) << ERR_error_string(er, nullptr);
