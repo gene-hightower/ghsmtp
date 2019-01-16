@@ -11,7 +11,7 @@ int main(int argc, char* argv[])
   std::stringstream then_str;
   then_str << then;
 
-  Now then_again(then);
+  Now then_again{then};
   std::stringstream then_again_str;
   then_again_str << then_again;
 
