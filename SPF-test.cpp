@@ -7,13 +7,13 @@ int main(int argc, char const* argv[])
   CHECK_EQ(sizeof(SPF::Server), sizeof(void*));
   CHECK_EQ(sizeof(SPF::Request), sizeof(void*));
 
-  SPF::Server srv("Example.com");
+  SPF::Server const srv{"Example.com"};
 
-  SPF::Request req(srv);
+  SPF::Request req{srv};
   req.set_ipv4_str("108.83.36.113");
   req.set_helo_dom("digilicious.com");
   req.set_env_from("postmaster@digilicious.com");
-  SPF::Response res(req);
+  SPF::Response const res{req};
   CHECK_EQ(res.result(), SPF::Result::PASS);
   CHECK(0
         == strcmp(res.header_comment(), "Example.com: domain of "
@@ -35,11 +35,11 @@ int main(int argc, char const* argv[])
   CHECK((0 == strcmp(res.received_spf(), pass_new))
         || (0 == strcmp(res.received_spf(), pass_old)));
 
-  SPF::Request req2(srv);
+  SPF::Request req2{srv};
   req2.set_ipv4_str("10.1.1.1");
   req2.set_helo_dom("digilicious.com");
   req2.set_env_from("postmaster@digilicious.com");
-  SPF::Response res2(req2);
+  SPF::Response const res2{req2};
   CHECK_EQ(res2.result(), SPF::Result::FAIL);
   CHECK(0
         == strcmp(res2.header_comment(), "Example.com: domain of "
