@@ -14,7 +14,7 @@ Magic::~Magic() { magic_close(magic_); }
 
 std::string Magic::buffer(std::string_view bfr) const
 {
-  auto data = reinterpret_cast<void const*>(bfr.data());
+  auto const data = reinterpret_cast<void const*>(bfr.data());
   return CHECK_NOTNULL(magic_buffer(magic_, data, bfr.size()));
 }
 
