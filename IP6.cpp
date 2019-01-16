@@ -95,13 +95,13 @@ bool is_private(std::string_view addr)
 
 bool is_address(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
+  memory_input<> in{addr.data(), addr.size(), "ip6"};
   return parse<IP6::ipv6_address_only>(in);
 }
 
 bool is_address_literal(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "ip6"}};
+  memory_input<> in{addr.data(), addr.size(), "ip6"};
   return parse<IP6::ipv6_address_literal_only>(in);
 }
 
@@ -113,7 +113,7 @@ std::string to_address_literal(std::string_view addr)
 
 std::string reverse(std::string_view addr_str)
 {
-  auto addr{in6_addr{}};
+  in6_addr addr{};
 
   static_assert(sizeof(addr) == 16, "in6_addr is the wrong size");
 

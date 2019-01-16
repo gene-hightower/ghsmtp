@@ -67,10 +67,10 @@ struct action<dec_octet> {
 
 bool is_private(std::string_view addr)
 {
-  auto a{std::vector<std::string>{}};
+  std::vector<std::string> a;
   a.reserve(4);
 
-  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  memory_input<> in{addr.data(), addr.size(), "addr"};
   CHECK((parse<ipv4_address, action>(in, a)));
 
   // From RFC 1918:
@@ -101,13 +101,13 @@ bool is_private(std::string_view addr)
 
 bool is_address(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  memory_input<> in{addr.data(), addr.size(), "addr"};
   return parse<ipv4_address>(in);
 }
 
 bool is_address_literal(std::string_view addr)
 {
-  auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
+  memory_input<> in{addr.data(), addr.size(), "addr"};
   return parse<ipv4_address_lit>(in);
 }
 
@@ -119,7 +119,7 @@ std::string to_address_literal(std::string_view addr)
 
 std::string reverse(std::string_view addr)
 {
-  auto a{std::vector<std::string>{}};
+  std::vector<std::string> a;
   a.reserve(4);
 
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
