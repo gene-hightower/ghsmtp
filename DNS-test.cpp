@@ -71,32 +71,32 @@ int main(int argc, char const* argv[])
 
   // These IP addresses might be stable for a while.
 
-  auto goog_a{"google-public-dns-a.google.com"};
-  auto goog_b{"google-public-dns-b.google.com"};
+  auto const goog_a{"google-public-dns-a.google.com"};
+  auto const goog_b{"google-public-dns-b.google.com"};
 
-  auto addrs_b = res.get_strings(DNS::RR_type::A, goog_b);
+  auto const addrs_b{res.get_strings(DNS::RR_type::A, goog_b)};
   CHECK_EQ(addrs_b.size(), 1U);
   CHECK_EQ(addrs_b[0], "8.8.4.4");
 
-  auto aaaaddrs_a = res.get_strings(DNS::RR_type::AAAA, goog_a);
+  auto const aaaaddrs_a{res.get_strings(DNS::RR_type::AAAA, goog_a)};
   CHECK_EQ(aaaaddrs_a.size(), 1U);
   CHECK_EQ(aaaaddrs_a[0], "2001:4860:4860::8888");
 
-  auto aaaaddrs_b = res.get_strings(DNS::RR_type::AAAA, goog_b);
+  auto const aaaaddrs_b{res.get_strings(DNS::RR_type::AAAA, goog_b)};
   CHECK_EQ(aaaaddrs_b.size(), 1U);
   CHECK_EQ(aaaaddrs_b[0], "2001:4860:4860::8844");
 
-  auto fcrdnses4 = fcrdns4(res, "1.1.1.1");
+  auto const fcrdnses4{fcrdns4(res, "1.1.1.1")};
   CHECK_EQ(fcrdnses4.size(), 1);
   CHECK(Domain::match(fcrdnses4.front(), "one.one.one.one"))
       << "no match for " << fcrdnses4.front();
 
-  auto fcrdnses6 = fcrdns6(res, "2606:4700:4700::1111");
+  auto const fcrdnses6{fcrdns6(res, "2606:4700:4700::1111")};
   CHECK_EQ(fcrdnses6.size(), 1);
   CHECK(Domain::match(fcrdnses6.front(), "one.one.one.one"))
       << "no match for " << fcrdnses6.front();
 
-  auto quad9 = fcrdns4(res, "9.9.9.9");
+  auto const quad9{fcrdns4(res, "9.9.9.9")};
   CHECK(Domain::match(quad9.front(), "dns.quad9.net"))
       << "no match for " << quad9.front();
 }
