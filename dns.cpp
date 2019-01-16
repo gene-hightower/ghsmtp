@@ -108,6 +108,12 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     do_addr(res, aaaa.c_str());
   }
 
+  auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
+  if (!q.has_record()) {
+    std::cout << "no records\n";
+    return;
+  }
+
   TLD tld_db;
   auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
   if (dom != reg_dom) {
@@ -116,7 +122,6 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   check_uribls(res, dom.ascii().c_str());
 
-  auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
   if (q.authentic_data()) {
     std::cout << "MX records authentic for domain " << dom << '\n';
   }
