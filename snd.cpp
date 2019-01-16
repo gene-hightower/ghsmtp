@@ -1251,8 +1251,9 @@ void sign_eml(Eml& eml,
                              ? OpenDKIM::Sign::body_type::binary
                              : OpenDKIM::Sign::body_type::text;
 
-  auto key_file = FLAGS_dkim_key_file.empty() ? (FLAGS_selector + ".private")
-                                              : FLAGS_dkim_key_file;
+  auto const key_file = FLAGS_dkim_key_file.empty()
+                            ? (FLAGS_selector + ".private")
+                            : FLAGS_dkim_key_file;
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
@@ -1834,7 +1835,7 @@ int main(int argc, char* argv[])
   }
 
   bool enforce_dane = true;
-  auto receivers = get_receivers(res, to_mbx, enforce_dane);
+  auto const receivers = get_receivers(res, to_mbx, enforce_dane);
 
   if (receivers.empty()) {
     LOG(INFO) << "noplace to send this mail";
