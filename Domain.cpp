@@ -64,7 +64,7 @@ void Domain::set(std::string_view dom)
 
   dom = remove_trailing_dot(dom);
 
-  auto norm = nfkc(dom);
+  auto const norm = nfkc(dom);
 
   // idn2_to_ascii_8z() converts (ASCII) to lower case
 
