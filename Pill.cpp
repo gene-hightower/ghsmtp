@@ -32,8 +32,8 @@ Pill::Pill()
 
   constexpr char b32_charset[]{"ybndrfg8ejkmcpqxot1uwisza345h769"};
 
-  auto const os = reinterpret_cast<const unsigned char*>(&s_);
-  auto osp = os + sizeof(s_);
+  auto const os{reinterpret_cast<const unsigned char*>(&s_)};
+  auto osp{os + sizeof(s_)};
   auto x{0ul};
 
   switch ((osp - os) % 5) { // Duff's device
