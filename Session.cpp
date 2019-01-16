@@ -1106,7 +1106,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return true;
   }
 
-  auto fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
+  auto const fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
   for (auto const& fcr : fcrdns) {
     client_fcrdns_.emplace_back(fcr);
   }
@@ -1223,7 +1223,7 @@ bool Session::verify_client_(Domain const& client_identity,
     return false;
   }
 
-  auto labels{std::vector<std::string>{}};
+  std::vector<std::string> labels;
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
@@ -1266,7 +1266,7 @@ bool Session::verify_client_(Domain const& client_identity,
 // check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
-  auto const sender_str{std::string{sender}};
+  std::string const sender_str{sender};
   CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
@@ -1350,7 +1350,6 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
   auto const two_level = fmt::format("{}.{}", labels[labels.size() - 2],
                                      labels[labels.size() - 1]);
-  ;
 
   if (labels.size() > 2) {
     auto const three_level
@@ -1435,8 +1434,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  auto const spf_srv{SPF::Server{server_id_().c_str()}};
-  auto spf_request = SPF::Request{spf_srv};
+  SPF::Server const spf_srv{server_id_().c_str()};
+  SPF::Request spf_request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
     spf_request.set_ipv4_str(sock_.them_c_str());
