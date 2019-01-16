@@ -71,15 +71,15 @@ std::string rr_str(ldns_rdf const* rdf)
 {
   CHECK_NOTNULL(rdf);
 
-  auto data = static_cast<char const*>(rdf->_data);
-  auto udata = static_cast<unsigned char const*>(rdf->_data);
+  auto const data = static_cast<char const*>(rdf->_data);
+  auto const udata = static_cast<unsigned char const*>(rdf->_data);
 
   return std::string(data + 1, static_cast<std::string::size_type>(*udata));
 }
 
 Resolver::Resolver()
 {
-  auto status = ldns_resolver_new_frm_file(&res_, nullptr);
+  auto const status = ldns_resolver_new_frm_file(&res_, nullptr);
   CHECK_EQ(status, LDNS_STATUS_OK) << "failed to initialize DNS resolver: "
                                    << ldns_get_errorstr_by_id(status);
 }
@@ -107,9 +107,9 @@ Query::Query(Resolver const& res, DNS::RR_type type, std::string const& dom)
 
 Query::Query(Resolver const& res, DNS::RR_type type, char const* domain)
 {
-  Domain dom(domain);
+  Domain const dom{domain};
 
-  ldns_status status = ldns_resolver_query_status(
+  ldns_status const status = ldns_resolver_query_status(
       &p_, res.get(), dom.get(), static_cast<ldns_enum_rr_type>(type),
       LDNS_RR_CLASS_IN, LDNS_RD | LDNS_AD);
 
@@ -164,13 +164,13 @@ Query::~Query()
 
 DNS::RR_collection Query::get_records() const
 {
-  RR_list rrlst(*this);
+  RR_list const rrlst{*this};
   return rrlst.get_records();
 }
 
 std::vector<std::string> Query::get_strings() const
 {
-  RR_list rrlst(*this);
+  RR_list const rrlst{*this};
   return rrlst.get_strings();
 }
 
@@ -377,16 +377,16 @@ std::vector<std::string> RR_list::get_strings() const
 DNS::RR_collection Resolver::get_records(DNS::RR_type typ,
                                          char const* domain) const
 {
-  Query q(*this, typ, domain);
-  RR_list rrlst(q);
+  Query const q{*this, typ, domain};
+  RR_list const rrlst{q};
   return rrlst.get_records();
 }
 
 std::vector<std::string> Resolver::get_strings(DNS::RR_type typ,
                                                char const* domain) const
 {
-  Query q(*this, typ, domain);
-  RR_list rrlst(q);
+  Query const q{*this, typ, domain};
+  RR_list const rrlst{q};
   return rrlst.get_strings();
 }
 
