@@ -8,13 +8,13 @@
 int main(int argc, char* argv[])
 {
   size_t width = 0;
-  for (auto arg = 1; arg < argc; ++arg) {
+  for (auto arg{1}; arg < argc; ++arg) {
     auto const len = strlen(argv[arg]);
     width = std::max(width, len);
   }
 
   Magic magic;
-  for (auto arg = 1; arg < argc; ++arg) {
+  for (auto arg{1}; arg < argc; ++arg) {
     std::cout << std::setw(width) << argv[arg] << ": " << magic.file(argv[arg])
               << '\n';
   }

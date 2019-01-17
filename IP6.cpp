@@ -125,7 +125,7 @@ std::string reverse(std::string_view addr_str)
   auto q{std::string{}};
   q.reserve(2 * NS_IN6ADDRSZ);
 
-  for (auto n = NS_IN6ADDRSZ - 1; n >= 0; --n) {
+  for (auto n{NS_IN6ADDRSZ - 1}; n >= 0; --n) {
     auto const ch = addr_uint[n];
 
     auto const lo = ch & 0xF;

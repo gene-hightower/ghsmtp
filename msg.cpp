@@ -1779,7 +1779,7 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  for (auto i = 1; i < argc; ++i) {
+  for (auto i{1}; i < argc; ++i) {
     auto fn{argv[i]};
     auto name{fs::path(fn)};
     auto f{boost::iostreams::mapped_file_source(name)};

@@ -1348,14 +1348,14 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
   }
 
   if (FLAGS_long_line) {
-    for (auto i = 0; i < 10000; ++i) {
+    for (auto i{0}; i < 10000; ++i) {
       cnn.sock.out() << 'X';
     }
     cnn.sock.out() << "\r\n" << std::flush;
   }
 
   while (FLAGS_slow_strangle) {
-    for (auto i = 0; i < 100; ++i) {
+    for (auto i{0}; i < 100; ++i) {
       cnn.sock.out() << 'X' << std::flush;
       sleep(3);
     }

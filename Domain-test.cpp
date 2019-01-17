@@ -66,7 +66,7 @@ int main(int argc, char const* argv[])
   Domain const mixed_case{"ExAmPle.COM"};
   CHECK_EQ(mixed_case.ascii(), "example.com");
 
-  for (auto arg = 1; arg < argc; ++arg) {
+  for (auto arg{1}; arg < argc; ++arg) {
     Domain const a{argv[arg]};
     std::cout << a << '\n';
   }

@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
   auto const s1 = "no characters to escape";
   CHECK_EQ(esc(s1), s1);
 
-  for (auto arg = 1; arg < argc; ++arg) {
+  for (auto arg{1}; arg < argc; ++arg) {
     fs::path const path{argv[arg]};
 
     auto const body_sz{fs::file_size(path)};

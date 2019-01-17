@@ -108,7 +108,7 @@ void Verify::foreach_sig(
   }
   CHECK_EQ(status_, DKIM_STAT_OK);
 
-  for (auto i = 0; i < nsigs; ++i) {
+  for (auto i{0}; i < nsigs; ++i) {
     auto const dom = CHECK_NOTNULL(dkim_sig_getdomain(sigs[i]));
 
     auto const flg = dkim_sig_getflags(sigs[i]);
@@ -163,7 +163,7 @@ bool Verify::check()
 
   LOG(INFO) << "nsigs == " << nsigs;
 
-  for (auto i = 0; i < nsigs; ++i) {
+  for (auto i{0}; i < nsigs; ++i) {
     LOG(INFO) << i << " domain == " << dkim_sig_getdomain(sigs[i]);
     auto flg = dkim_sig_getflags(sigs[i]);
     if ((flg & DKIM_SIGFLAG_IGNORE) != 0) {
@@ -216,7 +216,7 @@ bool Verify::check()
           = dkim_sig_getsignedhdrs(dkim_, sig, &signedhdrs[0], hdr_sz, &nhdrs);
       CHECK_EQ(status_, DKIM_STAT_OK);
 
-      for (auto i = 0u; i < nhdrs; ++i)
+      for (auto i{0u}; i < nhdrs; ++i)
         LOG(INFO) << &signedhdrs[i * hdr_sz];
 
       return true;
