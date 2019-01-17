@@ -263,7 +263,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   }
 
   if (*verb == 'H') {
-    out_() << "250 " << server_id_() << "\r\n" << std::flush;
+    out_() << "250 " << server_id_() << "\r\n";
   }
 
   if (*verb == 'E') {
@@ -271,11 +271,12 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     if (sock_.has_peername()) {
       out_() << " at your service, " << client_;
     }
-    out_() << "\r\n";
-
-    out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
-    out_() << "250-8BITMIME\r\n";                      // RFC 6152
-    out_() << "250-RRVS\r\n";                          // RFC 7293
+    out_() << "\r\n"
+              "250-SIZE "
+           << max_msg_size()
+           << "\r\n"             // RFC 1870
+              "250-8BITMIME\r\n" // RFC 6152
+              "250-RRVS\r\n";    // RFC 7293
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
@@ -285,12 +286,14 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       // If we're not already TLS, offer TLS, à la RFC 3207
       out_() << "250-STARTTLS\r\n";
     }
-    out_() << "250-ENHANCEDSTATUSCODES\r\n";    // RFC 2034
-    out_() << "250-PIPELINING\r\n";             // RFC 2920
-    out_() << "250-BINARYMIME\r\n"              // RFC 3030
-              "250-CHUNKING\r\n";               // same
-    out_() << "250 SMTPUTF8\r\n" << std::flush; // RFC 6531
+    out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
+              "250-PIPELINING\r\n"          // RFC 2920
+              "250-BINARYMIME\r\n"          // RFC 3030
+              "250-CHUNKING\r\n"            // RFC 3030
+              "250 SMTPUTF8\r\n";           // RFC 6531
   }
+
+  out_() << std::flush;
 
   if (sock_.has_peername()) {
     if (std::find(begin(client_fcrdns_), end(client_fcrdns_), client_identity_)
