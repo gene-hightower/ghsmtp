@@ -192,7 +192,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   CHECK(!domain.ascii().empty());
 
-  auto tlsa = fmt::format("_{:d}._tcp.{}", port, domain.ascii());
+  auto const tlsa{fmt::format("_{:d}._tcp.{}", port, domain.ascii())};
 
   DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
@@ -200,11 +200,10 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
   }
 
-  auto tlsa_rrs = q.get_records();
+  auto const tlsa_rrs{q.get_records()};
 
   if (q.bogus_or_indeterminate()) {
     LOG(WARNING) << "TLSA data bogus_or_indeterminate";
-    tlsa_rrs.clear();
   }
 
   return tlsa_rrs;
