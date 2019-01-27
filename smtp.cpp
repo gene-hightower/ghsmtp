@@ -722,7 +722,7 @@ void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
   write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
-  _exit(1);
+  _Exit(1);
 }
 
 int main(int argc, char* argv[])
