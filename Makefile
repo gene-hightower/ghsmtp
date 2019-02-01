@@ -19,7 +19,7 @@ PROGRAMS := dns smtp msg sasl snd socks5
 
 DNS := DNS DNS-rrs DNS-fcrdns
 
-dns_STEMS := dns \
+dns_tool_STEMS := dns_tool \
 	$(DNS) \
 	Domain \
 	IP \
