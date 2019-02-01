@@ -15,7 +15,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := dns smtp msg sasl snd socks5
+PROGRAMS := dns_tool smtp msg sasl snd socks5
 
 DNS := DNS DNS-rrs DNS-fcrdns
 
