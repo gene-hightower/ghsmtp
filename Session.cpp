@@ -74,13 +74,13 @@ char const* uribls[]{
     "multi.surbl.org",
 };
 
-constexpr auto greeting_wait = std::chrono::seconds{2};
-constexpr int max_recipients_per_message = 100;
-constexpr int max_unrecognized_cmds = 20;
+constexpr auto greeting_wait              = std::chrono::seconds{2};
+constexpr int  max_recipients_per_message = 100;
+constexpr int  max_unrecognized_cmds      = 20;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
-constexpr auto read_timeout = std::chrono::minutes{5};
+constexpr auto read_timeout  = std::chrono::minutes{5};
 constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
@@ -162,7 +162,7 @@ void Session::reset_()
   spf_received_.clear();
 
   binarymime_ = false;
-  smtputf8_ = false;
+  smtputf8_   = false;
 
   if (msg_) {
     msg_.reset();
@@ -431,7 +431,7 @@ std::string Session::added_headers_(Message const& msg)
   headers << "Return-Path: <" << reverse_path_ << ">\r\n";
 
   // STD 3 section 5.2.8
-  auto constexpr indent = "        ";
+  auto constexpr indent    = "        ";
   auto constexpr indent_sz = sizeof(indent) - 1;
   auto constexpr break_col = 80;
 
@@ -444,7 +444,7 @@ std::string Session::added_headers_(Message const& msg)
           << " id " << msg.id();
 
   if (forward_path_.size()) {
-    auto constexpr phor = "for ";
+    auto constexpr phor    = "for ";
     auto constexpr phor_sz = sizeof(phor) - 1;
     headers << "\r\n" << indent << phor;
     int len = indent_sz + phor_sz;
@@ -497,7 +497,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     return {SpamStatus::spam, "SPF failed"};
   }
 
-  auto status{SpamStatus::spam};
+  auto               status{SpamStatus::spam};
   fmt::memory_buffer reason;
 
   // Anything enciphered tastes a lot like ham.
@@ -1190,7 +1190,7 @@ bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
 
 // check the identity from HELO/EHLO
 bool Session::verify_client_(Domain const& client_identity,
-                             std::string& error_msg)
+                             std::string&  error_msg)
 {
   if (!client_fcrdns_.empty()) {
     if (auto id = std::find(begin(client_fcrdns_), end(client_fcrdns_),
@@ -1313,7 +1313,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
 // this sender is the RFC5321 MAIL FROM: domain part
 bool Session::verify_sender_domain_(Domain const& sender,
-                                    std::string& error_msg)
+                                    std::string&  error_msg)
 {
   if (sender.empty()) {
     // MAIL FROM:<>
@@ -1399,7 +1399,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
 // check sender domain on dynamic URI black lists
 bool Session::verify_sender_domain_uribl_(std::string_view sender,
-                                          std::string& error_msg)
+                                          std::string&     error_msg)
 {
   if (!sock_.has_peername()) // short circuit
     return true;
@@ -1408,7 +1408,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
                random_device_);
   for (auto uribl : Config::uribls) {
     auto const lookup = fmt::format("{}.{}", sender, uribl);
-    auto as = DNS::get_strings(res_, DNS::RR_type::A, lookup);
+    auto       as     = DNS::get_strings(res_, DNS::RR_type::A, lookup);
     if (!as.empty()) {
       if (as.front() == "127.0.0.1")
         continue;
@@ -1438,7 +1438,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   }
 
   SPF::Server const spf_srv{server_id_().c_str()};
-  SPF::Request spf_request{spf_srv};
+  SPF::Request      spf_request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
     spf_request.set_ipv4_str(sock_.them_c_str());
@@ -1458,8 +1458,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_request.set_env_from(from.c_str());
 
   auto const spf_res{SPF::Response{spf_request}};
-  spf_result_ = spf_res.result();
-  spf_received_ = spf_res.received_spf();
+  spf_result_        = spf_res.result();
+  spf_received_      = spf_res.received_spf();
   spf_sender_domain_ = Domain{spf_request.get_sender_dom()};
 
   if (spf_result_ == SPF::Result::PASS) {

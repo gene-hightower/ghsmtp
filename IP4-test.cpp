@@ -70,7 +70,7 @@ int main(int argc, char const* argv[])
   auto const rev{reverse("1.2.3.4")};
   CHECK_EQ(0, rev.compare("4.3.2.1."));
 
-  auto const addr = "108.83.36.113";
+  auto const addr     = "108.83.36.113";
   auto const addr_lit = "[108.83.36.113]";
 
   CHECK(is_address(addr));

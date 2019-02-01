@@ -56,8 +56,8 @@ enum class RR_type : uint16_t {
   SSHFP = 44,
 
   // RFC 4034
-  RRSIG = 46,  // DNSSEC signature
-  NSEC = 47,   // Next Secure record
+  RRSIG  = 46, // DNSSEC signature
+  NSEC   = 47, // Next Secure record
   DNSKEY = 48, // DNS Key record
 
   // RFC 6698 section 7.1 “TLSA RRtype”
@@ -157,15 +157,15 @@ public:
   std::optional<std::string> as_str() const { return std::string{str_}; }
 
   sockaddr_in const& addr() const { return addr_; }
-  char const* c_str() const { return str_; }
-  static RR_type rr_type() { return RR_type::A; }
+  char const*        c_str() const { return str_; }
+  static RR_type     rr_type() { return RR_type::A; }
 
   bool operator==(RR_A const& rhs) const { return strcmp(str_, rhs.str_) == 0; }
   bool operator<(RR_A const& rhs) const { return strcmp(str_, rhs.str_) < 0; }
 
 private:
   sockaddr_in addr_;
-  char str_[INET_ADDRSTRLEN];
+  char        str_[INET_ADDRSTRLEN];
 };
 
 class RR_CNAME {
@@ -178,8 +178,8 @@ public:
   std::optional<std::string> as_str() const { return str(); }
 
   std::string const& str() const { return cname_; }
-  char const* c_str() const { return str().c_str(); }
-  static RR_type rr_type() { return RR_type::CNAME; }
+  char const*        c_str() const { return str().c_str(); }
+  static RR_type     rr_type() { return RR_type::CNAME; }
 
   bool operator==(RR_CNAME const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_CNAME const& rhs) const { return str() < rhs.str(); }
@@ -199,8 +199,8 @@ public:
   std::optional<std::string> as_str() const { return str(); }
 
   std::string const& str() const { return ptrdname_; }
-  char const* c_str() const { return str().c_str(); }
-  static RR_type rr_type() { return RR_type::PTR; }
+  char const*        c_str() const { return str().c_str(); }
+  static RR_type     rr_type() { return RR_type::PTR; }
 
   bool operator==(RR_PTR const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_PTR const& rhs) const { return str() < rhs.str(); }
@@ -220,7 +220,7 @@ public:
   std::optional<std::string> as_str() const { return exchange(); }
 
   std::string const& exchange() const { return exchange_; }
-  uint16_t preference() const { return preference_; }
+  uint16_t           preference() const { return preference_; }
 
   static RR_type rr_type() { return RR_type::MX; }
 
@@ -239,7 +239,7 @@ public:
 
 private:
   std::string exchange_;
-  uint16_t preference_;
+  uint16_t    preference_;
 };
 
 class RR_TXT {
@@ -251,9 +251,9 @@ public:
 
   std::optional<std::string> as_str() const { return str(); }
 
-  char const* c_str() const { return str().c_str(); }
+  char const*        c_str() const { return str().c_str(); }
   std::string const& str() const { return txt_data_; }
-  static RR_type rr_type() { return RR_type::TXT; }
+  static RR_type     rr_type() { return RR_type::TXT; }
 
   bool operator==(RR_TXT const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_TXT const& rhs) const { return str() < rhs.str(); }
@@ -269,8 +269,8 @@ public:
   std::optional<std::string> as_str() const { return std::string{c_str()}; }
 
   sockaddr_in6 const& addr() const { return addr_; }
-  char const* c_str() const { return str_; }
-  static RR_type rr_type() { return RR_type::AAAA; }
+  char const*         c_str() const { return str_; }
+  static RR_type      rr_type() { return RR_type::AAAA; }
 
   bool operator==(RR_AAAA const& rhs) const
   {
@@ -283,7 +283,7 @@ public:
 
 private:
   sockaddr_in6 addr_;
-  char str_[INET6_ADDRSTRLEN];
+  char         str_[INET6_ADDRSTRLEN];
 };
 
 class RR_TLSA {
@@ -292,14 +292,14 @@ public:
 
   using container_t = std::vector<octet, default_init_allocator<octet>>;
 
-  RR_TLSA(uint8_t cert_usage,
-          uint8_t selector,
-          uint8_t matching_type,
+  RR_TLSA(uint8_t        cert_usage,
+          uint8_t        selector,
+          uint8_t        matching_type,
           uint8_t const* assoc_data,
-          size_t assoc_data_sz);
-  unsigned cert_usage() const { return cert_usage_; }
-  unsigned selector() const { return selector_; }
-  unsigned matching_type() const { return matching_type_; }
+          size_t         assoc_data_sz);
+  unsigned           cert_usage() const { return cert_usage_; }
+  unsigned           selector() const { return selector_; }
+  unsigned           matching_type() const { return matching_type_; }
   container_t const& assoc_data() const { return assoc_data_; }
 
   // doesn't have a string representation
@@ -320,9 +320,9 @@ public:
 
 private:
   container_t assoc_data_;
-  uint8_t cert_usage_;
-  uint8_t selector_;
-  uint8_t matching_type_;
+  uint8_t     cert_usage_;
+  uint8_t     selector_;
+  uint8_t     matching_type_;
 };
 
 using RR

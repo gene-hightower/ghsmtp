@@ -17,10 +17,10 @@
 #include "TLD.hpp"
 
 namespace Config {
-constexpr size_t kibibyte = 1024;
-constexpr size_t mebibyte = kibibyte * kibibyte;
+constexpr size_t kibibyte             = 1024;
+constexpr size_t mebibyte             = kibibyte * kibibyte;
 constexpr size_t max_msg_size_initial = 15 * mebibyte;
-constexpr size_t max_msg_size_bro = 150 * mebibyte;
+constexpr size_t max_msg_size_bro     = 150 * mebibyte;
 } // namespace Config
 
 class Session {
@@ -31,8 +31,8 @@ public:
   Session& operator=(Session const&) = delete;
 
   explicit Session(std::function<void(void)> read_hook = []() {},
-                   int fd_in = STDIN_FILENO,
-                   int fd_out = STDOUT_FILENO);
+                   int                       fd_in     = STDIN_FILENO,
+                   int                       fd_out    = STDOUT_FILENO);
 
   void greeting();
   void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
@@ -67,15 +67,15 @@ public:
   void time_out() __attribute__((noreturn));
   void starttls();
 
-  bool maxed_out() { return sock_.maxed_out(); }
-  bool timed_out() { return sock_.timed_out(); }
+  bool          maxed_out() { return sock_.maxed_out(); }
+  bool          timed_out() { return sock_.timed_out(); }
   std::istream& in() { return sock_.in(); }
 
   void flush();
   void last_in_group_(std::string_view verb);
 
   size_t max_msg_size() const { return max_msg_size_; }
-  void max_msg_size(size_t max);
+  void   max_msg_size(size_t max);
 
   void log_stats() { sock_.log_stats(); }
 
@@ -88,7 +88,7 @@ private:
   std::string added_headers_(Message const& msg);
 
   std::ostream& out_() { return sock_.out(); }
-  void lo_(char const* verb, std::string_view client_identity);
+  void          lo_(char const* verb, std::string_view client_identity);
 
   void bad_host_(char const* msg) const __attribute__((noreturn));
 
@@ -104,7 +104,7 @@ private:
   bool verify_sender_(Mailbox const& sender, std::string& error_msg);
   bool verify_sender_domain_(Domain const& sender, std::string& error_msg);
   bool verify_sender_domain_uribl_(std::string_view sender,
-                                   std::string& error_msg);
+                                   std::string&     error_msg);
   bool verify_sender_spf_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
   bool verify_rcpt_params_(parameters_t const& parameters);
@@ -113,19 +113,19 @@ private:
 
 private:
   DNS::Resolver res_;
-  Sock sock_;
+  Sock          sock_;
 
   // per connection/session
-  Domain server_identity_;            // who we identify as
-  std::vector<Domain> client_fcrdns_; // who they look-up as
-  std::vector<Domain> server_fcrdns_; // who we look-up as
-  std::string client_;                // (fcrdns_ [sock_.them_c_str()])
+  Domain              server_identity_; // who we identify as
+  std::vector<Domain> client_fcrdns_;   // who they look-up as
+  std::vector<Domain> server_fcrdns_;   // who we look-up as
+  std::string         client_;          // (fcrdns_ [sock_.them_c_str()])
 
   // per transaction
-  Domain client_identity_;            // from ehlo/helo
-  Mailbox reverse_path_;              // "mail from"
-  std::vector<Mailbox> forward_path_; // for each "rcpt to"
-  std::string spf_received_;
+  Domain                   client_identity_; // from ehlo/helo
+  Mailbox                  reverse_path_;    // "mail from"
+  std::vector<Mailbox>     forward_path_;    // for each "rcpt to"
+  std::string              spf_received_;
   std::unique_ptr<Message> msg_;
 
   TLD tld_db_;
@@ -144,7 +144,7 @@ private:
   int n_unrecognized_cmds_{0};
 
   SPF::Result spf_result_;
-  Domain spf_sender_domain_;
+  Domain      spf_sender_domain_;
 
   // RFC 5321 section 3.3. Mail Transactions
   enum class xact_step : int8_t {

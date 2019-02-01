@@ -69,10 +69,10 @@ struct auth_resp : sor<auth_ok, auth_cont, auth_fail> {};
 // clang-format on
 
 struct Context {
-  uint32_t id;
-  std::string cookie;
-  std::string sasl_mech;
-  std::vector<std::string> parameter;
+  uint32_t                                                  id;
+  std::string                                               cookie;
+  std::string                                               sasl_mech;
+  std::vector<std::string>                                  parameter;
   std::unordered_map<std::string, std::vector<std::string>> mech;
 
   enum class auth_response { none, ok, cont, fail };

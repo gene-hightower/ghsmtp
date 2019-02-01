@@ -1,5 +1,5 @@
-#include "DNS.hpp"
 #include "DNS-fcrdns.hpp"
+#include "DNS.hpp"
 #include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
@@ -41,7 +41,7 @@ void check_uribls(DNS::Resolver& res, char const* dom)
 
   for (auto uribl : uribls) {
     auto const lookup = fmt::format("{}.{}", dom, uribl);
-    auto as = DNS::get_strings(res, DNS::RR_type::A, lookup);
+    auto       as     = DNS::get_strings(res, DNS::RR_type::A, lookup);
     if (!as.empty()) {
       if (as.front() == "127.0.0.1")
         continue;
@@ -52,7 +52,7 @@ void check_uribls(DNS::Resolver& res, char const* dom)
 
 void do_addr(DNS::Resolver& res, char const* a)
 {
-  auto const names = DNS::fcrdns(res, a);
+  auto const          names = DNS::fcrdns(res, a);
   std::vector<Domain> doms;
   for (auto const& name : names) {
     doms.emplace_back(name);
@@ -114,7 +114,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     return;
   }
 
-  TLD tld_db;
+  TLD  tld_db;
   auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
   if (dom != reg_dom) {
     std::cout << "registered domain is " << reg_dom << '\n';

@@ -11,10 +11,10 @@
 #include "DNS-rrs.hpp"
 
 // forward decl
-typedef struct ldns_struct_pkt ldns_pkt;
-typedef struct ldns_struct_rdf ldns_rdf;
+typedef struct ldns_struct_pkt      ldns_pkt;
+typedef struct ldns_struct_rdf      ldns_rdf;
 typedef struct ldns_struct_resolver ldns_resolver;
-typedef struct ldns_struct_rr_list ldns_rr_list;
+typedef struct ldns_struct_rr_list  ldns_rr_list;
 
 namespace DNS_ldns {
 
@@ -28,11 +28,11 @@ public:
   ~Domain();
 
   std::string const& str() const { return str_; }
-  ldns_rdf* get() const { return rdfp_; }
+  ldns_rdf*          get() const { return rdfp_; }
 
 private:
   std::string str_;
-  ldns_rdf* rdfp_;
+  ldns_rdf*   rdfp_;
 
   friend std::ostream& operator<<(std::ostream& os, Domain const& dom)
   {
@@ -48,20 +48,20 @@ public:
   Resolver();
   ~Resolver();
 
-  DNS::RR_collection get_records(DNS::RR_type typ,
+  DNS::RR_collection get_records(DNS::RR_type       typ,
                                  std::string const& domain) const
   {
     return get_records(typ, domain.c_str());
   }
   DNS::RR_collection get_records(DNS::RR_type typ, char const* domain) const;
 
-  std::vector<std::string> get_strings(DNS::RR_type typ,
+  std::vector<std::string> get_strings(DNS::RR_type       typ,
                                        std::string const& domain) const
   {
     return get_strings(typ, domain.c_str());
   }
   std::vector<std::string> get_strings(DNS::RR_type typ,
-                                       char const* domain) const;
+                                       char const*  domain) const;
 
   ldns_resolver* get() const { return res_; }
 
@@ -84,7 +84,7 @@ public:
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
 
-  DNS::RR_collection get_records() const;
+  DNS::RR_collection       get_records() const;
   std::vector<std::string> get_strings() const;
 
 private:
@@ -103,7 +103,7 @@ public:
   explicit RR_list(Query const& q);
   ~RR_list();
 
-  DNS::RR_collection get_records() const;
+  DNS::RR_collection       get_records() const;
   std::vector<std::string> get_strings() const;
 
 private:

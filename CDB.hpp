@@ -16,11 +16,11 @@ public:
   CDB(std::string_view db);
   ~CDB();
 
-  bool lookup(std::string_view key);
+  bool           lookup(std::string_view key);
   constexpr bool is_open() const;
 
 private:
-  int fd_{-1};
+  int        fd_{-1};
   struct cdb cdb_;
 };
 

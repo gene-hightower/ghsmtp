@@ -8,7 +8,7 @@
 #include <fmt/ostream.h>
 
 void Message::open(std::string_view fqdn,
-                   std::streamsize max_size,
+                   std::streamsize  max_size,
                    std::string_view folder)
 {
   max_size_ = max_size;
@@ -19,7 +19,7 @@ void Message::open(std::string_view fqdn,
       return fs::path(maildir_ev);
     }
 
-    auto homedir{fs::path{}};
+    auto       homedir{fs::path{}};
     auto const homedir_ev{getenv("HOME")};
     if (homedir_ev) {
       CHECK(strcmp(homedir_ev, "/root")) << "should not run as root";

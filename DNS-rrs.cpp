@@ -26,11 +26,11 @@ RR_AAAA::RR_AAAA(uint8_t const* rd, size_t sz)
   PCHECK(inet_ntop(AF_INET6, &addr_.sin6_addr, str_, sizeof str_));
 }
 
-RR_TLSA::RR_TLSA(uint8_t cert_usage,
-                 uint8_t selector,
-                 uint8_t matching_type,
+RR_TLSA::RR_TLSA(uint8_t        cert_usage,
+                 uint8_t        selector,
+                 uint8_t        matching_type,
                  uint8_t const* assoc_data,
-                 size_t assoc_data_sz)
+                 size_t         assoc_data_sz)
   : cert_usage_(cert_usage)
   , selector_(selector)
   , matching_type_(matching_type)

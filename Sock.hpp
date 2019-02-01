@@ -7,8 +7,8 @@
 #include "sa.hpp"
 
 namespace Config {
-constexpr auto read_timeout_default = std::chrono::seconds(30);
-constexpr auto write_timeout_default = std::chrono::seconds(30);
+constexpr auto read_timeout_default     = std::chrono::seconds(30);
+constexpr auto write_timeout_default    = std::chrono::seconds(30);
 constexpr auto starttls_timeout_default = std::chrono::seconds(30);
 } // namespace Config
 
@@ -17,16 +17,16 @@ public:
   Sock(const Sock&) = delete;
   Sock& operator=(const Sock&) = delete;
 
-  Sock(int fd_in,
-       int fd_out,
-       std::function<void(void)> read_hook = []() {},
-       std::chrono::milliseconds read_timeout = Config::read_timeout_default,
+  Sock(int                       fd_in,
+       int                       fd_out,
+       std::function<void(void)> read_hook     = []() {},
+       std::chrono::milliseconds read_timeout  = Config::read_timeout_default,
        std::chrono::milliseconds write_timeout = Config::write_timeout_default,
        std::chrono::milliseconds starttls_timeout
        = Config::starttls_timeout_default);
 
-  char const* us_c_str() const { return us_addr_str_; }
-  char const* them_c_str() const { return them_addr_str_; }
+  char const*        us_c_str() const { return us_addr_str_; }
+  char const*        them_c_str() const { return them_addr_str_; }
   std::string const& us_address_literal() const { return us_address_literal_; }
   std::string const& them_address_literal() const
   {
@@ -44,17 +44,17 @@ public:
   std::ostream& out() { return iostream_; }
 
   bool starttls_server() { return iostream_->starttls_server(); }
-  bool starttls_client(char const* client_name,
-                       char const* server_name,
+  bool starttls_client(char const*               client_name,
+                       char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
-                       bool enforce_dane)
+                       bool                      enforce_dane)
   {
     return iostream_->starttls_client(client_name, server_name, tlsa_rrs,
                                       enforce_dane);
   }
-  bool tls() { return iostream_->tls(); }
+  bool        tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }
-  bool verified() { return iostream_->verified(); };
+  bool        verified() { return iostream_->verified(); };
 
   void set_max_read(std::streamsize max) { iostream_->set_max_read(max); }
 

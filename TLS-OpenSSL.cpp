@@ -103,7 +103,7 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
   if (depth > Config::cert_verify_depth) {
     preverify_ok = 0;
-    err = X509_V_ERR_CERT_CHAIN_TOO_LONG;
+    err          = X509_V_ERR_CERT_CHAIN_TOO_LONG;
     X509_STORE_CTX_set_error(ctx, err);
   }
   if (!preverify_ok) {
@@ -155,12 +155,12 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   return SSL_TLSEXT_ERR_OK;
 }
 
-bool TLS::starttls_client(int fd_in,
-                          int fd_out,
-                          char const* client_name,
-                          char const* server_name,
+bool TLS::starttls_client(int                       fd_in,
+                          int                       fd_out,
+                          char const*               client_name,
+                          char const*               server_name,
                           DNS::RR_collection const& tlsa_rrs,
-                          bool enforce_dane,
+                          bool                      enforce_dane,
                           std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
@@ -179,7 +179,7 @@ bool TLS::starttls_client(int fd_in,
 
     for (auto const& cert : certs) {
 
-      auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+      auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
       std::vector<Domain> cn;
 
       // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
@@ -222,9 +222,9 @@ bool TLS::starttls_client(int fd_in,
         lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
         if (lastpos == -1)
           break;
-        auto e = X509_NAME_get_entry(subj, lastpos);
-        ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
-        auto str = ASN1_STRING_get0_data(d);
+        auto         e   = X509_NAME_get_entry(subj, lastpos);
+        ASN1_STRING* d   = X509_NAME_ENTRY_get_data(e);
+        auto         str = ASN1_STRING_get0_data(d);
         // LOG(INFO) << "client cert found for " << str;
         cn.emplace_back(reinterpret_cast<const char*>(str));
       }
@@ -342,9 +342,9 @@ bool TLS::starttls_client(int fd_in,
 
   for (auto const& tlsa_rr : tlsa_rrs) {
     if (std::holds_alternative<DNS::RR_TLSA>(tlsa_rr)) {
-      auto const rp = std::get<DNS::RR_TLSA>(tlsa_rr);
-      auto data = rp.assoc_data();
-      auto rc = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
+      auto const rp   = std::get<DNS::RR_TLSA>(tlsa_rr);
+      auto       data = rp.assoc_data();
+      auto       rc   = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
                                   rp.matching_type(), data.data(), data.size());
 
       if (rc < 0) {
@@ -434,12 +434,12 @@ bool TLS::starttls_client(int fd_in,
     }
 
     EVP_PKEY* mspki = nullptr;
-    int depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
+    int       depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
     if (depth >= 0) {
 
-      uint8_t usage, selector, mtype;
+      uint8_t              usage, selector, mtype;
       const unsigned char* certdata;
-      size_t certdata_len;
+      size_t               certdata_len;
 
       SSL_get0_dane_tlsa(ssl_, &usage, &selector, &mtype, &certdata,
                          &certdata_len);
@@ -464,8 +464,8 @@ bool TLS::starttls_client(int fd_in,
   return true;
 }
 
-bool TLS::starttls_server(int fd_in,
-                          int fd_out,
+bool TLS::starttls_server(int                       fd_in,
+                          int                       fd_out,
                           std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
@@ -490,7 +490,7 @@ bool TLS::starttls_server(int fd_in,
 
   for (auto const& cert : certs) {
 
-    auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
+    auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
     std::vector<Domain> names;
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
@@ -554,9 +554,9 @@ bool TLS::starttls_server(int fd_in,
       lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
       if (lastpos == -1)
         break;
-      auto e = X509_NAME_get_entry(subj, lastpos);
-      ASN1_STRING* d = X509_NAME_ENTRY_get_data(e);
-      auto str = ASN1_STRING_get0_data(d);
+      auto         e   = X509_NAME_get_entry(subj, lastpos);
+      ASN1_STRING* d   = X509_NAME_ENTRY_get_data(e);
+      auto         str = ASN1_STRING_get0_data(d);
       // LOG(INFO) << "server cert found for " << str;
       names.emplace_back(reinterpret_cast<const char*>(str));
     }
@@ -710,12 +710,12 @@ bool TLS::starttls_server(int fd_in,
       }
 
       EVP_PKEY* mspki = nullptr;
-      int depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
+      int       depth = SSL_get0_dane_authority(ssl_, nullptr, &mspki);
       if (depth >= 0) {
 
-        uint8_t usage, selector, mtype;
+        uint8_t              usage, selector, mtype;
         const unsigned char* certdata;
-        size_t certdata_len;
+        size_t               certdata_len;
 
         SSL_get0_dane_tlsa(ssl_, &usage, &selector, &mtype, &certdata,
                            &certdata_len);
@@ -756,14 +756,14 @@ std::string TLS::info() const
   return "";
 }
 
-std::streamsize TLS::io_tls_(char const* fn,
+std::streamsize TLS::io_tls_(char const*                          fn,
                              std::function<int(SSL*, void*, int)> io_fnc,
-                             char* s,
-                             std::streamsize n,
-                             std::chrono::milliseconds timeout,
-                             bool& t_o)
+                             char*                                s,
+                             std::streamsize                      n,
+                             std::chrono::milliseconds            timeout,
+                             bool&                                t_o)
 {
-  auto const start = std::chrono::system_clock::now();
+  auto const start    = std::chrono::system_clock::now();
   auto const end_time = start + timeout;
 
   ERR_clear_error();

@@ -24,10 +24,10 @@ public:
   void set(std::string_view dom);
 
   inline void clear();
-  bool empty() const { return ascii_.empty(); }
+  bool        empty() const { return ascii_.empty(); }
 
   inline static std::string_view remove_trailing_dot(std::string_view a);
-  inline static bool match(std::string_view a, std::string_view b);
+  inline static bool             match(std::string_view a, std::string_view b);
 
   bool operator==(std::string_view rhs) const { return match(ascii_, rhs); }
   bool operator!=(std::string_view rhs) const { return !(*this == rhs); }

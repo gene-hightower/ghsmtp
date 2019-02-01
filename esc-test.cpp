@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
     boost::iostreams::mapped_file_source file_source{};
     file_source.open(path);
 
-    imemstream isfile{file_source.data(), file_source.size()};
+    imemstream  isfile{file_source.data(), file_source.size()};
     std::string line;
     while (std::getline(isfile, line)) {
       if (!isfile.eof())

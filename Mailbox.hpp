@@ -24,7 +24,7 @@ public:
     domain_.clear();
   }
   std::string const& local_part() const { return local_part_; }
-  Domain const& domain() const { return domain_; }
+  Domain const&      domain() const { return domain_; }
 
   enum class encoding : bool { ascii, utf8 };
 
@@ -62,7 +62,7 @@ public:
 
 private:
   std::string local_part_;
-  Domain domain_;
+  Domain      domain_;
 };
 
 inline std::ostream& operator<<(std::ostream& s, Mailbox const& mb)

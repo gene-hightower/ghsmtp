@@ -23,7 +23,7 @@ octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
 enum class auth_method : octet {
   no_auth = 0,
-  none = 0xff,
+  none    = 0xff,
 };
 
 constexpr char const* c_str(auth_method auth)
@@ -43,13 +43,13 @@ std::ostream& operator<<(std::ostream& os, auth_method const& auth)
 }
 
 class greeting {
-  octet version_{5};
-  octet nmethod_{1};
+  octet       version_{5};
+  octet       nmethod_{1};
   auth_method method_{auth_method::no_auth};
 };
 
 class response {
-  octet version_;
+  octet       version_;
   auth_method method_;
 
 public:
@@ -58,8 +58,8 @@ public:
 };
 
 enum class command : octet {
-  connect = 1,
-  bind = 2,
+  connect       = 1,
+  bind          = 2,
   udp_associate = 3,
 };
 
@@ -101,13 +101,13 @@ std::ostream& operator<<(std::ostream& os, address_type const& at)
 }
 
 class request4 {
-  octet version_{5};
-  command cmd_{command::connect};
-  octet reserved_{0};
+  octet        version_{5};
+  command      cmd_{command::connect};
+  octet        reserved_{0};
   address_type typ_{address_type::ip4_address};
-  octet ip4_[4];
-  octet port_hi_;
-  octet port_lo_;
+  octet        ip4_[4];
+  octet        port_hi_;
+  octet        port_lo_;
 
 public:
   void addr(char const* addr)
@@ -164,18 +164,18 @@ std::ostream& operator<<(std::ostream& os, reply_field const& rp)
 }
 
 class reply4 {
-  octet version_;
-  reply_field rep_;
-  octet reserved_;
+  octet        version_;
+  reply_field  rep_;
+  octet        reserved_;
   address_type typ_;
-  octet ip4_[4];
-  octet port_lo_;
-  octet port_hi_;
+  octet        ip4_[4];
+  octet        port_lo_;
+  octet        port_hi_;
 
 public:
-  auto version() const { return version_; }
-  auto rep() const { return rep_; }
-  auto typ() const { return typ_; }
+  auto        version() const { return version_; }
+  auto        rep() const { return rep_; }
+  auto        typ() const { return typ_; }
   std::string addr() const
   {
     std::string a;
@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
 
   auto in4{sockaddr_in{}};
   in4.sin_family = AF_INET;
-  in4.sin_port = htons(tor_port);
+  in4.sin_port   = htons(tor_port);
   CHECK_EQ(inet_pton(AF_INET, tor_host, reinterpret_cast<void*>(&in4.sin_addr)),
            1);
   PCHECK(connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4)) == 0)
@@ -267,7 +267,7 @@ int main(int argc, char* argv[])
   Sock sock(fd, fd);
 
   DNS::Resolver res;
-  auto tlsa_rrs = get_tlsa_rrs(res, Domain(domain), port);
+  auto          tlsa_rrs = get_tlsa_rrs(res, Domain(domain), port);
 
   LOG(INFO) << "starting TLS";
 

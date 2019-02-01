@@ -23,10 +23,10 @@ size_t constexpr max_length = 255;
 std::string nfkc(std::string_view str)
 {
   size_t length = max_length;
-  char bfr[max_length];
+  char   bfr[max_length];
   CHECK_LE(str.length(), max_length);
   auto udata = reinterpret_cast<uint8_t const*>(str.data());
-  auto ubfr = reinterpret_cast<uint8_t*>(bfr);
+  auto ubfr  = reinterpret_cast<uint8_t*>(bfr);
   CHECK_NOTNULL(u8_normalize(UNINORM_NFKC, udata, str.size(), ubfr, &length));
   return std::string{bfr, length};
 }
@@ -39,21 +39,21 @@ void Domain::set(std::string_view dom)
 
   // Handle "bare" IP addresses, without the brackets.
   if (IP4::is_address(dom)) {
-    ascii_ = IP4::to_address_literal(dom);
-    utf8_ = ascii_;
+    ascii_              = IP4::to_address_literal(dom);
+    utf8_               = ascii_;
     is_address_literal_ = true;
     return;
   }
   if (IP6::is_address(dom)) {
-    ascii_ = IP6::to_address_literal(dom);
-    utf8_ = ascii_;
+    ascii_              = IP6::to_address_literal(dom);
+    utf8_               = ascii_;
     is_address_literal_ = true;
     return;
   }
 
   if (IP4::is_address_literal(dom) || IP6::is_address_literal(dom)) {
-    ascii_ = std::string(dom.data(), dom.length());
-    utf8_ = ascii_;
+    ascii_              = std::string(dom.data(), dom.length());
+    utf8_               = ascii_;
     is_address_literal_ = true;
     return;
   }
@@ -68,15 +68,15 @@ void Domain::set(std::string_view dom)
 
   // idn2_to_ascii_8z() converts (ASCII) to lower case
 
-  char* ptr = nullptr;
-  auto code = idn2_to_ascii_8z(norm.data(), &ptr, IDN2_TRANSITIONAL);
+  char* ptr  = nullptr;
+  auto  code = idn2_to_ascii_8z(norm.data(), &ptr, IDN2_TRANSITIONAL);
   if (code != IDN2_OK) {
     throw std::runtime_error(idn2_strerror(code));
   }
   ascii_ = ptr;
   idn2_free(ptr);
 
-  ptr = nullptr;
+  ptr  = nullptr;
   code = idn2_to_unicode_8z8z(ascii_.c_str(), &ptr, IDN2_TRANSITIONAL);
   if (code != IDN2_OK) {
     throw std::runtime_error(idn2_strerror(code));

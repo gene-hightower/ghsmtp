@@ -6,12 +6,12 @@
 #include <vector>
 
 namespace IP4 {
-bool is_private(std::string_view addr);
-bool is_address(std::string_view addr);
-bool is_address_literal(std::string_view addr);
+bool        is_private(std::string_view addr);
+bool        is_address(std::string_view addr);
+bool        is_address_literal(std::string_view addr);
 std::string to_address_literal(std::string_view addr);
 std::string_view constexpr as_address(std::string_view addr);
-std::string reverse(std::string_view addr);
+std::string              reverse(std::string_view addr);
 std::vector<std::string> fcrdns(std::string_view addr);
 
 constexpr char lit_pfx[] = "[";

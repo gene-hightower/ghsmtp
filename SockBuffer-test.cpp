@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
   PCHECK((fd_in = open(infile, O_RDONLY)) != -1);
 
   constexpr char tmplt[]{"/tmp/SockBuffert-XXXXXX"};
-  char outfile[sizeof(tmplt)];
+  char           outfile[sizeof(tmplt)];
   strcpy(outfile, tmplt);
 
   int fd_out;

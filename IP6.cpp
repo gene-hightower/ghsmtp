@@ -31,7 +31,7 @@ using tao::pegtl::abnf::HEXDIG;
 
 namespace IP6 {
 
-using dot = one<'.'>;
+using dot   = one<'.'>;
 using colon = one<':'>;
 
 // clang-format off
@@ -83,7 +83,7 @@ bool istarts_with(std::string_view str, std::string_view prefix)
     return iequal(str.substr(0, prefix.size()), prefix);
   return false;
 }
-}
+} // namespace
 
 bool is_private(std::string_view addr)
 {

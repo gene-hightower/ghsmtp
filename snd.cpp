@@ -123,7 +123,7 @@ using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
 namespace Config {
-constexpr auto read_timeout = std::chrono::seconds(30);
+constexpr auto read_timeout  = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 } // namespace Config
 
@@ -295,8 +295,8 @@ struct Connection {
 
   std::string server_id;
 
-  std::string ehlo_keyword;
-  std::vector<std::string> ehlo_param;
+  std::string                                               ehlo_keyword;
+  std::vector<std::string>                                  ehlo_param;
   std::unordered_map<std::string, std::vector<std::string>> ehlo_params;
 
   std::string reply_code;
@@ -544,7 +544,7 @@ struct action<greeting_ok> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.greeting_ok = true;
-    imemstream stream{begin(in), size(in)};
+    imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -558,7 +558,7 @@ struct action<ehlo_ok_rsp> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_ok = true;
-    imemstream stream{begin(in), size(in)};
+    imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -601,7 +601,7 @@ struct action<reply_lines> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    imemstream stream{begin(in), size(in)};
+    imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
       LOG(INFO) << " S: " << line;
@@ -655,7 +655,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto const& addr : addrs) {
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port = htons(port);
+      in6.sin6_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -698,7 +698,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto addr : addrs) {
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
+      in4.sin_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -811,15 +811,15 @@ public:
   }
 
   char const* data() const { return file_.data(); }
-  size_t size() const { return file_.size(); }
-  data_type type() const { return type_; }
+  size_t      size() const { return file_.size(); }
+  data_type   type() const { return type_; }
 
   bool empty() const { return size() == 0; }
-  operator std::string_view() const { return std::string_view(data(), size()); }
+       operator std::string_view() const { return std::string_view(data(), size()); }
 
 private:
-  data_type type_;
-  fs::path path_;
+  data_type                            type_;
+  fs::path                             path_;
   boost::iostreams::mapped_file_source file_;
 };
 
@@ -1195,13 +1195,13 @@ auto parse_mailboxes()
   return std::make_tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
 }
 
-auto create_eml(Domain const& sender,
-                std::string const& from,
-                std::string const& to,
+auto create_eml(Domain const&               sender,
+                std::string const&          from,
+                std::string const&          to,
                 std::vector<content> const& bodies,
-                bool ext_smtputf8)
+                bool                        ext_smtputf8)
 {
-  auto eml{Eml{}};
+  auto       eml{Eml{}};
   auto const date{Now{}};
   auto const pill{Pill{}};
 
@@ -1243,8 +1243,8 @@ auto create_eml(Domain const& sender,
   return eml;
 }
 
-void sign_eml(Eml& eml,
-              Mailbox const& from_mbx,
+void sign_eml(Eml&                        eml,
+              Mailbox const&              from_mbx,
               std::vector<content> const& bodies)
 {
   auto const body_type = (bodies[0].type() == data_type::binary)
@@ -1256,7 +1256,7 @@ void sign_eml(Eml& eml,
                             : FLAGS_dkim_key_file;
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
-  std::string key(std::istreambuf_iterator<char>{keyfs}, {});
+  std::string    key(std::istreambuf_iterator<char>{keyfs}, {});
   OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(),
                      from_mbx.domain().ascii().c_str(), body_type);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
@@ -1374,16 +1374,16 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 }
 
-bool snd(int fd_in,
-         int fd_out,
-         Domain const& sender,
-         Domain const& receiver,
-         DNS::RR_collection const& tlsa_rrs,
-         bool enforce_dane,
-         Mailbox const& from_mbx,
-         Mailbox const& to_mbx,
-         Mailbox const& smtp_from_mbx,
-         Mailbox const& smtp_to_mbx,
+bool snd(int                         fd_in,
+         int                         fd_out,
+         Domain const&               sender,
+         Domain const&               receiver,
+         DNS::RR_collection const&   tlsa_rrs,
+         bool                        enforce_dane,
+         Mailbox const&              from_mbx,
+         Mailbox const&              to_mbx,
+         Mailbox const&              smtp_from_mbx,
+         Mailbox const&              smtp_to_mbx,
          std::vector<content> const& bodies)
 {
   auto constexpr read_hook{[]() {}};
@@ -1435,7 +1435,7 @@ bool snd(int fd_in,
 
   if (bad_dad) {
     FLAGS_use_chunking = false;
-    FLAGS_use_size = false;
+    FLAGS_use_size     = false;
   }
 
   auto const ext_8bitmime{
@@ -1514,7 +1514,7 @@ bool snd(int fd_in,
   auto max_msg_size{0u};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
-      char* ep = nullptr;
+      char* ep     = nullptr;
       max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in SIZE argument: "
@@ -1834,8 +1834,8 @@ int main(int argc, char* argv[])
                : EXIT_FAILURE;
   }
 
-  bool enforce_dane = true;
-  auto const receivers = get_receivers(res, to_mbx, enforce_dane);
+  bool       enforce_dane = true;
+  auto const receivers    = get_receivers(res, to_mbx, enforce_dane);
 
   if (receivers.empty()) {
     LOG(INFO) << "noplace to send this mail";
@@ -1858,11 +1858,11 @@ int main(int argc, char* argv[])
 
     // Get our local IP address as "us".
 
-    sa::sockaddrs us_addr{};
-    socklen_t us_addr_len{sizeof us_addr};
-    char us_addr_str[INET6_ADDRSTRLEN]{'\0'};
+    sa::sockaddrs            us_addr{};
+    socklen_t                us_addr_len{sizeof us_addr};
+    char                     us_addr_str[INET6_ADDRSTRLEN]{'\0'};
     std::vector<std::string> fcrdns;
-    bool private_addr = false;
+    bool                     private_addr = false;
 
     if (-1 == getsockname(fd, &us_addr.addr, &us_addr_len)) {
       // Ignore ENOTSOCK errors from getsockname, useful for testing.

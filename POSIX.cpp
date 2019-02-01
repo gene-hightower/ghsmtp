@@ -27,7 +27,7 @@ bool POSIX::input_ready(int fd_in, milliseconds wait)
   FD_SET(fd_in, &fds);
 
   auto tv{timeval{}};
-  tv.tv_sec = duration_cast<seconds>(wait).count();
+  tv.tv_sec  = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
   int puts;
@@ -43,7 +43,7 @@ bool POSIX::output_ready(int fd_out, milliseconds wait)
   FD_SET(fd_out, &fds);
 
   auto tv{timeval{}};
-  tv.tv_sec = duration_cast<seconds>(wait).count();
+  tv.tv_sec  = duration_cast<seconds>(wait).count();
   tv.tv_usec = (wait.count() % 1000) * 1000;
 
   int puts;
@@ -52,16 +52,16 @@ bool POSIX::output_ready(int fd_out, milliseconds wait)
   return 0 != puts;
 }
 
-std::streamsize POSIX::io_fd_(char const* fnm,
+std::streamsize POSIX::io_fd_(char const*              fnm,
                               time_point<system_clock> start,
                               ssize_t (*io_fnc)(int, void*, size_t),
                               bool (*rdy_fnc)(int, milliseconds),
                               std::function<void(void)> read_hook,
-                              int fd,
-                              char* s,
-                              std::streamsize n,
-                              milliseconds timeout,
-                              bool& t_o)
+                              int                       fd,
+                              char*                     s,
+                              std::streamsize           n,
+                              milliseconds              timeout,
+                              bool&                     t_o)
 {
   auto end_time = start + timeout;
 

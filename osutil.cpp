@@ -97,7 +97,7 @@ std::string get_hostname()
 
 uint16_t get_port(char const* const service)
 {
-  char* ep = nullptr;
+  char*      ep = nullptr;
   auto const service_no{strtoul(service, &ep, 10)};
   if (ep && (*ep == '\0')) {
     CHECK_LE(service_no, std::numeric_limits<uint16_t>::max());
@@ -107,7 +107,7 @@ uint16_t get_port(char const* const service)
   auto result_buf{servent{}};
 
   servent* result_ptr = nullptr;
-  auto str_buf{std::vector<char, default_init_allocator<char>>(
+  auto     str_buf{std::vector<char, default_init_allocator<char>>(
       1024)}; // 1024 suggested by getservbyname_r(3)
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
@@ -139,7 +139,7 @@ std::vector<fs::path> list_directory(
   std::regex const pattern_regex(pattern, traits);
 
   for (auto const& it : fs::directory_iterator(path)) {
-    auto const it_filename = it.path().filename().string();
+    auto const  it_filename = it.path().filename().string();
     std::smatch matches;
     if (std::regex_match(it_filename, matches, pattern_regex)) {
       ret.push_back(it.path());

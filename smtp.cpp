@@ -35,7 +35,7 @@ struct Ctx {
   std::string mb_loc;
   std::string mb_dom;
 
-  std::pair<std::string, std::string> param;
+  std::pair<std::string, std::string>          param;
   std::unordered_map<std::string, std::string> parameters;
 
   std::streamsize chunk_size;
@@ -663,9 +663,9 @@ struct action<rset> {
 template <typename Input>
 std::string_view get_string_view(Input const& in)
 {
-  auto const b = begin(in) + 4;
+  auto const b   = begin(in) + 4;
   auto const len = end(in) - b;
-  auto str = std::string_view(b, len);
+  auto       str = std::string_view(b, len);
   if (str.front() == ' ')
     str.remove_prefix(1);
   return str;
@@ -739,7 +739,7 @@ int main(int argc, char* argv[])
   struct sigaction sact {
   };
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
-  sact.sa_flags = 0;
+  sact.sa_flags   = 0;
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
   alarm(2 * 60); // initial alarm
@@ -753,7 +753,7 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   std::unique_ptr<RFC5321::Ctx> ctx;
-  auto const read_hook{[&ctx]() { ctx->session.flush(); }};
+  auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
   ctx = std::make_unique<RFC5321::Ctx>(read_hook);
 
   // Don't wait for STARTTLS to fail if no cert.
@@ -765,7 +765,7 @@ int main(int argc, char* argv[])
 
   istream_input<eol::crlf> in{ctx->session.in(), std::size_t(FLAGS_bfr_size),
                               "ses"};
-  auto ret{0};
+  auto                     ret{0};
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
   }

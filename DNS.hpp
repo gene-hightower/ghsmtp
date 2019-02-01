@@ -15,8 +15,7 @@ class packet {
 public:
   using octet = unsigned char;
 
-  using container_t
-      = std::vector<octet, default_init_allocator<octet>>;
+  using container_t = std::vector<octet, default_init_allocator<octet>>;
 
   packet() {}
 
@@ -68,8 +67,8 @@ public:
 
 private:
   std::unique_ptr<Sock> ns_sock_;
-  int ns_;
-  int ns_fd_;
+  int                   ns_;
+  int                   ns_fd_;
 };
 
 class Query {
@@ -87,8 +86,8 @@ public:
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
   bool nx_domain() const { return nx_domain_; }
 
-  bool has_record() const { return has_record_; }
-  RR_collection get_records();
+  bool                     has_record() const { return has_record_; }
+  RR_collection            get_records();
   std::vector<std::string> get_strings();
 
   uint16_t rcode() const { return rcode_; }

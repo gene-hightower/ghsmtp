@@ -26,22 +26,22 @@ private:
 
 class Policy {
 public:
-  Policy() = default;
+  Policy()              = default;
   Policy(Policy const&) = delete;
   Policy& operator=(Policy const&) = delete;
 
   ~Policy();
 
-  void init(char const* ip);
-  bool store_from_domain(char const* from_domain);
-  bool store_dkim(char const* d_equal_domain,
-                  int dkim_result,
-                  char const* human_result);
-  bool store_spf(char const* domain,
-                 int result,
-                 int origin,
-                 char const* human_readable);
-  bool query_dmarc(char const* domain);
+  void   init(char const* ip);
+  bool   store_from_domain(char const* from_domain);
+  bool   store_dkim(char const* d_equal_domain,
+                    int         dkim_result,
+                    char const* human_result);
+  bool   store_spf(char const* domain,
+                   int         result,
+                   int         origin,
+                   char const* human_readable);
+  bool   query_dmarc(char const* domain);
   Advice get_advice();
 
 private:

@@ -6,9 +6,9 @@
 
 namespace sa {
 union sockaddrs {
-  struct sockaddr addr;
-  struct sockaddr_in addr_in;
-  struct sockaddr_in6 addr_in6;
+  struct sockaddr         addr;
+  struct sockaddr_in      addr_in;
+  struct sockaddr_in6     addr_in6;
   struct sockaddr_storage addr_storage;
 };
 } // namespace sa

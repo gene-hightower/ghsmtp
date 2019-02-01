@@ -11,13 +11,13 @@
 CDB::CDB(std::string_view db)
 {
   auto const config_path = osutil::get_config_dir();
-  auto db_path = config_path / db;
+  auto       db_path     = config_path / db;
   db_path += ".cdb";
   auto const db_fn = db_path.string();
 
   fd_ = ::open(db_fn.c_str(), O_RDONLY);
   if (fd_ == -1) {
-    char err[256]{};
+    char       err[256]{};
     auto const msg = strerror_r(errno, err, sizeof(err));
     LOG(WARNING) << "unable to open " << db_fn << ": " << msg;
   }

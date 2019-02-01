@@ -124,7 +124,7 @@ struct ci_less {
 struct Ctx {
   OpenDKIM::Verify dkv;
 
-  OpenDMARC::Lib dml;
+  OpenDMARC::Lib    dml;
   OpenDMARC::Policy dmp;
 
   std::string mb_loc;
@@ -142,7 +142,7 @@ struct Ctx {
   std::vector<std::pair<std::string, std::string>> kv_list;
 
   std::map<std::string, std::string, ci_less> spf_info;
-  std::string spf_result;
+  std::string                                 spf_result;
 
   // std::unordered_multimap<char const*, std::string> defined_hdrs;
   // std::multimap<std::string, std::string, ci_less> opt_hdrs;
@@ -196,7 +196,7 @@ struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
 struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
 };
 
-using dot = one<'.'>;
+using dot   = one<'.'>;
 using colon = one<':'>;
 
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
@@ -1320,7 +1320,7 @@ struct action<received_spf> {
 
     auto node = osutil::get_hostname();
 
-    SPF::Server spf_srv(node.c_str());
+    SPF::Server  spf_srv(node.c_str());
     SPF::Request spf_req(spf_srv);
 
     spf_req.set_ip_str(ctx.spf_info["client-ip"].c_str());
@@ -1331,7 +1331,7 @@ struct action<received_spf> {
     }
 
     SPF::Response spf_res(spf_req);
-    auto res = spf_res.result();
+    auto          res = spf_res.result();
     CHECK_NE(res, SPF::Result::INVALID);
 
     if (ctx.spf_result != res.c_str()) {
@@ -1374,11 +1374,11 @@ struct action<received_spf> {
 
     // Google sometimes doesn't put in anything but client-ip
     if (ctx.spf_info.find("envelope-from") != end(ctx.spf_info)) {
-      auto dom = ctx.spf_info["envelope-from"];
+      auto dom    = ctx.spf_info["envelope-from"];
       auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
       if (dom == "<>") {
-        dom = ctx.spf_info["helo"];
+        dom    = ctx.spf_info["helo"];
         origin = DMARC_POLICY_SPF_ORIGIN_HELO;
         LOG(INFO) << "SPF: origin HELO " << dom;
       }
@@ -1388,7 +1388,7 @@ struct action<received_spf> {
                                                                ctx)) {
           LOG(FATAL) << "Failed to parse domain: " << dom;
         }
-        dom = ctx.mb_dom;
+        dom    = ctx.mb_dom;
         origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
         LOG(INFO) << "SPF: origin MAIL FROM " << dom;
 
@@ -1447,7 +1447,7 @@ struct action<discrete_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.discrete_type = true;
-    ctx.type = in.string();
+    ctx.type          = in.string();
   }
 };
 
@@ -1457,7 +1457,7 @@ struct action<composite_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.composite_type = true;
-    ctx.type = in.string();
+    ctx.type           = in.string();
   }
 };
 
@@ -1695,7 +1695,7 @@ void selftest()
 
   for (auto i : ip_list) {
     memory_input<> in(i, i);
-    RFC5322::Ctx ctx;
+    RFC5322::Ctx   ctx;
     if (!parse<RFC5322::ip, RFC5322::action /*, tao::pegtl::tracer*/>(in,
                                                                       ctx)) {
       LOG(ERROR) << "Error parsing as ip \"" << i << "\"";
@@ -1720,7 +1720,7 @@ void selftest()
 
   for (auto i : rec_list) {
     memory_input<> in(i, i);
-    RFC5322::Ctx ctx;
+    RFC5322::Ctx   ctx;
     if (!parse<RFC5322::received, RFC5322::action /*, tao::pegtl::tracer*/>(
             in, ctx)) {
       LOG(ERROR) << "Error parsing as Received: \"" << i << "\"";
@@ -1737,7 +1737,7 @@ void selftest()
 
   for (auto i : date_list) {
     memory_input<> in(i, i);
-    RFC5322::Ctx ctx;
+    RFC5322::Ctx   ctx;
     if (!parse<RFC5322::orig_date, RFC5322::action /*, tao::pegtl::tracer*/>(
             in, ctx)) {
       LOG(ERROR) << "Error parsing as Date: \"" << i << "\"";
@@ -1758,7 +1758,7 @@ void selftest()
 
   for (auto i : spf_list) {
     memory_input<> in(i, i);
-    RFC5322::Ctx ctx;
+    RFC5322::Ctx   ctx;
     if (!parse<RFC5322::received_spf, RFC5322::action /*, tao::pegtl::tracer*/>(
             in, ctx)) {
       LOG(ERROR) << "Error parsing as Received-SPF: \"" << i << "\"";

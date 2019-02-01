@@ -18,12 +18,12 @@ std::ostream& operator<<(std::ostream& os, const std::variant<Ts...>& v)
 
 int main(int argc, char const* argv[])
 {
-  DNS::Resolver res;
+  DNS::Resolver      res;
   DNS_ldns::Resolver res_ldns;
 
   struct lkp {
     DNS::RR_type typ;
-    char const* name;
+    char const*  name;
   };
 
   lkp lookups[] = {
@@ -46,7 +46,7 @@ int main(int argc, char const* argv[])
   };
 
   for (auto const& lookup : lookups) {
-    DNS::Query q(res, lookup.typ, lookup.name);
+    DNS::Query      q(res, lookup.typ, lookup.name);
     DNS_ldns::Query q_ldns(res_ldns, lookup.typ, lookup.name);
 
     CHECK_EQ(q.nx_domain(), q_ldns.nx_domain());

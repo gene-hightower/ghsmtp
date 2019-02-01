@@ -5,8 +5,8 @@
 
 #include <glog/logging.h>
 
-Sock::Sock(int fd_in,
-           int fd_out,
+Sock::Sock(int                       fd_in,
+           int                       fd_out,
            std::function<void(void)> read_hook,
            std::chrono::milliseconds read_timeout,
            std::chrono::milliseconds write_timeout,

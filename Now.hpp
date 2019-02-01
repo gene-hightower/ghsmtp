@@ -9,13 +9,13 @@ class Now {
 public:
   Now();
 
-  auto sec() const { return tv_.tv_sec; }
-  auto usec() const { return tv_.tv_usec; }
+  auto        sec() const { return tv_.tv_sec; }
+  auto        usec() const { return tv_.tv_usec; }
   const char* c_str() const { return c_str_; }
 
 private:
   timeval tv_;
-  char c_str_[32]; // RFC 5322 date-time section 3.3.
+  char    c_str_[32]; // RFC 5322 date-time section 3.3.
 
   friend std::ostream& operator<<(std::ostream& s, Now const& now)
   {

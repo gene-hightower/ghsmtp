@@ -4,9 +4,9 @@
 #include <functional>
 #include <string_view>
 
-typedef struct dkim_lib DKIM_LIB; // local or forward declaration
-typedef struct dkim DKIM;         // local or forward declaration
-typedef int DKIM_STAT;            // local or forward declaration
+typedef struct dkim_lib DKIM_LIB;  // local or forward declaration
+typedef struct dkim     DKIM;      // local or forward declaration
+typedef int             DKIM_STAT; // local or forward declaration
 
 namespace OpenDKIM {
 
@@ -26,7 +26,7 @@ protected:
   ~Lib();
 
   DKIM_LIB* lib_{nullptr};
-  DKIM* dkim_{nullptr};
+  DKIM*     dkim_{nullptr};
   DKIM_STAT status_{0};
 };
 
@@ -49,7 +49,7 @@ public:
   Sign(char const* secretkey,
        char const* selector,
        char const* domain,
-       body_type typ = body_type::text);
+       body_type   typ = body_type::text);
 
   std::string getsighdr();
 };

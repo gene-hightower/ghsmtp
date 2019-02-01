@@ -65,7 +65,7 @@ bool Policy::store_from_domain(char const* from_domain)
 }
 
 bool Policy::store_dkim(char const* d_equal_domain,
-                        int dkim_result,
+                        int         dkim_result,
                         char const* human_result)
 {
   auto const status = opendmarc_policy_store_dkim(
@@ -79,8 +79,8 @@ bool Policy::store_dkim(char const* d_equal_domain,
 }
 
 bool Policy::store_spf(char const* domain,
-                       int result,
-                       int origin,
+                       int         result,
+                       int         origin,
                        char const* human_readable)
 {
   auto const status = opendmarc_policy_store_spf(pctx_, uc(domain), result,

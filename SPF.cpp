@@ -72,10 +72,10 @@ Server::~Server()
 Server::initializer::initializer()
 {
   // Hook info libspf2's error procs.
-  SPF_error_handler = log_error_;
+  SPF_error_handler   = log_error_;
   SPF_warning_handler = log_warning_;
-  SPF_info_handler = log_info_;
-  SPF_debug_handler = nullptr;
+  SPF_info_handler    = log_info_;
+  SPF_debug_handler   = nullptr;
 }
 
 Request::Request(Server const& srv)

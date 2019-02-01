@@ -25,8 +25,8 @@ constexpr std::chrono::seconds default_starttls_timeout{2};
 class SockBuffer
   : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
-  SockBuffer(int fd_in,
-             int fd_out,
+  SockBuffer(int                       fd_in,
+             int                       fd_out,
              std::function<void(void)> read_hook = []() {},
              std::chrono::milliseconds read_timeout
              = Config::default_read_timeout,
@@ -60,24 +60,24 @@ public:
     return tls_active_
            = tls_.starttls_server(fd_in_, fd_out_, starttls_timeout_);
   }
-  bool starttls_client(char const* client_name,
-                       char const* server_name,
+  bool starttls_client(char const*               client_name,
+                       char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
-                       bool enforce_dane)
+                       bool                      enforce_dane)
   {
     return tls_active_
            = tls_.starttls_client(fd_in_, fd_out_, client_name, server_name,
                                   tlsa_rrs, enforce_dane, starttls_timeout_);
   }
-  bool tls() const { return tls_active_; }
+  bool        tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }
-  bool verified() const { return tls_.verified(); };
+  bool        verified() const { return tls_.verified(); };
 
   void set_max_read(std::streamsize max)
   {
-    limit_read_ = true;
-    read_limit_ = max;
-    octets_read_ = 0;
+    limit_read_     = true;
+    read_limit_     = max;
+    octets_read_    = 0;
     octets_written_ = 0;
   }
 

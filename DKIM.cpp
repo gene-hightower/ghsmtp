@@ -99,9 +99,9 @@ void Lib::eom()
 void Verify::foreach_sig(
     std::function<void(char const* domain, bool passed)> func)
 {
-  int nsigs = 0;
-  DKIM_SIGINFO** sigs = nullptr;
-  status_ = dkim_getsiglist(dkim_, &sigs, &nsigs);
+  int            nsigs = 0;
+  DKIM_SIGINFO** sigs  = nullptr;
+  status_              = dkim_getsiglist(dkim_, &sigs, &nsigs);
   if (status_ == DKIM_STAT_INVALID) {
     LOG(WARNING) << "skipping DKIM sigs";
     return;
@@ -156,9 +156,9 @@ Verify::Verify()
 
 bool Verify::check()
 {
-  int nsigs = 0;
-  DKIM_SIGINFO** sigs = nullptr;
-  status_ = dkim_getsiglist(dkim_, &sigs, &nsigs);
+  int            nsigs = 0;
+  DKIM_SIGINFO** sigs  = nullptr;
+  status_              = dkim_getsiglist(dkim_, &sigs, &nsigs);
   CHECK_EQ(status_, DKIM_STAT_OK);
 
   LOG(INFO) << "nsigs == " << nsigs;
@@ -234,7 +234,7 @@ bool Verify::sig_syntax(std::string_view sig)
 Sign::Sign(char const* secretkey,
            char const* selector,
            char const* domain,
-           body_type typ)
+           body_type   typ)
 {
   dkim_ = CHECK_NOTNULL(dkim_sign(
       lib_, id_s, nullptr, uc(secretkey), uc(selector), uc(domain),
@@ -245,10 +245,10 @@ Sign::Sign(char const* secretkey,
 
 std::string Sign::getsighdr()
 {
-  auto const initial{strlen(DKIM_SIGNHEADER) + 2};
+  auto const     initial{strlen(DKIM_SIGNHEADER) + 2};
   unsigned char* buf = nullptr;
-  size_t len = 0;
-  status_ = dkim_getsighdr_d(dkim_, initial, &buf, &len);
+  size_t         len = 0;
+  status_            = dkim_getsighdr_d(dkim_, initial, &buf, &len);
   return std::string(c(buf), len);
 }
 } // namespace OpenDKIM

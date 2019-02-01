@@ -35,7 +35,7 @@ struct nameserver {
   char const* host; // name used to match cert
   char const* addr;
   char const* port;
-  sock_type typ;
+  sock_type   typ;
 };
 
 constexpr nameserver nameservers[]{
@@ -393,10 +393,10 @@ int name_length(octet const* encoded, DNS::packet const& pkt)
   return length ? length - 1 : length;
 }
 
-bool expand_name(octet const* encoded,
+bool expand_name(octet const*       encoded,
                  DNS::packet const& pkt,
-                 std::string& name,
-                 int& enc_len)
+                 std::string&       name,
+                 int&               enc_len)
 {
   name.clear();
 
@@ -429,7 +429,7 @@ bool expand_name(octet const* encoded,
     if ((*p & NS_CMPRSFLGS) == NS_CMPRSFLGS) {
       if (!indir) {
         enc_len = uztosl(p + 2 - encoded);
-        indir = true;
+        indir   = true;
       }
       p = begin(pkt) + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
     }
@@ -471,7 +471,7 @@ int name_put(octet* bfr, char const* name)
       return -1;
     }
 
-    uint8_t len = 0;
+    uint8_t     len = 0;
     char const* p;
 
     for (p = name; *p && *p != '.'; p++) {
@@ -563,7 +563,7 @@ Resolver::Resolver()
 
     auto const& nameserver = Config::nameservers[ns_];
 
-    ns_fd_ = -1;
+    ns_fd_        = -1;
     uint16_t port = osutil::get_port(nameserver.port);
 
     auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
@@ -575,7 +575,7 @@ Resolver::Resolver()
 
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
+      in4.sin_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -594,7 +594,7 @@ Resolver::Resolver()
 
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port = htons(port);
+      in6.sin6_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -665,11 +665,11 @@ packet Resolver::xchg(packet const& q)
 
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
 
-  auto sz = Config::max_udp_sz;
+  auto                     sz = Config::max_udp_sz;
   DNS::packet::container_t bfr(sz);
 
   auto constexpr hook{[]() {}};
-  auto t_o{false};
+  auto       t_o{false};
   auto const a_buf = reinterpret_cast<char*>(bfr.data());
   auto const a_buflen
       = POSIX::read(ns_fd_, a_buf, int(sz), hook, Config::read_timeout, t_o);
@@ -753,7 +753,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
                                    std::numeric_limits<uint16_t>::max());
 
   uint16_t cls = ns_c_in;
-  q_ = create_question(name, type, cls, id);
+  q_           = create_question(name, type, cls, id);
 
   if (!xchg_(res, id))
     return;
@@ -773,12 +773,12 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
   // an un-trusted datum from afar.
 
   auto cls{[this, type = type]() {
-    auto q = begin(q_);
+    auto       q       = begin(q_);
     auto const q_hdr_p = reinterpret_cast<header const*>(q);
     CHECK_EQ(q_hdr_p->qdcount(), uint16_t(1));
     q += sizeof(header);
     std::string qname;
-    int name_len;
+    int         name_len;
     CHECK(expand_name(q, q_, qname, name_len));
     q += name_len;
     auto const question_p = reinterpret_cast<question const*>(q);
@@ -810,7 +810,7 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
   }
 
   authentic_data_ = hdr_p->authentic_data();
-  has_record_ = hdr_p->ancount() != 0;
+  has_record_     = hdr_p->ancount() != 0;
 
   // check the question part of the replay
 
@@ -827,7 +827,7 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
 
   { // make sure the question name matches
     std::string qname;
-    auto enc_len = 0;
+    auto        enc_len = 0;
     if (!expand_name(p, a_, qname, enc_len)) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "bad packet";
@@ -871,7 +871,7 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
   // answers and nameservers
   for (auto i = 0; i < (hdr_p->ancount() + hdr_p->nscount()); ++i) {
     std::string x;
-    auto enc_len = 0;
+    auto        enc_len = 0;
     if (!expand_name(p, a_, x, enc_len)
         || ((p + enc_len + sizeof(rr)) > end(a_))) {
       bogus_or_indeterminate_ = true;
@@ -881,13 +881,13 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
     }
     p += enc_len;
     auto rr_p = reinterpret_cast<rr const*>(p);
-    p = rr_p->next_rr_name();
+    p         = rr_p->next_rr_name();
   }
 
   // check additional section for OPT record
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string x;
-    auto enc_len = 0;
+    auto        enc_len = 0;
     if (!expand_name(p, a_, x, enc_len)
         || ((p + enc_len + sizeof(rr)) > end(a_))) {
       bogus_or_indeterminate_ = true;
@@ -900,7 +900,7 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
 
     switch (rr_p->rr_type()) {
     case ns_t_opt: {
-      auto opt_p = reinterpret_cast<edns0_opt_meta_rr const*>(p);
+      auto opt_p      = reinterpret_cast<edns0_opt_meta_rr const*>(p);
       extended_rcode_ = (opt_p->extended_rcode() << 4) + hdr_p->rcode();
       break;
     }
@@ -944,7 +944,7 @@ std::optional<RR> get_A(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR> get_CNAME(rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
   std::string name;
-  int enc_len;
+  int         enc_len;
   if (!expand_name(rr_p->rddata(), pkt, name, enc_len)) {
     LOG(WARNING) << "bogus CNAME record";
     err = true;
@@ -956,7 +956,7 @@ std::optional<RR> get_CNAME(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR> get_PTR(rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
   std::string name;
-  int enc_len;
+  int         enc_len;
   if (!expand_name(rr_p->rddata(), pkt, name, enc_len)) {
     LOG(WARNING) << "bogus PTR record";
     err = true;
@@ -968,13 +968,13 @@ std::optional<RR> get_PTR(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR> get_MX(rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
   std::string name;
-  int enc_len;
+  int         enc_len;
   if (rr_p->rdlength() < 3) {
     LOG(WARNING) << "bogus MX record";
     err = true;
     return {};
   }
-  auto p = rr_p->rddata();
+  auto       p          = rr_p->rddata();
   auto const preference = as_u16(p[0], p[1]);
   p += 2;
   if (!expand_name(p, pkt, name, enc_len)) {
@@ -993,7 +993,7 @@ std::optional<RR> get_TXT(rr const* rr_p, DNS::packet const& pkt, bool& err)
     return {};
   }
   std::string str;
-  auto p = rr_p->rddata();
+  auto        p = rr_p->rddata();
   do {
     if ((p + 1 + *p) > rr_p->next_rr_name()) {
       LOG(WARNING) << "bogus string in TXT record";
@@ -1033,12 +1033,12 @@ std::optional<RR> get_TLSA(rr const* rr_p, DNS::packet const& pkt, bool& err)
 
   auto p = rr_p->rddata();
 
-  uint8_t cert_usage = *p++;
-  uint8_t selector = *p++;
+  uint8_t cert_usage    = *p++;
+  uint8_t selector      = *p++;
   uint8_t matching_type = *p++;
 
-  uint8_t const* assoc_data = p;
-  size_t assoc_data_sz = rr_p->rdlength() - 3;
+  uint8_t const* assoc_data    = p;
+  size_t         assoc_data_sz = rr_p->rdlength() - 3;
 
   return RR_TLSA{cert_usage, selector, matching_type, assoc_data,
                  assoc_data_sz};
@@ -1094,7 +1094,7 @@ RR_collection Query::get_records()
   // skip queries
   for (auto i = 0; i < hdr_p->qdcount(); ++i) {
     std::string qname;
-    auto enc_len = 0;
+    auto        enc_len = 0;
 
     CHECK(expand_name(p, a_, qname, enc_len));
     p += enc_len;
@@ -1105,7 +1105,7 @@ RR_collection Query::get_records()
   // get answers
   for (auto i = 0; i < hdr_p->ancount(); ++i) {
     std::string name;
-    auto enc_len = 0;
+    auto        enc_len = 0;
     CHECK(expand_name(p, a_, name, enc_len));
     p += enc_len;
     if ((p + sizeof(rr)) > end(a_)) {

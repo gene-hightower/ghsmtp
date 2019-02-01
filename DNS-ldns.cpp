@@ -33,7 +33,7 @@ std::string rr_name_str(ldns_rdf const* rdf)
   auto const data = ldns_rdf_data(rdf);
 
   unsigned char src_pos = 0;
-  unsigned char len = data[src_pos];
+  unsigned char len     = data[src_pos];
 
   std::string str;
   str.reserve(64);
@@ -71,7 +71,7 @@ std::string rr_str(ldns_rdf const* rdf)
 {
   CHECK_NOTNULL(rdf);
 
-  auto const data = static_cast<char const*>(rdf->_data);
+  auto const data  = static_cast<char const*>(rdf->_data);
   auto const udata = static_cast<unsigned char const*>(rdf->_data);
 
   return std::string(data + 1, static_cast<std::string::size_type>(*udata));
@@ -178,7 +178,7 @@ RR_list::RR_list(Query const& q)
 {
   if (q.get()) {
     // no clones, so no frees required
-    rrlst_answer_ = ldns_pkt_answer(q.get());
+    rrlst_answer_     = ldns_pkt_answer(q.get());
     rrlst_additional_ = ldns_pkt_additional(q.get());
   }
 }
@@ -375,17 +375,17 @@ std::vector<std::string> RR_list::get_strings() const
 }
 
 DNS::RR_collection Resolver::get_records(DNS::RR_type typ,
-                                         char const* domain) const
+                                         char const*  domain) const
 {
-  Query const q{*this, typ, domain};
+  Query const   q{*this, typ, domain};
   RR_list const rrlst{q};
   return rrlst.get_records();
 }
 
 std::vector<std::string> Resolver::get_strings(DNS::RR_type typ,
-                                               char const* domain) const
+                                               char const*  domain) const
 {
-  Query const q{*this, typ, domain};
+  Query const   q{*this, typ, domain};
   RR_list const rrlst{q};
   return rrlst.get_strings();
 }

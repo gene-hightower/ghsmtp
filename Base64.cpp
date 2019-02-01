@@ -24,13 +24,13 @@ std::string enc(std::string_view text, std::string::size_type wrap)
 {
   unsigned char group_8bit[3];
   unsigned char group_6bit[4];
-  int count_3_chars = 0;
+  int           count_3_chars = 0;
 
-  auto const input_size = text.length();
-  auto const padding = ((input_size % 3) ? (3 - (input_size % 3)) : 0);
+  auto const input_size       = text.length();
+  auto const padding          = ((input_size % 3) ? (3 - (input_size % 3)) : 0);
   auto const code_padded_size = ((input_size + padding) / 3) * 4;
-  auto const newline_size = wrap ? ((code_padded_size) / wrap) * 2 : 0;
-  auto const total_size = code_padded_size + newline_size;
+  auto const newline_size     = wrap ? ((code_padded_size) / wrap) * 2 : 0;
+  auto const total_size       = code_padded_size + newline_size;
 
   std::string enc_text;
   enc_text.reserve(total_size);
@@ -103,13 +103,13 @@ bool is_base64char(char ch)
 std::string dec(std::string_view text)
 {
   auto const input_size = text.length();
-  auto const max_size = (input_size / 4) * 3;
+  auto const max_size   = (input_size / 4) * 3;
 
   std::string dec_text;
   dec_text.reserve(max_size);
   unsigned char group_6bit[4];
   unsigned char group_8bit[3];
-  int count_4_chars = 0;
+  int           count_4_chars = 0;
 
   for (std::string::size_type ch = 0; ch < text.length(); ch++) {
     if (text[ch] == '=')

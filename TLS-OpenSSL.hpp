@@ -13,7 +13,7 @@ namespace Config {
 auto constexpr cert_verify_depth{10};
 
 auto constexpr cert_fn_re = ".+\\.pem$";
-auto constexpr key_ext = ".key";
+auto constexpr key_ext    = ".key";
 
 } // namespace Config
 
@@ -25,12 +25,12 @@ public:
   explicit TLS(std::function<void(void)> read_hook);
   ~TLS();
 
-  bool starttls_client(int fd_in,
-                       int fd_out,
-                       char const* client_name,
-                       char const* server_name,
+  bool starttls_client(int                       fd_in,
+                       int                       fd_out,
+                       char const*               client_name,
+                       char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
-                       bool enforce_dane,
+                       bool                      enforce_dane,
                        std::chrono::milliseconds timeout);
   bool
   starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);
@@ -42,10 +42,10 @@ public:
   {
     return io_tls_("SSL_read", SSL_read, s, n, wait, t_o);
   }
-  std::streamsize write(const char* c_s,
-                        std::streamsize n,
+  std::streamsize write(const char*               c_s,
+                        std::streamsize           n,
                         std::chrono::milliseconds wait,
-                        bool& t_o)
+                        bool&                     t_o)
   {
     auto s = const_cast<char*>(c_s);
     return io_tls_("SSL_write", SSL_write, s, n, wait, t_o);
@@ -54,7 +54,7 @@ public:
   std::string info() const;
 
   std::string const& verified_peername() const { return verified_peername_; }
-  bool verified() const { return verified_; }
+  bool               verified() const { return verified_; }
 
   struct per_cert_ctx {
     explicit per_cert_ctx(SSL_CTX* ctx_, std::vector<Domain> cn_)
@@ -63,17 +63,17 @@ public:
     {
     }
 
-    SSL_CTX* ctx;
+    SSL_CTX*            ctx;
     std::vector<Domain> cn;
   };
 
 private:
-  std::streamsize io_tls_(char const* fn,
+  std::streamsize io_tls_(char const*                          fn,
                           std::function<int(SSL*, void*, int)> io_fnc,
-                          char* s,
-                          std::streamsize n,
-                          std::chrono::milliseconds wait,
-                          bool& t_o);
+                          char*                                s,
+                          std::streamsize                      n,
+                          std::chrono::milliseconds            wait,
+                          bool&                                t_o);
 
   static void ssl_error(int n_err) __attribute__((noreturn));
 
@@ -85,7 +85,7 @@ private:
   std::function<void(void)> read_hook_;
 
   std::string verified_peername_;
-  bool verified_{false};
+  bool        verified_{false};
 };
 
 #endif // TLS_OPENSSL_DOT_HPP

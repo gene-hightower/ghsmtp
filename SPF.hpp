@@ -6,8 +6,8 @@
 #include <glog/logging.h>
 
 // forward stuff from <spf2/spf.h>
-typedef struct SPF_server_struct SPF_server_t;
-typedef struct SPF_request_struct SPF_request_t;
+typedef struct SPF_server_struct   SPF_server_t;
+typedef struct SPF_request_struct  SPF_request_t;
 typedef struct SPF_response_struct SPF_response_t;
 
 namespace SPF {
@@ -43,7 +43,7 @@ public:
 
   char const* c_str() const { return c_str(value_); }
 
-  operator value_t() const { return value_; }
+           operator value_t() const { return value_; }
   explicit operator char const*() const { return c_str(); }
 
 private:
@@ -100,11 +100,11 @@ public:
   explicit Request(Server const& srv);
   ~Request();
 
-  void set_ip_str(char const* ip);
-  void set_ipv4_str(char const* ipv4);
-  void set_ipv6_str(char const* ipv6);
-  void set_helo_dom(char const* dom);
-  void set_env_from(char const* frm);
+  void        set_ip_str(char const* ip);
+  void        set_ipv4_str(char const* ipv4);
+  void        set_ipv6_str(char const* ipv6);
+  void        set_helo_dom(char const* dom);
+  void        set_env_from(char const* frm);
   char const* get_sender_dom() const;
 
 private:
@@ -122,7 +122,7 @@ public:
   explicit Response(Request const& req);
   ~Response();
 
-  Result result() const;
+  Result      result() const;
   char const* smtp_comment() const;
   char const* header_comment() const;
   char const* received_spf() const;
