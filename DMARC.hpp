@@ -58,17 +58,10 @@ enum class Advice {
 constexpr char const* Advice_to_string(Advice adv)
 {
   switch (adv) {
-  case Advice::ACCEPT:
-    return "accept";
-
-  case Advice::REJECT:
-    return "reject";
-
-  case Advice::QUARANTINE:
-    return "quarantine";
-
-  case Advice::NONE:
-    break;
+  case Advice::ACCEPT: return "accept";
+  case Advice::REJECT: return "reject";
+  case Advice::QUARANTINE: return "quarantine";
+  case Advice::NONE: break;
   }
   return "none";
 }

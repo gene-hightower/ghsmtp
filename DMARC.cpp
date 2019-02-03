@@ -116,20 +116,11 @@ Advice Policy::get_advice()
     LOG(WARNING) << "no From: domain";
     return Advice::NONE;
 
-  case DMARC_POLICY_ABSENT:
-    return Advice::NONE;
-
-  case DMARC_POLICY_PASS:
-    return Advice::ACCEPT;
-
-  case DMARC_POLICY_REJECT:
-    return Advice::REJECT;
-
-  case DMARC_POLICY_QUARANTINE:
-    return Advice::QUARANTINE;
-
-  case DMARC_POLICY_NONE:
-    return Advice::NONE;
+  case DMARC_POLICY_ABSENT: return Advice::NONE;
+  case DMARC_POLICY_PASS: return Advice::ACCEPT;
+  case DMARC_POLICY_REJECT: return Advice::REJECT;
+  case DMARC_POLICY_QUARANTINE: return Advice::QUARANTINE;
+  case DMARC_POLICY_NONE: return Advice::NONE;
   }
 
   LOG(FATAL) << "unknown status";
