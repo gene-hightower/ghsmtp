@@ -791,17 +791,9 @@ void Query::check_answer_(Resolver& res, RR_type type, char const* name)
 
   rcode_ = hdr_p->rcode();
   switch (rcode_) {
-  case ns_r_noerror:
-    break;
-
-  case ns_r_nxdomain:
-    nx_domain_ = true;
-    break;
-
-  case ns_r_servfail:
-    bogus_or_indeterminate_ = true;
-    break;
-
+  case ns_r_noerror: break;
+  case ns_r_nxdomain: nx_domain_ = true; break;
+  case ns_r_servfail: bogus_or_indeterminate_ = true; break;
   default:
     bogus_or_indeterminate_ = true;
     LOG(WARNING) << "name lookup error: " << rcode_c_str(rcode_) << " for "
@@ -1047,34 +1039,17 @@ std::optional<RR> get_TLSA(rr const* rr_p, DNS::packet const& pkt, bool& err)
 std::optional<RR>
 get_rr(DNS::RR_type typ, rr const* rr_p, DNS::packet const& pkt, bool& err)
 {
-  switch (typ) {
-  case DNS::RR_type::A:
-    return get_A(rr_p, pkt, err);
-
-  case DNS::RR_type::CNAME:
-    return get_CNAME(rr_p, pkt, err);
-
-  case DNS::RR_type::PTR:
-    return get_PTR(rr_p, pkt, err);
-
-  case DNS::RR_type::MX:
-    return get_MX(rr_p, pkt, err);
-
-  case DNS::RR_type::TXT:
-    return get_TXT(rr_p, pkt, err);
-
-  case DNS::RR_type::AAAA:
-    return get_AAAA(rr_p, pkt, err);
-
-  case DNS::RR_type::RRSIG:
-    return get_RRSIG(rr_p, pkt, err);
-
-  case DNS::RR_type::TLSA:
-    return get_TLSA(rr_p, pkt, err);
-
-  default:
-    break;
-  }
+  switch (typ) { // clang-format off
+  case DNS::RR_type::A:     return get_A(rr_p, pkt, err);
+  case DNS::RR_type::CNAME: return get_CNAME(rr_p, pkt, err);
+  case DNS::RR_type::PTR:   return get_PTR(rr_p, pkt, err);
+  case DNS::RR_type::MX:    return get_MX(rr_p, pkt, err);
+  case DNS::RR_type::TXT:   return get_TXT(rr_p, pkt, err);
+  case DNS::RR_type::AAAA:  return get_AAAA(rr_p, pkt, err);
+  case DNS::RR_type::RRSIG: return get_RRSIG(rr_p, pkt, err);
+  case DNS::RR_type::TLSA:  return get_TLSA(rr_p, pkt, err);
+  default: break;
+  } // clang-format on
 
   LOG(WARNING) << "unknown RR type " << typ;
   return {};
