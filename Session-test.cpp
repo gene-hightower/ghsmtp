@@ -25,7 +25,7 @@ struct Session_test {
     int fd_null = open("/dev/null", O_WRONLY);
     PCHECK(fd_null >= 0) << " can't open /dev/null";
 
-    auto read_hook = []() { std::cout << "Session-test read_hook\n"; };
+    auto    read_hook = []() { std::cout << "Session-test read_hook\n"; };
     Session sess(read_hook, STDIN_FILENO, fd_null);
 
     auto sender{Domain{"example.er"}};
