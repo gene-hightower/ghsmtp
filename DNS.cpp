@@ -525,7 +525,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   new (q) header(id);
   q += sizeof(header);
 
-  auto len = name_put(q, name);
+  auto const len = name_put(q, name);
   CHECK_GE(len, 1) << "malformed domain name " << name;
   q += len;
 
