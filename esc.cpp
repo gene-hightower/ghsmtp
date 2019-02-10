@@ -19,32 +19,18 @@ std::string esc(std::string_view str, esc_line_option line_option)
   ret.reserve(str.length() + nesc);
   for (auto c : str) {
     switch (c) {
-    case '\a':
-      ret += "\\a";
-      break;
-    case '\b':
-      ret += "\\b";
-      break;
-    case '\f':
-      ret += "\\f";
-      break;
+    case '\a': ret += "\\a"; break;
+    case '\b': ret += "\\b"; break;
+    case '\f': ret += "\\f"; break;
     case '\n':
       ret += "\\n";
       if (line_option == esc_line_option::multi)
         ret += '\n';
       break;
-    case '\r':
-      ret += "\\r";
-      break;
-    case '\t':
-      ret += "\\t";
-      break;
-    case '\v':
-      ret += "\\v";
-      break;
-    case '\\':
-      ret += "\\\\";
-      break;
+    case '\r': ret += "\\r"; break;
+    case '\t': ret += "\\t"; break;
+    case '\v': ret += "\\v"; break;
+    case '\\': ret += "\\\\"; break;
     default:
       if (isprint(static_cast<unsigned char>(c))) {
         ret += c;

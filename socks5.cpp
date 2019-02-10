@@ -29,10 +29,8 @@ enum class auth_method : octet {
 constexpr char const* c_str(auth_method auth)
 {
   switch (auth) {
-  case auth_method::no_auth:
-    return "no authentication required";
-  case auth_method::none:
-    return "no acceptable methods";
+  case auth_method::no_auth: return "no authentication required";
+  case auth_method::none: return "no acceptable methods";
   }
   return "*** unknown auth_method ***";
 }
@@ -66,12 +64,9 @@ enum class command : octet {
 constexpr char const* c_str(command cmd)
 {
   switch (cmd) {
-  case command::connect:
-    return "connect";
-  case command::bind:
-    return "bind";
-  case command::udp_associate:
-    return "UDP associate";
+  case command::connect: return "connect";
+  case command::bind: return "bind";
+  case command::udp_associate: return "UDP associate";
   }
   return "*** unknown command ***";
 }
@@ -85,12 +80,9 @@ enum class address_type : octet {
 constexpr char const* c_str(address_type at)
 {
   switch (at) {
-  case address_type::ip4_address:
-    return "IPv4 address";
-  case address_type::domain_name:
-    return "domain name";
-  case address_type::ip6_address:
-    return "IPv6 address";
+  case address_type::ip4_address: return "IPv4 address";
+  case address_type::domain_name: return "domain name";
+  case address_type::ip6_address: return "IPv6 address";
   }
   return "*** unknown address type ***";
 }
@@ -136,22 +128,14 @@ enum class reply_field : octet {
 constexpr char const* c_str(reply_field rp)
 {
   switch (rp) {
-  case reply_field::succeeded:
-    return "succeeded";
-  case reply_field::server_failure:
-    return "server_failure";
-  case reply_field::not_allowed:
-    return "not_allowed";
-  case reply_field::network_unreachable:
-    return "network_unreachable";
-  case reply_field::host_unreachable:
-    return "host_unreachable";
-  case reply_field::connection_refused:
-    return "connection_refused";
-  case reply_field::TTL_expired:
-    return "TTL_expired";
-  case reply_field::command_not_supported:
-    return "command_not_supported";
+  case reply_field::succeeded: return "succeeded";
+  case reply_field::server_failure: return "server_failure";
+  case reply_field::not_allowed: return "not_allowed";
+  case reply_field::network_unreachable: return "network_unreachable";
+  case reply_field::host_unreachable: return "host_unreachable";
+  case reply_field::connection_refused: return "connection_refused";
+  case reply_field::TTL_expired: return "TTL_expired";
+  case reply_field::command_not_supported: return "command_not_supported";
   case reply_field::address_type_not_supported:
     return "address_type_not_supported";
   }
