@@ -414,8 +414,7 @@ bool TLS::starttls_client(int                       fd_in,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default:
-      ssl_error(n_get_err);
+    default: ssl_error(n_get_err);
     }
   }
 
@@ -689,8 +688,7 @@ bool TLS::starttls_server(int                       fd_in,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default:
-      ssl_error(n_get_err);
+    default: ssl_error(n_get_err);
     }
   }
 
@@ -812,8 +810,7 @@ std::streamsize TLS::io_tls_(char const*                          fn,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default:
-      ssl_error(n_get_err);
+    default: ssl_error(n_get_err);
     }
   }
 
@@ -821,18 +818,14 @@ std::streamsize TLS::io_tls_(char const*                          fn,
   if (0 == n_ret) {
     int n_get_err;
     switch (n_get_err = SSL_get_error(ssl_, n_ret)) {
-    case SSL_ERROR_NONE:
-      LOG(INFO) << fn << " returned SSL_ERROR_NONE";
-      break;
+    case SSL_ERROR_NONE: LOG(INFO) << fn << " returned SSL_ERROR_NONE"; break;
 
     case SSL_ERROR_ZERO_RETURN:
       // This is a close, not at all sure this is the right thing to do.
       LOG(INFO) << fn << " returned SSL_ERROR_ZERO_RETURN";
       break;
 
-    default:
-      LOG(INFO) << fn << " returned zero";
-      ssl_error(n_get_err);
+    default: LOG(INFO) << fn << " returned zero"; ssl_error(n_get_err);
     }
   }
 
@@ -843,30 +836,16 @@ void TLS::ssl_error(int n_get_err)
 {
   LOG(WARNING) << "n_get_err == " << n_get_err;
   switch (n_get_err) {
-  case SSL_ERROR_NONE:
-    LOG(WARNING) << "SSL_ERROR_NONE";
-    break;
-  case SSL_ERROR_ZERO_RETURN:
-    LOG(WARNING) << "SSL_ERROR_ZERO_RETURN";
-    break;
-  case SSL_ERROR_WANT_READ:
-    LOG(WARNING) << "SSL_ERROR_WANT_READ";
-    break;
-  case SSL_ERROR_WANT_WRITE:
-    LOG(WARNING) << "SSL_ERROR_WANT_WRITE";
-    break;
-  case SSL_ERROR_WANT_CONNECT:
-    LOG(WARNING) << "SSL_ERROR_WANT_CONNECT";
-    break;
-  case SSL_ERROR_WANT_ACCEPT:
-    LOG(WARNING) << "SSL_ERROR_WANT_ACCEPT";
-    break;
+  case SSL_ERROR_NONE: LOG(WARNING) << "SSL_ERROR_NONE"; break;
+  case SSL_ERROR_ZERO_RETURN: LOG(WARNING) << "SSL_ERROR_ZERO_RETURN"; break;
+  case SSL_ERROR_WANT_READ: LOG(WARNING) << "SSL_ERROR_WANT_READ"; break;
+  case SSL_ERROR_WANT_WRITE: LOG(WARNING) << "SSL_ERROR_WANT_WRITE"; break;
+  case SSL_ERROR_WANT_CONNECT: LOG(WARNING) << "SSL_ERROR_WANT_CONNECT"; break;
+  case SSL_ERROR_WANT_ACCEPT: LOG(WARNING) << "SSL_ERROR_WANT_ACCEPT"; break;
   case SSL_ERROR_WANT_X509_LOOKUP:
     LOG(WARNING) << "SSL_ERROR_WANT_X509_LOOKUP";
     break;
-  case SSL_ERROR_SSL:
-    LOG(WARNING) << "SSL_ERROR_SSL";
-    break;
+  case SSL_ERROR_SSL: LOG(WARNING) << "SSL_ERROR_SSL"; break;
   }
   unsigned long er;
   while (0 != (er = ERR_get_error()))

@@ -318,8 +318,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     LOG(WARNING) << "'MAIL FROM' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
-  case xact_step::mail:
-    break;
+  case xact_step::mail: break;
   case xact_step::rcpt:
   case xact_step::data:
   case xact_step::bdat:
@@ -375,8 +374,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::rcpt:
-  case xact_step::data:
-    break;
+  case xact_step::data: break;
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
@@ -672,8 +670,7 @@ bool Session::data_start()
     LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
-  case xact_step::data:
-    break;
+  case xact_step::data: break;
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
     LOG(WARNING) << "'DATA' during BDAT transfer"
@@ -787,8 +784,7 @@ bool Session::bdat_start(size_t n)
     return false;
   case xact_step::data: // first bdat
     break;
-  case xact_step::bdat:
-    return true;
+  case xact_step::bdat: return true;
   case xact_step::rset:
     out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"

@@ -133,8 +133,7 @@ Query::Query(Resolver const& res, DNS::RR_type type, char const* domain)
     auto const rcode = ldns_pkt_get_rcode(p_);
 
     switch (rcode) {
-    case LDNS_RCODE_NOERROR:
-      break;
+    case LDNS_RCODE_NOERROR: break;
 
     case LDNS_RCODE_NXDOMAIN:
       nx_domain_ = true;
