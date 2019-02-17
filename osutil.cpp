@@ -1,6 +1,6 @@
 #include "osutil.hpp"
 
-#include "default_init_allocator.hpp"
+#include "iobuffer.hpp"
 
 #include <regex>
 
@@ -26,33 +26,29 @@ namespace osutil {
 
 fs::path get_config_dir()
 {
-  static fs::path path;
+  fs::path path;
 
-  static bool configured{false};
-  if (!configured) {
-    if (!FLAGS_config_dir.empty()) {
-      path = FLAGS_config_dir;
-    }
-    else {
-      path = osutil::get_home_dir();
+  if (!FLAGS_config_dir.empty()) {
+    path = FLAGS_config_dir;
+  }
+  else {
+    path = osutil::get_home_dir();
 
-      // Maybe work from some installed location...
+    // Maybe work from some installed location...
 
-      // if ends in /bin, switch to /share or /etc
-      // if (fs::is_directory(path) && (path.filename() == "bin")) {
-      //   auto share = path;
-      //   share.replace_filename("share");
-      //   if (fs::exists(share) && fs::is_directory(share))
-      //   path = share;
-      // }
-    }
-    configured = true;
+    // if ends in /bin, switch to /share or /etc
+    // if (fs::is_directory(path) && (path.filename() == "bin")) {
+    //   auto share = path;
+    //   share.replace_filename("share");
+    //   if (fs::exists(share) && fs::is_directory(share))
+    //   path = share;
+    // }
   }
 
   return path;
 }
 
-fs::path get_home_dir()
+fs::path get_exe_path()
 {
   auto const exe{fs::path("/proc/self/exe")};
   CHECK(fs::exists(exe) && fs::is_symlink(exe))
@@ -65,17 +61,24 @@ fs::path get_home_dir()
   // This problem has been corrected in later versions, but my little
   // loop should work on everything POSIX.
 
-  auto p{std::string{64, '\0'}};
-  for (;;) {
-    auto const len{::readlink(exe.c_str(), p.data(), p.size())};
-    PCHECK(len > 0) << "readlink";
-    if (len < static_cast<ssize_t>(p.size()))
-      break;
-    CHECK_LT(p.size(), 4096) << "link too long";
-    p.resize(p.size() * 2);
-  }
+  auto constexpr min_link = 64;
+  auto constexpr max_link = 4096 + 1;
 
-  return fs::path(p).parent_path();
+  for (std::string p{min_link}; p.size() < max_link; p.resize(p.size() * 2)) {
+    auto const len{::readlink(exe.c_str(), p.data(), p.size())};
+    PCHECK(len != -1) << "readlink";
+    if (len < static_cast<ssize_t>(p.size())) {
+      p.resize(len);
+      return p;
+    }
+  }
+  LOG(FATAL) << exe << " link too long";
+}
+
+fs::path get_home_dir()
+{
+  auto const exe{get_exe_path()};
+  return exe.parent_path();
 }
 
 std::string get_hostname()
@@ -107,8 +110,7 @@ uint16_t get_port(char const* const service)
   auto result_buf{servent{}};
 
   servent* result_ptr = nullptr;
-  auto     str_buf{std::vector<char, default_init_allocator<char>>(
-      1024)}; // 1024 suggested by getservbyname_r(3)
+  iobuffer str_buf{1024}; // 1024 suggested by getservbyname_r(3)
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
          == ERANGE) {

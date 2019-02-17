@@ -133,7 +133,9 @@ TESTS := \
 	TLD-test \
 	TLS-OpenSSL-test \
 	default_init_allocator-test \
-	esc-test
+	esc-test \
+	iobuffer-test \
+	osutil-test
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
@@ -149,6 +151,7 @@ Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffe
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+osutil-test_STEMS := osutil
 
 Session-test_STEMS := \
 	CDB \
