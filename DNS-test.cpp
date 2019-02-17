@@ -3,6 +3,7 @@
 #include "DNS-ldns.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
+#include "osutil.hpp"
 
 #include <algorithm>
 #include <random>
@@ -18,7 +19,9 @@ std::ostream& operator<<(std::ostream& os, const std::variant<Ts...>& v)
 
 int main(int argc, char const* argv[])
 {
-  DNS::Resolver      res;
+  auto const config_path = osutil::get_config_dir();
+
+  DNS::Resolver      res(config_path);
   DNS_ldns::Resolver res_ldns;
 
   struct lkp {

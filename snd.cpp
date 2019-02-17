@@ -1374,7 +1374,8 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 }
 
-bool snd(int                         fd_in,
+bool snd(fs::path                    config_path,
+         int                         fd_in,
          int                         fd_out,
          Domain const&               sender,
          Domain const&               receiver,
@@ -1475,8 +1476,8 @@ bool snd(int                         fd_in,
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     // LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
-    cnn.sock.starttls_client(sender.ascii().c_str(), receiver.ascii().c_str(),
-                             tlsa_rrs, enforce_dane);
+    cnn.sock.starttls_client(config_path, sender.ascii().c_str(),
+                             receiver.ascii().c_str(), tlsa_rrs, enforce_dane);
 
     LOG(INFO) << "TLS: " << cnn.sock.tls_info();
 
@@ -1792,6 +1793,8 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
+  auto const config_path = osutil::get_config_dir();
+
   auto sender = get_sender();
 
   if (FLAGS_selftest) {
@@ -1824,12 +1827,13 @@ int main(int argc, char* argv[])
 
   auto const port{osutil::get_port(FLAGS_service.c_str())};
 
-  auto res{DNS::Resolver{}};
+  auto res{DNS::Resolver{config_path}};
   auto tlsa_rrs{get_tlsa_rrs(res, to_mbx.domain(), port)};
 
   if (FLAGS_pipe) {
-    return snd(STDIN_FILENO, STDOUT_FILENO, sender, to_mbx.domain(), tlsa_rrs,
-               false, from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)
+    return snd(config_path, STDIN_FILENO, STDOUT_FILENO, sender,
+               to_mbx.domain(), tlsa_rrs, false, from_mbx, to_mbx,
+               smtp_from_mbx, smtp_to_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
@@ -1910,16 +1914,16 @@ int main(int argc, char* argv[])
     }
 
     if (to_mbx.domain() == receiver) {
-      if (snd(fd, fd, sender, receiver, tlsa_rrs, enforce_dane, from_mbx,
-              to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
+      if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs, enforce_dane,
+              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }
     else {
       auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
       tlsa_rrs_mx.insert(end(tlsa_rrs_mx), begin(tlsa_rrs), end(tlsa_rrs));
-      if (snd(fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane, from_mbx,
-              to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
+      if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane,
+              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }

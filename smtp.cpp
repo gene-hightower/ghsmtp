@@ -10,9 +10,9 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 #include <fstream>
 
 #include "Session.hpp"
-#include "default_init_allocator.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
+#include "iobuffer.hpp"
 #include "osutil.hpp"
 
 #include <cstdlib>
@@ -40,8 +40,8 @@ struct Ctx {
 
   std::streamsize chunk_size;
 
-  Ctx(std::function<void(void)> read_hook = []() {})
-    : session(read_hook)
+  Ctx(fs::path config_path, std::function<void(void)> read_hook = []() {})
+    : session(config_path, read_hook)
   {
   }
 };
@@ -517,7 +517,7 @@ bool bdat_act(Ctx& ctx)
   auto to_xfer = ctx.chunk_size;
 
   auto const bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
-  std::vector<char, default_init_allocator<char>> bfr(bfr_size);
+  iobuffer   bfr(bfr_size);
 
   while (to_xfer) {
     auto const xfer_sz{std::min(to_xfer, bfr_size)};
@@ -753,13 +753,14 @@ int main(int argc, char* argv[])
   google::InitGoogleLogging(argv[0]);
 
   std::unique_ptr<RFC5321::Ctx> ctx;
-  auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
-  ctx = std::make_unique<RFC5321::Ctx>(read_hook);
 
   // Don't wait for STARTTLS to fail if no cert.
   auto const config_path = osutil::get_config_dir();
   auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
   CHECK_GE(certs.size(), 1) << "no certs found";
+
+  auto const read_hook{[&ctx]() { ctx->session.flush(); }};
+  ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
   ctx->session.greeting();
 

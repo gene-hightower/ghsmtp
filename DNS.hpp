@@ -5,7 +5,7 @@
 
 #include "DNS-rrs.hpp"
 #include "Sock.hpp"
-#include "default_init_allocator.hpp"
+#include "iobuffer.hpp"
 
 #include <glog/logging.h>
 
@@ -15,7 +15,7 @@ class packet {
 public:
   using octet = unsigned char;
 
-  using container_t = std::vector<octet, default_init_allocator<octet>>;
+  using container_t = iobuffer<octet>;
 
   packet() {}
 
@@ -49,7 +49,7 @@ public:
   Resolver(Resolver const&) = delete;
   Resolver& operator=(Resolver const&) = delete;
 
-  Resolver();
+  Resolver(fs::path config_path);
 
   RR_collection get_records(RR_type typ, char const* name);
   RR_collection get_records(RR_type typ, std::string const& name)

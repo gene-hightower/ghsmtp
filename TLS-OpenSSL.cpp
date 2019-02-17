@@ -155,7 +155,8 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   return SSL_TLSEXT_ERR_OK;
 }
 
-bool TLS::starttls_client(int                       fd_in,
+bool TLS::starttls_client(fs::path                  config_path,
+                          int                       fd_in,
                           int                       fd_out,
                           char const*               client_name,
                           char const*               server_name,
@@ -169,8 +170,6 @@ bool TLS::starttls_client(int                       fd_in,
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
   auto const method = CHECK_NOTNULL(SSLv23_client_method());
-
-  auto const config_path = osutil::get_config_dir();
 
   if (client_name) {
     auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
@@ -463,7 +462,8 @@ bool TLS::starttls_client(int                       fd_in,
   return true;
 }
 
-bool TLS::starttls_server(int                       fd_in,
+bool TLS::starttls_server(fs::path                  config_path,
+                          int                       fd_in,
                           int                       fd_out,
                           std::chrono::milliseconds timeout)
 {
@@ -473,8 +473,6 @@ bool TLS::starttls_server(int                       fd_in,
   CHECK(RAND_status()); // Be sure the PRNG has been seeded with enough data.
 
   auto const method = CHECK_NOTNULL(SSLv23_server_method());
-
-  auto const config_path = osutil::get_config_dir();
 
   auto const bio
       = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));

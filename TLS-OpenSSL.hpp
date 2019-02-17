@@ -3,6 +3,7 @@
 
 #include "DNS-rrs.hpp"
 #include "Domain.hpp"
+#include "fs.hpp"
 
 #include <chrono>
 #include <functional>
@@ -25,15 +26,18 @@ public:
   explicit TLS(std::function<void(void)> read_hook);
   ~TLS();
 
-  bool starttls_client(int                       fd_in,
+  bool starttls_client(fs::path                  config_path,
+                       int                       fd_in,
                        int                       fd_out,
                        char const*               client_name,
                        char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
                        bool                      enforce_dane,
                        std::chrono::milliseconds timeout);
-  bool
-  starttls_server(int fd_in, int fd_out, std::chrono::milliseconds timeout);
+  bool starttls_server(fs::path                  config_path,
+                       int                       fd_in,
+                       int                       fd_out,
+                       std::chrono::milliseconds timeout);
 
   bool pending() const { return SSL_pending(ssl_) > 0; }
 

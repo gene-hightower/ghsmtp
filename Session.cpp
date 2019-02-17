@@ -89,8 +89,15 @@ constexpr auto write_timeout = std::chrono::seconds{30};
 DEFINE_uint64(max_read, 0, "max data to read");
 DEFINE_uint64(max_write, 0, "max data to write");
 
-Session::Session(std::function<void(void)> read_hook, int fd_in, int fd_out)
-  : sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+DEFINE_bool(rrvs, false, "support RRVS à la RFC 7293");
+
+Session::Session(fs::path                  config_path,
+                 std::function<void(void)> read_hook,
+                 int                       fd_in,
+                 int                       fd_out)
+  : config_path_(config_path)
+  , res_(config_path_)
+  , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
@@ -274,9 +281,11 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     out_() << "\r\n"
               "250-SIZE "
            << max_msg_size()
-           << "\r\n"             // RFC 1870
-              "250-8BITMIME\r\n" // RFC 6152
-              "250-RRVS\r\n";    // RFC 7293
+           << "\r\n"              // RFC 1870
+              "250-8BITMIME\r\n"; // RFC 6152
+    if (FLAGS_rrvs) {
+      out_() << "250-RRVS\r\n"; // RFC 7293
+    }
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
@@ -973,7 +982,7 @@ void Session::starttls()
   }
   else {
     out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
-    if (sock_.starttls_server()) {
+    if (sock_.starttls_server(config_path_)) {
       reset_();
       max_msg_size(Config::max_msg_size_bro);
       LOG(INFO) << "STARTTLS " << sock_.tls_info();

@@ -1,6 +1,7 @@
 #include "DNS.hpp"
 #include "POSIX.hpp"
 #include "Sock.hpp"
+#include "osutil.hpp"
 
 #include <memory>
 
@@ -250,12 +251,14 @@ int main(int argc, char* argv[])
   POSIX::set_nonblocking(fd);
   Sock sock(fd, fd);
 
-  DNS::Resolver res;
+  auto const    config_dir = osutil::get_config_dir();
+  DNS::Resolver res(config_dir);
   auto          tlsa_rrs = get_tlsa_rrs(res, Domain(domain), port);
 
   LOG(INFO) << "starting TLS";
 
-  sock.starttls_client(nullptr, domain, tlsa_rrs, !tlsa_rrs.empty());
+  sock.starttls_client(config_dir, nullptr, domain, tlsa_rrs,
+                       !tlsa_rrs.empty());
 
   sock.out() << "GET / HTTP/1.1\r\nHost: digilicious.com\r\n\r\n" << std::flush;
 

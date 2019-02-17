@@ -4,6 +4,7 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "TLD.hpp"
+#include "osutil.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -156,7 +157,8 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
 int main(int argc, char* argv[])
 {
-  DNS::Resolver res;
+  fs::path      config_path = osutil::get_config_dir();
+  DNS::Resolver res(config_path);
 
   for (int i = 1; i < argc; ++i) {
     auto const arg = argv[i];

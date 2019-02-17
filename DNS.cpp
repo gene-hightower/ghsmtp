@@ -548,7 +548,7 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
 
 namespace DNS {
 
-Resolver::Resolver()
+Resolver::Resolver(fs::path config_path)
 {
   auto tries = countof(Config::nameservers);
 
@@ -615,7 +615,8 @@ Resolver::Resolver()
 
       if (port != 53) {
         DNS::RR_collection tlsa_rrs; // empty FIXME!
-        ns_sock_->starttls_client(nullptr, nameserver.host, tlsa_rrs, false);
+        ns_sock_->starttls_client(config_path, nullptr, nameserver.host,
+                                  tlsa_rrs, false);
         if (ns_sock_->verified()) {
           ns_fd_ = -1;
           return;

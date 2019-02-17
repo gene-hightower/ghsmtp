@@ -1,6 +1,6 @@
 #include "CDB.hpp"
 
-#include "osutil.hpp"
+#include "fs.hpp"
 
 #include <glog/logging.h>
 
@@ -10,8 +10,7 @@
 
 CDB::CDB(std::string_view db)
 {
-  auto const config_path = osutil::get_config_dir();
-  auto       db_path     = config_path / db;
+  fs::path db_path = db;
   db_path += ".cdb";
   auto const db_fn = db_path.string();
 

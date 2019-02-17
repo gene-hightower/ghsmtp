@@ -10,7 +10,7 @@
 
 #include <netinet/in.h>
 
-#include "default_init_allocator.hpp"
+#include "iobuffer.hpp"
 
 namespace DNS {
 
@@ -290,7 +290,7 @@ class RR_TLSA {
 public:
   using octet = unsigned char;
 
-  using container_t = std::vector<octet, default_init_allocator<octet>>;
+  using container_t = iobuffer<octet>;
 
   RR_TLSA(uint8_t        cert_usage,
           uint8_t        selector,
