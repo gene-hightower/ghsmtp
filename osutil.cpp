@@ -50,10 +50,6 @@ fs::path get_config_dir()
 
 fs::path get_exe_path()
 {
-  auto const exe{fs::path("/proc/self/exe")};
-  CHECK(fs::exists(exe) && fs::is_symlink(exe))
-      << "can't find myself: is this not a Linux kernel?";
-
   // The std::experimental::filesystem::read_symlink() as shipped with
   // GCC 7.2.1 20170915 included with Fedora 27 is unusable when lstat
   // returns st_size of zero, as happens with /proc/self/exe.
@@ -62,9 +58,9 @@ fs::path get_exe_path()
   // loop should work on everything POSIX.
 
   auto constexpr min_link = 64;
-  auto constexpr max_link = 4096 + 1;
+  auto constexpr max_link = 8 * 1024;
 
-  for (std::string p{min_link}; p.size() < max_link; p.resize(p.size() * 2)) {
+  for (iobuffer p{min_link}; p.size() <= max_link; p.resize(p.size() * 2)) {
     auto const len{::readlink(exe.c_str(), p.data(), p.size())};
     PCHECK(len != -1) << "readlink";
     if (len < static_cast<ssize_t>(p.size())) {
