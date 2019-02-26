@@ -68,6 +68,7 @@ fs::path get_exe_path()
   if (len == max_link) {
     LOG(FATAL) << exe << " link too long";
   }
+  buf[len] = '\0';
   return fs::path(buf);
 }
 
