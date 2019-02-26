@@ -57,18 +57,18 @@ fs::path get_exe_path()
   // This problem has been corrected in later versions, but my little
   // loop should work on everything POSIX.
 
-  auto constexpr min_link = 64;
-  auto constexpr max_link = 8 * 1024;
+  auto const exe = "/proc/self/exe";
 
-  for (iobuffer p{min_link}; p.size() <= max_link; p.resize(p.size() * 2)) {
-    auto const len{::readlink(exe.c_str(), p.data(), p.size())};
-    PCHECK(len != -1) << "readlink";
-    if (len < static_cast<ssize_t>(p.size())) {
-      p.resize(len);
-      return p;
-    }
+  auto constexpr max_link = 4 * 1024;
+
+  char buf[max_link];
+
+  auto const len{::readlink(exe, buf, max_link)};
+  PCHECK(len != -1) << "readlink";
+  if (len == max_link) {
+    LOG(FATAL) << exe << " link too long";
   }
-  LOG(FATAL) << exe << " link too long";
+  return fs::path(buf);
 }
 
 fs::path get_home_dir()
