@@ -54,16 +54,16 @@ fs::path get_exe_path()
   // GCC 7.2.1 20170915 included with Fedora 27 is unusable when lstat
   // returns st_size of zero, as happens with /proc/self/exe.
 
-  // This problem has been corrected in later versions, but my little
-  // loop should work on everything POSIX.
+  // This problem has been corrected in later versions, but this code
+  // should work on everything POSIX.
 
-  auto const exe = "/proc/self/exe";
+  auto constexpr exe = "/proc/self/exe";
 
   auto constexpr max_link = 4 * 1024;
-
   char buf[max_link];
 
   auto const len{::readlink(exe, buf, max_link)};
+
   PCHECK(len != -1) << "readlink";
   if (len == max_link) {
     LOG(FATAL) << exe << " link too long";
