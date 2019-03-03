@@ -14,7 +14,7 @@ public:
   CDB& operator=(CDB const&) = delete;
 
   CDB() = default;
-  explicit CDB(std::string_view db);
+  explicit CDB(std::string_view db) { open(db); }
   ~CDB();
 
   bool           open(std::string_view db);
@@ -22,8 +22,8 @@ public:
   constexpr bool is_open() const;
 
 private:
-  int        fd_{-1};
-  struct cdb cdb_;
+  int fd_{-1};
+  cdb cdb_{0};
 };
 
 constexpr bool CDB::is_open() const { return fd_ != -1; }

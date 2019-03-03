@@ -8,8 +8,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-CDB::CDB(std::string_view db) { open(db); }
-
 CDB::~CDB()
 {
   if (is_open()) {
