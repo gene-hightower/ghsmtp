@@ -1283,7 +1283,10 @@ bool Session::verify_client_(Domain const& client_identity,
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
   std::string const sender_str{sender};
-  CDB bad_senders{"bad_senders"}; // Addresses we don't accept mail from.
+
+  auto bad_senders_db_name = config_path_ / "bad_senders";
+  CDB  bad_senders{bad_senders_db_name.c_str()}; // Addresses we don't accept
+                                                 // mail from.
   if (bad_senders.lookup(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
     out_() << "501 5.1.8 " << error_msg << "\r\n" << std::flush;
