@@ -32,5 +32,5 @@ int main(int argc, char* argv[])
   auto const accept_dom_path = config_dir / "accept_domains";
 
   CHECK(accept_dom.open(accept_dom_path.c_str()));
-  CHECK(accept_dom.lookup("digilicious.com"));
+  CHECK(accept_dom.lookup(osutil::get_hostname().c_str()));
 }
