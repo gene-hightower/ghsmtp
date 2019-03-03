@@ -135,11 +135,11 @@ private:
   std::random_device random_device_;
 
   // White and black lists for domains.
-  CDB white_{"white"};
-  CDB black_{"black"};
+  CDB white_;
+  CDB black_;
 
   // Domains we receive mail for.
-  CDB accept_domains_{"accept_domains"};
+  CDB accept_domains_;
 
   size_t max_msg_size_;
 

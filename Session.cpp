@@ -99,6 +99,14 @@ Session::Session(fs::path                  config_path,
   , res_(config_path_)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
+  auto accept_db_name = config_path_ / "accept_domains";
+  auto black_db_name  = config_path_ / "black";
+  auto white_db_name  = config_path_ / "white";
+
+  accept_domains_.open(accept_db_name.c_str());
+  black_.open(black_db_name.c_str());
+  white_.open(white_db_name.c_str());
+
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
     for (auto const& fcr : fcrdns) {
