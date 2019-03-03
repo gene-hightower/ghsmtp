@@ -8,7 +8,17 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-CDB::CDB(std::string_view db)
+CDB::CDB(std::string_view db) { open(db); }
+
+CDB::~CDB()
+{
+  if (is_open()) {
+    close(fd_);
+    cdb_free(&cdb_);
+  }
+}
+
+bool CDB::open(std::string_view db)
 {
   fs::path db_path = db;
   db_path += ".cdb";
@@ -19,18 +29,10 @@ CDB::CDB(std::string_view db)
     char       err[256]{};
     auto const msg = strerror_r(errno, err, sizeof(err));
     LOG(WARNING) << "unable to open " << db_fn << ": " << msg;
+    return false;
   }
-  else {
-    cdb_init(&cdb_, fd_);
-  }
-}
-
-CDB::~CDB()
-{
-  if (is_open()) {
-    close(fd_);
-    cdb_free(&cdb_);
-  }
+  cdb_init(&cdb_, fd_);
+  return true;
 }
 
 bool CDB::lookup(std::string_view key)

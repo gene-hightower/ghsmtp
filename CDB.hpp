@@ -13,9 +13,11 @@ public:
   CDB(CDB const&) = delete;
   CDB& operator=(CDB const&) = delete;
 
-  CDB(std::string_view db);
+  CDB() = default;
+  explicit CDB(std::string_view db);
   ~CDB();
 
+  bool           open(std::string_view db);
   bool           lookup(std::string_view key);
   constexpr bool is_open() const;
 

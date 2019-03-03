@@ -27,4 +27,10 @@ int main(int argc, char* argv[])
   CHECK(cdb3.lookup("act.edu.au"));
   CHECK(cdb3.lookup("zen.co.uk"));
   CHECK(!cdb3.lookup("This should not be found."));
+
+  CDB        accept_dom;
+  auto const accept_dom_path = config_dir / "accept_domains";
+
+  CHECK(accept_dom.open(accept_dom_path.c_str()));
+  CHECK(accept_dom.lookup("digilicious.com"));
 }
