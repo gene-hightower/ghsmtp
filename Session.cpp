@@ -1103,7 +1103,8 @@ bool ip4_whitelisted(char const* addr)
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
-  CDB ip_black{"ip-black"};
+  auto ip_black_db_name = config_path_ / "ip-black";
+  CDB  ip_black{ip_black_db_name.c_str()};
   if (ip_black.lookup(sock_.them_c_str())) {
     error_msg
         = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
@@ -1626,8 +1627,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // Check for local addresses we reject.
   auto bad_recipients_db_name = config_path_ / "bad_recipients";
-  CDB  bad_recipients{bad_recipients_db_name.c_str()};
-  if (bad_recipients.lookup(recipient.local_part())) {
+  CDB  bad_recipients_db{bad_recipients_db_name.c_str()};
+  if (bad_recipients_db.lookup(recipient.local_part())) {
     out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
     LOG(WARNING) << "bad recipient " << recipient;
     return false;
