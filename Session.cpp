@@ -1625,7 +1625,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  CDB bad_recipients{"bad_recipients"};
+  auto bad_recipients_db_name = config_path_ / "bad_recipients";
+  CDB  bad_recipients{bad_recipients_db_name.c_str()};
   if (bad_recipients.lookup(recipient.local_part())) {
     out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
     LOG(WARNING) << "bad recipient " << recipient;
