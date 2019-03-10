@@ -1375,7 +1375,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
     auto const three_level
         = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
 
-    CDB three_tld{"three-level-tlds"};
+    auto three_tld_db_name = config_path_ / "three-level-tlds";
+    CDB  three_tld{three_tld_db_name};
     if (three_tld.lookup(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
@@ -1393,7 +1394,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
     }
   }
 
-  CDB two_tld{"two-level-tlds"};
+  auto two_tld_db_name = config_path_ / "two-level-tlds";
+  CDB  two_tld{two_tld_db_name};
   if (two_tld.lookup(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
