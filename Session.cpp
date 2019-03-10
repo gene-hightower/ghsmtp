@@ -1104,7 +1104,7 @@ bool ip4_whitelisted(char const* addr)
 bool Session::verify_ip_address_(std::string& error_msg)
 {
   auto ip_black_db_name = config_path_ / "ip-black";
-  CDB  ip_black{ip_black_db_name.c_str()};
+  CDB  ip_black{ip_black_db_name};
   if (ip_black.lookup(sock_.them_c_str())) {
     error_msg
         = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
@@ -1286,8 +1286,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   std::string const sender_str{sender};
 
   auto bad_senders_db_name = config_path_ / "bad_senders";
-  CDB  bad_senders{bad_senders_db_name.c_str()}; // Addresses we don't accept
-                                                 // mail from.
+  CDB  bad_senders{bad_senders_db_name}; // Addresses we don't accept mail from.
   if (bad_senders.lookup(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
     out_() << "501 5.1.8 " << error_msg << "\r\n" << std::flush;
@@ -1629,7 +1628,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // Check for local addresses we reject.
   auto bad_recipients_db_name = config_path_ / "bad_recipients";
-  CDB  bad_recipients_db{bad_recipients_db_name.c_str()};
+  CDB  bad_recipients_db{bad_recipients_db_name};
   if (bad_recipients_db.lookup(recipient.local_part())) {
     out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
     LOG(WARNING) << "bad recipient " << recipient;

@@ -16,18 +16,18 @@ int main(int argc, char* argv[])
   auto const config_dir = osutil::get_config_dir();
 
   auto const no_database = config_dir / "unable-to-open-database";
-  CDB        no_db{no_database.c_str()};
+  CDB        no_db{no_database};
   CHECK(!no_db.lookup("foo"));
 
   auto const two_level_tlds = config_dir / "two-level-tlds";
-  CDB        cdb2{two_level_tlds.c_str()};
+  CDB        cdb2{two_level_tlds};
 
   CHECK(cdb2.lookup("0.bg"));
   CHECK(cdb2.lookup("zzux.com"));
   CHECK(!cdb2.lookup("This should not be found."));
 
   auto const three_level_tlds = config_dir / "three-level-tlds";
-  CDB        cdb3{three_level_tlds.c_str()};
+  CDB        cdb3{three_level_tlds};
 
   CHECK(cdb3.lookup("act.edu.au"));
   CHECK(cdb3.lookup("zen.co.uk"));

@@ -8,6 +8,8 @@ extern "C" {
 #include <cdb.h>
 }
 
+#include "fs.hpp"
+
 class CDB {
 public:
   CDB(CDB const&) = delete;
@@ -15,6 +17,7 @@ public:
 
   CDB() = default;
   explicit CDB(std::string_view db) { open(db); }
+  explicit CDB(fs::path db) { open(db.c_str()); }
   ~CDB();
 
   bool           open(std::string_view db);
