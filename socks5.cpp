@@ -150,17 +150,17 @@ std::ostream& operator<<(std::ostream& os, reply_field const& rp)
 
 class reply4 {
   octet        version_;
-  reply_field  rep_;
+  reply_field  reply_;
   octet        reserved_;
-  address_type typ_;
+  address_type type_;
   octet        ip4_[4];
   octet        port_lo_;
   octet        port_hi_;
 
 public:
   auto        version() const { return version_; }
-  auto        rep() const { return rep_; }
-  auto        typ() const { return typ_; }
+  auto        reply() const { return reply_; }
+  auto        type() const { return type_; }
   std::string addr() const
   {
     std::string a;
@@ -243,8 +243,8 @@ int main(int argc, char* argv[])
       << "reply read failed: ";
 
   CHECK_EQ(reply.version(), 5);
-  CHECK_EQ(reply.rep(), reply_field::succeeded);
-  CHECK_EQ(reply.typ(), address_type::ip4_address);
+  CHECK_EQ(reply.reply(), reply_field::succeeded);
+  CHECK_EQ(reply.type(), address_type::ip4_address);
 
   LOG(INFO) << "connected to " << reply.addr() << ':' << reply.port() << '\n';
 
