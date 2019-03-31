@@ -516,7 +516,7 @@ bool bdat_act(Ctx& ctx)
 
   auto to_xfer = ctx.chunk_size;
 
-  auto const     bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
+  auto const bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
   iobuffer<char> bfr(bfr_size);
 
   while (to_xfer) {

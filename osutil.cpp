@@ -106,7 +106,7 @@ uint16_t get_port(char const* const service)
 
   auto result_buf{servent{}};
 
-  servent* result_ptr = nullptr;
+  servent*       result_ptr = nullptr;
   iobuffer<char> str_buf{1024}; // 1024 suggested by getservbyname_r(3)
   while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
                          str_buf.size(), &result_ptr)
