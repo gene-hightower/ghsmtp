@@ -1,8 +1,7 @@
 #include "DNS-packet.hpp"
 
-#include "Domain.hpp"
-
 #include "DNS-iostream.hpp"
+#include "Domain.hpp"
 
 #include <arpa/nameser.h>
 
