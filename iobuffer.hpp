@@ -3,12 +3,13 @@
 
 #include "default_init_allocator.hpp"
 
+#include <cstddef>
 #include <vector>
 
-template <typename CharT = char>
+template <typename ByteT = std::byte>
 class iobuffer {
 public:
-  using buffer_t  = std::vector<CharT, default_init_allocator<CharT>>;
+  using buffer_t  = std::vector<ByteT, default_init_allocator<ByteT>>;
   using size_type = typename buffer_t::size_type;
 
   iobuffer() = default;
