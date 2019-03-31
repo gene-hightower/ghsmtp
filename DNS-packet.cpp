@@ -2,6 +2,8 @@
 
 #include "Domain.hpp"
 
+#include "DNS-iostream.hpp"
+
 #include <arpa/nameser.h>
 
 namespace {
@@ -483,8 +485,8 @@ void check_answer(bool& nx_domain,
     CHECK(expand_name(q_p, q, qname, name_len));
     q_p += name_len;
     auto const question_p = reinterpret_cast<question const*>(q_p);
-    CHECK(question_p->qtype() == type) << RR_type_c_str(question_p->qtype())
-                                       << " != " << RR_type_c_str(type) << '\n';
+    CHECK(question_p->qtype() == type)
+        << question_p->qtype() << " != " << type << '\n';
     return question_p->qclass();
   }()};
 
@@ -498,7 +500,7 @@ void check_answer(bool& nx_domain,
   default:
     bogus_or_indeterminate = true;
     LOG(WARNING) << "name lookup error: " << DNS::rcode_c_str(rcode) << " for "
-                 << name << '/' << RR_type_c_str(type);
+                 << name << '/' << type;
     break;
   }
 
@@ -510,7 +512,7 @@ void check_answer(bool& nx_domain,
   if (hdr_p->qdcount() != 1) {
     bogus_or_indeterminate = true;
     LOG(WARNING) << "question not copied into answer for " << name << '/'
-                 << RR_type_c_str(type);
+                 << type;
     return;
   }
 
@@ -550,8 +552,8 @@ void check_answer(bool& nx_domain,
 
   if (question_p->qtype() != type) {
     bogus_or_indeterminate = true;
-    LOG(WARNING) << "qtypes don't match, " << RR_type_c_str(question_p->qtype())
-                 << " != " << RR_type_c_str(type);
+    LOG(WARNING) << "qtypes don't match, " << question_p->qtype()
+                 << " != " << type;
     return;
   }
   if (question_p->qclass() != cls) {
@@ -569,7 +571,7 @@ void check_answer(bool& nx_domain,
         || ((p + enc_len + sizeof(rr)) > end(a))) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad packet in answer or nameserver section for " << name
-                   << '/' << RR_type_c_str(type);
+                   << '/' << type;
       return;
     }
     p += enc_len;
@@ -585,7 +587,7 @@ void check_answer(bool& nx_domain,
         || ((p + enc_len + sizeof(rr)) > end(a))) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad packet in additional section for " << name << '/'
-                   << RR_type_c_str(type);
+                   << type;
       return;
     }
     p += enc_len;
@@ -607,7 +609,7 @@ void check_answer(bool& nx_domain,
 
     default:
       LOG(INFO) << "unknown additional record, name == " << name;
-      LOG(INFO) << "rr_p->type()  == " << DNS::RR_type_c_str(rr_p->rr_type());
+      LOG(INFO) << "rr_p->type()  == " << rr_p->rr_type();
       LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
       LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
       break;
@@ -619,8 +621,7 @@ void check_answer(bool& nx_domain,
   auto size_check = p - begin(a);
   if (size_check != size(a)) {
     bogus_or_indeterminate = true;
-    LOG(WARNING) << "bad packet size for " << name << '/'
-                 << RR_type_c_str(type);
+    LOG(WARNING) << "bad packet size for " << name << '/' << type;
     return;
   }
 }
@@ -754,7 +755,7 @@ std::optional<RR> get_rr(rr const* rr_p, DNS::packet const& pkt, bool& err)
   default: break;
   } // clang-format on
 
-  LOG(WARNING) << "unsupported RR type " << RR_type_c_str(typ);
+  LOG(WARNING) << "unsupported RR type " << typ;
   return {};
 }
 
