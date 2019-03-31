@@ -17,7 +17,7 @@ LDLIBS += \
 
 PROGRAMS := dns_tool smtp msg sasl snd socks5
 
-DNS := DNS DNS-rrs DNS-fcrdns
+DNS := DNS DNS-rrs DNS-fcrdns DNS-packet
 
 dns_tool_STEMS := dns_tool \
 	$(DNS) \
@@ -265,7 +265,7 @@ net-check::
 	  rm $$tmp_out; \
 	done
 
-check::
+check:: msg snd
 	./msg --selftest
 	GHSMTP_CLIENT_ID=digilicious.com ./snd --selftest
 

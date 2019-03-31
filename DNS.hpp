@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "DNS-packet.hpp"
 #include "DNS-rrs.hpp"
 #include "Sock.hpp"
 #include "iobuffer.hpp"
@@ -10,39 +11,6 @@
 #include <glog/logging.h>
 
 namespace DNS {
-
-class packet {
-public:
-  using octet = unsigned char;
-
-  using container_t = iobuffer<octet>;
-
-  packet() {}
-
-  explicit packet(container_t::size_type sz)
-    : bfr_(sz)
-  {
-    CHECK_LE(sz, std::numeric_limits<uint16_t>::max());
-  }
-
-  explicit packet(container_t&& bfr)
-    : bfr_{std::move(bfr)}
-  {
-    CHECK_LE(size(), std::numeric_limits<uint16_t>::max());
-  }
-
-  uint16_t size() const { return bfr_.size(); }
-
-  auto begin() const { return bfr_.data(); }
-  auto end() const { return bfr_.data() + bfr_.size(); }
-
-private:
-  container_t bfr_;
-};
-
-inline auto begin(packet const& pkt) { return pkt.begin(); }
-inline auto end(packet const& pkt) { return pkt.end(); }
-inline auto size(packet const& pkt) { return pkt.size(); }
 
 class Resolver {
 public:
