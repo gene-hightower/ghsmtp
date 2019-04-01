@@ -19,7 +19,8 @@ int main()
   v.resize(10);
 
   // verify the values are unchanged
-  for (size_t i = 0; i < v.size(); ++i) {
+  CHECK_EQ(v.size(), 10);
+  for (size_t i = 0; i < 10; ++i) {
     CHECK_EQ(*(v.data() + i), i);
   }
 }
