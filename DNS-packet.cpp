@@ -380,6 +380,7 @@ int name_put(octet* bfr, char const* name)
       len++;
     }
     if (len > 63) {
+      // RFC-1035 Section 2.3.4. Size limits
       LOG(WARNING) << "label exceeds 63 octets";
       return -1;
     }
@@ -402,6 +403,7 @@ int name_put(octet* bfr, char const* name)
 
   auto const sz = q - bfr;
   if (sz > 255) {
+    // RFC-1035 Section 2.3.4. Size limits
     LOG(WARNING) << "domain name exceeds 255 octets";
     return -1;
   }
