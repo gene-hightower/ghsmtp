@@ -137,7 +137,8 @@ std::vector<fs::path> list_directory(
 
   std::regex const pattern_regex(pattern, traits);
 
-  for (auto const& it : fs::directory_iterator(path)) {
+  auto const di = fs::directory_iterator(path);
+  for (auto const& it : di) {
     auto const  it_filename = it.path().filename().string();
     std::smatch matches;
     if (std::regex_match(it_filename, matches, pattern_regex)) {
