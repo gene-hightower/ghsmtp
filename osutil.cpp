@@ -129,12 +129,11 @@ std::vector<fs::path> list_directory(
 {
   std::vector<fs::path> ret;
 
+  auto const traits = std::regex_constants::ECMAScript
 #if defined(__APPLE__) || defined(_WIN32)
-  auto const traits
-      = std::regex_constants::ECMAScript | std::regex_constants::icase;
-#else
-  auto const traits = std::regex_constants::ECMAScript;
+                      | std::regex_constants::icase
 #endif
+      ;
 
   std::regex const pattern_regex(pattern, traits);
 
