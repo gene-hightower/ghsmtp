@@ -181,6 +181,8 @@ bool TLS::starttls_client(fs::path                  config_path,
       auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
       std::vector<Domain> cn;
 
+      SSL_CTX_set_ecdh_auto(ctx, 1);
+
       // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
       CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
@@ -479,8 +481,6 @@ bool TLS::starttls_server(fs::path                  config_path,
   auto const dh
       = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
-  auto const ecdh = CHECK_NOTNULL(EC_KEY_new_by_curve_name(NID_secp521r1));
-
   auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
   CHECK_GE(certs.size(), 1) << "no server cert(s) found";
@@ -491,6 +491,8 @@ bool TLS::starttls_server(fs::path                  config_path,
     std::vector<Domain> names;
 
     // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+
+    SSL_CTX_set_ecdh_auto(ctx, 1);
 
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
         << "unable to enable DANE on SSL context";
@@ -518,7 +520,6 @@ bool TLS::starttls_server(fs::path                  config_path,
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 
     SSL_CTX_set_tmp_dh(ctx, dh);
-    SSL_CTX_set_tmp_ecdh(ctx, ecdh);
 
 #pragma GCC diagnostic pop
 
@@ -638,8 +639,6 @@ bool TLS::starttls_server(fs::path                  config_path,
 
   DH_free(dh);
   BIO_free(bio);
-
-  EC_KEY_free(ecdh);
 
   ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
 
