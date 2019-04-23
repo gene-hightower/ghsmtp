@@ -41,7 +41,7 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 auto bin2hexstring(uint8_t const* data, size_t length)
 {
   std::string ret;
-  ret.reserve(2 * length + 1);
+  ret.reserve(2 * length);
 
   for (size_t n = 0u; n < length; ++n) {
     auto const ch = data[n];
