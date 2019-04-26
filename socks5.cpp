@@ -102,15 +102,21 @@ class request4 {
   octet        port_hi_;
   octet        port_lo_;
 
-public:
-  void addr(char const* addr)
+  void addr_(char const* addr)
   {
     CHECK_EQ(inet_pton(AF_INET, addr, reinterpret_cast<void*>(ip4_)), 1);
   }
-  void port(uint16_t port)
+  void port_(uint16_t port)
   {
     port_hi_ = hi(port);
     port_lo_ = lo(port);
+  }
+
+public:
+  request4(char const* addr, uint16_t port)
+  {
+    addr_(addr);
+    port_(port);
   }
 };
 
@@ -227,10 +233,7 @@ int main(int argc, char* argv[])
   auto constexpr domain{"digilicious.com"};
   uint16_t constexpr port{443};
 
-  request4 request;
-
-  request.port(port);
-  request.addr("108.83.36.113");
+  request4 request("108.83.36.113", port);
 
   PCHECK(write(fd, reinterpret_cast<char*>(&request), sizeof(request4))
          == sizeof(request4))
