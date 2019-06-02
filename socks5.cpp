@@ -16,6 +16,8 @@
 
 #include <fmt/format.h>
 
+constexpr auto socks_version = 5;
+
 namespace {
 using octet = uint8_t;
 
@@ -42,7 +44,7 @@ std::ostream& operator<<(std::ostream& os, auth_method const& auth)
 }
 
 class greeting {
-  octet       version_{5};
+  octet       version_{socks_version};
   octet       nmethod_{1};
   auth_method method_{auth_method::no_auth};
 };
@@ -94,7 +96,7 @@ std::ostream& operator<<(std::ostream& os, address_type const& at)
 }
 
 class request4 {
-  octet        version_{5};
+  octet        version_{socks_version};
   command      cmd_{command::connect};
   octet        reserved_{0};
   address_type typ_{address_type::ip4_address};
@@ -164,9 +166,10 @@ class reply4 {
   octet        port_hi_;
 
 public:
-  auto        version() const { return version_; }
-  auto        reply() const { return reply_; }
-  auto        type() const { return type_; }
+  auto version() const { return version_; }
+  auto reply() const { return reply_; }
+  auto type() const { return type_; }
+
   std::string addr() const
   {
     std::string a;
@@ -227,7 +230,7 @@ int main(int argc, char* argv[])
   PCHECK(read(fd, &rspns, sizeof(rspns)) == sizeof(rspns))
       << "response read failed: ";
 
-  CHECK_EQ(rspns.version(), 5);
+  CHECK_EQ(rspns.version(), socks_version);
   CHECK_EQ(rspns.method(), auth_method::no_auth);
 
   auto constexpr domain{"digilicious.com"};
@@ -245,7 +248,7 @@ int main(int argc, char* argv[])
          == sizeof(reply4))
       << "reply read failed: ";
 
-  CHECK_EQ(reply.version(), 5);
+  CHECK_EQ(reply.version(), socks_version);
   CHECK_EQ(reply.reply(), reply_field::succeeded);
   CHECK_EQ(reply.type(), address_type::ip4_address);
 
