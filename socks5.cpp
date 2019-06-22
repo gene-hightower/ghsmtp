@@ -16,6 +16,8 @@
 
 #include <fmt/format.h>
 
+#define CRLF "\r\n"
+
 constexpr auto socks_version = 5;
 
 namespace {
@@ -266,7 +268,7 @@ int main(int argc, char* argv[])
   sock.starttls_client(config_dir, nullptr, domain, tlsa_rrs,
                        !tlsa_rrs.empty());
 
-  sock.out() << "GET / HTTP/1.1\r\nHost: " << domain << "\r\n\r\n"
+  sock.out() << "GET / HTTP/1.1" CRLF "Host: " << domain << CRLF CRLF
              << std::flush;
 
   std::string line;
