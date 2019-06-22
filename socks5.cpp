@@ -266,7 +266,8 @@ int main(int argc, char* argv[])
   sock.starttls_client(config_dir, nullptr, domain, tlsa_rrs,
                        !tlsa_rrs.empty());
 
-  sock.out() << "GET / HTTP/1.1\r\nHost: digilicious.com\r\n\r\n" << std::flush;
+  sock.out() << "GET / HTTP/1.1\r\nHost: " << domain << "\r\n\r\n"
+             << std::flush;
 
   std::string line;
   while (std::getline(sock.in(), line)) {
