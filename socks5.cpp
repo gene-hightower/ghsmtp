@@ -204,6 +204,18 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 
   return tlsa_rrs;
 }
+
+template <class T>
+void read_checked(int fd, T& obj, std::string_view msg)
+{
+  PCHECK(read(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
+}
+
+template <class T>
+void write_checked(int fd, T const& obj, std::string_view msg)
+{
+  PCHECK(write(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
+}
 } // namespace
 
 int main(int argc, char* argv[])
@@ -223,14 +235,10 @@ int main(int argc, char* argv[])
       << "connect failed: ";
 
   greeting grtng;
-
-  PCHECK(write(fd, &grtng, sizeof(grtng)) == sizeof(grtng))
-      << "greeting write failed: ";
+  write_checked(fd, grtng, "greeting write failed");
 
   response rspns;
-
-  PCHECK(read(fd, &rspns, sizeof(rspns)) == sizeof(rspns))
-      << "response read failed: ";
+  read_checked(fd, rspns, "response read failed");
 
   CHECK_EQ(rspns.version(), socks_version);
   CHECK_EQ(rspns.method(), auth_method::no_auth);
@@ -239,16 +247,10 @@ int main(int argc, char* argv[])
   uint16_t constexpr port{443};
 
   request4 request("108.83.36.113", port);
-
-  PCHECK(write(fd, reinterpret_cast<char*>(&request), sizeof(request4))
-         == sizeof(request4))
-      << "request write failed: ";
+  write_checked(fd, request, "request write failed");
 
   reply4 reply;
-
-  PCHECK(read(fd, reinterpret_cast<char*>(&reply), sizeof(reply4))
-         == sizeof(reply4))
-      << "reply read failed: ";
+  read_checked(fd, reply, "reply read failed");
 
   CHECK_EQ(reply.version(), socks_version);
   CHECK_EQ(reply.reply(), reply_field::succeeded);
