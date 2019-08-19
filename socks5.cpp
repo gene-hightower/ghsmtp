@@ -16,6 +16,10 @@
 
 #include <fmt/format.h>
 
+#define CRLF "\r\n"
+
+constexpr auto socks_version = 5;
+
 namespace {
 using octet = uint8_t;
 
@@ -42,7 +46,7 @@ std::ostream& operator<<(std::ostream& os, auth_method const& auth)
 }
 
 class greeting {
-  octet       version_{5};
+  octet       version_{socks_version};
   octet       nmethod_{1};
   auth_method method_{auth_method::no_auth};
 };
@@ -94,7 +98,7 @@ std::ostream& operator<<(std::ostream& os, address_type const& at)
 }
 
 class request4 {
-  octet        version_{5};
+  octet        version_{socks_version};
   command      cmd_{command::connect};
   octet        reserved_{0};
   address_type typ_{address_type::ip4_address};
@@ -164,9 +168,10 @@ class reply4 {
   octet        port_hi_;
 
 public:
-  auto        version() const { return version_; }
-  auto        reply() const { return reply_; }
-  auto        type() const { return type_; }
+  auto version() const { return version_; }
+  auto reply() const { return reply_; }
+  auto type() const { return type_; }
+
   std::string addr() const
   {
     std::string a;
@@ -199,6 +204,18 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 
   return tlsa_rrs;
 }
+
+template <class T>
+void read_checked(int fd, T& obj, std::string_view msg)
+{
+  PCHECK(read(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
+}
+
+template <class T>
+void write_checked(int fd, T const& obj, std::string_view msg)
+{
+  PCHECK(write(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
+}
 } // namespace
 
 int main(int argc, char* argv[])
@@ -218,34 +235,24 @@ int main(int argc, char* argv[])
       << "connect failed: ";
 
   greeting grtng;
-
-  PCHECK(write(fd, &grtng, sizeof(grtng)) == sizeof(grtng))
-      << "greeting write failed: ";
+  write_checked(fd, grtng, "greeting write failed");
 
   response rspns;
+  read_checked(fd, rspns, "response read failed");
 
-  PCHECK(read(fd, &rspns, sizeof(rspns)) == sizeof(rspns))
-      << "response read failed: ";
-
-  CHECK_EQ(rspns.version(), 5);
+  CHECK_EQ(rspns.version(), socks_version);
   CHECK_EQ(rspns.method(), auth_method::no_auth);
 
   auto constexpr domain{"digilicious.com"};
   uint16_t constexpr port{443};
 
   request4 request("108.83.36.113", port);
-
-  PCHECK(write(fd, reinterpret_cast<char*>(&request), sizeof(request4))
-         == sizeof(request4))
-      << "request write failed: ";
+  write_checked(fd, request, "request write failed");
 
   reply4 reply;
+  read_checked(fd, reply, "reply read failed");
 
-  PCHECK(read(fd, reinterpret_cast<char*>(&reply), sizeof(reply4))
-         == sizeof(reply4))
-      << "reply read failed: ";
-
-  CHECK_EQ(reply.version(), 5);
+  CHECK_EQ(reply.version(), socks_version);
   CHECK_EQ(reply.reply(), reply_field::succeeded);
   CHECK_EQ(reply.type(), address_type::ip4_address);
 
@@ -263,7 +270,8 @@ int main(int argc, char* argv[])
   sock.starttls_client(config_dir, nullptr, domain, tlsa_rrs,
                        !tlsa_rrs.empty());
 
-  sock.out() << "GET / HTTP/1.1\r\nHost: digilicious.com\r\n\r\n" << std::flush;
+  sock.out() << "GET / HTTP/1.1" CRLF "Host: " << domain << CRLF CRLF
+             << std::flush;
 
   std::string line;
   while (std::getline(sock.in(), line)) {

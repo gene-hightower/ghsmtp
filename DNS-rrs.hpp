@@ -198,9 +198,9 @@ public:
 
   std::optional<std::string> as_str() const { return str(); }
 
-  std::string const& str() const { return ptrdname_; }
-  char const*        c_str() const { return str().c_str(); }
-  static RR_type     rr_type() { return RR_type::PTR; }
+  std::string const&       str() const { return ptrdname_; }
+  char const*              c_str() const { return str().c_str(); }
+  constexpr static RR_type rr_type() { return RR_type::PTR; }
 
   bool operator==(RR_PTR const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_PTR const& rhs) const { return str() < rhs.str(); }
@@ -297,9 +297,10 @@ public:
           uint8_t        matching_type,
           uint8_t const* assoc_data,
           size_t         assoc_data_sz);
-  unsigned           cert_usage() const { return cert_usage_; }
-  unsigned           selector() const { return selector_; }
-  unsigned           matching_type() const { return matching_type_; }
+  unsigned cert_usage() const { return cert_usage_; }
+  unsigned selector() const { return selector_; }
+  unsigned matching_type() const { return matching_type_; }
+
   container_t const& assoc_data() const { return assoc_data_; }
 
   // doesn't have a string representation
