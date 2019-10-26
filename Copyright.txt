@@ -1,2 +1,2 @@
 All files in this repository are part of ghsmtp - Gene's SMTP server.
-Copyright © 2013-2018 Gene Hightower <gene@digilicious.com>
+Copyright © 2013-2019 Gene Hightower <gene@digilicious.com>
