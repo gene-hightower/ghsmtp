@@ -4,9 +4,8 @@
 #include <functional>
 #include <string_view>
 
-typedef struct dkim_lib DKIM_LIB;  // local or forward declaration
-typedef struct dkim     DKIM;      // local or forward declaration
-typedef int             DKIM_STAT; // local or forward declaration
+struct dkim_lib;
+struct dkim;
 
 namespace OpenDKIM {
 
@@ -25,9 +24,9 @@ protected:
   Lib();
   ~Lib();
 
-  DKIM_LIB* lib_{nullptr};
-  DKIM*     dkim_{nullptr};
-  DKIM_STAT status_{0};
+  dkim_lib* lib_{nullptr};
+  dkim*     dkim_{nullptr};
+  int       status_{0};
 };
 
 class Verify : public Lib {

@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-typedef struct magic_set* magic_t; // local or forward declaration
+struct magic_set;
 
 class Magic {
 public:
@@ -18,7 +18,7 @@ public:
   std::string file(char const* path) const;
 
 private:
-  magic_t magic_; // This library is *not* thread safe!
+  magic_set* magic_; // This library is *not* thread safe!
 };
 
 #endif // MAGIC_DOT_HPP
