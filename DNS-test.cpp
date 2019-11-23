@@ -6,7 +6,6 @@
 #include "osutil.hpp"
 
 #include <algorithm>
-#include <random>
 
 #include <glog/logging.h>
 
@@ -29,7 +28,7 @@ int main(int argc, char const* argv[])
     char const*  name;
   };
 
-  lkp lookups[] = {
+  lkp lookups[] {
       {DNS::RR_type::A, "amazon.com"},
       {DNS::RR_type::A, "dee.test.digilicious.com"},
       {DNS::RR_type::A, "does-not-exist.test.digilicious.com"},
@@ -100,6 +99,6 @@ int main(int argc, char const* argv[])
       << "no match for " << fcrdnses6.front();
 
   auto const quad9{fcrdns4(res, "9.9.9.9")};
-  CHECK(Domain::match(quad9.front(), "dns.quad9.net"))
+  CHECK(Domain::match(quad9.front(), "dns9.quad9.net"))
       << "no match for " << quad9.front();
 }
