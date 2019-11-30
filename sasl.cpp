@@ -202,8 +202,8 @@ int main()
       << "CPID\t" << getpid() << "\n"
       << std::flush;
 
-  auto ctx{dovecot::Context{}};
-  auto in{istream_input<eol::lf>{ios, 4 * 1024, "sasl"}};
+  dovecot::Context       ctx;
+  istream_input<eol::lf> in{ios, 4 * 1024, "sasl"};
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }
@@ -212,7 +212,7 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  auto tok{std::stringstream{}};
+  std::stringstream tok;
   tok.str().reserve(sizeof(test::username) + sizeof(test::password));
   tok << '\0' << test::username << '\0' << test::password;
   auto const init{Base64::enc(tok.str())};
