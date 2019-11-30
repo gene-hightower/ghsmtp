@@ -12,22 +12,21 @@ u_char* uc(char const* cp)
 namespace OpenDMARC {
 Lib::Lib()
 {
-  memset(&lib_, 0, sizeof(lib_));
-
+#define PUBLIC_SUFFIX_LIST_DAT "public_suffix_list.dat"
   auto const path{[] {
-    auto const system_list{
-        fs::path{"/usr/share/publicsuffix/public_suffix_list.dat"}};
-    if (fs::exists(system_list))
-      return system_list;
+    auto const sys_list{
+        fs::path{"/usr/share/publicsuffix/" PUBLIC_SUFFIX_LIST_DAT}};
+    if (fs::exists(sys_list))
+      return sys_list;
 
-    auto const our_list{osutil::get_config_dir() / "public_suffix_list.dat"};
+    auto const our_list{osutil::get_config_dir() / PUBLIC_SUFFIX_LIST_DAT};
     if (fs::exists(our_list))
       return our_list;
 
-    LOG(FATAL) << "can't find public_suffix_list.dat";
+    LOG(FATAL) << "can't find " PUBLIC_SUFFIX_LIST_DAT;
   }()};
 
-  lib_.tld_type = OPENDMARC_TLD_TYPE_MOZILLA;
+  lib_ = {.tld_type = OPENDMARC_TLD_TYPE_MOZILLA};
 
   CHECK_LT(path.string().length(), sizeof(lib_.tld_source_file));
   strcpy(reinterpret_cast<char*>(lib_.tld_source_file), path.string().c_str());
