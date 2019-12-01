@@ -51,7 +51,7 @@ struct UPPER_ALPHA : range<'A', 'Z'> {};
 struct mech_char : sor<UPPER_ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
 struct sasl_mech : rep_min_max<1, 20, mech_char> {};
 
-struct vers : seq<TAOCPP_PEGTL_STRING("VERSION"), HTAB, one<'1'>, HTAB, one<'1'>, LF> {};
+struct vers : seq<TAOCPP_PEGTL_STRING("VERSION"), HTAB, one<'1'>, HTAB, DIGIT, LF> {};
 struct mech : seq<TAOCPP_PEGTL_STRING("MECH"), HTAB, sasl_mech, star<seq<HTAB, parameter>>, LF> {};
 struct spid : seq<TAOCPP_PEGTL_STRING("SPID"), HTAB, pid, LF> {};
 struct cuid : seq<TAOCPP_PEGTL_STRING("CUID"), HTAB, pid, LF> {};
