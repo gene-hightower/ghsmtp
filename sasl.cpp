@@ -69,11 +69,15 @@ struct auth_resp : sor<auth_ok, auth_cont, auth_fail> {};
 // clang-format on
 
 struct Context {
-  uint32_t                                                  id;
-  std::string                                               cookie;
-  std::string                                               sasl_mech;
-  std::vector<std::string>                                  parameter;
-  std::unordered_map<std::string, std::vector<std::string>> mech;
+  using parameters_t = std::vector<std::string>;
+  using mechs_t      = std::unordered_map<std::string, parameters_t>;
+
+  uint32_t    id;
+  std::string cookie;
+  std::string sasl_mech;
+
+  parameters_t parameters;
+  mechs_t      mechs;
 
   enum class auth_response { none, ok, cont, fail };
 
@@ -130,7 +134,7 @@ struct action<parameter> {
   template <typename Input>
   static void apply(Input const& in, Context& ctx)
   {
-    ctx.parameter.push_back(in.string());
+    ctx.parameters.push_back(in.string());
   }
 };
 
@@ -148,7 +152,7 @@ struct action<mech> {
   template <typename Input>
   static void apply(Input const& in, Context& ctx)
   {
-    ctx.mech.emplace(std::move(ctx.sasl_mech), std::move(ctx.parameter));
+    ctx.mechs.emplace(std::move(ctx.sasl_mech), std::move(ctx.parameters));
   }
 };
 
@@ -177,10 +181,17 @@ struct action<auth_fail> {
 };
 } // namespace dovecot
 
+// clang-format off
 constexpr char const* defined_params[]{
-    "anonymous",       "plaintext",   "dictionary", "active",
-    "forward-secrecy", "mutual-auth", "private",
+    "anonymous",
+    "plaintext",
+    "dictionary",
+    "active",
+    "forward-secrecy",
+    "mutual-auth",
+    "private",
 };
+// clang-format on
 
 int main()
 {
@@ -208,7 +219,7 @@ int main()
     LOG(WARNING) << "handshake response parse failed";
   }
 
-  for (auto const& m : ctx.mech) {
+  for (auto const& m : ctx.mechs) {
     LOG(INFO) << m.first;
   }
 
@@ -217,7 +228,7 @@ int main()
   tok << '\0' << test::username << '\0' << test::password;
   auto const init{Base64::enc(tok.str())};
 
-  if (ctx.mech.find("PLAIN") != end(ctx.mech)) {
+  if (ctx.mechs.find("PLAIN") != end(ctx.mechs)) {
     auto id{uint32_t{0x12345678}};
 
     ios << "AUTH\t" << id << "\tPLAIN"
