@@ -5,21 +5,21 @@
 #include <fstream>
 #include <iostream>
 
+#include <fmt/format.h>
+
 #include <glog/logging.h>
 
 int main(int argc, char* argv[])
 {
-  constexpr char infile[]{"body.txt"};
+  constexpr auto infile = "body.txt";
 
-  int fd_in;
-  PCHECK((fd_in = open(infile, O_RDONLY)) != -1);
+  int fd_in = open(infile, O_RDONLY);
+  PCHECK(fd_in != -1);
 
-  constexpr char tmplt[]{"/tmp/SockBuffert-XXXXXX"};
-  char           outfile[sizeof(tmplt)];
-  strcpy(outfile, tmplt);
+  char outfile[] = "/tmp/SockBuffer-test-XXXXXX";
 
-  int fd_out;
-  PCHECK((fd_out = mkstemp(outfile)) != -1);
+  int fd_out = mkstemp(outfile);
+  PCHECK(fd_out != -1);
 
   auto read_hook = []() { std::cout << "read_hook\n"; };
 
@@ -36,14 +36,10 @@ int main(int argc, char* argv[])
   }
   iostream << std::flush;
 
-  std::string diff_cmd = "diff ";
-  diff_cmd += infile;
-  diff_cmd += " ";
-  diff_cmd += outfile;
+  auto const diff_cmd{fmt::format("diff {} {}", infile, outfile)};
   CHECK_EQ(system(diff_cmd.c_str()), 0);
 
   PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;
 
-  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n'
-            << std::flush;
+  std::cout << "sizeof(SockBuffer) == " << sizeof(SockBuffer) << '\n';
 }
