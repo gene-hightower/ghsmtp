@@ -35,7 +35,7 @@ dns_tool_STEMS := dns_tool \
 
 msg_STEMS := msg \
 	CDB \
-	DKIM \
+	OpenDKIM \
 	DMARC \
 	$(DNS) \
 	Domain \
@@ -82,7 +82,7 @@ smtp_STEMS := smtp \
 
 snd_STEMS := snd \
 	Base64 \
-	DKIM \
+	OpenDKIM \
 	$(DNS) \
 	Domain \
 	IP \
@@ -232,7 +232,7 @@ public_suffix_list.dat:
 
 # visibility_flags := # nada
 
-# lto_flags := # nada
+lto_flags := # nada
 
 include MKUltra/rules
 
