@@ -1,4 +1,4 @@
-#include "DKIM.hpp"
+#include "OpenDKIM.hpp"
 
 #include <cstdbool> // needs to be above <dkim.h>
 

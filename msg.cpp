@@ -20,9 +20,9 @@ DEFINE_bool(selftest, false, "run a self test");
 
 #include <iostream>
 
-#include "DKIM.hpp"
 #include "DMARC.hpp"
 #include "Mailbox.hpp"
+#include "OpenDKIM.hpp"
 #include "SPF.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
