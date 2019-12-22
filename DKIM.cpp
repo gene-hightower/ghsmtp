@@ -38,9 +38,9 @@ Lib::~Lib()
 
 void Lib::header(std::string_view header)
 {
-  if (size(header) && header.back() == '\n')
+  if (header.size() && header.back() == '\n')
     header.remove_suffix(1);
-  if (size(header) && header.back() == '\r')
+  if (header.size() && header.back() == '\r')
     header.remove_suffix(1);
 
   CHECK_EQ((status_ = dkim_header(dkim_, uc(header.data()), header.length())),
