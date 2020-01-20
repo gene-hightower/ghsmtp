@@ -26,11 +26,11 @@ public:
   std::string const& local_part() const { return local_part_; }
   Domain const&      domain() const { return domain_; }
 
-  enum class encoding : bool { ascii, utf8 };
+  enum class domain_encoding : bool { ascii, utf8 };
 
-  size_t length(encoding enc = encoding::utf8) const
+  size_t length(domain_encoding enc = domain_encoding::utf8) const
   {
-    if (enc == encoding::ascii) {
+    if (enc == domain_encoding::ascii) {
       for (auto ch : local_part_) {
         if (!isascii(static_cast<unsigned char>(ch))) {
           throw std::range_error("non ascii chars in local part of mailbox");
@@ -38,19 +38,19 @@ public:
       }
     }
     auto const& d
-        = (enc == encoding::utf8) ? domain().utf8() : domain().ascii();
+        = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
     return local_part_.length() + (d.length() ? (d.length() + 1) : 0);
   }
 
   bool empty() const { return length() == 0; }
 
-  std::string as_string(encoding enc = encoding::utf8) const
+  std::string as_string(domain_encoding enc = domain_encoding::utf8) const
   {
     std::string s;
     s.reserve(length(enc));
     s = local_part();
     auto const& d
-        = (enc == encoding::utf8) ? domain().utf8() : domain().ascii();
+        = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
     if (!d.empty()) {
       s += '@';
       s += d;
@@ -58,7 +58,7 @@ public:
     return s;
   }
 
-  operator std::string() const { return as_string(encoding::utf8); }
+  operator std::string() const { return as_string(domain_encoding::utf8); }
 
 private:
   std::string local_part_;

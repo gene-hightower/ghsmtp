@@ -1528,8 +1528,8 @@ bool snd(fs::path                    config_path,
 
   in.discard();
 
-  auto enc = FLAGS_force_smtputf8 ? Mailbox::encoding::utf8
-                                  : Mailbox::encoding::ascii;
+  auto enc = FLAGS_force_smtputf8 ? Mailbox::domain_encoding::utf8
+                                  : Mailbox::domain_encoding::ascii;
 
   std::string from = smtp_from_mbx.empty() ? from_mbx.as_string(enc)
                                            : smtp_from_mbx.as_string(enc);
