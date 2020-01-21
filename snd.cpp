@@ -306,7 +306,7 @@ struct Connection {
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
     : sock(
-          fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+        fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
   {
   }
 };
@@ -648,6 +648,10 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
       if (IP6::is_address(node.ascii())) {
         addrs.push_back(node.ascii());
       }
+      if (IP6::is_address_literal(node.ascii())) {
+        auto const addr = IP6::as_address(node.ascii());
+        addrs.push_back(std::string(addr.data(), addr.length()));
+      }
     }
     else {
       addrs = res.get_strings(DNS::RR_type::AAAA, node.ascii());
@@ -690,6 +694,10 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     if (node.is_address_literal()) {
       if (IP4::is_address(node.ascii())) {
         addrs.push_back(node.ascii());
+      }
+      if (IP4::is_address_literal(node.ascii())) {
+        auto const addr = IP4::as_address(node.ascii());
+        addrs.push_back(std::string(addr.data(), addr.length()));
       }
     }
     else {
