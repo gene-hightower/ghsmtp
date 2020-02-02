@@ -1,16 +1,7 @@
 // Email address parsing and validating.
 
-#include <boost/algorithm/string.hpp>
-
-#include <gflags/gflags.h>
-namespace gflags {
-// in case we didn't have one
-}
-
-#include <glog/logging.h>
-
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include <string>
+#include <cassert>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -164,7 +155,6 @@ struct action<local_part> {
   static void apply(Input const& in, Address& addr)
   {
     addr.local_part = in.string();
-    boost::trim(addr.local_part);
   }
 };
 
@@ -283,15 +273,9 @@ bool parse_address(char const* value)
   return true;
 }
 
-void check_address(char const* value)
-{
-  auto const valid = parse_address(value);
-  fmt::print("{} is {}\n", value, valid ? "valid" : "NOT valid");
-}
-
 int main()
 {
-  CHECK(!parse_address("foo bar@digilicious.com"));
-  CHECK(parse_address("gene@digilicious.com"));
-  CHECK(parse_address("Gene Hightower <gene@digilicious.com>"));
+  assert(!parse_address("foo bar@digilicious.com"));
+  assert(parse_address("gene@digilicious.com"));
+  assert(parse_address("Gene Hightower <gene@digilicious.com>"));
 }
