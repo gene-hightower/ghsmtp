@@ -313,8 +313,6 @@ struct Connection {
 
 // clang-format off
 
-struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
-
 using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
