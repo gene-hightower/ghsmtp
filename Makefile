@@ -124,6 +124,7 @@ TESTS := \
 	Mailbox-test \
 	Message-test \
 	Now-test \
+	OpenDKIM-test \
 	POSIX-test \
 	Pill-test \
 	SPF-test \
@@ -148,6 +149,7 @@ IP6-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc os
 Magic-test_STEMS := Magic
 Mailbox-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
