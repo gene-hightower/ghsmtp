@@ -408,18 +408,18 @@ struct group_list : sor<mailbox_list, CFWS> {
 struct day : seq<opt<FWS>, rep_min_max<1, 2, DIGIT>> {
 };
 
-struct month_name : sor<TAOCPP_PEGTL_ISTRING("Jan"),
-                        TAOCPP_PEGTL_ISTRING("Feb"),
-                        TAOCPP_PEGTL_ISTRING("Mar"),
-                        TAOCPP_PEGTL_ISTRING("Apr"),
-                        TAOCPP_PEGTL_ISTRING("May"),
-                        TAOCPP_PEGTL_ISTRING("Jun"),
-                        TAOCPP_PEGTL_ISTRING("Jul"),
-                        TAOCPP_PEGTL_ISTRING("Aug"),
-                        TAOCPP_PEGTL_ISTRING("Sep"),
-                        TAOCPP_PEGTL_ISTRING("Oct"),
-                        TAOCPP_PEGTL_ISTRING("Nov"),
-                        TAOCPP_PEGTL_ISTRING("Dec")> {
+struct month_name : sor<TAO_PEGTL_ISTRING("Jan"),
+                        TAO_PEGTL_ISTRING("Feb"),
+                        TAO_PEGTL_ISTRING("Mar"),
+                        TAO_PEGTL_ISTRING("Apr"),
+                        TAO_PEGTL_ISTRING("May"),
+                        TAO_PEGTL_ISTRING("Jun"),
+                        TAO_PEGTL_ISTRING("Jul"),
+                        TAO_PEGTL_ISTRING("Aug"),
+                        TAO_PEGTL_ISTRING("Sep"),
+                        TAO_PEGTL_ISTRING("Oct"),
+                        TAO_PEGTL_ISTRING("Nov"),
+                        TAO_PEGTL_ISTRING("Dec")> {
 };
 
 struct month : seq<FWS, month_name, FWS> {
@@ -431,13 +431,13 @@ struct year : rep<4, DIGIT> {
 struct date : seq<day, month, year> {
 };
 
-struct day_name : sor<TAOCPP_PEGTL_ISTRING("Mon"),
-                      TAOCPP_PEGTL_ISTRING("Tue"),
-                      TAOCPP_PEGTL_ISTRING("Wed"),
-                      TAOCPP_PEGTL_ISTRING("Thu"),
-                      TAOCPP_PEGTL_ISTRING("Fri"),
-                      TAOCPP_PEGTL_ISTRING("Sat"),
-                      TAOCPP_PEGTL_ISTRING("Sun")> {
+struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
+                      TAO_PEGTL_ISTRING("Tue"),
+                      TAO_PEGTL_ISTRING("Wed"),
+                      TAO_PEGTL_ISTRING("Thu"),
+                      TAO_PEGTL_ISTRING("Fri"),
+                      TAO_PEGTL_ISTRING("Sat"),
+                      TAO_PEGTL_ISTRING("Sun")> {
 };
 
 // struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
@@ -488,16 +488,16 @@ struct time_of_day
 //                       range<75, 90>,
 //                       range<97, 105>,
 //                       range<107, 122>,
-//                       TAOCPP_PEGTL_ISTRING("UT"),
-//                       TAOCPP_PEGTL_ISTRING("GMT"),
-//                       TAOCPP_PEGTL_ISTRING("EST"),
-//                       TAOCPP_PEGTL_ISTRING("EDT"),
-//                       TAOCPP_PEGTL_ISTRING("CST"),
-//                       TAOCPP_PEGTL_ISTRING("CDT"),
-//                       TAOCPP_PEGTL_ISTRING("MST"),
-//                       TAOCPP_PEGTL_ISTRING("MDT"),
-//                       TAOCPP_PEGTL_ISTRING("PST"),
-//                       TAOCPP_PEGTL_ISTRING("PDT")> {
+//                       TAO_PEGTL_ISTRING("UT"),
+//                       TAO_PEGTL_ISTRING("GMT"),
+//                       TAO_PEGTL_ISTRING("EST"),
+//                       TAO_PEGTL_ISTRING("EDT"),
+//                       TAO_PEGTL_ISTRING("CST"),
+//                       TAO_PEGTL_ISTRING("CDT"),
+//                       TAO_PEGTL_ISTRING("MST"),
+//                       TAO_PEGTL_ISTRING("MDT"),
+//                       TAO_PEGTL_ISTRING("PST"),
+//                       TAO_PEGTL_ISTRING("PDT")> {
 // };
 
 struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {
@@ -511,32 +511,32 @@ struct date_time
 };
 
 // The Origination Date Field
-struct orig_date : seq<TAOCPP_PEGTL_ISTRING("Date:"), date_time, eol> {
+struct orig_date : seq<TAO_PEGTL_ISTRING("Date:"), date_time, eol> {
 };
 
 // Originator Fields
-struct from : seq<TAOCPP_PEGTL_ISTRING("From:"), mailbox_list, eol> {
+struct from : seq<TAO_PEGTL_ISTRING("From:"), mailbox_list, eol> {
 };
 
-struct sender : seq<TAOCPP_PEGTL_ISTRING("Sender:"), mailbox, eol> {
+struct sender : seq<TAO_PEGTL_ISTRING("Sender:"), mailbox, eol> {
 };
 
-struct reply_to : seq<TAOCPP_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
+struct reply_to : seq<TAO_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
 };
 
 struct address_list_or_pm
-  : sor<TAOCPP_PEGTL_ISTRING("Postmaster"), address_list> {
+  : sor<TAO_PEGTL_ISTRING("Postmaster"), address_list> {
 };
 
 // Destination Address Fields
-struct to : seq<TAOCPP_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {
+struct to : seq<TAO_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {
 };
 
-struct cc : seq<TAOCPP_PEGTL_ISTRING("Cc:"), address_list, eol> {
+struct cc : seq<TAO_PEGTL_ISTRING("Cc:"), address_list, eol> {
 };
 
 struct bcc
-  : seq<TAOCPP_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
+  : seq<TAO_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
 };
 
 // Identification Fields
@@ -554,65 +554,65 @@ struct msg_id
   : seq<opt<CFWS>, one<'<'>, id_left, one<'@'>, id_right, one<'>'>, opt<CFWS>> {
 };
 
-struct message_id : seq<TAOCPP_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {
+struct message_id : seq<TAO_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {
 };
 
 struct in_reply_to
-  : seq<TAOCPP_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
+  : seq<TAO_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
 };
 
 struct references
-  : seq<TAOCPP_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
+  : seq<TAO_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
 };
 
 // Informational Fields
 
-struct subject : seq<TAOCPP_PEGTL_ISTRING("Subject:"), unstructured, eol> {
+struct subject : seq<TAO_PEGTL_ISTRING("Subject:"), unstructured, eol> {
 };
 
-struct comments : seq<TAOCPP_PEGTL_ISTRING("Comments:"), unstructured, eol> {
+struct comments : seq<TAO_PEGTL_ISTRING("Comments:"), unstructured, eol> {
 };
 
 struct keywords
-  : seq<TAOCPP_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {
+  : seq<TAO_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {
 };
 
 // Resent Fields
 
-struct resent_date : seq<TAOCPP_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {
+struct resent_date : seq<TAO_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {
 };
 
 struct resent_from
-  : seq<TAOCPP_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
+  : seq<TAO_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
 };
 
 struct resent_sender
-  : seq<TAOCPP_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
+  : seq<TAO_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
 };
 
-struct resent_to : seq<TAOCPP_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
+struct resent_to : seq<TAO_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
 };
 
-struct resent_cc : seq<TAOCPP_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {
+struct resent_cc : seq<TAO_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {
 };
 
-struct resent_bcc : seq<TAOCPP_PEGTL_ISTRING("Resent-Bcc:"),
+struct resent_bcc : seq<TAO_PEGTL_ISTRING("Resent-Bcc:"),
                         opt<sor<address_list, CFWS>>,
                         eol> {
 };
 
 struct resent_msg_id
-  : seq<TAOCPP_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {
+  : seq<TAO_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {
 };
 
 // Trace Fields
 
-struct return_path : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"), path, eol> {
+struct return_path : seq<TAO_PEGTL_ISTRING("Return-Path:"), path, eol> {
 };
 
 // Facebook, among others
 
-struct return_path_retarded : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"),
+struct return_path_retarded : seq<TAO_PEGTL_ISTRING("Return-Path:"),
                                   opt<CFWS>,
                                   addr_spec,
                                   star<WSP>,
@@ -622,7 +622,7 @@ struct return_path_retarded : seq<TAOCPP_PEGTL_ISTRING("Return-Path:"),
 struct received_token : sor<angle_addr, addr_spec, domain, word> {
 };
 
-struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
+struct received : seq<TAO_PEGTL_ISTRING("Received:"),
                       opt<sor<plus<received_token>, CFWS>>,
                       one<';'>,
                       date_time,
@@ -630,22 +630,22 @@ struct received : seq<TAOCPP_PEGTL_ISTRING("Received:"),
                       eol> {
 };
 
-struct result : sor<TAOCPP_PEGTL_ISTRING("Pass"),
-                    TAOCPP_PEGTL_ISTRING("Fail"),
-                    TAOCPP_PEGTL_ISTRING("SoftFail"),
-                    TAOCPP_PEGTL_ISTRING("Neutral"),
-                    TAOCPP_PEGTL_ISTRING("None"),
-                    TAOCPP_PEGTL_ISTRING("TempError"),
-                    TAOCPP_PEGTL_ISTRING("PermError")> {
+struct result : sor<TAO_PEGTL_ISTRING("Pass"),
+                    TAO_PEGTL_ISTRING("Fail"),
+                    TAO_PEGTL_ISTRING("SoftFail"),
+                    TAO_PEGTL_ISTRING("Neutral"),
+                    TAO_PEGTL_ISTRING("None"),
+                    TAO_PEGTL_ISTRING("TempError"),
+                    TAO_PEGTL_ISTRING("PermError")> {
 };
 
-struct spf_key : sor<TAOCPP_PEGTL_ISTRING("client-ip"),
-                     TAOCPP_PEGTL_ISTRING("envelope-from"),
-                     TAOCPP_PEGTL_ISTRING("helo"),
-                     TAOCPP_PEGTL_ISTRING("problem"),
-                     TAOCPP_PEGTL_ISTRING("receiver"),
-                     TAOCPP_PEGTL_ISTRING("identity"),
-                     TAOCPP_PEGTL_ISTRING("mechanism")> {
+struct spf_key : sor<TAO_PEGTL_ISTRING("client-ip"),
+                     TAO_PEGTL_ISTRING("envelope-from"),
+                     TAO_PEGTL_ISTRING("helo"),
+                     TAO_PEGTL_ISTRING("problem"),
+                     TAO_PEGTL_ISTRING("receiver"),
+                     TAO_PEGTL_ISTRING("identity"),
+                     TAO_PEGTL_ISTRING("mechanism")> {
 };
 
 // This value syntax (allowing mailbox) is not in accordance with RFC
@@ -664,7 +664,7 @@ struct spf_key_value_list
         opt<one<';'>>> {
 };
 
-struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
+struct received_spf : seq<TAO_PEGTL_ISTRING("Received-SPF:"),
                           opt<CFWS>,
                           result,
                           opt<seq<FWS, comment>>,
@@ -673,10 +673,10 @@ struct received_spf : seq<TAOCPP_PEGTL_ISTRING("Received-SPF:"),
 };
 
 struct dkim_signature
-  : seq<TAOCPP_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
+  : seq<TAO_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
 };
 
-struct mime_version : seq<TAOCPP_PEGTL_ISTRING("MIME-Version:"),
+struct mime_version : seq<TAO_PEGTL_ISTRING("MIME-Version:"),
                           opt<CFWS>,
                           one<'1'>,
                           opt<CFWS>,
@@ -745,22 +745,22 @@ struct token : plus<tchar> {
 struct ietf_token : token {
 };
 
-struct x_token : seq<TAOCPP_PEGTL_ISTRING("X-"), token> {
+struct x_token : seq<TAO_PEGTL_ISTRING("X-"), token> {
 };
 
 struct extension_token : sor<x_token, ietf_token> {
 };
 
-struct discrete_type : sor<TAOCPP_PEGTL_ISTRING("text"),
-                           TAOCPP_PEGTL_ISTRING("image"),
-                           TAOCPP_PEGTL_ISTRING("audio"),
-                           TAOCPP_PEGTL_ISTRING("video"),
-                           TAOCPP_PEGTL_ISTRING("application"),
+struct discrete_type : sor<TAO_PEGTL_ISTRING("text"),
+                           TAO_PEGTL_ISTRING("image"),
+                           TAO_PEGTL_ISTRING("audio"),
+                           TAO_PEGTL_ISTRING("video"),
+                           TAO_PEGTL_ISTRING("application"),
                            extension_token> {
 };
 
-struct composite_type : sor<TAOCPP_PEGTL_ISTRING("message"),
-                            TAOCPP_PEGTL_ISTRING("multipart"),
+struct composite_type : sor<TAO_PEGTL_ISTRING("message"),
+                            TAO_PEGTL_ISTRING("multipart"),
                             extension_token> {
 };
 
@@ -785,7 +785,7 @@ struct attribute : token {
 struct parameter : seq<attribute, one<'='>, value> {
 };
 
-struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
+struct content : seq<TAO_PEGTL_ISTRING("Content-Type:"),
                      opt<CFWS>,
                      seq<type, one<'/'>, subtype>,
                      star<seq<one<';'>, opt<CFWS>, parameter>>,
@@ -797,27 +797,27 @@ struct content : seq<TAOCPP_PEGTL_ISTRING("Content-Type:"),
 //              "quoted-printable" / "base64" /
 //              ietf-token / x-token
 
-struct mechanism : sor<TAOCPP_PEGTL_ISTRING("7bit"),
-                       TAOCPP_PEGTL_ISTRING("8bit"),
-                       TAOCPP_PEGTL_ISTRING("binary"),
-                       TAOCPP_PEGTL_ISTRING("quoted-printable"),
-                       TAOCPP_PEGTL_ISTRING("base64"),
+struct mechanism : sor<TAO_PEGTL_ISTRING("7bit"),
+                       TAO_PEGTL_ISTRING("8bit"),
+                       TAO_PEGTL_ISTRING("binary"),
+                       TAO_PEGTL_ISTRING("quoted-printable"),
+                       TAO_PEGTL_ISTRING("base64"),
                        ietf_token,
                        x_token> {
 };
 
 struct content_transfer_encoding
-  : seq<TAOCPP_PEGTL_ISTRING("Content-Transfer-Encoding:"),
+  : seq<TAO_PEGTL_ISTRING("Content-Transfer-Encoding:"),
         opt<CFWS>,
         mechanism,
         eol> {
 };
 
-struct id : seq<TAOCPP_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
+struct id : seq<TAO_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
 };
 
 struct description
-  : seq<TAOCPP_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
+  : seq<TAO_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
 };
 
 // Optional Fields

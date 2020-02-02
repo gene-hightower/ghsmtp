@@ -51,18 +51,18 @@ struct UPPER_ALPHA : range<'A', 'Z'> {};
 struct mech_char : sor<UPPER_ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
 struct sasl_mech : rep_min_max<1, 20, mech_char> {};
 
-struct vers : seq<TAOCPP_PEGTL_STRING("VERSION"), HTAB, one<'1'>, HTAB, DIGIT, LF> {};
-struct mech : seq<TAOCPP_PEGTL_STRING("MECH"), HTAB, sasl_mech, star<seq<HTAB, parameter>>, LF> {};
-struct spid : seq<TAOCPP_PEGTL_STRING("SPID"), HTAB, pid, LF> {};
-struct cuid : seq<TAOCPP_PEGTL_STRING("CUID"), HTAB, pid, LF> {};
-struct cook : seq<TAOCPP_PEGTL_STRING("COOKIE"), HTAB, cookie, LF> {};
-struct done : seq<TAOCPP_PEGTL_STRING("DONE"), LF> {};
+struct vers : seq<TAO_PEGTL_STRING("VERSION"), HTAB, one<'1'>, HTAB, DIGIT, LF> {};
+struct mech : seq<TAO_PEGTL_STRING("MECH"), HTAB, sasl_mech, star<seq<HTAB, parameter>>, LF> {};
+struct spid : seq<TAO_PEGTL_STRING("SPID"), HTAB, pid, LF> {};
+struct cuid : seq<TAO_PEGTL_STRING("CUID"), HTAB, pid, LF> {};
+struct cook : seq<TAO_PEGTL_STRING("COOKIE"), HTAB, cookie, LF> {};
+struct done : seq<TAO_PEGTL_STRING("DONE"), LF> {};
 
 struct resp : seq<vers, star<mech>, spid, cuid, cook, done> {};
 
-struct auth_ok : seq<TAOCPP_PEGTL_STRING("OK"), HTAB, id, star<seq<HTAB, parameter>>> {};
-struct auth_cont : seq<TAOCPP_PEGTL_STRING("CONT"), HTAB, id, HTAB, base64_data> {};
-struct auth_fail : seq<TAOCPP_PEGTL_STRING("FAIL"), HTAB, id, star<seq<HTAB, parameter>>> {};
+struct auth_ok : seq<TAO_PEGTL_STRING("OK"), HTAB, id, star<seq<HTAB, parameter>>> {};
+struct auth_cont : seq<TAO_PEGTL_STRING("CONT"), HTAB, id, HTAB, base64_data> {};
+struct auth_fail : seq<TAO_PEGTL_STRING("FAIL"), HTAB, id, star<seq<HTAB, parameter>>> {};
 
 struct auth_resp : sor<auth_ok, auth_cont, auth_fail> {};
 

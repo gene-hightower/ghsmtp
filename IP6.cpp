@@ -66,9 +66,9 @@ struct ipv6_address : sor<seq<                                          rep<6, h
                           seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 // clang-format on
 
-struct ipv6_address_literal : seq<TAOCPP_PEGTL_ISTRING(lit_pfx),
+struct ipv6_address_literal : seq<TAO_PEGTL_ISTRING(lit_pfx),
                                   ipv6_address,
-                                  TAOCPP_PEGTL_ISTRING(lit_sfx)> {
+                                  TAO_PEGTL_ISTRING(lit_sfx)> {
 };
 
 struct ipv6_address_only : seq<ipv6_address, eof> {

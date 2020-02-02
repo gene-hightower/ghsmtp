@@ -90,7 +90,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {};
+struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
 struct dcontent : ranges<33, 90, 94, 126> {};
 

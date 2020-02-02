@@ -245,7 +245,7 @@ struct domain : sor<dot_atom, domain_literal> {};
 
 struct addr_spec : seq<local_part, one<'@'>, domain> {};
 
-struct postmaster : TAOCPP_PEGTL_ISTRING("Postmaster") {};
+struct postmaster : TAO_PEGTL_ISTRING("Postmaster") {};
 
 struct addr_spec_or_postmaster : sor<addr_spec, postmaster> {};
 
@@ -359,7 +359,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {};
+struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
 struct dcontent : ranges<33, 90, 94, 126> {};
 
@@ -421,10 +421,10 @@ struct server_id : sor<domain, address_literal> {};
 //                    "220 " [ textstring ] CRLF )
 
 struct greeting_ok
-: sor<seq<TAOCPP_PEGTL_ISTRING("220 "), server_id, opt<textstring>, CRLF>,
-      seq<TAOCPP_PEGTL_ISTRING("220-"), server_id, opt<textstring>, CRLF,
- star<seq<TAOCPP_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
-      seq<TAOCPP_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {};
+: sor<seq<TAO_PEGTL_ISTRING("220 "), server_id, opt<textstring>, CRLF>,
+      seq<TAO_PEGTL_ISTRING("220-"), server_id, opt<textstring>, CRLF,
+ star<seq<TAO_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
+      seq<TAO_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {};
 
 // Reply-code     = %x32-35 %x30-35 %x30-39
 
@@ -480,24 +480,24 @@ struct ehlo_line
 // Was added to work with postfix/src/smtpstone/smtp-sink.c.
 
 struct ehlo_ok_rsp
-: sor<seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF>,
+: sor<seq<TAO_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF>,
 
-      seq<TAOCPP_PEGTL_ISTRING("250-"), server_id, opt<ehlo_greet>, CRLF,
- star<seq<TAOCPP_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
-      seq<TAOCPP_PEGTL_ISTRING("250 "), opt<ehlo_line>, CRLF>>
+      seq<TAO_PEGTL_ISTRING("250-"), server_id, opt<ehlo_greet>, CRLF,
+ star<seq<TAO_PEGTL_ISTRING("250-"), ehlo_line, CRLF>>,
+      seq<TAO_PEGTL_ISTRING("250 "), opt<ehlo_line>, CRLF>>
       > {};
 
 struct ehlo_rsp
   : sor<ehlo_ok_rsp, reply_lines> {};
 
 struct helo_ok_rsp
-  : seq<TAOCPP_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF> {};
+  : seq<TAO_PEGTL_ISTRING("250 "), server_id, opt<ehlo_greet>, CRLF> {};
 
 struct auth_login_username
-    : seq<TAOCPP_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
+    : seq<TAO_PEGTL_STRING("334 VXNlcm5hbWU6"), CRLF> {};
 
 struct auth_login_password
-    : seq<TAOCPP_PEGTL_STRING("334 UGFzc3dvcmQ6"), CRLF> {};
+    : seq<TAO_PEGTL_STRING("334 UGFzc3dvcmQ6"), CRLF> {};
 
 // clang-format on
 

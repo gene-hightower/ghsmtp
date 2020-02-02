@@ -113,7 +113,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 
-struct IPv6_address_literal : seq<TAOCPP_PEGTL_ISTRING("IPv6:"), IPv6address> {};
+struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
 struct dcontent : ranges<33, 90, 94, 126> {};
 
@@ -179,11 +179,11 @@ struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
 struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {};
 
-struct bounce_path : TAOCPP_PEGTL_ISTRING("<>") {};
+struct bounce_path : TAO_PEGTL_ISTRING("<>") {};
 
 struct reverse_path : sor<path, bounce_path> {};
 
-struct magic_postmaster : TAOCPP_PEGTL_ISTRING("<Postmaster>") {};
+struct magic_postmaster : TAO_PEGTL_ISTRING("<Postmaster>") {};
 
 struct forward_path : sor<path, magic_postmaster> {};
 
@@ -199,25 +199,25 @@ struct rcpt_parameters : list<esmtp_param, SP> {};
 
 struct string : sor<quoted_string, atom> {};
 
-struct helo : seq<TAOCPP_PEGTL_ISTRING("HELO"),
+struct helo : seq<TAO_PEGTL_ISTRING("HELO"),
                   SP,
                   sor<domain, address_literal>,
                   CRLF> {};
 
-struct ehlo : seq<TAOCPP_PEGTL_ISTRING("EHLO"),
+struct ehlo : seq<TAO_PEGTL_ISTRING("EHLO"),
                   SP,
                   sor<domain, address_literal>,
                   CRLF> {};
 
-struct mail_from : seq<TAOCPP_PEGTL_ISTRING("MAIL"),
-                       TAOCPP_PEGTL_ISTRING(" FROM:"),
+struct mail_from : seq<TAO_PEGTL_ISTRING("MAIL"),
+                       TAO_PEGTL_ISTRING(" FROM:"),
                        opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                        reverse_path,
                        opt<seq<SP, mail_parameters>>,
                        CRLF> {};
 
-struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
-                     TAOCPP_PEGTL_ISTRING(" TO:"),
+struct rcpt_to : seq<TAO_PEGTL_ISTRING("RCPT"),
+                     TAO_PEGTL_ISTRING(" TO:"),
                      opt<SP>, // obsolete in RFC5321, but kosher in RFC821
                      forward_path,
                      opt<seq<SP, rcpt_parameters>>,
@@ -225,14 +225,14 @@ struct rcpt_to : seq<TAOCPP_PEGTL_ISTRING("RCPT"),
 
 struct chunk_size : plus<DIGIT> {};
 
-struct end_marker : TAOCPP_PEGTL_ISTRING(" LAST") {};
+struct end_marker : TAO_PEGTL_ISTRING(" LAST") {};
 
-struct bdat : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {};
+struct bdat : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {};
 
 struct bdat_last
-    : seq<TAOCPP_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {};
+    : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {};
 
-struct data : seq<TAOCPP_PEGTL_ISTRING("DATA"), CRLF> {};
+struct data : seq<TAO_PEGTL_ISTRING("DATA"), CRLF> {};
 
 struct data_end : seq<dot, CRLF> {};
 
@@ -265,18 +265,18 @@ struct data_line : sor<at<data_end>,
 
 struct data_grammar : until<data_end, data_line> {};
 
-struct rset : seq<TAOCPP_PEGTL_ISTRING("RSET"), CRLF> {};
+struct rset : seq<TAO_PEGTL_ISTRING("RSET"), CRLF> {};
 
-struct noop : seq<TAOCPP_PEGTL_ISTRING("NOOP"), opt<seq<SP, string>>, CRLF> {};
+struct noop : seq<TAO_PEGTL_ISTRING("NOOP"), opt<seq<SP, string>>, CRLF> {};
 
-struct vrfy : seq<TAOCPP_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {};
+struct vrfy : seq<TAO_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {};
 
-struct help : seq<TAOCPP_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {};
+struct help : seq<TAO_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {};
 
 struct starttls
-    : seq<TAOCPP_PEGTL_ISTRING("STAR"), TAOCPP_PEGTL_ISTRING("TTLS"), CRLF> {};
+    : seq<TAO_PEGTL_ISTRING("STAR"), TAO_PEGTL_ISTRING("TTLS"), CRLF> {};
 
-struct quit : seq<TAOCPP_PEGTL_ISTRING("QUIT"), CRLF> {};
+struct quit : seq<TAO_PEGTL_ISTRING("QUIT"), CRLF> {};
 
 // Anti-AUTH support
 
@@ -287,7 +287,7 @@ struct base64_char : sor<ALPHA, DIGIT, one<'+', '/'>> {};
 
 // base64-terminal = (2base64-char "==") / (3base64-char "=")
 
-struct base64_terminal : sor<seq<rep<2, base64_char>, TAOCPP_PEGTL_ISTRING("==")>,
+struct base64_terminal : sor<seq<rep<2, base64_char>, TAO_PEGTL_ISTRING("==")>,
                              seq<rep<3, base64_char>, one<'='>>
                              > {};
 
@@ -320,7 +320,7 @@ struct sasl_mech : rep_min_max<1, 20, mech_char> {};
 //                   CRLF
 //                   ;; <sasl-mech> is defined in RFC 4422
 
-struct auth : seq<TAOCPP_PEGTL_ISTRING("AUTH"), SP, sasl_mech,
+struct auth : seq<TAO_PEGTL_ISTRING("AUTH"), SP, sasl_mech,
                   opt<seq<SP, initial_response>>,
                   // star<CRLF, opt<base64>>,
                   // opt<seq<CRLF, cancel_response>>,
