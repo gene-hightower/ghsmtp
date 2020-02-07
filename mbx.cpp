@@ -1,7 +1,7 @@
 // Email address parsing and validating.
 
-#include <string>
 #include <cassert>
+#include <string>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
@@ -130,6 +130,7 @@ struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
 struct local_part : sor<dot_string, quoted_string> {};
 struct non_local_part : sor<domain, address_literal> {};
 struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
+struct mailbox_only : seq<mailbox, eof> {};
 
 // clang-format on
 // Actions
@@ -257,6 +258,8 @@ struct group_list : sor<mailbox_list, CFWS> {};
 
 struct address : sor<mailbox, group> {};
 
+struct address_only : seq<address, eof> {};
+
 // clang-format on
 
 // Actions
@@ -289,7 +292,7 @@ bool parse_mailbox(char const* value)
   Address addr;
 
   memory_input<> address_in(value, "address");
-  if (!parse<RFC5321::mailbox, RFC5321::action>(address_in, addr)) {
+  if (!parse<RFC5321::mailbox_only, RFC5321::action>(address_in, addr)) {
     return false;
   }
 
@@ -301,7 +304,7 @@ bool parse_address(char const* value)
   Address addr;
 
   memory_input<> address_in(value, "address");
-  if (!parse<RFC5322::address, RFC5322::action>(address_in, addr)) {
+  if (!parse<RFC5322::address_only, RFC5322::action>(address_in, addr)) {
     return false;
   }
 
@@ -314,8 +317,14 @@ int main()
   assert(parse_address("gene@digilicious.com"));
   assert(parse_address("Gene Hightower <gene@digilicious.com>"));
   assert(parse_address("gene@[127.999.0.1]"));
+  assert(parse_address("madness!@example.org"));
+  assert(parse_address("(comment)mailbox@example.com"));
 
   assert(parse_mailbox("gene@digilicious.com"));
   assert(parse_mailbox("gene@[127.0.0.1]"));
   assert(!parse_mailbox("gene@[127.999.0.1]"));
+  assert(!parse_mailbox("allen@bad_d0main.com"));
+
+  assert(!parse_mailbox("2962"));
+  assert(parse_mailbox("실례@실례.테스트"));
 }
