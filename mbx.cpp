@@ -313,6 +313,75 @@ bool parse_address(char const* value)
 
 int main()
 {
+  // <https://en.wikipedia.org/wiki/Email_address#Examples>
+
+  // Valid email addresses
+
+  assert(parse_mailbox("simple@example.com"));
+  assert(parse_mailbox("very.common@example.com"));
+  assert(parse_mailbox("disposable.style.email.with+symbol@example.com"));
+  assert(parse_mailbox("other.email-with-hyphen@example.com"));
+  assert(parse_mailbox("fully-qualified-domain@example.com"));
+
+  assert(parse_mailbox(
+      "user.name+tag+sorting@example.com")); // (may go to user.name@example.com
+                                             // inbox depending on mail server)
+
+  assert(parse_mailbox("x@example.com")); // (one-letter local-part)
+  assert(parse_mailbox("example-indeed@strange-example.com"));
+
+  assert(parse_mailbox(
+      "admin@mailserver1")); // (local domain name with no TLD, although ICANN
+                             // highly discourages dotless email addresses)
+
+  assert(parse_mailbox("example@s.example")); // (see the List of Internet
+                                              // top-level domains)
+
+  assert(parse_mailbox("\" \"@example.org")); // (space between the quotes)
+
+  assert(parse_mailbox("\"john..doe\"@example.org")); // (quoted double dot)
+
+  assert(parse_mailbox("mailhost!username@example.org")); // (bangified host
+                                                          // route used for uucp
+                                                          // mailers)
+  assert(parse_mailbox(
+      "user%example.com@example.org")); // (% escaped mail route to
+                                        // user@example.com via example.org)
+
+  // Invalid email addresses
+
+  assert(!parse_mailbox("Abc.example.com"));   // (no @ character)
+  assert(!parse_mailbox("A@b@c@example.com")); // (only one @ is allowed outside
+                                               // quotation marks)
+  assert(!parse_mailbox(
+      "a\"b(c)d,e:f;g<h>i[j\\k]l@example.com")); // (none of the special
+                                                 // characters in this
+                                                 // local-part are allowed
+                                                 // outside quotation marks)
+
+  assert(!parse_mailbox(
+      "just\"not\"right@example.com")); // (quoted strings must be dot separated
+                                        // or the only element making up the
+                                        // local-part)
+  assert(!parse_mailbox(
+      "this is\"not\\allowed@example.com")); // (spaces, quotes, and backslashes
+                                             // may only exist when within
+                                             // quoted strings and preceded by a
+                                             // backslash)
+
+  assert(!parse_mailbox(
+      "this\\ still\\\"not\\\\allowed@example.com")); // (even if escaped
+                                                      // (preceded by a
+                                                      // backslash), spaces,
+                                                      // quotes, and backslashes
+                                                      // must still be contained
+                                                      // by quotes)
+
+  // FIXME!!!
+  assert(parse_mailbox("1234567890123456789012345678901234567890123456789012345"
+                       "678901234+x@example.com")); // (local part is longer
+                                                    // than 64 characters)
+
   assert(!parse_address("foo bar@digilicious.com"));
   assert(parse_address("gene@digilicious.com"));
   assert(parse_address("Gene Hightower <gene@digilicious.com>"));
@@ -327,4 +396,85 @@ int main()
 
   assert(!parse_mailbox("2962"));
   assert(parse_mailbox("실례@실례.테스트"));
+
+  // <https://docs.microsoft.com/en-us/archive/blogs/testing123/email-address-test-cases>
+
+  assert(parse_mailbox("email@domain.com"));              // Valid email
+  assert(parse_mailbox("firstname.lastname@domain.com")); // Email contains
+                                                          // dot in the address
+                                                          // field
+  assert(parse_mailbox("email@subdomain.domain.com"));    // Email contains
+                                                          // dot with subdomain
+  assert(parse_mailbox("firstname+lastname@domain.com")); // Plus sign is
+                                                          // considered valid
+                                                          // character
+  assert(parse_mailbox("email@123.123.123.123"));         // Domain is valid IP
+                                                          // address
+  assert(parse_mailbox("email@[123.123.123.123]")); // Square bracket around IP
+                                                    // address is considered
+                                                    // valid
+  assert(parse_mailbox("\"email\"@domain.com"));    // Quotes around email is
+                                                    // considered valid
+  assert(parse_mailbox("1234567890@domain.com"));   // Digits in address are
+                                                    // valid
+  assert(parse_mailbox("email@domain-one.com"));    // Dash in domain name is
+                                                    // valid
+  assert(parse_mailbox("_______@domain.com"));      // Underscore in the
+                                                    // address field is valid
+  assert(parse_mailbox("email@domain.name"));       // .name is valid Top Level
+                                                    // Domain name
+  assert(parse_mailbox("email@domain.co.jp"));      // Dot in Top Level Domain
+                                               // name also considered valid
+                                               // (use co.jp as example here)
+
+  assert(parse_mailbox("firstname-lastname@domain.com")); // Dash in address
+                                                          // field is valid
+
+  assert(!parse_mailbox("plainaddress"));     // Missing @ sign and domain
+  assert(!parse_mailbox("#@%^%#$@#$@#.com")); // Garbage
+  assert(!parse_mailbox("@domain.com"));      // Missing username
+
+  assert(!parse_mailbox("Joe Smith <email@domain.com>")); // Encoded html within
+                                                          // email is invalid
+
+  assert(parse_address("Joe Smith <email@domain.com>")); // Ok by RFC-5322
+
+  assert(!parse_mailbox("email.domain.com"));        // Missing @
+  assert(!parse_mailbox("email@domain@domain.com")); // Two @ sign
+
+  assert(!parse_mailbox(".email@domain.com")); // Leading dot in address
+                                               // is not allowed
+
+  assert(!parse_mailbox("email.@domain.com")); // Trailing dot in address
+                                               // is not allowed
+
+  assert(!parse_mailbox("email..email@domain.com")); // Multiple dots
+
+  assert(parse_mailbox("あいうえお@domain.com")); // OK!! Unicode char as
+                                                  // address
+
+  assert(!parse_mailbox("email@domain.com (Joe Smith)")); // Text followed
+                                                          // email is not
+                                                          // allowed
+
+  assert(parse_address("email@domain.com (Joe Smith)")); // Text followed
+                                                         // email is ok by 5322
+
+  assert(parse_mailbox("email@domain")); // Missing top level domain
+                                         // (.com/.net/.org/etc)
+
+  assert(!parse_mailbox("email@-domain.com")); // Leading dash in front of
+                                               // domain is invalid
+
+  assert(parse_mailbox("email@domain.web")); // .web is not a valid top
+                                             // level domain
+
+  assert(!parse_mailbox("email@[111.222.333.44444]")); // Invalid IP
+                                                       // format
+
+  assert(parse_mailbox("email@111.222.333.44444")); // Invalid IP
+                                                    // format, but valid domain
+                                                    // name
+
+  assert(!parse_mailbox("email@domain..com"));
 }
