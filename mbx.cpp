@@ -14,29 +14,32 @@ struct Address {
   std::string domain;
 };
 
-namespace Chars {
+namespace RFC3629 {
 // clang-format off
 
-struct tail : range<'\x80', '\xBF'> {};
+// 4.  Syntax of UTF-8 Byte Sequences
 
-// Single unit code point, aka ASCII.
-struct one_unit : range<0x00, 0x7F> {};
+struct UTF8_tail : range<'\x80', '\xBF'> {};
 
-struct two_unit : seq<range<'\xC2', '\xDF'>, tail> {};
+struct UTF8_1 : range<0x00, 0x7F> {};
 
-struct three_unit : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, tail>,
-                    seq<range<'\xE1', '\xEC'>, rep<2, tail>>,
-                    seq<one<'\xED'>, range<'\x80', '\x9F'>, tail>,
-                    seq<range<'\xEE', '\xEF'>, rep<2, tail>>> {};
+struct UTF8_2 : seq<range<'\xC2', '\xDF'>, UTF8_tail> {};
 
-struct four_unit
-  : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, tail>>,
-        seq<range<'\xF1', '\xF3'>, rep<3, tail>>,
-        seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, tail>>> {};
+struct UTF8_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
+                    seq<range<'\xE1', '\xEC'>, rep<2, UTF8_tail>>,
+                    seq<one<'\xED'>, range<'\x80', '\x9F'>, UTF8_tail>,
+                    seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {};
 
-struct non_ascii : sor<two_unit, three_unit, four_unit> {};
+struct UTF8_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
+                    seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
+                    seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {};
 
-struct VUCHAR : sor<VCHAR, non_ascii> {};
+struct non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
+
+} // namespace RFC3629
+
+namespace Chars {
+struct VUCHAR : sor<VCHAR, RFC3629::non_ascii> {};
 
 // excluded from atext: "(),.@[]"
 struct atext : sor<ALPHA, DIGIT,
@@ -50,19 +53,17 @@ struct atext : sor<ALPHA, DIGIT,
                        '`', '{',
                        '|', '}',
                        '~'>,
-                   non_ascii> {};
+                   RFC3629::non_ascii> {};
 
-// clang-format on
 } // namespace Chars
 
 namespace RFC5321 {
 // <https://tools.ietf.org/html/rfc5321>
-// clang-format off
 
 using dot = one<'.'>;
 using colon = one<':'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, Chars::non_ascii> {};
+struct u_let_dig : sor<ALPHA, DIGIT, RFC3629::non_ascii> {};
 
 struct u_ldh_tail : star<sor<seq<plus<one<'-'>>, u_let_dig>, u_let_dig>> {};
 
@@ -119,7 +120,7 @@ struct address_literal : seq<one<'['>,
                              one<']'>> {};
 
 
-struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, Chars::non_ascii> {};
+struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, RFC3629::non_ascii> {};
 struct graphic : range<32, 126> {};
 struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
 struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
@@ -171,7 +172,7 @@ struct quoted_pair : seq<one<'\\'>, sor<Chars::VUCHAR, WSP>> {};
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 
 // ctext is ASCII but not '(' or ')' or '\\', plus non-ASCII
-struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, Chars::non_ascii> {};
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, RFC3629::non_ascii> {};
 
 struct comment;
 
@@ -189,7 +190,7 @@ struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {};
 
 // 3.2.4.  Quoted Strings
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, Chars::non_ascii> {};
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, RFC3629::non_ascii> {};
 struct qcontent : sor<qtext, quoted_pair> {};
 
 // Corrected in errata ID: 3135
@@ -229,7 +230,6 @@ struct address : sor<mailbox, group> {};
 struct address_only : seq<address, eof> {};
 
 // clang-format on
-
 // Actions
 
 template <typename Rule>
@@ -454,4 +454,7 @@ int main()
 
   // Not a valid domain name.
   assert(!validate_mailbox("email@domain..com"));
+
+  // general_address_literal
+  assert(validate_mailbox("email@[x:~Foo_Bar_Baz<\?\?>]"));
 }
