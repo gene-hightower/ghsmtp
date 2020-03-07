@@ -111,7 +111,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
   if (!q.has_record()) {
-    std::cout << "no records\n";
+    std::cout << "no MX records\n";
     return;
   }
 
