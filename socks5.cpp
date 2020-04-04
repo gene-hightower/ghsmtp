@@ -3,6 +3,7 @@
 #include "Sock.hpp"
 #include "osutil.hpp"
 
+#include <cstddef>
 #include <memory>
 
 #include <arpa/inet.h>
@@ -96,6 +97,27 @@ std::ostream& operator<<(std::ostream& os, address_type const& at)
 {
   return os << c_str(at);
 }
+
+class request_domain {
+  octet        version_{socks_version};
+  command      cmd_{command::connect};
+  octet        reserved_{0};
+  address_type typ_{address_type::domain_name};
+  octet        var_[258]; // 255 + 1 + 2
+
+public:
+  request_domain(char const* addr, uint16_t port)
+  {
+    auto const len = strlen(addr);
+    CHECK_LE(len, 255);
+    var_[0] = static_cast<octet>(len);
+    memcpy(var_ + 1, addr, len);
+    var_[len + 1] = hi(port);
+    var_[len + 2] = lo(port);
+  }
+
+  ssize_t size() const { return offsetof(request_domain, var_) + var_[0] + 3; }
+};
 
 class request4 {
   octet        version_{socks_version};
@@ -246,8 +268,10 @@ int main(int argc, char* argv[])
   auto constexpr domain{"digilicious.com"};
   uint16_t constexpr port{443};
 
-  request4 request("108.83.36.113", port);
-  write_checked(fd, request, "request write failed");
+  // request4 request("108.83.36.113", port);
+  request_domain request(domain, port);
+  PCHECK(write(fd, &request, request.size()) == request.size())
+      << "request write failed";
 
   reply4 reply;
   read_checked(fd, reply, "reply read failed");
