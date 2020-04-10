@@ -144,16 +144,16 @@ CDB-test_STEMS := CDB osutil
 
 DNS-test_STEMS := $(DNS) DNS-ldns Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 
-Domain-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-IP4-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-IP6-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Domain-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP4-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+IP6-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Magic-test_STEMS := Magic
-Mailbox-test_STEMS := $(DNS) Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Mailbox-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
-SPF-test_STEMS := $(DNS) Domain IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 osutil-test_STEMS := osutil
 
 Session-test_STEMS := \
@@ -174,9 +174,9 @@ Session-test_STEMS := \
 	esc \
 	osutil
 
-Sock-test_STEMS := Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-SockBuffer-test_STEMS := Domain IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-TLS-OpenSSL-test_STEMS := Domain IP4 IP6 POSIX TLS-OpenSSL osutil
+Sock-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+SockBuffer-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+TLS-OpenSSL-test_STEMS := Domain IP IP4 IP6 POSIX TLS-OpenSSL osutil
 esc-test_STEMS := esc
 
 databases := \
