@@ -24,7 +24,8 @@ public:
   void set(std::string_view dom);
 
   inline void clear();
-  bool        empty() const { return ascii_.empty(); }
+
+  bool empty() const { return ascii_.empty(); }
 
   inline static std::string_view remove_trailing_dot(std::string_view a);
   inline static bool             match(std::string_view a, std::string_view b);
@@ -57,7 +58,7 @@ inline void Domain::clear()
 
 inline std::string_view Domain::remove_trailing_dot(std::string_view a)
 {
-  if (a.length() && ('.' == a.back())) {
+  if (a.length() && (a.back() == '.')) {
     a.remove_suffix(1);
   }
   return a;
