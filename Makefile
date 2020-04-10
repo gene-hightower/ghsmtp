@@ -53,6 +53,7 @@ msg_STEMS := msg \
 sasl_STEMS := sasl \
 	Base64 \
 	Domain \
+	IP \
 	IP4 \
 	IP6 \
 	POSIX \
