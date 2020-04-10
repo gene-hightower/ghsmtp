@@ -65,6 +65,8 @@ struct action<dec_octet> {
   }
 };
 
+// <https://en.wikipedia.org/wiki/Private_network#Private_IPv4_addresses>
+
 auto is_private(std::string_view addr) -> bool
 {
   std::vector<std::string> a;
@@ -73,7 +75,8 @@ auto is_private(std::string_view addr) -> bool
   memory_input<> in{addr.data(), addr.size(), "addr"};
   CHECK((parse<ipv4_address, action>(in, a)));
 
-  // From RFC 1918:
+  // <https://tools.ietf.org/html/rfc1918#section-3>
+
   // 10.0.0.0        -   10.255.255.255  (10/8 prefix)
   // 172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
   // 192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
@@ -82,7 +85,7 @@ auto is_private(std::string_view addr) -> bool
     return true;
 
   if (a[0] == "172") {
-    // auto oct = atoi(a[1].c_str());
+    // auto const oct = atoi(a[1].c_str());
 
     uint8_t oct{};
     std::from_chars(a[1].data(), a[1].data() + a[1].size(), oct);
@@ -107,7 +110,7 @@ auto is_address_literal(std::string_view addr) -> bool
 
 auto to_address_literal(std::string_view addr) -> std::string
 {
-  CHECK(is_address(addr));
+  // CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
