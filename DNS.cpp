@@ -188,7 +188,7 @@ Resolver::Resolver(fs::path config_path)
   LOG(FATAL) << "no nameservers left to try";
 }
 
-packet Resolver::xchg(packet const& q)
+message Resolver::xchg(message const& q)
 {
   if (Config::nameservers[ns_].typ == Config::sock_type::stream) {
     CHECK_EQ(ns_fd_, -1);
@@ -204,7 +204,7 @@ packet Resolver::xchg(packet const& q)
     ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
     sz = ntohs(sz);
 
-    DNS::packet::container_t bfr(sz);
+    DNS::message::container_t bfr(sz);
     ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
 
     if (!ns_sock_->in()) {
@@ -212,7 +212,7 @@ packet Resolver::xchg(packet const& q)
                    << ns_sock_->in().gcount() << " octets";
     }
 
-    return packet{std::move(bfr)};
+    return message{std::move(bfr)};
   }
 
   CHECK(Config::nameservers[ns_].typ == Config::sock_type::dgram);
@@ -220,8 +220,8 @@ packet Resolver::xchg(packet const& q)
 
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
 
-  auto                     sz = Config::max_udp_sz;
-  DNS::packet::container_t bfr(sz);
+  auto                      sz = Config::max_udp_sz;
+  DNS::message::container_t bfr(sz);
 
   auto constexpr hook{[]() {}};
   auto       t_o{false};
@@ -231,19 +231,19 @@ packet Resolver::xchg(packet const& q)
 
   if (a_buflen < 0) {
     LOG(WARNING) << "DNS read failed";
-    return packet{0};
+    return message{0};
   }
 
   if (t_o) {
     LOG(WARNING) << "DNS read timed out";
-    return packet{0};
+    return message{0};
   }
 
   sz = a_buflen;
   bfr.resize(sz);
   bfr.shrink_to_fit();
 
-  return packet{std::move(bfr)};
+  return message{std::move(bfr)};
 }
 
 RR_collection Resolver::get_records(RR_type typ, char const* name)

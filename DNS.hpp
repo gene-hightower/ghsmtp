@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "DNS-packet.hpp"
+#include "DNS-message.hpp"
 #include "DNS-rrs.hpp"
 #include "Sock.hpp"
 #include "iobuffer.hpp"
@@ -31,7 +31,7 @@ public:
     return get_strings(typ, name.c_str());
   }
 
-  packet xchg(packet const& q);
+  message xchg(message const& q);
 
 private:
   std::unique_ptr<Sock> ns_sock_;
@@ -70,8 +70,8 @@ private:
 
   RR_type type_;
 
-  packet q_;
-  packet a_;
+  message q_;
+  message a_;
 
   bool authentic_data_{false};
   bool bogus_or_indeterminate_{false};
