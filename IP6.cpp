@@ -74,11 +74,11 @@ bool istarts_with(std::string_view str, std::string_view prefix)
 }
 } // namespace
 
+// <https://en.wikipedia.org/wiki/Private_network#Private_IPv6_addresses>
+
 bool is_private(std::string_view addr)
 {
-  CHECK(is_address(addr));
-
-  // <https://en.wikipedia.org/wiki/Private_network#Private_IPv6_addresses>
+  // CHECK(is_address(addr));
   return istarts_with(addr, "fd");
 }
 
@@ -96,7 +96,7 @@ bool is_address_literal(std::string_view addr)
 
 std::string to_address_literal(std::string_view addr)
 {
-  CHECK(is_address(addr));
+  // CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
