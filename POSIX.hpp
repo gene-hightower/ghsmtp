@@ -26,35 +26,37 @@ public:
                               std::chrono::milliseconds timeout,
                               bool&                     t_o)
   {
-    return io_fd_("read", std::chrono::system_clock::now(), ::read, input_ready,
-                  read_hook, fd_in, s, n, timeout, t_o);
+    return read_fd_(std::chrono::system_clock::now(), read_hook, fd_in, s, n,
+                    timeout, t_o);
   }
 
   static std::streamsize write(int                       fd_out,
-                               const char*               c_s,
+                               const char*               s,
                                std::streamsize           n,
                                std::chrono::milliseconds timeout,
                                bool&                     t_o)
   {
-    auto s = const_cast<char*>(c_s);
-    return io_fd_("write", std::chrono::system_clock::now(),
-                  // this casts away the const on "buf"
-                  reinterpret_cast<ssize_t (*)(int, void*, size_t)>(::write),
-                  output_ready, null_hook, fd_out, s, n, timeout, t_o);
+    return write_fd_(std::chrono::system_clock::now(), fd_out, s, n, timeout,
+                     t_o);
   }
 
 private:
   static std::streamsize
-  io_fd_(char const*                                        fnm,
-         std::chrono::time_point<std::chrono::system_clock> start,
-         ssize_t (*io_fnc)(int, void*, size_t),
-         bool (*rdy_fnc)(int, std::chrono::milliseconds),
-         std::function<void(void)> read_hook,
-         int                       fd,
-         char*                     s,
-         std::streamsize           n,
-         std::chrono::milliseconds timeout,
-         bool&                     t_o);
+  read_fd_(std::chrono::time_point<std::chrono::system_clock> start,
+           std::function<void(void)>                          read_hook,
+           int                                                fd,
+           char*                                              s,
+           std::streamsize                                    n,
+           std::chrono::milliseconds                          timeout,
+           bool&                                              t_o);
+
+  static std::streamsize
+  write_fd_(std::chrono::time_point<std::chrono::system_clock> start,
+            int                                                fd,
+            char const*                                        s,
+            std::streamsize                                    n,
+            std::chrono::milliseconds                          timeout,
+            bool&                                              t_o);
 };
 
 #endif // POSIX_DOT_HPP
