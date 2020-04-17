@@ -1,14 +1,16 @@
 #!/bin/bash
 
-mkdir -p /tmp/Maillogs
+log_dir=/tmp/Maillogs
 
-CWD=`pwd`
+mkdir -p ${log_dir}
+
+cwd=`pwd`
 
 coproc \
     ASAN_OPTIONS=detect_odr_violation=0 \
-    LLVM_PROFILE_FILE=${CWD}/smtp.profraw \
+    LLVM_PROFILE_FILE=${cwd}/smtp.profraw \
     MAILDIR=/tmp/Maildir \
-    GOOGLE_LOG_DIR=/tmp/Maillogs \
+    GOOGLE_LOG_DIR=${log_dir} \
     GLOG_minloglevel=0 \
     ./smtp
 
