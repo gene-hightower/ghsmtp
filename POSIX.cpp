@@ -59,7 +59,7 @@ std::streamsize POSIX::read(int                       fd,
                             std::chrono::milliseconds timeout,
                             bool&                     t_o)
 {
-  auto const start    = std::chrono::system_clock::now();
+  auto const start    = system_clock::now();
   auto const end_time = start + timeout;
 
   for (;;) {
@@ -101,7 +101,7 @@ std::streamsize POSIX::write(int                       fd,
                              std::chrono::milliseconds timeout,
                              bool&                     t_o)
 {
-  auto const start    = std::chrono::system_clock::now();
+  auto const start    = system_clock::now();
   auto const end_time = start + timeout;
 
   auto written = std::streamsize{};
