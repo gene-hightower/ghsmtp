@@ -103,8 +103,6 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include <string_view>
 #include <unordered_map>
 
-using namespace std::string_literals;
-
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -121,6 +119,8 @@ using namespace std::string_literals;
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
+
+using namespace std::string_literals;
 
 namespace Config {
 constexpr auto read_timeout  = std::chrono::seconds(30);
@@ -1198,7 +1198,7 @@ auto parse_mailboxes()
     FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to);
   }
 
-  return std::make_tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
+  return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
 }
 
 auto create_eml(Domain const&               sender,
