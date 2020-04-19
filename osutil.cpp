@@ -7,6 +7,10 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <pwd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <gflags/gflags.h>
 namespace gflags {
 }
@@ -26,17 +30,16 @@ namespace osutil {
 
 fs::path get_config_dir()
 {
-  fs::path path;
-
   if (!FLAGS_config_dir.empty()) {
-    path = FLAGS_config_dir;
+    return FLAGS_config_dir;
   }
   else {
-    path = osutil::get_home_dir();
+    return get_exe_path().parent_path();
 
     // Maybe work from some installed location...
-
     // if ends in /bin, switch to /share or /etc
+
+    // auto path = get_exe_path().parent_path();
     // if (fs::is_directory(path) && (path.filename() == "bin")) {
     //   auto share = path;
     //   share.replace_filename("share");
@@ -44,8 +47,6 @@ fs::path get_config_dir()
     //   path = share;
     // }
   }
-
-  return path;
 }
 
 fs::path get_exe_path()
@@ -74,8 +75,18 @@ fs::path get_exe_path()
 
 fs::path get_home_dir()
 {
-  auto const exe{get_exe_path()};
-  return exe.parent_path();
+  auto const homedir_ev{getenv("HOME")};
+  if (homedir_ev) {
+    CHECK(strcmp(homedir_ev, "/root")) << "should not run as root";
+    CHECK(strcmp(homedir_ev, "/")) << "should not run in root directory";
+    return homedir_ev;
+  }
+  else {
+    errno = 0; // See GETPWNAM(3)
+    passwd* pw;
+    PCHECK(pw = getpwuid(getuid()));
+    return pw->pw_dir;
+  }
 }
 
 std::string get_hostname()

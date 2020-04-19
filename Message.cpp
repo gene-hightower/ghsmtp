@@ -1,31 +1,13 @@
 #include "Message.hpp"
 
-#include <cstdlib>
+#include "osutil.hpp"
 
-#include <pwd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <cstdlib>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
 namespace {
-auto locate_homedir() -> fs::path
-{
-  auto const homedir_ev{getenv("HOME")};
-  if (homedir_ev) {
-    CHECK(strcmp(homedir_ev, "/root")) << "should not run as root";
-    CHECK(strcmp(homedir_ev, "/")) << "should not run in root directory";
-    return homedir_ev;
-  }
-  else {
-    errno = 0; // See GETPWNAM(3)
-    passwd* pw;
-    PCHECK(pw = getpwuid(getuid()));
-    return pw->pw_dir;
-  }
-}
-
 auto locate_maildir() -> fs::path
 {
   auto const maildir_ev{getenv("MAILDIR")};
@@ -33,7 +15,7 @@ auto locate_maildir() -> fs::path
     return maildir_ev;
   }
   else {
-    return locate_homedir() / "Maildir";
+    return osutil::get_home_dir() / "Maildir";
   }
 }
 } // namespace
@@ -52,8 +34,6 @@ void Message::open(std::string_view fqdn,
 
   tmpfn_ = maildir / "tmp";
   newfn_ = maildir / "new";
-
-  umask(077);
 
   error_code ec;
   create_directories(tmpfn_, ec);
