@@ -1,7 +1,5 @@
 #include "CDB.hpp"
 
-#include "fs.hpp"
-
 #include <glog/logging.h>
 
 #include <fcntl.h>
@@ -16,9 +14,8 @@ CDB::~CDB()
   }
 }
 
-bool CDB::open(std::string_view db)
+bool CDB::open(fs::path db_path)
 {
-  fs::path db_path = db;
   db_path += ".cdb";
   auto const db_fn = db_path.string();
 

@@ -59,7 +59,7 @@ void Message::open(std::string_view fqdn,
 
   // open
   ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-  ofs_.open(tmpfn_.string());
+  ofs_.open(tmpfn_);
 }
 
 std::ostream& Message::write(char const* s, std::streamsize count)
