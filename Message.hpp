@@ -49,6 +49,8 @@ private:
   fs::path newfn_;
 
   bool size_error_{false};
+
+  void try_close_();
 };
 
 #endif // MESSAGE_DOT_HPP
