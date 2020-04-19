@@ -1,13 +1,8 @@
 #ifndef MESSAGE_DOT_HPP
 #define MESSAGE_DOT_HPP
 
-#include <cstdlib>
 #include <fstream>
-#include <sstream>
 #include <string_view>
-
-#include <pwd.h>
-#include <sys/types.h>
 
 #include "Now.hpp"
 #include "Pill.hpp"
