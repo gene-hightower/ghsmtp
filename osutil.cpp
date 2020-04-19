@@ -77,8 +77,6 @@ fs::path get_home_dir()
 {
   auto const homedir_ev{getenv("HOME")};
   if (homedir_ev) {
-    CHECK(strcmp(homedir_ev, "/root")) << "should not run as root";
-    CHECK(strcmp(homedir_ev, "/")) << "should not run in root directory";
     return homedir_ev;
   }
   else {
