@@ -9,6 +9,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <fmt/format.h>
+
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -21,6 +23,8 @@
 #include <tao/pegtl/contrib/abnf.hpp>
 
 #include "test-credentials.ipp"
+
+using namespace std::string_literals;
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -223,10 +227,8 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  std::stringstream tok;
-  tok.str().reserve(sizeof(test::username) + sizeof(test::password));
-  tok << '\0' << test::username << '\0' << test::password;
-  auto const init{Base64::enc(tok.str())};
+  auto const tok{fmt::format("\0{}\0{}"s, test::username, test::password)};
+  auto const init{Base64::enc(tok)};
 
   if (ctx.mechs.find("PLAIN") != end(ctx.mechs)) {
     auto id{uint32_t{0x12345678}};
