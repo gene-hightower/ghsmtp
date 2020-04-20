@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <iomanip>
-#include <sstream>
 
 std::string esc(std::string_view str, esc_line_option line_option)
 {
