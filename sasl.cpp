@@ -40,7 +40,7 @@ struct pid : plus<DIGIT> {};
 struct cookie : rep<32, HEXDIG> {};
 
 struct base64_char : sor<ALPHA, DIGIT, one<'+'>, one<'/'>> {};
-struct base64_data : sor<plus<base64_char>, rep_min_max<0, 2, one<'='>>> {};
+struct base64_data : seq<plus<base64_char>, rep_min_max<0, 2, one<'='>>> {};
 
 struct param_char : sor<ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
 struct param_name : rep_min_max<1, 20, param_char> {};
@@ -62,13 +62,13 @@ struct cuid : seq<TAO_PEGTL_STRING("CUID"), HTAB, pid, LF> {};
 struct cook : seq<TAO_PEGTL_STRING("COOKIE"), HTAB, cookie, LF> {};
 struct done : seq<TAO_PEGTL_STRING("DONE"), LF> {};
 
-struct resp : seq<vers, star<mech>, spid, cuid, cook, done> {};
+struct resp : seq<vers, star<mech>, spid, cuid, cook, done, discard> {};
 
 struct auth_ok : seq<TAO_PEGTL_STRING("OK"), HTAB, id, star<seq<HTAB, parameter>>> {};
 struct auth_cont : seq<TAO_PEGTL_STRING("CONT"), HTAB, id, HTAB, base64_data> {};
 struct auth_fail : seq<TAO_PEGTL_STRING("FAIL"), HTAB, id, star<seq<HTAB, parameter>>> {};
 
-struct auth_resp : sor<auth_ok, auth_cont, auth_fail> {};
+struct auth_resp : seq<sor<auth_ok, auth_cont, auth_fail>, discard> {};
 
 // clang-format on
 
@@ -217,8 +217,8 @@ int main()
       << "CPID\t" << getpid() << "\n"
       << std::flush;
 
-  dovecot::Context       ctx;
-  istream_input<eol::lf> in{ios, 4 * 1024, "sasl"};
+  auto ctx = dovecot::Context{};
+  auto in = istream_input<eol::lf>{ios, 8 * 1024, "sasl"};
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }
