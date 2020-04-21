@@ -7,6 +7,7 @@ namespace gflags {
 
 DEFINE_bool(selftest, false, "run a self test");
 
+#include <map>
 #include <string>
 #include <vector>
 
