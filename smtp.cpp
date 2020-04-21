@@ -22,7 +22,6 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
-#include <tao/pegtl/contrib/tracer.hpp>
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -40,7 +39,7 @@ struct Ctx {
 
   std::streamsize chunk_size;
 
-  Ctx(fs::path config_path, std::function<void(void)> read_hook = []() {})
+  Ctx(fs::path config_path, std::function<void(void)> read_hook)
     : session(config_path, read_hook)
   {
   }
@@ -560,8 +559,7 @@ struct action<bdat> {
 
 template <>
 struct action<bdat_last> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
+  static void apply0(Ctx& ctx)
   {
     if (bdat_act(ctx))
       ctx.session.bdat_done(ctx.chunk_size, true);
@@ -631,8 +629,8 @@ struct action<data> {
   static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      auto din
-          = istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size, "din");
+      auto din = istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size,
+                                          "data");
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
                                                                        ctx)) {
@@ -764,9 +762,9 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  istream_input<eol::crlf> in{ctx->session.in(), std::size_t(FLAGS_bfr_size),
-                              "ses"};
-  auto                     ret{0};
+  istream_input<eol::crlf> in{ctx->session.in(), FLAGS_bfr_size, "session"};
+
+  int ret = 0;
   try {
     ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
   }
