@@ -224,12 +224,11 @@ struct rcpt_to : seq<TAO_PEGTL_ISTRING("RCPT"),
 
 struct chunk_size : plus<DIGIT> {};
 
-struct end_marker : TAO_PEGTL_ISTRING(" LAST") {};
+struct last : TAO_PEGTL_ISTRING("LAST") {};
 
 struct bdat : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {};
 
-struct bdat_last
-    : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, end_marker, CRLF> {};
+struct bdat_last : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, SP, last, CRLF> {};
 
 struct data : seq<TAO_PEGTL_ISTRING("DATA"), CRLF> {};
 
