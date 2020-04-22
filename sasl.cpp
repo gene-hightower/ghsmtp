@@ -218,7 +218,7 @@ int main()
       << std::flush;
 
   auto ctx = dovecot::Context{};
-  auto in = istream_input<eol::lf>{ios, 8 * 1024, "sasl"};
+  auto in = istream_input<eol::lf, 1>{ios, 8 * 1024, "sasl"};
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }

@@ -629,8 +629,8 @@ struct action<data> {
   static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      auto din = istream_input<eol::crlf>(ctx.session.in(), FLAGS_bfr_size,
-                                          "data");
+      auto din = istream_input<eol::crlf, 1>(ctx.session.in(), FLAGS_bfr_size,
+                                             "data");
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
                                                                        ctx)) {
@@ -762,7 +762,7 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  istream_input<eol::crlf> in{ctx->session.in(), FLAGS_bfr_size, "session"};
+  istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_bfr_size, "session"};
 
   int ret = 0;
   try {

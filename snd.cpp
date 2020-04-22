@@ -1397,7 +1397,8 @@ bool snd(fs::path                    config_path,
 
   auto cnn{RFC5321::Connection(fd_in, fd_out, read_hook)};
 
-  auto in{istream_input<eol::crlf>{cnn.sock.in(), FLAGS_bfr_size, "session"}};
+  auto in{
+      istream_input<eol::crlf, 1>{cnn.sock.in(), FLAGS_bfr_size, "session"}};
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
     LOG(WARNING) << "can't parse greeting";
     return false;
