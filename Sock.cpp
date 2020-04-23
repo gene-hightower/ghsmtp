@@ -79,7 +79,7 @@ Sock::Sock(int                       fd_in,
                          them_addr_str_, sizeof them_addr_str_)
                != nullptr);
         them_address_literal_ = IP4::to_address_literal(them_addr_str_);
-        LOG(INFO) << "IPv4 disguised as IPv6: " << them_addr_str_;
+        // LOG(INFO) << "IPv4 disguised as IPv6: " << them_addr_str_;
       }
       else {
         PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr,
