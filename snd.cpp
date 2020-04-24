@@ -1293,11 +1293,8 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   if (std::find(begin(auth->second), end(auth->second), "PLAIN")
       != end(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
-    auto tok{std::ostringstream{}};
-    tok.str().reserve(FLAGS_username.length() + FLAGS_password.length() + 2);
-    tok << '\0' << FLAGS_username << '\0' << FLAGS_password;
-    cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok.str()) << "\r\n"
-                   << std::flush;
+    auto const tok = fmt::format("\0{}\0{}"s, FLAGS_username, FLAGS_password);
+    cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok) << "\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     if (cnn.reply_code != "235") {
       LOG(ERROR) << "AUTH PLAIN returned " << cnn.reply_code;
@@ -1551,7 +1548,6 @@ bool snd(fs::path                    config_path,
 
   // Get the header as one big string
   std::ostringstream hdr_stream;
-  hdr_stream.str().reserve(2 * 1024);
   hdr_stream << eml;
   auto const& hdr_str = hdr_stream.str();
 
@@ -1573,7 +1569,6 @@ bool snd(fs::path                    config_path,
   }
 
   std::ostringstream param_stream;
-  param_stream.str().reserve(100);
   if (FLAGS_huge_size && ext_size) {
     // Claim some huge size.
     param_stream << " SIZE=" << std::numeric_limits<std::streamsize>::max();
@@ -1666,7 +1661,6 @@ bool snd(fs::path                    config_path,
 
   if (ext_chunking) {
     std::ostringstream bdat_stream;
-    bdat_stream.str().reserve(30);
     bdat_stream << "BDAT " << total_size << " LAST";
     LOG(INFO) << "C: " << bdat_stream.str();
 
@@ -1768,10 +1762,9 @@ bool snd(fs::path                    config_path,
 DNS::RR_collection
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
-  std::ostringstream tlsa;
-  tlsa << '_' << port << "._tcp." << domain.ascii();
+  auto const tlsa = fmt::format("_{}._tcp.{}", port, domain.ascii());
 
-  DNS::Query q(res, DNS::RR_type::TLSA, tlsa.str());
+  DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
   if (q.nx_domain()) {
     LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
