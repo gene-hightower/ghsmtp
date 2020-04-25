@@ -441,54 +441,34 @@ std::string Session::added_headers_(Message const& msg)
 
   std::string const tls_info{sock_.tls_info()};
 
-  std::ostringstream headers;
-  headers.str().reserve(500);
-  headers << "Return-Path: <" << reverse_path_ << ">\r\n";
+  fmt::memory_buffer headers;
+  fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
 
-  // STD 3 section 5.2.8
-  auto constexpr indent    = "        ";
-  auto constexpr indent_sz = sizeof(indent) - 1;
-  auto constexpr break_col = 80;
-
-  headers << "Received: from " << client_identity_.utf8();
+  // <https://tools.ietf.org/html/rfc5321#section-4.4>
+  fmt::format_to(headers, "Received: from {}", client_identity_.utf8());
   if (sock_.has_peername()) {
-    headers << " (" << client_ << ')';
+    fmt::format_to(headers, " ({})", client_);
   }
-  headers << "\r\n"
-          << indent << "by " << server_identity_.utf8() << " with " << protocol
-          << " id " << msg.id();
+  fmt::format_to(headers, "\r\n\tby {} with {} id {}", server_identity_.utf8(),
+                 protocol, msg.id());
 
   if (forward_path_.size()) {
-    auto constexpr phor    = "for ";
-    auto constexpr phor_sz = sizeof(phor) - 1;
-    headers << "\r\n" << indent << phor;
-    int len = indent_sz + phor_sz;
-    for (size_t i = 0; i < forward_path_.size(); ++i) {
-      auto const fwd = static_cast<std::string>(forward_path_[i]);
-      if (i) {
-        headers << ',';
-        ++len;
-      }
-      if ((len + fwd.length() + 2) > break_col) {
-        headers << "\r\n" << indent;
-        len = indent_sz;
-      }
-      headers << '<' << fwd << '>';
-      len += fwd.length() + 2;
-    }
+    fmt::format_to(headers, "\r\n\tfor <{}>", forward_path_[0]);
+    for (auto i = 1u; i < forward_path_.size(); ++i)
+      fmt::format_to(headers, ",\r\n\t   <{}>", forward_path_[i]);
   }
 
   if (tls_info.length()) {
-    headers << "\r\n" << indent << '(' << tls_info << ')';
+    fmt::format_to(headers, "\r\n\t({})", tls_info);
   }
-  headers << ";\r\n" << indent << msg.when() << "\r\n";
+  fmt::format_to(headers, ";\r\n\t{}\r\n", msg.when());
 
   // Received-SPF:
   if (!spf_received_.empty()) {
-    headers << spf_received_ << "\r\n";
+    fmt::format_to(headers, "{}\r\n", spf_received_);
   }
 
-  return headers.str();
+  return fmt::to_string(headers);
 }
 
 namespace {
