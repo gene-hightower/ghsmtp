@@ -99,19 +99,17 @@ constexpr char const* defined_fields[]{
 
 bool is_defined_field(std::string_view name)
 {
-  for (auto const& defined_field : defined_fields) {
-    if (iequal(name, defined_field))
-      return true;
-  }
-  return false;
+  return std::find_if(std::begin(defined_fields), std::end(defined_fields),
+                      [=](std::string_view v) { return iequal(name, v); })
+         != std::end(defined_fields);
 }
 
 char const* defined_field(std::string_view name)
 {
-  for (auto&& defined_field : defined_fields) {
-    if (iequal(name, defined_field))
-      return defined_field;
-  }
+  auto df = std::find_if(std::begin(defined_fields), std::end(defined_fields),
+                         [=](std::string_view v) { return iequal(name, v); });
+  if (df != std::end(defined_fields))
+    return *df;
   return "";
 }
 
@@ -525,8 +523,7 @@ struct sender : seq<TAO_PEGTL_ISTRING("Sender:"), mailbox, eol> {
 struct reply_to : seq<TAO_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
 };
 
-struct address_list_or_pm
-  : sor<TAO_PEGTL_ISTRING("Postmaster"), address_list> {
+struct address_list_or_pm : sor<TAO_PEGTL_ISTRING("Postmaster"), address_list> {
 };
 
 // Destination Address Fields
@@ -536,8 +533,7 @@ struct to : seq<TAO_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {
 struct cc : seq<TAO_PEGTL_ISTRING("Cc:"), address_list, eol> {
 };
 
-struct bcc
-  : seq<TAO_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
+struct bcc : seq<TAO_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
 };
 
 // Identification Fields
@@ -558,12 +554,10 @@ struct msg_id
 struct message_id : seq<TAO_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {
 };
 
-struct in_reply_to
-  : seq<TAO_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
+struct in_reply_to : seq<TAO_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
 };
 
-struct references
-  : seq<TAO_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
+struct references : seq<TAO_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
 };
 
 // Informational Fields
@@ -583,12 +577,10 @@ struct keywords
 struct resent_date : seq<TAO_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {
 };
 
-struct resent_from
-  : seq<TAO_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
+struct resent_from : seq<TAO_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
 };
 
-struct resent_sender
-  : seq<TAO_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
+struct resent_sender : seq<TAO_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
 };
 
 struct resent_to : seq<TAO_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
@@ -597,9 +589,8 @@ struct resent_to : seq<TAO_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
 struct resent_cc : seq<TAO_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {
 };
 
-struct resent_bcc : seq<TAO_PEGTL_ISTRING("Resent-Bcc:"),
-                        opt<sor<address_list, CFWS>>,
-                        eol> {
+struct resent_bcc
+  : seq<TAO_PEGTL_ISTRING("Resent-Bcc:"), opt<sor<address_list, CFWS>>, eol> {
 };
 
 struct resent_msg_id
