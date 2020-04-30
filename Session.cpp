@@ -313,8 +313,8 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   out_() << std::flush;
 
   if (sock_.has_peername()) {
-    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), client_identity_)
-        != end(client_fcrdns_)) {
+    if (std::find(begin(client_fcrdns_), end(client_fcrdns_),
+                  client_identity_) != end(client_fcrdns_)) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -1086,16 +1086,16 @@ bool Session::verify_ip_address_(std::string& error_msg)
   auto ip_black_db_name = config_path_ / "ip-black";
   CDB  ip_black{ip_black_db_name};
   if (ip_black.lookup(sock_.them_c_str())) {
-    error_msg
-        = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
+    error_msg =
+        fmt::format("IP address {} on static blacklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
   client_fcrdns_.clear();
 
-  if ((sock_.them_address_literal() == IP4::loopback_literal)
-      || (sock_.them_address_literal() == IP6::loopback_literal)) {
+  if ((sock_.them_address_literal() == IP4::loopback_literal) ||
+      (sock_.them_address_literal() == IP6::loopback_literal)) {
     LOG(INFO) << "loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
@@ -1114,8 +1114,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.lookup(client_fcrdns.ascii())) {
-        error_msg = fmt::format("FCrDNS {} on static blacklist",
-                                client_fcrdns.ascii());
+        error_msg =
+            fmt::format("FCrDNS {} on static blacklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
@@ -1152,8 +1152,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = fmt::format("unknown {}", sock_.them_address_literal());
   }
 
-  if (IP4::is_address(sock_.them_c_str())
-      && ip4_whitelisted(sock_.them_c_str())) {
+  if (IP4::is_address(sock_.them_c_str()) &&
+      ip4_whitelisted(sock_.them_c_str())) {
     ip_whitelisted_ = true;
     return true;
   }
@@ -1205,13 +1205,12 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername()
-      && ((client_identity == server_identity_)
-          || (client_identity == "localhost")
-          || (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername() && ((client_identity == server_identity_) ||
+                               (client_identity == "localhost") ||
+                               (client_identity == "localhost.localdomain"))) {
 
-    if ((sock_.them_address_literal() == IP4::loopback_literal)
-        || (sock_.them_address_literal() == IP6::loopback_literal)) {
+    if ((sock_.them_address_literal() == IP4::loopback_literal) ||
+        (sock_.them_address_literal() == IP6::loopback_literal)) {
       return true;
     }
 
@@ -1224,8 +1223,8 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg
-        = fmt::format("claimed bogus identity {}", client_identity.ascii());
+    error_msg =
+        fmt::format("claimed bogus identity {}", client_identity.ascii());
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1236,8 +1235,8 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = fmt::format("claimed blacklisted identity {}",
-                            client_identity.ascii());
+    error_msg =
+        fmt::format("claimed blacklisted identity {}", client_identity.ascii());
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -1277,10 +1276,10 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // mail for on an external network connection.
 
   if (sock_.them_address_literal() != sock_.us_address_literal()) {
-    if ((accept_domains_.is_open()
-         && (accept_domains_.lookup(sender.domain().ascii())
-             || accept_domains_.lookup(sender.domain().utf8())))
-        || (sender.domain() == server_identity_)) {
+    if ((accept_domains_.is_open() &&
+         (accept_domains_.lookup(sender.domain().ascii()) ||
+          accept_domains_.lookup(sender.domain().utf8()))) ||
+        (sender.domain() == server_identity_)) {
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       error_msg = fmt::format("liar, claimed to be {}", sender.domain());
       return false;
@@ -1351,16 +1350,16 @@ bool Session::verify_sender_domain_(Domain const& sender,
                                      labels[labels.size() - 1]);
 
   if (labels.size() > 2) {
-    auto const three_level
-        = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
+    auto const three_level =
+        fmt::format("{}.{}", labels[labels.size() - 3], two_level);
 
     auto three_tld_db_name = config_path_ / "three-level-tlds";
     CDB  three_tld{three_tld_db_name};
     if (three_tld.lookup(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
-        auto const look_up
-            = fmt::format("{}.{}", labels[labels.size() - 4], three_level);
+        auto const look_up =
+            fmt::format("{}.{}", labels[labels.size() - 4], three_level);
         LOG(INFO) << "looking up " << look_up;
         return verify_sender_domain_uribl_(look_up, error_msg);
       }
@@ -1378,8 +1377,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
   if (two_tld.lookup(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
-      auto const look_up
-          = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
+      auto const look_up =
+          fmt::format("{}.{}", labels[labels.size() - 3], two_level);
       LOG(INFO) << "looking up " << look_up;
       return verify_sender_domain_uribl_(look_up, error_msg);
     }
@@ -1427,10 +1426,10 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    spf_received_
-        = fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
-                      "envelope-from={}; helo={};",
-                      server_id_(), ip_addr, sender, client_identity_);
+    spf_received_ =
+        fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
+                    "envelope-from={}; helo={};",
+                    server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
     return true;
   }
@@ -1585,8 +1584,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
     // Domains we accept mail for.
     if (accept_domains_.is_open()) {
-      if (accept_domains_.lookup(recipient.domain().ascii())
-          || accept_domains_.lookup(recipient.domain().utf8())) {
+      if (accept_domains_.lookup(recipient.domain().ascii()) ||
+          accept_domains_.lookup(recipient.domain().utf8())) {
         return true;
       }
     }
