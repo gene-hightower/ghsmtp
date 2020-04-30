@@ -8,16 +8,14 @@
 
 inline bool iequal_char(char a, char b)
 {
-  return std::toupper(static_cast<unsigned char>(a))
-         == std::toupper(static_cast<unsigned char>(b));
+  return std::toupper(static_cast<unsigned char>(a)) ==
+         std::toupper(static_cast<unsigned char>(b));
 }
 
 inline bool iequal(std::string_view a, std::string_view b)
 {
-  if (size(a) == size(b)) {
-    return std::equal(begin(b), end(b), begin(a), iequal_char);
-  }
-  return false;
+  return (size(a) == size(b)) &&
+         std::equal(begin(b), end(b), begin(a), iequal_char);
 }
 
 // inline bool iequal(char const* a, char const* b)
