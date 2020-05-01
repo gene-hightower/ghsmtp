@@ -1,6 +1,7 @@
 #ifndef DNS_MESSAGE_DOT_HPP
 #define DNS_MESSAGE_DOT_HPP
 
+#include <limits>
 #include <memory>
 
 #include "DNS-rrs.hpp"
