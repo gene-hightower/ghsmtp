@@ -799,7 +799,7 @@ bool Session::bdat_start(size_t n)
 void Session::bdat_done(size_t n, bool last)
 {
   if (state_ != xact_step::bdat) {
-    bdat_error();
+    bdat_seq_error();
     return;
   }
 
@@ -860,7 +860,7 @@ void Session::bdat_size_error()
   reset_();
 }
 
-void Session::bdat_error()
+void Session::bdat_seq_error()
 {
   out_().clear(); // clear possible eof from input side
   out_() << "503 5.5.1 BDAT sequence error\r\n" << std::flush;
@@ -868,6 +868,17 @@ void Session::bdat_error()
     msg_->trash();
   }
   LOG(WARNING) << "BDAT sequence error";
+  reset_();
+}
+
+void Session::bdat_io_error()
+{
+  out_().clear(); // clear possible eof from input side
+  out_() << "503 5.5.1 BDAT I/O error\r\n" << std::flush;
+  if (msg_) {
+    msg_->trash();
+  }
+  LOG(WARNING) << "BDAT I/O error";
   reset_();
 }
 
@@ -1434,8 +1445,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  SPF::Server const spf_srv{server_id_().c_str()};
-  SPF::Request      spf_request{spf_srv};
+  auto const spf_srv     = SPF::Server{server_id_().c_str()};
+  auto       spf_request = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
     spf_request.set_ipv4_str(sock_.them_c_str());
@@ -1457,7 +1468,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   auto const spf_res{SPF::Response{spf_request}};
   spf_result_        = spf_res.result();
   spf_received_      = spf_res.received_spf();
-  spf_sender_domain_ = Domain{spf_request.get_sender_dom()};
+  spf_sender_domain_ = spf_request.get_sender_dom();
 
   if (spf_result_ == SPF::Result::PASS) {
     if (lookup_domain(black_, spf_sender_domain_)) {

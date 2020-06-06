@@ -508,9 +508,12 @@ struct action<chunk_size> {
   }
 };
 
-bool bdat_act(Ctx& ctx)
+void bdat_act(Ctx& ctx, bool last)
 {
-  auto ret = ctx.session.bdat_start(ctx.chunk_size);
+  auto status_returned = false;
+
+  if (!ctx.session.bdat_start(ctx.chunk_size))
+    status_returned = true;
 
   auto to_xfer = ctx.chunk_size;
 
@@ -526,33 +529,45 @@ bool bdat_act(Ctx& ctx)
                  << ctx.session.in().gcount();
       if (ctx.session.maxed_out()) {
         LOG(ERROR) << "input maxed out";
-        ctx.session.bdat_size_error();
-        return false;
+        if (!status_returned)
+          ctx.session.bdat_size_error();
       }
-      if (ctx.session.timed_out()) {
+      else if (ctx.session.timed_out()) {
         LOG(ERROR) << "input timed out";
+        if (!status_returned)
+          ctx.session.bdat_io_error();
       }
-      if (ctx.session.in().eof()) {
+      else if (ctx.session.in().eof()) {
         LOG(ERROR) << "EOF in BDAT";
+        if (!status_returned)
+          ctx.session.bdat_io_error();
       }
-      ctx.session.bdat_error();
-      return false;
+      else {
+        LOG(ERROR) << "I/O error in BDAT";
+        if (!status_returned)
+          ctx.session.bdat_io_error();
+      }
+      return;
     }
-    if (!ctx.session.msg_write(bfr.data(), xfer_sz))
-      ret = false;
+    if (!ctx.session.msg_write(bfr.data(), xfer_sz)) {
+      if (!status_returned)
+        ctx.session.bdat_size_error();
+      status_returned = true;
+    }
 
     to_xfer -= xfer_sz;
   }
 
-  return ret;
+  if (!status_returned) {
+    ctx.session.bdat_done(ctx.chunk_size, last);
+  }
 }
 
 template <>
 struct action<bdat> {
   static void apply0(Ctx& ctx)
   {
-    if (bdat_act(ctx))
-      ctx.session.bdat_done(ctx.chunk_size, false);
+    bdat_act(ctx, false);
   }
 };
 
@@ -560,8 +575,7 @@ template <>
 struct action<bdat_last> {
   static void apply0(Ctx& ctx)
   {
-    if (bdat_act(ctx))
-      ctx.session.bdat_done(ctx.chunk_size, true);
+    bdat_act(ctx, true);
   }
 };
 

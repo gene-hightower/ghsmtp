@@ -52,7 +52,8 @@ public:
   bool bdat_start(size_t n);
   void bdat_done(size_t n, bool last);
   void bdat_size_error();
-  void bdat_error();
+  void bdat_seq_error();
+  void bdat_io_error();
 
   void rset();
   void noop(std::string_view str);
