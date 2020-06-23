@@ -46,7 +46,6 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
 
 namespace RFC5322 {
 
-// clang-format off
 constexpr char const* defined_fields[]{
 
     // Trace Fields
@@ -95,7 +94,6 @@ constexpr char const* defined_fields[]{
     "Content-ID",
     "Content-Description",
 };
-// clang-format on
 
 bool is_defined_field(std::string_view name)
 {
@@ -143,8 +141,8 @@ struct Ctx {
   std::map<std::string, std::string, ci_less> spf_info;
   std::string                                 spf_result;
 
-  // std::unordered_multimap<char const*, std::string> defined_hdrs;
-  // std::multimap<std::string, std::string, ci_less> opt_hdrs;
+  std::unordered_multimap<char const*, std::string> defined_hdrs;
+  std::multimap<std::string, std::string, ci_less> opt_hdrs;
 
   std::string unstructured;
   std::string id;
@@ -166,92 +164,132 @@ struct Ctx {
   std::vector<std::string> msg_errors;
 };
 
-struct UTF8_tail : range<'\x80', '\xBF'> {
-};
+// clang-format off
 
-struct UTF8_1 : range<0x00, 0x7F> {
-};
+struct UTF8_tail : range<'\x80', '\xBF'> {};
 
-struct UTF8_2 : seq<range<'\xC2', '\xDF'>, UTF8_tail> {
-};
+struct UTF8_1 : range<0x00, 0x7F> {};
+
+struct UTF8_2 : seq<range<'\xC2', '\xDF'>, UTF8_tail> {};
 
 struct UTF8_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
                     seq<range<'\xE1', '\xEC'>, rep<2, UTF8_tail>>,
                     seq<one<'\xED'>, range<'\x80', '\x9F'>, UTF8_tail>,
-                    seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {
-};
+                    seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {};
 
 struct UTF8_4
   : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
         seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
-        seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {
-};
+        seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {};
 
 // UTF8_char = UTF8_1 | UTF8_2 | UTF8_3 | UTF8_4;
 
-struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {
-};
+struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
-struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {
-};
+struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {};
 
 using dot   = one<'.'>;
 using colon = one<':'>;
 
-struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {
-};
+struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {};
 
 // UTF-8 except NUL (0), LF (10) and CR (13).
-// struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {
-// };
+// struct body : seq<star<seq<rep_max<998, text>, eol>>, rep_max<998, text>> {};
 
 // BINARYMIME allows any byte
-struct body : until<eof> {
-};
+struct body : until<eof> {};
 
-struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {
-};
+struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {
-};
+struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {};
 
-struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {
-};
+struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
 
-// clang-format off
 struct atext : sor<ALPHA, DIGIT,
-                   one<'!'>, one<'#'>,
-                   one<'$'>, one<'%'>,
-                   one<'&'>, one<'\''>,
-                   one<'*'>, one<'+'>,
-                   one<'-'>, one<'/'>,
-                   one<'='>, one<'?'>,
-                   one<'^'>, one<'_'>,
-                   one<'`'>, one<'{'>,
-                   one<'|'>, one<'}'>,
-                   one<'~'>,
-                   UTF8_non_ascii> {
-};
-// clang-format on
+                   one<'!', '#',
+                       '$', '%',
+                       '&', '\'',
+                       '*', '+',
+                       '-', '/',
+                       '=', '?',
+                       '^', '_',
+                       '`', '{',
+                       '|', '}',
+                       '~'>,
+                   UTF8_non_ascii> {};
 
 // ctext is ASCII not '(' or ')' or '\\'
-struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8_non_ascii> {
-};
+struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8_non_ascii> {};
+
+// <https://tools.ietf.org/html/rfc2047>
+
+//   especials = "(" / ")" / "<" / ">" / "@" / "," / ";" / ":" / "
+//               <"> / "/" / "[" / "]" / "?" / "." / "="
+
+//   token = 1*<Any CHAR except SPACE, CTLs, and especials>
+
+struct tchar47 : ranges<        // NUL..' '
+                        33, 33, // !
+                     // 34, 34, // "
+                        35, 39, // #$%&'
+                     // 40, 41, // ()
+                        42, 43, // *+
+                     // 44, 44, // ,
+                        45, 45, // -
+                     // 46, 47, // ./
+                        48, 57, // 0123456789
+                     // 58, 64, // ;:<=>?@
+                        65, 90, // A..Z
+                     // 91, 91, // [
+                        92, 92, // '\\'
+                     // 93, 93, // ]
+                        94, 126 // ^_` a..z {|}~
+                     // 127,127 // DEL
+                        > {};
+
+struct token47 : plus<tchar47> {};
+
+struct charset : token47 {};
+struct encoding : token47 {};
+
+//   encoded-text = 1*<Any printable ASCII character other than "?"
+//                     or SPACE>
+
+struct echar : ranges<        // NUL..' '
+                      33, 62, // !..>
+                   // 63, 63, // ?
+                      64, 126 // @A..Z[\]^_` a..z {|}~
+                   // 127,127 // DEL
+                     > {};
+
+struct encoded_text : plus<echar> {};
+
+//   encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
+
+// leading opt<FWS> is not in RFC 2047
+
+struct encoded_word_book : seq<string<'=', '?'>,
+                          charset, string<'?'>,
+                          encoding, string<'?'>,
+                          encoded_text,
+                          string<'=', '?'>
+                          > {};
+
+struct encoded_word : seq<opt<FWS>, encoded_word_book> {};
 
 struct comment;
 
-struct ccontent : sor<ctext, quoted_pair, comment> {
-};
+struct ccontent : sor<ctext, quoted_pair, comment, encoded_word> {};
+
+// from <https://tools.ietf.org/html/rfc2047>
+// comment = "(" *(ctext / quoted-pair / comment / encoded-word) ")"
 
 struct comment
-  : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {
-};
+  : seq<one<'('>, star<seq<opt<FWS>, ccontent>>, opt<FWS>, one<')'>> {};
 
-struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {
-};
+struct CFWS : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>, FWS> {};
 
-struct qcontent : sor<qtext, quoted_pair> {
-};
+struct qcontent : sor<qtext, quoted_pair> {};
 
 // Corrected in errata ID: 3135
 struct quoted_string
@@ -259,48 +297,37 @@ struct quoted_string
         DQUOTE,
         sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
         DQUOTE,
-        opt<CFWS>> {
-};
+        opt<CFWS>> {};
+
 // *([FWS] VCHAR) *WSP
-struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {
-};
+struct unstructured : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
 
-struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {
-};
+struct atom : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {};
 
-struct dot_atom_text : list<plus<atext>, dot> {
-};
+struct dot_atom_text : list<plus<atext>, dot> {};
 
-struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {
-};
+struct dot_atom : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {};
 
-struct word : sor<atom, quoted_string> {
-};
+struct word : sor<atom, quoted_string> {};
 
-struct phrase : plus<word> {
-};
+//   obs-phrase      =   word *(word / "." / CFWS)
 
-// clang-format off
+struct phrase : plus<sor<encoded_word, word>> {};
+
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
                        seq<range<'0', '1'>, rep<2, DIGIT>>,
                        rep_min_max<1, 2, DIGIT>> {};
-// clang-format on
 
 struct ipv4_address
-  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {
-};
+  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {
-};
+struct h16 : rep_min_max<1, 4, HEXDIG> {};
 
-struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {
-};
+struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {};
 
-struct dcolon : two<':'> {
-};
+struct dcolon : two<':'> {};
 
-// clang-format off
 struct ipv6_address : sor<seq<                                          rep<6, h16, colon>, ls32>,
                           seq<                                  dcolon, rep<5, h16, colon>, ls32>,
                           seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
@@ -310,55 +337,41 @@ struct ipv6_address : sor<seq<                                          rep<6, h
                           seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
                           seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                           seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
-// clang-format on
 
-struct ip : sor<ipv4_address, ipv6_address> {
-};
+struct ip : sor<ipv4_address, ipv6_address> {};
 
-struct local_part : sor<dot_atom, quoted_string> {
-};
+struct local_part : sor<dot_atom, quoted_string> {};
 
-struct dtext : ranges<33, 90, 94, 126> {
-};
+struct dtext : ranges<33, 90, 94, 126> {};
 
 struct domain_literal : seq<opt<CFWS>,
                             one<'['>,
                             star<seq<opt<FWS>, dtext>>,
                             opt<FWS>,
                             one<']'>,
-                            opt<CFWS>> {
-};
+                            opt<CFWS>> {};
 
-struct domain : sor<dot_atom, domain_literal> {
-};
+struct domain : sor<dot_atom, domain_literal> {};
 
-struct addr_spec : seq<local_part, one<'@'>, domain> {
-};
+struct addr_spec : seq<local_part, one<'@'>, domain> {};
 
-struct angle_addr : seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>> {
-};
+struct angle_addr : seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>> {};
 
 struct path
-  : sor<angle_addr, seq<opt<CFWS>, one<'<'>, opt<CFWS>, one<'>'>, opt<CFWS>>> {
-};
+  : sor<angle_addr, seq<opt<CFWS>, one<'<'>, opt<CFWS>, one<'>'>, opt<CFWS>>> {};
 
-struct display_name : phrase {
-};
+struct display_name : phrase {};
 
-struct name_addr : seq<opt<display_name>, angle_addr> {
-};
+struct name_addr : seq<opt<display_name>, angle_addr> {};
 
-struct mailbox : sor<name_addr, addr_spec> {
-};
+struct mailbox : sor<name_addr, addr_spec> {};
 
 struct group_list;
 
 struct group
-  : seq<display_name, one<':'>, opt<group_list>, one<';'>, opt<CFWS>> {
-};
+  : seq<display_name, one<':'>, opt<group_list>, one<';'>, opt<CFWS>> {};
 
-struct address : sor<mailbox, group> {
-};
+struct address : sor<mailbox, group> {};
 
 #define OBSOLETE_SYNTAX
 
@@ -366,46 +379,36 @@ struct address : sor<mailbox, group> {
 // *([CFWS] ",") mailbox *("," [mailbox / CFWS])
 struct obs_mbox_list : seq<star<seq<opt<CFWS>, one<','>>>,
                            mailbox,
-                           star<one<','>, opt<sor<mailbox, CFWS>>>> {
-};
+                           star<one<','>, opt<sor<mailbox, CFWS>>>> {};
 
-struct mailbox_list : sor<list<mailbox, one<','>>, obs_mbox_list> {
-};
+struct mailbox_list : sor<list<mailbox, one<','>>, obs_mbox_list> {};
 #else
-struct mailbox_list : list<mailbox, one<','>> {
-};
+struct mailbox_list : list<mailbox, one<','>> {};
 #endif
 
 #ifdef OBSOLETE_SYNTAX
 // *([CFWS] ",") address *("," [address / CFWS])
 struct obs_addr_list : seq<star<seq<opt<CFWS>, one<','>>>,
                            address,
-                           star<one<','>, opt<sor<address, CFWS>>>> {
-};
+                           star<one<','>, opt<sor<address, CFWS>>>> {};
 
-struct address_list : sor<list<address, one<','>>, obs_addr_list> {
-};
+struct address_list : sor<list<address, one<','>>, obs_addr_list> {};
 #else
-struct address_list : list<address, one<','>> {
-};
+struct address_list : list<address, one<','>> {};
 #endif
 
 #ifdef OBSOLETE_SYNTAX
 // 1*([CFWS] ",") [CFWS]
-struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {
-};
+struct obs_group_list : seq<plus<seq<opt<CFWS>, one<','>>>, opt<CFWS>> {};
 
-struct group_list : sor<mailbox_list, CFWS, obs_group_list> {
-};
+struct group_list : sor<mailbox_list, CFWS, obs_group_list> {};
 #else
-struct group_list : sor<mailbox_list, CFWS> {
-};
+struct group_list : sor<mailbox_list, CFWS> {};
 #endif
 
 // 3.3. Date and Time Specification (mostly from RFC 2822)
 
-struct day : seq<opt<FWS>, rep_min_max<1, 2, DIGIT>> {
-};
+struct day : seq<opt<FWS>, rep_min_max<1, 2, DIGIT>> {};
 
 struct month_name : sor<TAO_PEGTL_ISTRING("Jan"),
                         TAO_PEGTL_ISTRING("Feb"),
@@ -418,17 +421,13 @@ struct month_name : sor<TAO_PEGTL_ISTRING("Jan"),
                         TAO_PEGTL_ISTRING("Sep"),
                         TAO_PEGTL_ISTRING("Oct"),
                         TAO_PEGTL_ISTRING("Nov"),
-                        TAO_PEGTL_ISTRING("Dec")> {
-};
+                        TAO_PEGTL_ISTRING("Dec")> {};
 
-struct month : seq<FWS, month_name, FWS> {
-};
+struct month : seq<FWS, month_name, FWS> {};
 
-struct year : rep<4, DIGIT> {
-};
+struct year : rep<4, DIGIT> {};
 
-struct date : seq<day, month, year> {
-};
+struct date : seq<day, month, year> {};
 
 struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
                       TAO_PEGTL_ISTRING("Tue"),
@@ -436,8 +435,7 @@ struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
                       TAO_PEGTL_ISTRING("Thu"),
                       TAO_PEGTL_ISTRING("Fri"),
                       TAO_PEGTL_ISTRING("Sat"),
-                      TAO_PEGTL_ISTRING("Sun")> {
-};
+                      TAO_PEGTL_ISTRING("Sun")> {};
 
 // struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
 // };
@@ -460,28 +458,22 @@ struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
 // struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
 // }
 
-struct day_of_week : seq<opt<FWS>, day_name> {
-};
+struct day_of_week : seq<opt<FWS>, day_name> {};
 
-struct hour : rep<2, DIGIT> {
-};
+struct hour : rep<2, DIGIT> {};
 
-struct minute : rep<2, DIGIT> {
-};
+struct minute : rep<2, DIGIT> {};
 
-struct second : rep<2, DIGIT> {
-};
+struct second : rep<2, DIGIT> {};
 
-struct millisecond : rep<3, DIGIT> {
-};
+struct millisecond : rep<3, DIGIT> {};
 
 // RFC-5322 extension is optional milliseconds
 struct time_of_day
   : seq<hour,
         one<':'>,
         minute,
-        opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {
-};
+        opt<seq<one<':'>, second, opt<seq<one<'.'>, millisecond>>>>> {};
 
 // struct obs_zone : sor<range<65, 73>,
 //                       range<75, 90>,
@@ -499,128 +491,96 @@ struct time_of_day
 //                       TAO_PEGTL_ISTRING("PDT")> {
 // };
 
-struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {
-};
+struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {};
 
-struct time : seq<time_of_day, FWS, zone> {
-};
+struct time : seq<time_of_day, FWS, zone> {};
 
 struct date_time
-  : seq<opt<seq<day_of_week, one<','>>>, date, FWS, time, opt<CFWS>> {
-};
+  : seq<opt<seq<day_of_week, one<','>>>, date, FWS, time, opt<CFWS>> {};
 
 // The Origination Date Field
-struct orig_date : seq<TAO_PEGTL_ISTRING("Date:"), date_time, eol> {
-};
+struct orig_date : seq<TAO_PEGTL_ISTRING("Date:"), date_time, eol> {};
 
 // Originator Fields
-struct from : seq<TAO_PEGTL_ISTRING("From:"), mailbox_list, eol> {
-};
+struct from : seq<TAO_PEGTL_ISTRING("From:"), opt<FWS>, mailbox_list, opt<FWS>, eol> {};
 
-struct sender : seq<TAO_PEGTL_ISTRING("Sender:"), mailbox, eol> {
-};
+struct sender : seq<TAO_PEGTL_ISTRING("Sender:"), mailbox, eol> {};
 
-struct reply_to : seq<TAO_PEGTL_ISTRING("Reply-To:"), address_list, eol> {
-};
+struct reply_to : seq<TAO_PEGTL_ISTRING("Reply-To:"), address_list, eol> {};
 
-struct address_list_or_pm : sor<TAO_PEGTL_ISTRING("Postmaster"), address_list> {
-};
+struct address_list_or_pm : sor<TAO_PEGTL_ISTRING("Postmaster"), address_list> {};
 
 // Destination Address Fields
-struct to : seq<TAO_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {
-};
+struct to : seq<TAO_PEGTL_ISTRING("To:"), address_list_or_pm, eol> {};
 
-struct cc : seq<TAO_PEGTL_ISTRING("Cc:"), address_list, eol> {
-};
+struct cc : seq<TAO_PEGTL_ISTRING("Cc:"), address_list, eol> {};
 
-struct bcc : seq<TAO_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {
-};
+struct bcc : seq<TAO_PEGTL_ISTRING("Bcc:"), opt<sor<address_list, CFWS>>, eol> {};
 
 // Identification Fields
 
-struct no_fold_literal : seq<one<'['>, star<dtext>, one<']'>> {
-};
+struct no_fold_literal : seq<one<'['>, star<dtext>, one<']'>> {};
 
-struct id_left : dot_atom_text {
-};
+struct id_left : dot_atom_text {};
 
-struct id_right : sor<dot_atom_text, no_fold_literal> {
-};
+struct id_right : sor<dot_atom_text, no_fold_literal> {};
 
 struct msg_id
-  : seq<opt<CFWS>, one<'<'>, id_left, one<'@'>, id_right, one<'>'>, opt<CFWS>> {
-};
+  : seq<opt<CFWS>, one<'<'>, id_left, one<'@'>, id_right, one<'>'>, opt<CFWS>> {};
 
-struct message_id : seq<TAO_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {
-};
+struct message_id : seq<TAO_PEGTL_ISTRING("Message-ID:"), msg_id, eol> {};
 
-struct in_reply_to : seq<TAO_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {
-};
+struct in_reply_to : seq<TAO_PEGTL_ISTRING("In-Reply-To:"), plus<msg_id>, eol> {};
 
-struct references : seq<TAO_PEGTL_ISTRING("References:"), star<msg_id>, eol> {
-};
+struct references : seq<TAO_PEGTL_ISTRING("References:"), star<msg_id>, eol> {};
 
 // Informational Fields
 
-struct subject : seq<TAO_PEGTL_ISTRING("Subject:"), unstructured, eol> {
-};
+struct subject : seq<TAO_PEGTL_ISTRING("Subject:"), unstructured, eol> {};
 
-struct comments : seq<TAO_PEGTL_ISTRING("Comments:"), unstructured, eol> {
-};
+struct comments : seq<TAO_PEGTL_ISTRING("Comments:"), unstructured, eol> {};
 
 struct keywords
-  : seq<TAO_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {
-};
+  : seq<TAO_PEGTL_ISTRING("Keywords:"), list<phrase, one<','>>, eol> {};
 
 // Resent Fields
 
-struct resent_date : seq<TAO_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {
-};
+struct resent_date : seq<TAO_PEGTL_ISTRING("Resent-Date:"), date_time, eol> {};
 
-struct resent_from : seq<TAO_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {
-};
+struct resent_from : seq<TAO_PEGTL_ISTRING("Resent-From:"), mailbox_list, eol> {};
 
-struct resent_sender : seq<TAO_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {
-};
+struct resent_sender : seq<TAO_PEGTL_ISTRING("Resent-Sender:"), mailbox, eol> {};
 
-struct resent_to : seq<TAO_PEGTL_ISTRING("Resent-To:"), address_list, eol> {
-};
+struct resent_to : seq<TAO_PEGTL_ISTRING("Resent-To:"), address_list, eol> {};
 
-struct resent_cc : seq<TAO_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {
-};
+struct resent_cc : seq<TAO_PEGTL_ISTRING("Resent-Cc:"), address_list, eol> {};
 
 struct resent_bcc
-  : seq<TAO_PEGTL_ISTRING("Resent-Bcc:"), opt<sor<address_list, CFWS>>, eol> {
-};
+  : seq<TAO_PEGTL_ISTRING("Resent-Bcc:"), opt<sor<address_list, CFWS>>, eol> {};
 
 struct resent_msg_id
-  : seq<TAO_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {
-};
+  : seq<TAO_PEGTL_ISTRING("Resent-Message-ID:"), msg_id, eol> {};
 
 // Trace Fields
 
-struct return_path : seq<TAO_PEGTL_ISTRING("Return-Path:"), path, eol> {
-};
+struct return_path : seq<TAO_PEGTL_ISTRING("Return-Path:"), opt<FWS>, path, eol> {};
 
 // Facebook, among others
 
-struct return_path_retarded : seq<TAO_PEGTL_ISTRING("Return-Path:"),
-                                  opt<CFWS>,
-                                  addr_spec,
-                                  star<WSP>,
-                                  eol> {
-};
+struct return_path_non_standard : seq<TAO_PEGTL_ISTRING("Return-Path:"),
+                                      opt<CFWS>,
+                                      addr_spec,
+                                      star<WSP>,
+                                      eol> {};
 
-struct received_token : sor<angle_addr, addr_spec, domain, word> {
-};
+struct received_token : sor<angle_addr, addr_spec, domain, word> {};
 
 struct received : seq<TAO_PEGTL_ISTRING("Received:"),
                       opt<sor<plus<received_token>, CFWS>>,
                       one<';'>,
                       date_time,
                       opt<seq<WSP, comment>>,
-                      eol> {
-};
+                      eol> {};
 
 struct result : sor<TAO_PEGTL_ISTRING("Pass"),
                     TAO_PEGTL_ISTRING("Fail"),
@@ -628,8 +588,7 @@ struct result : sor<TAO_PEGTL_ISTRING("Pass"),
                     TAO_PEGTL_ISTRING("Neutral"),
                     TAO_PEGTL_ISTRING("None"),
                     TAO_PEGTL_ISTRING("TempError"),
-                    TAO_PEGTL_ISTRING("PermError")> {
-};
+                    TAO_PEGTL_ISTRING("PermError")> {};
 
 struct spf_key : sor<TAO_PEGTL_ISTRING("client-ip"),
                      TAO_PEGTL_ISTRING("envelope-from"),
@@ -637,36 +596,30 @@ struct spf_key : sor<TAO_PEGTL_ISTRING("client-ip"),
                      TAO_PEGTL_ISTRING("problem"),
                      TAO_PEGTL_ISTRING("receiver"),
                      TAO_PEGTL_ISTRING("identity"),
-                     TAO_PEGTL_ISTRING("mechanism")> {
-};
+                     TAO_PEGTL_ISTRING("mechanism")> {};
 
 // This value syntax (allowing mailbox) is not in accordance with RFC
 // 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
 // before.
 
-struct spf_value : sor<ip, addr_spec, dot_atom, quoted_string> {
-};
+struct spf_value : sor<ip, addr_spec, dot_atom, quoted_string> {};
 
-struct spf_key_value_pair : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {
-};
+struct spf_key_value_pair : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {};
 
 struct spf_key_value_list
   : seq<spf_key_value_pair,
         star<seq<one<';'>, opt<CFWS>, spf_key_value_pair>>,
-        opt<one<';'>>> {
-};
+        opt<one<';'>>> {};
 
 struct received_spf : seq<TAO_PEGTL_ISTRING("Received-SPF:"),
                           opt<CFWS>,
                           result,
                           opt<seq<FWS, comment>>,
                           opt<seq<FWS, spf_key_value_list>>,
-                          eol> {
-};
+                          eol> {};
 
 struct dkim_signature
-  : seq<TAO_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {
-};
+  : seq<TAO_PEGTL_ISTRING("DKIM-Signature:"), unstructured, eol> {};
 
 struct mime_version : seq<TAO_PEGTL_ISTRING("MIME-Version:"),
                           opt<CFWS>,
@@ -676,15 +629,14 @@ struct mime_version : seq<TAO_PEGTL_ISTRING("MIME-Version:"),
                           opt<CFWS>,
                           one<'0'>,
                           opt<CFWS>,
-                          eol> {
-};
+                          eol> {};
 
 // CTL :=  <any ASCII control           ; (  0- 37,  0.- 31.)
 //          character and DEL>          ; (    177,     127.)
 
 // SPACE := 32
 
-// tspecials :=  "(" / ")" / "<" / ">" / "@" /
+// especials :=  "(" / ")" / "<" / ">" / "@" /
 //               "," / ";" / ":" / "\" / <">
 //               "/" / "[" / "]" / "?" / "="
 
@@ -728,39 +680,30 @@ struct mime_version : seq<TAO_PEGTL_ISTRING("MIME-Version:"),
 // token := 1*<any (US-ASCII) CHAR except CTLs, SPACE,
 //            or tspecials>
 
-struct tchar : ranges<33, 33, 35, 39, 42, 43, 45, 46, 48, 57, 65, 90, 94, 126> {
-};
+struct tchar : ranges<33, 33, 35, 39, 42, 43, 45, 46, 48, 57, 65, 90, 94, 126> {};
 
-struct token : plus<tchar> {
-};
+struct token : plus<tchar> {};
 
-struct ietf_token : token {
-};
+struct ietf_token : token {};
 
-struct x_token : seq<TAO_PEGTL_ISTRING("X-"), token> {
-};
+struct x_token : seq<TAO_PEGTL_ISTRING("X-"), token> {};
 
-struct extension_token : sor<x_token, ietf_token> {
-};
+struct extension_token : sor<x_token, ietf_token> {};
 
 struct discrete_type : sor<TAO_PEGTL_ISTRING("text"),
                            TAO_PEGTL_ISTRING("image"),
                            TAO_PEGTL_ISTRING("audio"),
                            TAO_PEGTL_ISTRING("video"),
                            TAO_PEGTL_ISTRING("application"),
-                           extension_token> {
-};
+                           extension_token> {};
 
 struct composite_type : sor<TAO_PEGTL_ISTRING("message"),
                             TAO_PEGTL_ISTRING("multipart"),
-                            extension_token> {
-};
+                            extension_token> {};
 
-struct type : sor<discrete_type, composite_type> {
-};
+struct type : sor<discrete_type, composite_type> {};
 
-struct subtype : token {
-};
+struct subtype : token {};
 
 // value     := token / quoted-string
 
@@ -768,22 +711,18 @@ struct subtype : token {
 
 // parameter := attribute "=" value
 
-struct value : sor<token, quoted_string> {
-};
+struct value : sor<token, quoted_string> {};
 
-struct attribute : token {
-};
+struct attribute : token {};
 
-struct parameter : seq<attribute, one<'='>, value> {
-};
+struct parameter : seq<attribute, one<'='>, value> {};
 
 struct content : seq<TAO_PEGTL_ISTRING("Content-Type:"),
                      opt<CFWS>,
                      seq<type, one<'/'>, subtype>,
                      star<seq<one<';'>, opt<CFWS>, parameter>>,
                      opt<one<';'>>, // not strictly RFC 2045, but common
-                     eol> {
-};
+                     eol> {};
 
 // mechanism := "7bit" / "8bit" / "binary" /
 //              "quoted-printable" / "base64" /
@@ -795,43 +734,34 @@ struct mechanism : sor<TAO_PEGTL_ISTRING("7bit"),
                        TAO_PEGTL_ISTRING("quoted-printable"),
                        TAO_PEGTL_ISTRING("base64"),
                        ietf_token,
-                       x_token> {
-};
+                       x_token> {};
 
 struct content_transfer_encoding
   : seq<TAO_PEGTL_ISTRING("Content-Transfer-Encoding:"),
         opt<CFWS>,
         mechanism,
-        eol> {
-};
+        eol> {};
 
-struct id : seq<TAO_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {
-};
+struct id : seq<TAO_PEGTL_ISTRING("Content-ID:"), msg_id, eol> {};
 
 struct description
-  : seq<TAO_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {
-};
+  : seq<TAO_PEGTL_ISTRING("Content-Description:"), star<text>, eol> {};
 
 // Optional Fields
 
-struct ftext : ranges<33, 57, 59, 126> {
-};
+struct ftext : ranges<33, 57, 59, 126> {};
 
-struct field_name : plus<ftext> {
-};
+struct field_name : plus<ftext> {};
 
-struct field_value : unstructured {
-};
+struct field_value : unstructured {};
 
-struct optional_field : seq<field_name, one<':'>, field_value, eol> {
-};
+struct optional_field : seq<field_name, one<':'>, field_value, eol> {};
 
 // message header
 
-// clang-format off
 struct fields : star<sor<
                          return_path,
-                         return_path_retarded,
+                         return_path_non_standard,
                          received,
                          received_spf,
 
@@ -869,16 +799,14 @@ struct fields : star<sor<
                          description,
 
                          optional_field
-                       >> {
-};
+                       >> {};
+
+struct message : seq<fields, opt<seq<eol, body>>, eof> {};
+
 // clang-format on
 
-struct message : seq<fields, opt<seq<eol, body>>, eof> {
-};
-
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<fields> {
@@ -938,12 +866,12 @@ struct action<optional_field> {
         auto const err
             = fmt::format("syntax error in: \"{}\"", esc(in.string()));
         ctx.msg_errors.push_back(err);
-        // LOG(ERROR) << err;
+        LOG(ERROR) << err;
       }
-      // ctx.defined_hdrs.emplace(defined_field(ctx.opt_name), ctx.opt_value);
+      ctx.defined_hdrs.emplace(defined_field(ctx.opt_name), ctx.opt_value);
     }
     else {
-      // ctx.opt_hdrs.emplace(ctx.opt_name, ctx.opt_value);
+      ctx.opt_hdrs.emplace(ctx.opt_name, ctx.opt_value);
     }
     header(in, ctx);
     ctx.unstructured.clear();
@@ -967,6 +895,7 @@ struct action<domain> {
   static void apply(Input const& in, Ctx& ctx)
   {
     ctx.mb_dom = in.string();
+    // LOG(INFO) << "domain == '" << ctx.mb_dom << "'";
   }
 };
 
@@ -1231,11 +1160,11 @@ struct action<return_path> {
 };
 
 template <>
-struct action<return_path_retarded> {
+struct action<return_path_non_standard> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "Return-Path: is retarded: " << esc(in.string());
+    // LOG(INFO) << "Return-Path: is retarded: " << esc(in.string());
     header(in, ctx);
     ctx.mb_list.clear();
   }
@@ -1376,8 +1305,8 @@ struct action<received_spf> {
       }
       else {
         memory_input<> addr_in(dom, "dom");
-        if (!parse_nested<RFC5322::addr_spec, RFC5322::action>(in, addr_in,
-                                                               ctx)) {
+        if (!parse<RFC5322::addr_spec, RFC5322::action>(addr_in,
+                                                        ctx)) {
           LOG(FATAL) << "Failed to parse domain: " << dom;
         }
         dom    = ctx.mb_dom;
@@ -1566,8 +1495,16 @@ struct action<message> {
 
     if (ctx.from_list.empty()) {
       // RFC-5322 says message must have a 'From:' header.
-      LOG(ERROR) << "no RFC5322.From header";
-      return;
+      LOG(ERROR) << "no (correct) RFC5322.From header";
+
+      auto range = ctx.defined_hdrs.equal_range(defined_field("From"));
+      for (auto it = range.first; it != range.second; ++it) {
+        LOG(ERROR) << "using bogus '" << it->second << "'";
+        // ctx.from_list.push_back(Mailbox(it->second));
+      }
+
+      if (ctx.from_list.empty())
+        return;
     }
 
     if (ctx.from_list.size() > 1) {
@@ -1736,7 +1673,7 @@ void selftest()
     }
   }
 
-  const char* spf_list[]{
+  const char* const spf_list[]{
       // works
       "Received-SPF: pass (digilicious.com: domain of gmail.com designates "
       "74.125.82.46 as permitted sender) client-ip=74.125.82.46; "
@@ -1776,7 +1713,7 @@ int main(int argc, char* argv[])
     auto name{fs::path(fn)};
     auto f{boost::iostreams::mapped_file_source(name)};
     auto in{memory_input<>(f.data(), f.size(), fn)};
-    LOG(INFO) << "file: " << fn;
+    LOG(INFO) << "#### file: " << fn;
     try {
       RFC5322::Ctx ctx;
       // ctx.defined_hdrs.reserve(countof(RFC5322::defined_fields));
