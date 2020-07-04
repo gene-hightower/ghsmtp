@@ -538,6 +538,19 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   return {status, fmt::to_string(reason)};
 }
 
+static char const* folder(Session::SpamStatus status,
+                          Mailbox const&      reverse_path)
+{
+  if ((status == Session::SpamStatus::spam) ||
+      (reverse_path.domain() == "localhost.local"))
+    return ".Junk";
+  if (reverse_path.domain() == "facebookmail.com")
+    return ".FB";
+  if (reverse_path.domain() == "nest.com")
+    return ".Nest";
+  return "";
+}
+
 bool Session::msg_new()
 {
   CHECK((state_ == xact_step::data) || (state_ == xact_step::bdat));
@@ -558,8 +571,7 @@ bool Session::msg_new()
     FLAGS_max_write = max_msg_size();
 
   try {
-    msg_->open(server_id_(), FLAGS_max_write,
-               (status == SpamStatus::spam) ? ".Junk" : "");
+    msg_->open(server_id_(), FLAGS_max_write, folder(status, reverse_path_));
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
