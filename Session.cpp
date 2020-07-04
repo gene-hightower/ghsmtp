@@ -495,6 +495,9 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   auto               status{SpamStatus::spam};
   fmt::memory_buffer reason;
 
+  if (reverse_path_.domain() == "localhost.local")
+    return {SpamStatus::spam, "bogus reverse_path"};
+
   // Anything enciphered tastes a lot like ham.
   if (sock_.tls()) {
     fmt::format_to(reason, "they used TLS");
@@ -541,8 +544,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 static char const* folder(Session::SpamStatus status,
                           Mailbox const&      reverse_path)
 {
-  if ((status == Session::SpamStatus::spam) ||
-      (reverse_path.domain() == "localhost.local"))
+  if (status == Session::SpamStatus::spam)
     return ".Junk";
   if (reverse_path.domain() == "facebookmail.com")
     return ".FB";
