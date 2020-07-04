@@ -81,10 +81,11 @@ public:
 
   void log_stats() { sock_.log_stats(); }
 
+  enum class SpamStatus : bool { ham, spam };
+
 private:
   friend struct Session_test;
 
-  enum class SpamStatus : bool { ham, spam };
   std::tuple<SpamStatus, std::string> spam_status_();
 
   std::string added_headers_(Message const& msg);
