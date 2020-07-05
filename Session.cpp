@@ -537,6 +537,8 @@ static char const* folder(Session::SpamStatus status,
     return ".FB";
   if (reverse_path.domain() == "nest.com")
     return ".Nest";
+  if (reverse_path.domain() == "linkedin.com")
+    return ".linkedin";
   return "";
 }
 
