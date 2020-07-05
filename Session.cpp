@@ -488,58 +488,44 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  if (spf_result_ == SPF::Result::FAIL && !ip_whitelisted_) {
+  if (spf_result_ == SPF::Result::FAIL && !ip_whitelisted_)
     return {SpamStatus::spam, "SPF failed"};
-  }
 
-  auto               status{SpamStatus::spam};
-  fmt::memory_buffer reason;
-
+  // These should have already been rejected by verify_client_().
   if ((reverse_path_.domain() == "localhost.local") ||
       (reverse_path_.domain() == "localhost"))
     return {SpamStatus::spam, "bogus reverse_path"};
 
+  std::vector<std::string> why_ham;
+
   // Anything enciphered tastes a lot like ham.
-  if (sock_.tls()) {
-    fmt::format_to(reason, "they used TLS");
-    status = SpamStatus::ham;
-  }
+  if (sock_.tls())
+    why_ham.emplace_back("they used TLS");
 
   if (spf_result_ == SPF::Result::PASS) {
     if (lookup_domain(white_, spf_sender_domain_)) {
-      if (status == SpamStatus::ham) {
-        fmt::format_to(reason, ", and ");
-      }
-      fmt::format_to(reason, "SPF sender domain ({}) is whitelisted",
-                     spf_sender_domain_.utf8());
-      status = SpamStatus::ham;
+      why_ham.emplace_back(fmt::format("SPF sender domain ({}) is whitelisted",
+                                       spf_sender_domain_.utf8()));
     }
     else {
       auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
       if (tld_dom && white_.lookup(tld_dom)) {
-        if (status == SpamStatus::ham) {
-          fmt::format_to(reason, ", and ");
-        }
-        fmt::format_to(reason,
-                       "SPF sender registered domain ({}) is whitelisted",
-                       tld_dom);
-        status = SpamStatus::ham;
+        why_ham.emplace_back(fmt::format(
+            "SPF sender registered domain ({}) is whitelisted", tld_dom));
       }
     }
   }
 
-  if (fcrdns_whitelisted_) {
-    if (status == SpamStatus::ham) {
-      fmt::format_to(reason, ", and ");
-    }
-    fmt::format_to(reason, "FCrDNS (or it's registered domain) is whitelisted");
-    status = SpamStatus::ham;
-  }
+  if (fcrdns_whitelisted_)
+    why_ham.emplace_back(
+        fmt::format("FCrDNS (or it's registered domain) is whitelisted"));
 
-  if (status != SpamStatus::ham)
-    return {SpamStatus::spam, "it's not ham"};
+  if (!why_ham.empty())
+    return {SpamStatus::ham,
+            fmt::format("{}", fmt::join(std::begin(why_ham), std::end(why_ham),
+                                        ", and "))};
 
-  return {status, fmt::to_string(reason)};
+  return {SpamStatus::spam, "it's not ham"};
 }
 
 static char const* folder(Session::SpamStatus status,
