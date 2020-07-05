@@ -495,7 +495,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   auto               status{SpamStatus::spam};
   fmt::memory_buffer reason;
 
-  if (reverse_path_.domain() == "localhost.local")
+  if ((reverse_path_.domain() == "localhost.local") ||
+      (reverse_path_.domain() == "localhost"))
     return {SpamStatus::spam, "bogus reverse_path"};
 
   // Anything enciphered tastes a lot like ham.
