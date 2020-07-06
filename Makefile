@@ -183,10 +183,11 @@ databases := \
 	accept_domains.cdb \
 	bad_recipients.cdb \
 	black.cdb \
+	folders.cdb \
 	ip-black.cdb \
 	three-level-tlds.cdb \
 	two-level-tlds.cdb \
-	white.cdb \
+	white.cdb
 
 all:: $(databases) public_suffix_list.dat
 
@@ -210,10 +211,12 @@ clean-test::
 clean::
 	rm -f accept_domains.cdb
 	rm -f black.cdb
+	rm -f cdb-gen
+	rm -f folders.cdb
 	rm -f ip-black.cdb
 	rm -f three-level-tlds.cdb
 	rm -f two-level-tlds.cdb
-	rm -f white.cdb cdb-gen
+	rm -f white.cdb
 
 real-clean::
 	rm -f two-level-tlds three-level-tlds public_suffix_list.dat
