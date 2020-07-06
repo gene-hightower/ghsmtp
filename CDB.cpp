@@ -30,7 +30,25 @@ bool CDB::open(fs::path db_path)
   return true;
 }
 
-bool CDB::lookup(std::string_view key)
+std::optional<std::string> find(std::string_view key)
+{
+  if (!is_open())
+    return {};
+
+  CHECK_LT(key.length(), std::numeric_limits<unsigned int>::max());
+  if (cdb_find(&cdb_, key.data(), static_cast<unsigned int>(key.length())) > 0) {
+    auto const vpos = cdb_datapos(&cdb_);
+    auto const vlen = cdb_datalen(&cdb_);
+    std::string val;
+    val.resize(vlen);
+    cdb_read(&cdb, &val[0], vlen, vpos);
+    return val;
+  }
+
+  return {};
+}
+
+bool CDB::contains(std::string_view key)
 {
   if (!is_open())
     return false;

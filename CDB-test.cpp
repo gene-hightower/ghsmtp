@@ -17,21 +17,22 @@ int main(int argc, char* argv[])
 
   auto const no_database = config_dir / "unable-to-open-database";
   CDB        no_db{no_database};
-  CHECK(!no_db.lookup("foo"));
+  CHECK(!no_db.contains("foo"));
 
   auto const two_level_tlds = config_dir / "two-level-tlds";
   CDB        cdb2{two_level_tlds};
 
-  CHECK(cdb2.lookup("0.bg"));
-  CHECK(cdb2.lookup("zzux.com"));
-  CHECK(!cdb2.lookup("This should not be found."));
+  CHECK(cdb2.contains("0.bg"));
+  CHECK(cdb2.contains("zzux.com"));
+  CHECK_EQ(cdb2.find("zzux.com"), "1");
+  CHECK(!cdb2.contains("This should not be found."));
 
   auto const three_level_tlds = config_dir / "three-level-tlds";
   CDB        cdb3{three_level_tlds};
 
-  CHECK(cdb3.lookup("act.edu.au"));
-  CHECK(cdb3.lookup("zen.co.uk"));
-  CHECK(!cdb3.lookup("This should not be found."));
+  CHECK(cdb3.contains("act.edu.au"));
+  CHECK(cdb3.contains("zen.co.uk"));
+  CHECK(!cdb3.contains("This should not be found."));
 
   CDB        accept_dom;
   auto const accept_dom_path = config_dir / "accept_domains";
@@ -51,5 +52,5 @@ int main(int argc, char* argv[])
     perror(("error while reading file "s + accept_dom_path.string()).c_str());
   in.close();
 
-  CHECK(accept_dom.lookup(line));
+  CHECK(accept_dom.contains(line));
 }

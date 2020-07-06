@@ -2,6 +2,8 @@
 #define CDB_DOT_HPP
 
 #include <memory>
+#include <optional>
+#include <string>
 #include <string_view>
 
 extern "C" {
@@ -20,7 +22,8 @@ public:
   ~CDB();
 
   bool           open(fs::path db);
-  bool           lookup(std::string_view key);
+  std::optional<std::string>    find(std::string_view key);
+  bool           contains(std::string_view key);
   constexpr bool is_open() const;
 
 private:
