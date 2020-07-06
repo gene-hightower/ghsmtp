@@ -24,7 +24,9 @@ int main(int argc, char* argv[])
 
   CHECK(cdb2.contains("0.bg"));
   CHECK(cdb2.contains("zzux.com"));
-  CHECK_EQ(cdb2.find("zzux.com"), "1");
+  auto const val = cdb2.find("zzux.com");
+  CHECK(val);
+  CHECK_EQ(*val, "1");
   CHECK(!cdb2.contains("This should not be found."));
 
   auto const three_level_tlds = config_dir / "three-level-tlds";

@@ -21,10 +21,10 @@ public:
   explicit CDB(fs::path db) { open(db); }
   ~CDB();
 
-  bool           open(fs::path db);
-  std::optional<std::string>    find(std::string_view key);
-  bool           contains(std::string_view key);
-  constexpr bool is_open() const;
+  bool                       open(fs::path db);
+  std::optional<std::string> find(std::string_view key);
+  bool                       contains(std::string_view key);
+  constexpr bool             is_open() const;
 
 private:
   int fd_{-1};

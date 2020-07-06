@@ -99,13 +99,15 @@ Session::Session(fs::path                  config_path,
   , res_(config_path_)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
-  auto accept_db_name = config_path_ / "accept_domains";
-  auto black_db_name  = config_path_ / "black";
-  auto white_db_name  = config_path_ / "white";
+  auto accept_db_name  = config_path_ / "accept_domains";
+  auto black_db_name   = config_path_ / "black";
+  auto white_db_name   = config_path_ / "white";
+  auto folders_db_name = config_path_ / "folders";
 
   accept_domains_.open(accept_db_name);
   black_.open(black_db_name);
   white_.open(white_db_name);
+  folders_.open(folders_db_name);
 
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
@@ -475,10 +477,10 @@ namespace {
 bool lookup_domain(CDB& cdb, Domain const& domain)
 {
   if (!domain.empty()) {
-    if (cdb.lookup(domain.ascii())) {
+    if (cdb.contains(domain.ascii())) {
       return true;
     }
-    if (domain.is_unicode() && cdb.lookup(domain.utf8())) {
+    if (domain.is_unicode() && cdb.contains(domain.utf8())) {
       return true;
     }
   }
@@ -509,7 +511,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     }
     else {
       auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
-      if (tld_dom && white_.lookup(tld_dom)) {
+      if (tld_dom && white_.contains(tld_dom)) {
         why_ham.emplace_back(fmt::format(
             "SPF sender registered domain ({}) is whitelisted", tld_dom));
       }
@@ -528,17 +530,16 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   return {SpamStatus::spam, "it's not ham"};
 }
 
-static char const* folder(Session::SpamStatus status,
-                          Mailbox const&      reverse_path)
+static std::string
+folder(Session::SpamStatus status, CDB& cdb, Mailbox const& reverse_path)
 {
   if (status == Session::SpamStatus::spam)
     return ".Junk";
-  if (reverse_path.domain() == "facebookmail.com")
-    return ".FB";
-  if (reverse_path.domain() == "nest.com")
-    return ".Nest";
-  if (reverse_path.domain() == "linkedin.com")
-    return ".linkedin";
+
+  auto const folder = cdb.find(reverse_path.domain().ascii());
+  if (folder)
+    return *folder;
+
   return "";
 }
 
@@ -562,7 +563,8 @@ bool Session::msg_new()
     FLAGS_max_write = max_msg_size();
 
   try {
-    msg_->open(server_id_(), FLAGS_max_write, folder(status, reverse_path_));
+    msg_->open(server_id_(), FLAGS_max_write,
+               folder(status, folders_, reverse_path_));
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
@@ -1099,7 +1101,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 {
   auto ip_black_db_name = config_path_ / "ip-black";
   CDB  ip_black{ip_black_db_name};
-  if (ip_black.lookup(sock_.them_c_str())) {
+  if (ip_black.contains(sock_.them_c_str())) {
     error_msg =
         fmt::format("IP address {} on static blacklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
@@ -1127,7 +1129,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
                           sock_.them_address_literal());
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (black_.lookup(client_fcrdns.ascii())) {
+      if (black_.contains(client_fcrdns.ascii())) {
         error_msg =
             fmt::format("FCrDNS {} on static blacklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
@@ -1136,7 +1138,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
-        if (black_.lookup(tld)) {
+        if (black_.contains(tld)) {
           error_msg = fmt::format(
               "FCrDNS registered domain {} on static blacklist", tld);
           out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
@@ -1147,14 +1149,14 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
     // check whitelist
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (white_.lookup(client_fcrdns.ascii())) {
+      if (white_.contains(client_fcrdns.ascii())) {
         // LOG(INFO) << "FCrDNS " << client_fcrdns << " whitelisted";
         fcrdns_whitelisted_ = true;
         return true;
       }
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
-        if (white_.lookup(tld)) {
+        if (white_.contains(tld)) {
           // LOG(INFO) << "FCrDNS registered domain " << tld << " whitelisted";
           fcrdns_whitelisted_ = true;
           return true;
@@ -1262,7 +1264,7 @@ bool Session::verify_client_(Domain const& client_identity,
     // LOG(WARNING) << "claimed identity has no registered domain";
     // return true;
   }
-  else if (black_.lookup(tld)) {
+  else if (black_.contains(tld)) {
     error_msg = fmt::format(
         "claimed identity has blacklisted registered domain {}", tld);
     out_() << "550 4.7.1 blacklisted registered domain\r\n" << std::flush;
@@ -1280,7 +1282,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   auto bad_senders_db_name = config_path_ / "bad_senders";
   CDB  bad_senders{bad_senders_db_name}; // Addresses we don't accept mail from.
-  if (bad_senders.lookup(sender_str)) {
+  if (bad_senders.contains(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
     out_() << "501 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
@@ -1291,8 +1293,8 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 
   if (sock_.them_address_literal() != sock_.us_address_literal()) {
     if ((accept_domains_.is_open() &&
-         (accept_domains_.lookup(sender.domain().ascii()) ||
-          accept_domains_.lookup(sender.domain().utf8()))) ||
+         (accept_domains_.contains(sender.domain().ascii()) ||
+          accept_domains_.contains(sender.domain().utf8()))) ||
         (sender.domain() == server_identity_)) {
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       error_msg = fmt::format("liar, claimed to be {}", sender.domain());
@@ -1330,7 +1332,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return true;
   }
 
-  if (white_.lookup(sender.ascii())) {
+  if (white_.contains(sender.ascii())) {
     LOG(INFO) << "sender " << sender.ascii() << " whitelisted";
     return true;
   }
@@ -1353,7 +1355,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
     out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
-  if (white_.lookup(reg_dom)) {
+  if (white_.contains(reg_dom)) {
     LOG(INFO) << "sender registered domain \"" << reg_dom << "\" whitelisted";
     return true;
   }
@@ -1369,7 +1371,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
     auto three_tld_db_name = config_path_ / "three-level-tlds";
     CDB  three_tld{three_tld_db_name};
-    if (three_tld.lookup(three_level)) {
+    if (three_tld.contains(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
         auto const look_up =
@@ -1388,7 +1390,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
 
   auto two_tld_db_name = config_path_ / "two-level-tlds";
   CDB  two_tld{two_tld_db_name};
-  if (two_tld.lookup(two_level)) {
+  if (two_tld.contains(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
       auto const look_up =
@@ -1598,8 +1600,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
     // Domains we accept mail for.
     if (accept_domains_.is_open()) {
-      if (accept_domains_.lookup(recipient.domain().ascii()) ||
-          accept_domains_.lookup(recipient.domain().utf8())) {
+      if (accept_domains_.contains(recipient.domain().ascii()) ||
+          accept_domains_.contains(recipient.domain().utf8())) {
         return true;
       }
     }
@@ -1622,7 +1624,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   auto bad_recipients_db_name = config_path_ / "bad_recipients";
   CDB  bad_recipients_db{bad_recipients_db_name};
-  if (bad_recipients_db.lookup(recipient.local_part())) {
+  if (bad_recipients_db.contains(recipient.local_part())) {
     out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
     LOG(WARNING) << "bad recipient " << recipient;
     return false;

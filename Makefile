@@ -225,6 +225,9 @@ three-level-tlds.cdb: three-level-tlds cdb-gen
 two-level-tlds.cdb: two-level-tlds cdb-gen
 white.cdb: white cdb-gen
 
+folders.cdb: folders
+	cat $< | cdb -c $@
+
 two-level-tlds three-level-tlds:
 	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
 

@@ -30,10 +30,11 @@ public:
   Session(Session const&) = delete;
   Session& operator=(Session const&) = delete;
 
-  explicit Session(fs::path                  config_path,
-                   std::function<void(void)> read_hook = []() {},
-                   int                       fd_in     = STDIN_FILENO,
-                   int                       fd_out    = STDOUT_FILENO);
+  explicit Session(
+      fs::path                  config_path,
+      std::function<void(void)> read_hook = []() {},
+      int                       fd_in     = STDIN_FILENO,
+      int                       fd_out    = STDOUT_FILENO);
 
   void greeting();
   void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
@@ -139,6 +140,7 @@ private:
   // White and black lists for domains.
   CDB white_;
   CDB black_;
+  CDB folders_;
 
   // Domains we receive mail for.
   CDB accept_domains_;
