@@ -493,7 +493,7 @@ bool TLS::starttls_server(fs::path                  config_path,
     auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
     std::vector<Domain> names;
 
-    // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
 
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
