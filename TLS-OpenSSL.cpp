@@ -494,6 +494,7 @@ bool TLS::starttls_server(fs::path                  config_path,
     std::vector<Domain> names;
 
     SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
+    SSL_CTX_clear_options(ctx, SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
