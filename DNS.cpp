@@ -117,11 +117,11 @@ Resolver::Resolver(fs::path config_path)
 
     auto const& nameserver = Config::nameservers[ns_];
 
-    ns_fd_        = -1;
-    uint16_t port = osutil::get_port(nameserver.port);
-
     auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
                                                              : SOCK_DGRAM;
+    uint16_t port = osutil::get_port(nameserver.port,
+                                     (typ == SOCK_STREAM) ? "tcp" : "udp");
+    ns_fd_ = -1;
 
     if (IP4::is_address(nameserver.addr)) {
       ns_fd_ = socket(AF_INET, typ, 0);
@@ -129,7 +129,7 @@ Resolver::Resolver(fs::path config_path)
 
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port   = htons(port);
+      in4.sin_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -148,7 +148,7 @@ Resolver::Resolver(fs::path config_path)
 
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port   = htons(port);
+      in6.sin6_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -306,7 +306,7 @@ Query::Query(Resolver& res, RR_type type, char const* name)
                                    std::numeric_limits<uint16_t>::max());
 
   uint16_t cls = ns_c_in;
-  q_           = create_question(name, type, cls, id);
+  q_ = create_question(name, type, cls, id);
 
   if (!xchg_(res, id))
     return;

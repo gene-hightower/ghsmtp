@@ -104,7 +104,7 @@ std::string get_hostname()
   return node;
 }
 
-uint16_t get_port(char const* const service)
+uint16_t get_port(char const* const service, char const* const proto)
 {
   char*      ep = nullptr;
   auto const service_no{strtoul(service, &ep, 10)};
@@ -117,8 +117,9 @@ uint16_t get_port(char const* const service)
 
   auto     result_buf{servent{}};
   servent* result_ptr = nullptr;
-  while (getservbyname_r(service, "tcp", &result_buf, str_buf.data(),
-                         str_buf.size(), &result_ptr) == ERANGE) {
+  while (getservbyname_r(service, proto, &result_buf, str_buf.data(),
+                         str_buf.size(), &result_ptr)
+         == ERANGE) {
     CHECK_LT(str_buf.size(), 64 * 1024); // ridiculous
     str_buf.resize(str_buf.size() * 2);
   }

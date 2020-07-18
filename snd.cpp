@@ -1825,7 +1825,7 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  auto const port{osutil::get_port(FLAGS_service.c_str())};
+  auto const port{osutil::get_port(FLAGS_service.c_str(), "tcp")};
 
   auto res{DNS::Resolver{config_path}};
   auto tlsa_rrs{get_tlsa_rrs(res, to_mbx.domain(), port)};
