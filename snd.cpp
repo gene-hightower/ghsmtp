@@ -123,7 +123,7 @@ using namespace tao::pegtl::abnf;
 using namespace std::string_literals;
 
 namespace Config {
-constexpr auto read_timeout  = std::chrono::seconds(30);
+constexpr auto read_timeout = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 } // namespace Config
 
@@ -657,7 +657,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto const& addr : addrs) {
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port   = htons(port);
+      in6.sin6_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -704,7 +704,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto addr : addrs) {
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port   = htons(port);
+      in4.sin_port = htons(port);
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -1440,7 +1440,7 @@ bool snd(fs::path                    config_path,
 
   if (bad_dad) {
     FLAGS_use_chunking = false;
-    FLAGS_use_size     = false;
+    FLAGS_use_size = false;
   }
 
   auto const ext_8bitmime{
@@ -1519,7 +1519,7 @@ bool snd(fs::path                    config_path,
   auto max_msg_size{0u};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
-      char* ep     = nullptr;
+      char* ep = nullptr;
       max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in SIZE argument: "
@@ -1839,7 +1839,7 @@ int main(int argc, char* argv[])
   }
 
   bool       enforce_dane = true;
-  auto const receivers    = get_receivers(res, to_mbx, enforce_dane);
+  auto const receivers = get_receivers(res, to_mbx, enforce_dane);
 
   if (receivers.empty()) {
     LOG(INFO) << "noplace to send this mail";
