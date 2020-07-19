@@ -41,7 +41,6 @@ constexpr nameserver nameservers[]{
         "domain",
         sock_type::dgram,
     },
-    /*
     {
         "localhost",
         "::1",
@@ -49,11 +48,37 @@ constexpr nameserver nameservers[]{
         sock_type::dgram,
     },
     {
-        "1dot1dot1dot1.cloudflare-dns.com",
+        "one.one.one.one",
         "1.1.1.1",
         "domain",
         sock_type::dgram,
     },
+    {
+        "dns.google",
+        "8.8.8.8",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "dns.google",
+        "8.8.4.4",
+        "domain",
+        sock_type::dgram,
+    },
+
+    {
+        "dns.google",
+        "2001:4860:4860::8888",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "dns.google",
+        "2001:4860:4860::8844",
+        "domain",
+        sock_type::dgram,
+    },
+    /*
     {
         "1dot1dot1dot1.cloudflare-dns.com",
         "1.0.0.1",
@@ -73,19 +98,25 @@ constexpr nameserver nameservers[]{
         sock_type::stream,
     },
     {
-        "dns.quad9.net",
+        "dns9.quad9.net",
+        "9.9.9.9",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "dns10.quad9.net",
         "9.9.9.10",
         "domain-s",
         sock_type::stream,
     },
     {
-        "dns.quad9.net",
+        "dns10.quad9.net",
         "149.112.112.10",
         "domain-s",
         sock_type::stream,
     },
     {
-        "dns.quad9.net",
+        "dns10.quad9.net",
         "2620:fe::10",
         "domain-s",
         sock_type::stream,
@@ -200,12 +231,12 @@ message Resolver::xchg(message const& q)
     ns_sock_->out().flush();
 
     sz = 0;
-
     ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
     sz = ntohs(sz);
 
     DNS::message::container_t bfr(sz);
     ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
+    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sz));
 
     if (!ns_sock_->in()) {
       LOG(WARNING) << "Resolver::xchg was able to read only "
@@ -220,14 +251,13 @@ message Resolver::xchg(message const& q)
 
   CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
 
-  auto                      sz = Config::max_udp_sz;
-  DNS::message::container_t bfr(sz);
+  DNS::message::container_t bfr(Config::max_udp_sz);
 
   auto constexpr hook{[]() {}};
   auto       t_o{false};
   auto const a_buf = reinterpret_cast<char*>(bfr.data());
-  auto const a_buflen
-      = POSIX::read(ns_fd_, a_buf, int(sz), hook, Config::read_timeout, t_o);
+  auto const a_buflen = POSIX::read(ns_fd_, a_buf, int(Config::max_udp_sz),
+                                    hook, Config::read_timeout, t_o);
 
   if (a_buflen < 0) {
     LOG(WARNING) << "DNS read failed";
@@ -239,8 +269,7 @@ message Resolver::xchg(message const& q)
     return message{0};
   }
 
-  sz = a_buflen;
-  bfr.resize(sz);
+  bfr.resize(a_buflen);
   bfr.shrink_to_fit();
 
   return message{std::move(bfr)};
