@@ -47,6 +47,7 @@ constexpr nameserver nameservers[]{
         "domain",
         sock_type::dgram,
     },
+    /*
     {
         "one.one.one.one",
         "1.1.1.1",
@@ -78,7 +79,6 @@ constexpr nameserver nameservers[]{
         "domain",
         sock_type::dgram,
     },
-    /*
     {
         "1dot1dot1dot1.cloudflare-dns.com",
         "1.0.0.1",
