@@ -74,13 +74,13 @@ char const* uribls[]{
     "multi.surbl.org",
 };
 
-constexpr auto greeting_wait              = std::chrono::seconds{2};
+constexpr auto greeting_wait = std::chrono::seconds{2};
 constexpr int  max_recipients_per_message = 100;
-constexpr int  max_unrecognized_cmds      = 20;
+constexpr int  max_unrecognized_cmds = 20;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
-constexpr auto read_timeout  = std::chrono::minutes{5};
+constexpr auto read_timeout = std::chrono::minutes{5};
 constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
@@ -99,9 +99,9 @@ Session::Session(fs::path                  config_path,
   , res_(config_path_)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
 {
-  auto accept_db_name  = config_path_ / "accept_domains";
-  auto black_db_name   = config_path_ / "black";
-  auto white_db_name   = config_path_ / "white";
+  auto accept_db_name = config_path_ / "accept_domains";
+  auto black_db_name = config_path_ / "black";
+  auto white_db_name = config_path_ / "white";
   auto folders_db_name = config_path_ / "folders";
 
   accept_domains_.open(accept_db_name);
@@ -179,7 +179,7 @@ void Session::reset_()
   spf_received_.clear();
 
   binarymime_ = false;
-  smtputf8_   = false;
+  smtputf8_ = false;
 
   if (msg_) {
     msg_.reset();
@@ -267,7 +267,6 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 {
   last_in_group_(verb);
   reset_();
-  extensions_ = true;
 
   if (client_identity_ != client_identity) {
     client_identity_ = client_identity;
@@ -284,6 +283,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   }
 
   if (*verb == 'E') {
+    extensions_ = true;
     out_() << "250-" << server_id_();
     if (sock_.has_peername()) {
       out_() << " at your service, " << client_;
@@ -315,8 +315,8 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   out_() << std::flush;
 
   if (sock_.has_peername()) {
-    if (std::find(begin(client_fcrdns_), end(client_fcrdns_),
-                  client_identity_) != end(client_fcrdns_)) {
+    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), client_identity_)
+        != end(client_fcrdns_)) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -494,8 +494,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     return {SpamStatus::spam, "SPF failed"};
 
   // These should have already been rejected by verify_client_().
-  if ((reverse_path_.domain() == "localhost.local") ||
-      (reverse_path_.domain() == "localhost"))
+  if ((reverse_path_.domain() == "localhost.local")
+      || (reverse_path_.domain() == "localhost"))
     return {SpamStatus::spam, "bogus reverse_path"};
 
   std::vector<std::string> why_ham;
@@ -530,8 +530,10 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   return {SpamStatus::spam, "it's not ham"};
 }
 
-static std::string
-folder(Session::SpamStatus status, CDB& cdb, Mailbox const& reverse_path)
+static std::string folder(Session::SpamStatus         status,
+                          CDB&                        cdb,
+                          std::vector<Mailbox> const& forward_path,
+                          Mailbox const&              reverse_path)
 {
   if (status == Session::SpamStatus::spam)
     return ".Junk";
@@ -564,7 +566,7 @@ bool Session::msg_new()
 
   try {
     msg_->open(server_id_(), FLAGS_max_write,
-               folder(status, folders_, reverse_path_));
+               folder(status, folders_, forward_path_, reverse_path_));
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
@@ -1102,16 +1104,16 @@ bool Session::verify_ip_address_(std::string& error_msg)
   auto ip_black_db_name = config_path_ / "ip-black";
   CDB  ip_black{ip_black_db_name};
   if (ip_black.contains(sock_.them_c_str())) {
-    error_msg =
-        fmt::format("IP address {} on static blacklist", sock_.them_c_str());
+    error_msg
+        = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
   client_fcrdns_.clear();
 
-  if ((sock_.them_address_literal() == IP4::loopback_literal) ||
-      (sock_.them_address_literal() == IP6::loopback_literal)) {
+  if ((sock_.them_address_literal() == IP4::loopback_literal)
+      || (sock_.them_address_literal() == IP6::loopback_literal)) {
     LOG(INFO) << "loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
@@ -1130,8 +1132,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.contains(client_fcrdns.ascii())) {
-        error_msg =
-            fmt::format("FCrDNS {} on static blacklist", client_fcrdns.ascii());
+        error_msg = fmt::format("FCrDNS {} on static blacklist",
+                                client_fcrdns.ascii());
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
@@ -1168,8 +1170,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = fmt::format("unknown {}", sock_.them_address_literal());
   }
 
-  if (IP4::is_address(sock_.them_c_str()) &&
-      ip4_whitelisted(sock_.them_c_str())) {
+  if (IP4::is_address(sock_.them_c_str())
+      && ip4_whitelisted(sock_.them_c_str())) {
     ip_whitelisted_ = true;
     return true;
   }
@@ -1221,12 +1223,13 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername() && ((client_identity == server_identity_) ||
-                               (client_identity == "localhost") ||
-                               (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername()
+      && ((client_identity == server_identity_)
+          || (client_identity == "localhost")
+          || (client_identity == "localhost.localdomain"))) {
 
-    if ((sock_.them_address_literal() == IP4::loopback_literal) ||
-        (sock_.them_address_literal() == IP6::loopback_literal)) {
+    if ((sock_.them_address_literal() == IP4::loopback_literal)
+        || (sock_.them_address_literal() == IP6::loopback_literal)) {
       return true;
     }
 
@@ -1239,8 +1242,8 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg =
-        fmt::format("claimed bogus identity {}", client_identity.ascii());
+    error_msg
+        = fmt::format("claimed bogus identity {}", client_identity.ascii());
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1251,8 +1254,8 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg =
-        fmt::format("claimed blacklisted identity {}", client_identity.ascii());
+    error_msg = fmt::format("claimed blacklisted identity {}",
+                            client_identity.ascii());
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -1292,10 +1295,10 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // mail for on an external network connection.
 
   if (sock_.them_address_literal() != sock_.us_address_literal()) {
-    if ((accept_domains_.is_open() &&
-         (accept_domains_.contains(sender.domain().ascii()) ||
-          accept_domains_.contains(sender.domain().utf8()))) ||
-        (sender.domain() == server_identity_)) {
+    if ((accept_domains_.is_open()
+         && (accept_domains_.contains(sender.domain().ascii())
+             || accept_domains_.contains(sender.domain().utf8())))
+        || (sender.domain() == server_identity_)) {
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       error_msg = fmt::format("liar, claimed to be {}", sender.domain());
       return false;
@@ -1366,16 +1369,16 @@ bool Session::verify_sender_domain_(Domain const& sender,
                                      labels[labels.size() - 1]);
 
   if (labels.size() > 2) {
-    auto const three_level =
-        fmt::format("{}.{}", labels[labels.size() - 3], two_level);
+    auto const three_level
+        = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
 
     auto three_tld_db_name = config_path_ / "three-level-tlds";
     CDB  three_tld{three_tld_db_name};
     if (three_tld.contains(three_level)) {
       LOG(INFO) << reg_dom << " found on the three level list";
       if (labels.size() > 3) {
-        auto const look_up =
-            fmt::format("{}.{}", labels[labels.size() - 4], three_level);
+        auto const look_up
+            = fmt::format("{}.{}", labels[labels.size() - 4], three_level);
         LOG(INFO) << "looking up " << look_up;
         return verify_sender_domain_uribl_(look_up, error_msg);
       }
@@ -1393,8 +1396,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
   if (two_tld.contains(two_level)) {
     LOG(INFO) << reg_dom << " found on the two level list";
     if (labels.size() > 2) {
-      auto const look_up =
-          fmt::format("{}.{}", labels[labels.size() - 3], two_level);
+      auto const look_up
+          = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
       LOG(INFO) << "looking up " << look_up;
       return verify_sender_domain_uribl_(look_up, error_msg);
     }
@@ -1421,7 +1424,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
                random_device_);
   for (auto uribl : Config::uribls) {
     auto const lookup = fmt::format("{}.{}", sender, uribl);
-    auto       as     = DNS::get_strings(res_, DNS::RR_type::A, lookup);
+    auto       as = DNS::get_strings(res_, DNS::RR_type::A, lookup);
     if (!as.empty()) {
       if (as.front() == "127.0.0.1")
         continue;
@@ -1442,15 +1445,15 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    spf_received_ =
-        fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
-                    "envelope-from={}; helo={};",
-                    server_id_(), ip_addr, sender, client_identity_);
+    spf_received_
+        = fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
+                      "envelope-from={}; helo={};",
+                      server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
     return true;
   }
 
-  auto const spf_srv     = SPF::Server{server_id_().c_str()};
+  auto const spf_srv = SPF::Server{server_id_().c_str()};
   auto       spf_request = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
@@ -1471,8 +1474,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_request.set_env_from(from.c_str());
 
   auto const spf_res{SPF::Response{spf_request}};
-  spf_result_        = spf_res.result();
-  spf_received_      = spf_res.received_spf();
+  spf_result_ = spf_res.result();
+  spf_received_ = spf_res.received_spf();
   spf_sender_domain_ = spf_request.get_sender_dom();
 
   if (spf_result_ == SPF::Result::PASS) {
@@ -1600,8 +1603,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
     // Domains we accept mail for.
     if (accept_domains_.is_open()) {
-      if (accept_domains_.contains(recipient.domain().ascii()) ||
-          accept_domains_.contains(recipient.domain().utf8())) {
+      if (accept_domains_.contains(recipient.domain().ascii())
+          || accept_domains_.contains(recipient.domain().utf8())) {
         return true;
       }
     }
