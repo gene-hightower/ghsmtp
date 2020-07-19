@@ -284,26 +284,32 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 
   if (*verb == 'E') {
     extensions_ = true;
-    out_() << "250-" << server_id_();
+
     if (sock_.has_peername()) {
-      out_() << " at your service, " << client_;
+      out_() << "250-" << server_id_() << " at your service, " << client_
+             << "\r\n";
     }
-    out_() << "\r\n"
-              "250-SIZE "
-           << max_msg_size()
-           << "\r\n"              // RFC 1870
-              "250-8BITMIME\r\n"; // RFC 6152
+    else {
+      out_() << "250-" << server_id_() << "\r\n";
+    }
+
+    out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
+    out_() << "250-8BITMIME\r\n";                      // RFC 6152
+
     if (FLAGS_rrvs) {
       out_() << "250-RRVS\r\n"; // RFC 7293
     }
+
+    // PRDR?
+
     if (sock_.tls()) {
       // Check sasl sources for auth types.
       // out_() << "250-AUTH PLAIN\r\n";
-      out_() << "250-REQUIRETLS\r\n";
+      out_() << "250-REQUIRETLS\r\n"; // RFC 8689
     }
     else {
-      // If we're not already TLS, offer TLS, à la RFC 3207
-      out_() << "250-STARTTLS\r\n";
+      // If we're not already TLS, offer TLS
+      out_() << "250-STARTTLS\r\n"; // RFC 3207
     }
     out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
               "250-PIPELINING\r\n"          // RFC 2920
