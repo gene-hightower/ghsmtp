@@ -182,6 +182,7 @@ esc-test_STEMS := esc
 databases := \
 	accept_domains.cdb \
 	bad_recipients.cdb \
+	bad_senders.cdb \
 	black.cdb \
 	folders.cdb \
 	ip-black.cdb \
