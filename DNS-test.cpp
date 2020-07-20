@@ -51,10 +51,13 @@ int main(int argc, char const* argv[])
     DNS::Query      q(res, lookup.typ, lookup.name);
     DNS_ldns::Query q_ldns(res_ldns, lookup.typ, lookup.name);
 
-    CHECK_EQ(q.nx_domain(), q_ldns.nx_domain());
+    CHECK_EQ(q.nx_domain(), q_ldns.nx_domain()) <<
+      lookup.name;
+      
     CHECK_EQ(q.bogus_or_indeterminate(), q_ldns.bogus_or_indeterminate());
 
-    CHECK_EQ(q.authentic_data(), q_ldns.authentic_data());
+    CHECK_EQ(q.authentic_data(), q_ldns.authentic_data()) <<
+      lookup.name;
 
     auto rrs{q.get_records()};
     auto rrs_ldns{q_ldns.get_records()};

@@ -112,7 +112,6 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
   if (!q.has_record()) {
     std::cout << "no MX records\n";
-    return;
   }
 
   TLD  tld_db;
@@ -121,7 +120,14 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     std::cout << "registered domain is " << reg_dom << '\n';
   }
 
-  check_uribls(res, dom.ascii().c_str());
+  auto txts = res.get_strings(DNS::RR_type::TXT, dom.ascii().c_str());
+  for (auto const& txt : txts) {
+    std::cout << "TXT " << txt << '\n';
+  }
+
+  if (q.has_record()) {
+    check_uribls(res, dom.ascii().c_str());
+  }
 
   if (q.authentic_data()) {
     std::cout << "MX records authentic for domain " << dom << '\n';
@@ -135,8 +141,9 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
                            }),
             end(mxs));
 
-  if (!mxs.empty())
+  if (!mxs.empty()) {
     std::cout << "mail for " << dom << " is handled by\n";
+  }
 
   std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
     auto mxa = std::get<DNS::RR_MX>(a);

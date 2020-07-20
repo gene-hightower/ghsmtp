@@ -11,32 +11,29 @@ DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
 DEFINE_bool(selftest, false, "run a self test");
 
-DEFINE_bool(pipe, false, "send to stdin/stdout");
-
-DEFINE_bool(to_the_neck, false, "shove data forever");
-DEFINE_bool(slow_strangle, false, "super slow mo");
-DEFINE_bool(long_line, false, "super long text line");
+DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(bare_lf, false, "send a bare LF");
 DEFINE_bool(huge_size, false, "attempt with huge size");
-DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
-DEFINE_bool(nosend, false, "don't actually send any mail");
+DEFINE_bool(long_line, false, "super long text line");
 DEFINE_bool(noconn, false, "don't connect to any host");
+DEFINE_bool(noop, false, "send a NOOP right after EHLO");
+DEFINE_bool(nosend, false, "don't actually send any mail");
+DEFINE_bool(pipe, false, "send to stdin/stdout");
 DEFINE_bool(rawdog,
             false,
             "send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots");
-
-DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
-
+DEFINE_bool(require_tls, true, "use STARTTLS or die");
+DEFINE_bool(slow_strangle, false, "super slow mo");
+DEFINE_bool(to_the_neck, false, "shove data forever");
 DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension");
 DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
 DEFINE_bool(use_chunking, true, "use CHUNKING extension");
+DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
 DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
-
-DEFINE_bool(require_tls, true, "use STARTTLS or die");
 
 // To force it, set if you have UTF8 in the local part of any RFC5321
 // address.
@@ -1496,6 +1493,11 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "QUIT\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     exit(EXIT_FAILURE);
+  }
+
+  if (FLAGS_noop) {
+    LOG(INFO) << "C: NOOP";
+    cnn.sock.out() << "NOOP\r\n" << std::flush;
   }
 
   if (receiver != cnn.server_id) {

@@ -20,10 +20,3 @@ smtp.pem
 snd
 socks5
 test-credentials.ipp
-three-level-black.cdb
-three-level-tlds
-three-level-tlds.cdb
-two-level-black.cdb
-two-level-tlds
-two-level-tlds.cdb
-two-level-white.cdb
