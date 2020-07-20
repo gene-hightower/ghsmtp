@@ -17,10 +17,10 @@
 #include "TLD.hpp"
 
 namespace Config {
-constexpr size_t kibibyte             = 1024;
-constexpr size_t mebibyte             = kibibyte * kibibyte;
+constexpr size_t kibibyte = 1024;
+constexpr size_t mebibyte = kibibyte * kibibyte;
 constexpr size_t max_msg_size_initial = 15 * mebibyte;
-constexpr size_t max_msg_size_bro     = 150 * mebibyte;
+constexpr size_t max_msg_size_bro = 150 * mebibyte;
 } // namespace Config
 
 class Session {
@@ -33,8 +33,8 @@ public:
   explicit Session(
       fs::path                  config_path,
       std::function<void(void)> read_hook = []() {},
-      int                       fd_in     = STDIN_FILENO,
-      int                       fd_out    = STDOUT_FILENO);
+      int                       fd_in = STDIN_FILENO,
+      int                       fd_out = STDOUT_FILENO);
 
   void greeting();
   void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
@@ -168,6 +168,7 @@ private:
   bool binarymime_{false};
   bool extensions_{false};
   bool smtputf8_{false};
+  bool prdr_{false};
 
   // per connection
   bool fcrdns_whitelisted_{false};

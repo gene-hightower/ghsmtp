@@ -180,6 +180,7 @@ void Session::reset_()
 
   binarymime_ = false;
   smtputf8_ = false;
+  prdr_ = false;
 
   if (msg_) {
     msg_.reset();
@@ -300,7 +301,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-RRVS\r\n"; // RFC 7293
     }
 
-    // PRDR?
+    out_() << "250-PRDR\r\n"; // draft-hall-prdr-00.txt
 
     if (sock_.tls()) {
       // Check sasl sources for auth types.
@@ -339,20 +340,24 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   switch (state_) {
   case xact_step::helo:
-    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'MAIL FROM' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::mail: break;
   case xact_step::rcpt:
+    out_() << "503 5.5.1 sequence error, expecting RCPT\r\n" << std::flush;
+    LOG(WARNING) << "nested MAIL command"
+                 << (sock_.has_peername() ? " from " : "") << client_;
+    return;
   case xact_step::data:
   case xact_step::bdat:
-    out_() << "503 5.5.1 nested MAIL command\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting DATA/BDAT\r\n" << std::flush;
     LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::rset:
-    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -389,24 +394,24 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   switch (state_) {
   case xact_step::helo:
-    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::mail:
-    out_() << "503 5.5.1 must send MAIL FROM before RCPT TO\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting MAIL\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::rcpt:
   case xact_step::data: break;
   case xact_step::bdat:
-    out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting BDAT\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
   case xact_step::rset:
-    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return;
@@ -666,28 +671,48 @@ bool Session::data_start()
 
   switch (state_) {
   case xact_step::helo:
-    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'DATA' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::mail:
-    out_() << "503 5.5.1 must send 'MAIL FROM' before DATA\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting MAIL\r\n" << std::flush;
     LOG(WARNING) << "'DATA' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::rcpt:
-    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
+
+    /******************************************************************
+    <https://tools.ietf.org/html/rfc5321#section-3.3> says:
+
+    The DATA command can fail at only two points in the protocol exchange:
+
+    If there was no MAIL, or no RCPT, command, or all such commands were
+    rejected, the server MAY return a "command out of sequence" (503) or
+    "no valid recipients" (554) reply in response to the DATA command.
+
+    However, <https://tools.ietf.org/html/rfc2033#section-4.2> says:
+
+    The additional restriction is that when there have been no successful
+    RCPT commands in the mail transaction, the DATA command MUST fail
+    with a 503 reply code.
+
+    Therefore I will send the reply code that is valid for both, and
+    do the same for the BDAT case.
+    *******************************************************************/
+
+    out_() << "503 5.5.1 sequence error, expecting RCPT\r\n" << std::flush;
     LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::data: break;
   case xact_step::bdat:
-    out_() << "503 5.5.1 sequence error, expecting BDAT" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting BDAT\r\n" << std::flush;
     LOG(WARNING) << "'DATA' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::rset:
-    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
@@ -745,6 +770,13 @@ void Session::data_done()
     }
   }
 
+  if (prdr_) {
+    out_() << "353\r\n";
+    for (auto fp : forward_path_) {
+      out_() << "250 2.1.5 RCPT TO OK\r\n";
+    }
+  }
+
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
             << msg_->id();
@@ -778,17 +810,18 @@ bool Session::bdat_start(size_t n)
 {
   switch (state_) {
   case xact_step::helo:
-    out_() << "503 5.5.1 must send HELO/EHLO first\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'BDAT' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::mail:
-    out_() << "503 5.5.1 must send 'MAIL FROM' before BDAT\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting MAIL\r\n" << std::flush;
     LOG(WARNING) << "'BDAT' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   case xact_step::rcpt:
-    out_() << "554 5.5.1 no valid recipients\r\n" << std::flush;
+    // See comment in data_start()
+    out_() << "503 5.5.1 sequence error, expecting RCPT\r\n" << std::flush;
     LOG(WARNING) << "no valid recipients"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
@@ -796,7 +829,7 @@ bool Session::bdat_start(size_t n)
     break;
   case xact_step::bdat: return true;
   case xact_step::rset:
-    out_() << "503 5.5.1 sequence error, expecting RSET" << std::flush;
+    out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
@@ -1369,52 +1402,6 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return true;
   }
 
-  // Based on <http://www.surbl.org/guidelines>
-
-  auto const two_level = fmt::format("{}.{}", labels[labels.size() - 2],
-                                     labels[labels.size() - 1]);
-
-  if (labels.size() > 2) {
-    auto const three_level
-        = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
-
-    auto three_tld_db_name = config_path_ / "three-level-tlds";
-    CDB  three_tld{three_tld_db_name};
-    if (three_tld.contains(three_level)) {
-      LOG(INFO) << reg_dom << " found on the three level list";
-      if (labels.size() > 3) {
-        auto const look_up
-            = fmt::format("{}.{}", labels[labels.size() - 4], three_level);
-        LOG(INFO) << "looking up " << look_up;
-        return verify_sender_domain_uribl_(look_up, error_msg);
-      }
-      else {
-        out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-        error_msg = fmt::format(
-            "{} blocked by exact match on three-level-tlds list", three_level);
-        return false;
-      }
-    }
-  }
-
-  auto two_tld_db_name = config_path_ / "two-level-tlds";
-  CDB  two_tld{two_tld_db_name};
-  if (two_tld.contains(two_level)) {
-    LOG(INFO) << reg_dom << " found on the two level list";
-    if (labels.size() > 2) {
-      auto const look_up
-          = fmt::format("{}.{}", labels[labels.size() - 3], two_level);
-      LOG(INFO) << "looking up " << look_up;
-      return verify_sender_domain_uribl_(look_up, error_msg);
-    }
-    else {
-      out_() << "550 5.7.1 bad sender domain\r\n" << std::flush;
-      error_msg = fmt::format(
-          "{} blocked by exact match on two-level-tlds list", two_level);
-      return false;
-    }
-  }
-
   // LOG(INFO) << "looking up " << reg_dom;
   return verify_sender_domain_uribl_(reg_dom, error_msg);
 }
@@ -1533,6 +1520,10 @@ bool Session::verify_from_params_(parameters_t const& parameters)
         LOG(WARNING) << "SMTPUTF8 parameter has a value: " << value;
       }
       smtputf8_ = true;
+    }
+    else if (iequal(name, "PRDR")) {
+      LOG(INFO) << "using PRDR";
+      prdr_ = true;
     }
     else if (iequal(name, "SIZE")) {
       if (value.empty()) {

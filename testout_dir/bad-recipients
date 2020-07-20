@@ -2,7 +2,7 @@
 250 digilicious.com
 250 2.1.0 MAIL FROM OK
 550 5.1.1 bad recipient nobody@digilicious.com
-554 5.5.1 no valid recipients
+503 5.5.1 sequence error, expecting RCPT
 500 5.5.1 command unrecognized: "Subject: foo bar baz\r\n"
 500 5.5.1 command unrecognized: "\r\n"
 500 5.5.1 command unrecognized: ".\r\n"

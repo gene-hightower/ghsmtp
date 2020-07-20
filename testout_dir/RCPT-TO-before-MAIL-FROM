@@ -1,4 +1,4 @@
 220 digilicious.com ESMTP - ghsmtp
 250 digilicious.com
-503 5.5.1 must send MAIL FROM before RCPT TO
+503 5.5.1 sequence error, expecting MAIL
 221 2.0.0 closing connection

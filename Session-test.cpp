@@ -51,7 +51,6 @@ struct Session_test {
     CHECK(sess.verify_sender_domain_(Domain(""), error_msg));
 
     CHECK(!sess.verify_sender_domain_(Domain("com"), error_msg));
-    CHECK(!sess.verify_sender_domain_(Domain("zzux.com"), error_msg));
     CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar"), error_msg));
 
     // SPF
