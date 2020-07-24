@@ -1,9 +1,6 @@
 [submodule "MKUltra"]
 	path = MKUltra
 	url = https://github.com/gene-hightower/MKUltra.git
-[submodule "GSL"]
-	path = GSL
-	url = https://github.com/Microsoft/GSL.git
 [submodule "PEGTL"]
 	path = PEGTL
 	url = https://github.com/taocpp/PEGTL.git
