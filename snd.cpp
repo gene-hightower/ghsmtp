@@ -24,11 +24,14 @@ DEFINE_bool(rawdog,
             "send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots");
 DEFINE_bool(require_tls, true, "use STARTTLS or die");
+
 DEFINE_bool(slow_strangle, false, "super slow mo");
 DEFINE_bool(to_the_neck, false, "shove data forever");
+
 DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension");
 DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
 DEFINE_bool(use_chunking, true, "use CHUNKING extension");
+DEFINE_bool(use_deliverby, true, "use DELIVERBY extension");
 DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
 DEFINE_bool(use_size, true, "use SIZE extension");
@@ -407,7 +410,12 @@ struct path_only : seq<path, eof> {};
 
 // textstring     = 1*(%d09 / %d32-126) ; HT, SP, Printable US-ASCII
 
-struct textstring : plus<sor<one<9>, range<32, 126>>> {};
+// Although not explicit in the grammar of RFC-6531, in practice UTF-8
+// is used in the replys.
+
+// struct textstring : plus<sor<one<9>, range<32, 126>>> {};
+
+  struct textstring : plus<sor<one<9>, range<32, 126>, chars::non_ascii>> {};
 
 struct server_id : sor<domain, address_literal> {};
 
@@ -1451,6 +1459,11 @@ bool snd(fs::path                    config_path,
   auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking
                             && cnn.ehlo_params.find("BINARYMIME")
                                    != end(cnn.ehlo_params)};
+
+  auto const ext_deliverby{FLAGS_use_deliverby
+                           && cnn.ehlo_params.find("DELIVERBY")
+                                  != end(cnn.ehlo_params)};
+
   auto const ext_pipelining{
       FLAGS_use_pipelining
       && (cnn.ehlo_params.find("PIPELINING") != end(cnn.ehlo_params))};
@@ -1530,6 +1543,17 @@ bool snd(fs::path                    config_path,
     }
   }
 
+  auto max_deliverby{0u};
+  if (ext_deliverby) {
+    if (!cnn.ehlo_params["DELIVERBY"].empty()) {
+      char* ep = nullptr;
+      max_msg_size = strtoul(cnn.ehlo_params["DELIVERBY"][0].c_str(), &ep, 10);
+      if (ep && (*ep != '\0')) {
+        LOG(WARNING) << "garbage in DELIVERBY argument: "
+                     << cnn.ehlo_params["DELIVERBY"][0];
+      }
+    }
+  }
   do_auth(in, cnn);
 
   in.discard();
