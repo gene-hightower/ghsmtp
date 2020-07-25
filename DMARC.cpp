@@ -14,14 +14,14 @@ Lib::Lib()
 {
 #define PUBLIC_SUFFIX_LIST_DAT "public_suffix_list.dat"
   auto const path{[] {
+    auto const our_list{osutil::get_config_dir() / PUBLIC_SUFFIX_LIST_DAT};
+    if (fs::exists(our_list))
+      return our_list;
+
     auto const sys_list{
         fs::path{"/usr/share/publicsuffix/" PUBLIC_SUFFIX_LIST_DAT}};
     if (fs::exists(sys_list))
       return sys_list;
-
-    auto const our_list{osutil::get_config_dir() / PUBLIC_SUFFIX_LIST_DAT};
-    if (fs::exists(our_list))
-      return our_list;
 
     LOG(FATAL) << "can't find " PUBLIC_SUFFIX_LIST_DAT;
   }()};
