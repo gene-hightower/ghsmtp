@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 
 extern "C" {
-#include <regdom.h>
+#include <libpsl.h>
 }
 
 class TLD {
@@ -13,14 +13,14 @@ public:
   TLD& operator=(TLD const&) = delete;
 
   TLD()
-    : tree_(CHECK_NOTNULL(loadTldTree()))
+    : ctx_(CHECK_NOTNULL(psl_latest(nullptr)))
   {
   }
-  ~TLD() { freeTldTree(tree_); }
+  ~TLD() { psl_free(ctx_); }
 
   char const* get_registered_domain(char const* dom) const
   {
-    return getRegisteredDomain(dom, tree_);
+    return psl_registrable_domain(ctx_, dom);
   }
 
   char const* get_registered_domain(std::string const& dom) const
@@ -29,7 +29,7 @@ public:
   }
 
 private:
-  void* tree_;
+  psl_ctx_t* ctx_;
 };
 
 #endif // TLD_DOT_HPP

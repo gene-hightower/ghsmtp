@@ -11,7 +11,7 @@ LDLIBS += \
 	-lgflags \
 	-lmagic \
 	-lopendmarc \
-	-lregdom \
+	-lpsl \
 	-lspf2 \
 	-lunistring
 
@@ -182,10 +182,11 @@ esc-test_STEMS := esc
 databases := \
 	accept_domains.cdb \
 	bad_recipients.cdb \
-	bad_senders.cdb \
 	black.cdb \
 	folders.cdb \
 	ip-black.cdb \
+	three-level-tlds.cdb \
+	two-level-tlds.cdb \
 	white.cdb
 
 all:: $(databases) public_suffix_list.dat
@@ -213,18 +214,25 @@ clean::
 	rm -f cdb-gen
 	rm -f folders.cdb
 	rm -f ip-black.cdb
+	rm -f three-level-tlds.cdb
+	rm -f two-level-tlds.cdb
 	rm -f white.cdb
 
 real-clean::
-	rm -f public_suffix_list.dat
+	rm -f two-level-tlds three-level-tlds public_suffix_list.dat
 
 accept_domains.cdb: accept_domains cdb-gen
 black.cdb: black cdb-gen
 ip-black.cdb: ip-black cdb-gen
+three-level-tlds.cdb: three-level-tlds cdb-gen
+two-level-tlds.cdb: two-level-tlds cdb-gen
 white.cdb: white cdb-gen
 
 folders.cdb: folders
 	cat $< | cdb -c $@
+
+two-level-tlds three-level-tlds:
+	wget --timestamping $(patsubst %,http://george.surbl.org/%,$@)
 
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
