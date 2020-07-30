@@ -186,6 +186,7 @@ databases := \
 	black.cdb \
 	folders.cdb \
 	ip-black.cdb \
+	temp_fail.cdb \
 	white.cdb
 
 all:: $(databases) public_suffix_list.dat

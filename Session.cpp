@@ -1632,5 +1632,13 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return false;
   }
 
+  auto temp_fail_db_name = config_path_ / "temp_fail";
+  CDB  temp_fail{temp_fail_db_name}; // Addresses we make wait...
+  if (temp_fail.contains(recipient.local_part())) {
+    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+           << std::flush;
+    return false;
+  }
+
   return true;
 }
