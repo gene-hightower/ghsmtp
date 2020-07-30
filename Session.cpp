@@ -1637,6 +1637,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   if (temp_fail.contains(recipient.local_part())) {
     out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
            << std::flush;
+    LOG(WARNING) << "temp fail for recipient " << recipient;
     return false;
   }
 
