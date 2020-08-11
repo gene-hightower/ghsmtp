@@ -51,7 +51,7 @@ constexpr char const* defined_fields[]{
     // Trace Fields
     "Return-Path",
     "Received",
-    "Received-SPF",   // RFC 7208 added trace field
+    "Received-SPF", // RFC 7208 added trace field
 
     // Sig
     "DKIM-Signature", // RFC 7489
@@ -142,7 +142,7 @@ struct Ctx {
   std::string                                 spf_result;
 
   std::unordered_multimap<char const*, std::string> defined_hdrs;
-  std::multimap<std::string, std::string, ci_less> opt_hdrs;
+  std::multimap<std::string, std::string, ci_less>  opt_hdrs;
 
   std::string unstructured;
   std::string id;
@@ -363,6 +363,8 @@ struct path
 struct display_name : phrase {};
 
 struct name_addr : seq<opt<display_name>, angle_addr> {};
+
+struct name_addr_only : seq<name_addr, eof> {};
 
 struct mailbox : sor<name_addr, addr_spec> {};
 
@@ -806,7 +808,8 @@ struct message : seq<fields, opt<seq<eol, body>>, eof> {};
 // clang-format on
 
 template <typename Rule>
-struct action : nothing<Rule> {};
+struct action : nothing<Rule> {
+};
 
 template <>
 struct action<fields> {
@@ -1295,21 +1298,20 @@ struct action<received_spf> {
 
     // Google sometimes doesn't put in anything but client-ip
     if (ctx.spf_info.find("envelope-from") != end(ctx.spf_info)) {
-      auto dom    = ctx.spf_info["envelope-from"];
+      auto dom = ctx.spf_info["envelope-from"];
       auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
       if (dom == "<>") {
-        dom    = ctx.spf_info["helo"];
+        dom = ctx.spf_info["helo"];
         origin = DMARC_POLICY_SPF_ORIGIN_HELO;
         LOG(INFO) << "SPF: origin HELO " << dom;
       }
       else {
         memory_input<> addr_in(dom, "dom");
-        if (!parse<RFC5322::addr_spec, RFC5322::action>(addr_in,
-                                                        ctx)) {
+        if (!parse<RFC5322::addr_spec, RFC5322::action>(addr_in, ctx)) {
           LOG(FATAL) << "Failed to parse domain: " << dom;
         }
-        dom    = ctx.mb_dom;
+        dom = ctx.mb_dom;
         origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
         LOG(INFO) << "SPF: origin MAIL FROM " << dom;
 
@@ -1368,7 +1370,7 @@ struct action<discrete_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.discrete_type = true;
-    ctx.type          = in.string();
+    ctx.type = in.string();
   }
 };
 
@@ -1378,7 +1380,7 @@ struct action<composite_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.composite_type = true;
-    ctx.type           = in.string();
+    ctx.type = in.string();
   }
 };
 
@@ -1600,6 +1602,39 @@ struct action<obs_group_list> {
     LOG(INFO) << "obsolete group list: " << esc(in.string());
   }
 };
+
+template <>
+struct action<angle_addr> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "angle_addr: " << in.string();
+  }
+};
+template <>
+struct action<display_name> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "display_name: " << in.string();
+  }
+};
+template <>
+struct action<name_addr> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "name_addr: " << in.string();
+  }
+};
+template <>
+struct action<name_addr_only> {
+  template <typename Input>
+  static void apply(const Input& in, Ctx& ctx)
+  {
+    LOG(INFO) << "name_addr_only: " << in.string();
+  }
+};
 } // namespace RFC5322
 
 void display(RFC5322::Ctx const& ctx)
@@ -1614,6 +1649,25 @@ void display(RFC5322::Ctx const& ctx)
 
 void selftest()
 {
+  const char* name_addr_list[]{
+      "Gene Hightower <gene@digilicious.com>",
+      "via Relay <noreply@relay.firefox.com>",
+      "[via Relay] <noreply@relay.firefox.com>",
+      "Gene Hightower <gene@digilicious.com> [via Relay] "
+      "<noreply@relay.firefox.com>",
+  };
+
+  for (auto i : name_addr_list) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx   ctx;
+    if (!parse<RFC5322::name_addr_only,
+               RFC5322::action /*, tao::pegtl::tracer*/>(in, ctx)) {
+      LOG(ERROR) << "Error parsing as name_addr_only \"" << i << "\"";
+    }
+  }
+
+  exit(0);
+
   CHECK(RFC5322::is_defined_field("Subject"));
   CHECK(!RFC5322::is_defined_field("X-Subject"));
 
