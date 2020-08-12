@@ -31,7 +31,7 @@ DEFINE_bool(to_the_neck, false, "shove data forever");
 DEFINE_bool(use_8bitmime, true, "use 8BITMIME extension");
 DEFINE_bool(use_binarymime, true, "use BINARYMIME extension");
 DEFINE_bool(use_chunking, true, "use CHUNKING extension");
-DEFINE_bool(use_deliverby, true, "use DELIVERBY extension");
+DEFINE_bool(use_deliverby, false, "use DELIVERBY extension");
 DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
 DEFINE_bool(use_size, true, "use SIZE extension");
@@ -1363,9 +1363,9 @@ void bad_daddy(Input& in, RFC5321::Connection& cnn)
   }
 
   while (FLAGS_slow_strangle) {
-    for (auto i{0}; i < 100; ++i) {
+    for (auto i{0}; i < 500; ++i) {
       cnn.sock.out() << 'X' << std::flush;
-      sleep(3);
+      sleep(1);
     }
     cnn.sock.out() << "\r\n";
   }
@@ -1415,7 +1415,16 @@ bool snd(fs::path                    config_path,
 
   if (FLAGS_use_esmtp) {
     LOG(INFO) << "C: EHLO " << sender.ascii();
-    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+
+    if (FLAGS_slow_strangle) {
+      auto ehlo_str = fmt::format("EHLO {}\r\n", sender.ascii());
+      for (auto ch : ehlo_str) {
+        cnn.sock.out() << ch << std::flush;
+        sleep(1);
+      }
+    } else {
+      cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+    }
 
     CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
     if (!cnn.ehlo_ok) {
@@ -1543,7 +1552,7 @@ bool snd(fs::path                    config_path,
     }
   }
 
-  auto max_deliverby{0u};
+  auto deliver_by{0u};
   if (ext_deliverby) {
     if (!cnn.ehlo_params["DELIVERBY"].empty()) {
       char* ep = nullptr;
@@ -1608,6 +1617,10 @@ bool snd(fs::path                    config_path,
   }
   else if (ext_8bitmime) {
     param_stream << " BODY=8BITMIME";
+  }
+
+  if (ext_deliverby) {
+    param_stream << " BY=1200;NT";
   }
 
   if (ext_smtputf8) {

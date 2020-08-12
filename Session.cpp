@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <charconv>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -21,9 +22,58 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <boost/xpressive/xpressive.hpp>
+
 #include <syslog.h>
 
 namespace Config {
+char const* wls[]{
+    "list.dnswl.org",
+};
+
+/*
+<https://www.dnswl.org/?page_id=15#query>
+
+Return codes
+
+The return codes are structured as 127.0.x.y, with “x” indicating the category
+of an entry and “y” indicating how trustworthy an entry has been judged.
+
+Categories (127.0.X.y):
+
+    2 – Financial services
+    3 – Email Service Providers
+    4 – Organisations (both for-profit [ie companies] and non-profit)
+    5 – Service/network providers
+    6 – Personal/private servers
+    7 – Travel/leisure industry
+    8 – Public sector/governments
+    9 – Media and Tech companies
+    10 – some special cases
+    11 – Education, academic
+    12 – Healthcare
+    13 – Manufacturing/Industrial
+    14 – Retail/Wholesale/Services
+    15 – Email Marketing Providers
+    20 – Added through Self Service without specific category
+
+Trustworthiness / Score (127.0.x.Y):
+
+    0 = none – only avoid outright blocking (eg large ESP mailservers, -0.1)
+    1 = low – reduce chance of false positives (-1.0)
+    2 = medium – make sure to avoid false positives but allow override for clear
+cases (-10.0) 3 = high – avoid override (-100.0).
+
+The scores in parantheses are typical SpamAssassin scores.
+
+Special return code 127.0.0.255
+
+In cases where your nameserver issues more than 100’000 queries / 24 hours, you
+may be blocked from further queries. The return code “127.0.0.255” indicates
+this situation.
+
+*/
+
 char const* rbls[]{
     "b.barracudacentral.org",
     "psbl.surriel.com",
@@ -85,6 +135,8 @@ constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
 #include <gflags/gflags.h>
+
+DEFINE_bool(immortal, false, "don't set process timout");
 
 DEFINE_uint64(max_read, 0, "max data to read");
 DEFINE_uint64(max_write, 0, "max data to write");
@@ -253,6 +305,10 @@ void Session::greeting()
   }
 
   out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
+
+  if ((!FLAGS_immortal) && (getenv("GHSMTP_IMMORTAL") == nullptr)) {
+    alarm(2 * 60); // initial alarm
+  }
 }
 
 void Session::flush() { out_() << std::flush; }
@@ -567,7 +623,8 @@ bool Session::msg_new()
 
   // All sources of ham get a fresh 5 minute timeout per message.
   if (status == SpamStatus::ham) {
-    alarm(5 * 60);
+    if ((!FLAGS_immortal) && (getenv("GHSMTP_IMMORTAL") == nullptr))
+      alarm(5 * 60);
   }
 
   msg_ = std::make_unique<Message>();
@@ -777,6 +834,25 @@ void Session::data_done()
     }
   }
 
+  {
+    using namespace boost::xpressive;
+
+    mark_tag     secs_(1);
+    sregex const rex = icase("wait-data-") >> (secs_ = +_d);
+    smatch       what;
+
+    for (auto fp : forward_path_) {
+      if (regex_match(fp.local_part(), what, rex)) {
+        auto const str = what[secs_].str();
+        LOG(INFO) << "waiting at DATA " << str << " seconds";
+        long value = 0;
+        std::from_chars(str.data(), str.data() + str.size(), value);
+        sleep(value);
+        LOG(INFO) << "done waiting";
+      }
+    }
+  }
+
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
             << msg_->id();
@@ -973,7 +1049,7 @@ void Session::auth()
 
 void Session::error(std::string_view log_msg)
 {
-  out_() << "421 4.3.5 system error\r\n" << std::flush;
+  out_() << "421 4.3.5 system error: " << log_msg << "\r\n" << std::flush;
   LOG(WARNING) << log_msg;
 }
 
@@ -1217,14 +1293,23 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return true;
   }
 
-  return verify_ip_address_dnsbl_(error_msg);
-}
-
-bool Session::verify_ip_address_dnsbl_(std::string& error_msg)
-{
   if (IP4::is_address(sock_.them_c_str())) {
-    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     auto const reversed{IP4::reverse(sock_.them_c_str())};
+
+    // Check with white list.
+    std::shuffle(std::begin(Config::wls), std::end(Config::wls),
+                 random_device_);
+    for (auto wl : Config::wls) {
+      DNS::Query q(res_, DNS::RR_type::A, reversed + wl);
+      if (q.has_record()) {
+        auto as = q.get_strings();
+        LOG(INFO) << "on white list " << wl << " as " << as[0];
+        ip_whitelisted_ = true;
+        return true;
+      }
+    }
+
+    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  random_device_);
     for (auto rbl : Config::rbls) {
@@ -1639,6 +1724,23 @@ bool Session::verify_recipient_(Mailbox const& recipient)
            << std::flush;
     LOG(WARNING) << "temp fail for recipient " << recipient;
     return false;
+  }
+
+  {
+    using namespace boost::xpressive;
+
+    mark_tag     secs_(1);
+    sregex const rex = icase("wait-rcpt-") >> (secs_ = +_d);
+    smatch       what;
+
+    if (regex_match(recipient.local_part(), what, rex)) {
+      auto const str = what[secs_].str();
+      LOG(INFO) << "waiting at RCPT TO " << str << " seconds";
+      long value = 0;
+      std::from_chars(str.data(), str.data() + str.size(), value);
+      sleep(value);
+      LOG(INFO) << "done waiting";
+    }
   }
 
   return true;
