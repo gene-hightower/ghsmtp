@@ -1289,6 +1289,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if (IP4::is_address(sock_.them_c_str())
       && ip4_whitelisted(sock_.them_c_str())) {
+    LOG(INFO) << "on internal white list";
     ip_whitelisted_ = true;
     return true;
   }
