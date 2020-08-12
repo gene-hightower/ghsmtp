@@ -1300,12 +1300,34 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // Check with white list.
     std::shuffle(std::begin(Config::wls), std::end(Config::wls),
                  random_device_);
+
     for (auto wl : Config::wls) {
       DNS::Query q(res_, DNS::RR_type::A, reversed + wl);
       if (q.has_record()) {
-        auto as = q.get_strings();
-        LOG(INFO) << "on white list " << wl << " as " << as[0];
-        ip_whitelisted_ = true;
+        using namespace boost::xpressive;
+
+        auto const as = q.get_strings()[0];
+
+        LOG(INFO) << "on white list " << wl << " as " << as;
+
+        mark_tag     x_(1);
+        mark_tag     y_(2);
+        sregex const rex = as_xpr("127.0.") >> (x_ = +_d) >> '.' >> (y_ = +_d);
+        smatch       what;
+
+        if (regex_match(as, what, rex)) {
+          auto const x = what[x_].str();
+          auto const y = what[y_].str();
+
+          int value = 0;
+          std::from_chars(y.data(), y.data() + y.size(), value);
+          if (value > 0) {
+            ip_whitelisted_ = true;
+            LOG(INFO) << "white-listing";
+          }
+        }
+
+        // Any match skips check on black list
         return true;
       }
     }
@@ -1313,6 +1335,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
     std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
                  random_device_);
+
     for (auto rbl : Config::rbls) {
       if (has_record(res_, DNS::RR_type::A, reversed + rbl)) {
         error_msg = fmt::format("blocked on advice from {}", rbl);
@@ -1515,7 +1538,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
     }
   }
 
-  LOG(INFO) << sender << " cleared by URIBLs";
+  // LOG(INFO) << sender << " cleared by URIBLs";
   return true;
 }
 
