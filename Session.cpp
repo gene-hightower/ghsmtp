@@ -74,7 +74,7 @@ this situation.
 
 */
 
-char const* rbls[]{
+char const* bls[]{
     "b.barracudacentral.org",
     "psbl.surriel.com",
     "zen.spamhaus.org",
@@ -1308,7 +1308,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
         using namespace boost::xpressive;
 
         auto const as = q.get_strings()[0];
-
         LOG(INFO) << "on white list " << wl << " as " << as;
 
         mark_tag     x_(1);
@@ -1334,15 +1333,23 @@ bool Session::verify_ip_address_(std::string& error_msg)
     }
 
     // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
-    std::shuffle(std::begin(Config::rbls), std::end(Config::rbls),
+    std::shuffle(std::begin(Config::bls), std::end(Config::bls),
                  random_device_);
 
-    for (auto rbl : Config::rbls) {
-      if (has_record(res_, DNS::RR_type::A, reversed + rbl)) {
-        error_msg = fmt::format("blocked on advice from {}", rbl);
-        // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
-        out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
-        return false;
+    for (auto bl : Config::bls) {
+
+      DNS::Query q(res_, DNS::RR_type::A, reversed + bl);
+      if (q.has_record()) {
+        auto const as = q.get_strings()[0];
+        if (as == "127.0.1.1") {
+          LOG(INFO) << "Query blocked by " << bl;
+        }
+        else {
+          error_msg = fmt::format("blocked on advice from {}", bl);
+          // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
+          out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
+          return false;
+        }
       }
     }
     // LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
@@ -1734,23 +1741,28 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   // Check for local addresses we reject.
-  auto bad_recipients_db_name = config_path_ / "bad_recipients";
-  CDB  bad_recipients_db{bad_recipients_db_name};
-  if (bad_recipients_db.contains(recipient.local_part())) {
-    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
-    LOG(WARNING) << "bad recipient " << recipient;
-    return false;
+  {
+    auto bad_recipients_db_name = config_path_ / "bad_recipients";
+    CDB  bad_recipients_db{bad_recipients_db_name};
+    if (bad_recipients_db.contains(recipient.local_part())) {
+      out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
+      LOG(WARNING) << "bad recipient " << recipient;
+      return false;
+    }
   }
 
-  auto temp_fail_db_name = config_path_ / "temp_fail";
-  CDB  temp_fail{temp_fail_db_name}; // Addresses we make wait...
-  if (temp_fail.contains(recipient.local_part())) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-           << std::flush;
-    LOG(WARNING) << "temp fail for recipient " << recipient;
-    return false;
+  {
+    auto temp_fail_db_name = config_path_ / "temp_fail";
+    CDB  temp_fail{temp_fail_db_name}; // Addresses we make wait...
+    if (temp_fail.contains(recipient.local_part())) {
+      out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+             << std::flush;
+      LOG(WARNING) << "temp fail for recipient " << recipient;
+      return false;
+    }
   }
 
+  // Check for and act on magic "wait" address.
   {
     using namespace boost::xpressive;
 
