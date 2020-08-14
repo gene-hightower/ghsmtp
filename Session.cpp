@@ -1247,6 +1247,22 @@ bool Session::verify_ip_address_(std::string& error_msg)
   if (!client_fcrdns_.empty()) {
     client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
                           sock_.them_address_literal());
+    // check whitelist
+    for (auto const& client_fcrdns : client_fcrdns_) {
+      if (white_.contains(client_fcrdns.ascii())) {
+        // LOG(INFO) << "FCrDNS " << client_fcrdns << " whitelisted";
+        fcrdns_whitelisted_ = true;
+        return true;
+      }
+      auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
+      if (tld) {
+        if (white_.contains(tld)) {
+          // LOG(INFO) << "FCrDNS registered domain " << tld << " whitelisted";
+          fcrdns_whitelisted_ = true;
+          return true;
+        }
+      }
+    }
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.contains(client_fcrdns.ascii())) {
@@ -1266,36 +1282,19 @@ bool Session::verify_ip_address_(std::string& error_msg)
         }
       }
     }
-
-    // check whitelist
-    for (auto const& client_fcrdns : client_fcrdns_) {
-      if (white_.contains(client_fcrdns.ascii())) {
-        // LOG(INFO) << "FCrDNS " << client_fcrdns << " whitelisted";
-        fcrdns_whitelisted_ = true;
-        return true;
-      }
-      auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
-      if (tld) {
-        if (white_.contains(tld)) {
-          // LOG(INFO) << "FCrDNS registered domain " << tld << " whitelisted";
-          fcrdns_whitelisted_ = true;
-          return true;
-        }
-      }
-    }
   }
   else {
     client_ = fmt::format("unknown {}", sock_.them_address_literal());
   }
 
-  if (IP4::is_address(sock_.them_c_str())
-      && ip4_whitelisted(sock_.them_c_str())) {
-    LOG(INFO) << "on internal white list";
-    ip_whitelisted_ = true;
-    return true;
-  }
-
   if (IP4::is_address(sock_.them_c_str())) {
+
+    if (ip4_whitelisted(sock_.them_c_str())) {
+      LOG(INFO) << "on internal white list";
+      ip_whitelisted_ = true;
+      return true;
+    }
+
     auto const reversed{IP4::reverse(sock_.them_c_str())};
 
     // Check with white list.
