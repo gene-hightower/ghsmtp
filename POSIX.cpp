@@ -122,7 +122,9 @@ std::streamsize POSIX::write(int                       fd,
             << "error from write(2)";
       }
     }
-    else {
+    else if (n_ret == 0) {
+      LOG(WARNING) << "zero write";
+    } else {
       s += n_ret;
       written += n_ret;
     }
