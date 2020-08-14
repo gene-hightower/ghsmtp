@@ -753,7 +753,6 @@ int main(int argc, char* argv[])
   sact.sa_flags   = 0;
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
-  alarm(2 * 60); // initial alarm
 
   auto const log_dir{getenv("GOOGLE_LOG_DIR")};
   if (log_dir) {
