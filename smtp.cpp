@@ -210,14 +210,14 @@ struct ehlo : seq<TAO_PEGTL_ISTRING("EHLO"),
 
 struct mail_from : seq<TAO_PEGTL_ISTRING("MAIL"),
                        TAO_PEGTL_ISTRING(" FROM:"),
-                       // opt<SP>, // obsolete in RFC5321, but kosher in RFC821
+                       // opt<SP>, // common error
                        reverse_path,
                        opt<seq<SP, mail_parameters>>,
                        CRLF> {};
 
 struct rcpt_to : seq<TAO_PEGTL_ISTRING("RCPT"),
                      TAO_PEGTL_ISTRING(" TO:"),
-                     // opt<SP>, // obsolete in RFC5321, but kosher in RFC821
+                     // opt<SP>, // common error
                      forward_path,
                      opt<seq<SP, rcpt_parameters>>,
                      CRLF> {};
