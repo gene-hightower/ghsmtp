@@ -42,10 +42,14 @@ int main(int argc, char const* argv[])
   CHECK(is_address("001.001.001.001"));
   // and this
   CHECK(is_address("01.01.01.01"));
+  // and this
+  CHECK(is_address("000.000.000.000"));
   // but not:
   CHECK(!is_address("0001.0.0.0"));
   // or:
   CHECK(!is_address("00001.0.0.0"));
+  // or:
+  CHECK(!is_address("0000.0.0.0"));
 
   CHECK(!is_address("256.0.0.0"));
   CHECK(!is_address("260.0.0.0"));
