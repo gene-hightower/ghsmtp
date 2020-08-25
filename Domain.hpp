@@ -20,7 +20,6 @@ public:
     set(dom);
     return *this;
   }
-  Domain& operator=(Domain const& dom) = default;
 
   void set(std::string_view dom);
 
@@ -46,8 +45,7 @@ public:
 private:
   std::string ascii_;
   std::string utf8_;
-
-  bool is_address_literal_{false};
+  bool        is_address_literal_{false};
 };
 
 inline void Domain::clear()
@@ -76,5 +74,15 @@ inline std::ostream& operator<<(std::ostream& os, Domain const& dom)
     return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
   return os << dom.ascii();
 }
+
+namespace std {
+template <>
+struct hash<Domain> {
+  std::size_t operator()(Domain const& k) const
+  {
+    return hash<std::string>()(k.ascii());
+  }
+};
+} // namespace std
 
 #endif // DOMAIN_DOT_HPP
