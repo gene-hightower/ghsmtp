@@ -13,15 +13,16 @@ int main()
   auto const dom_to{Domain("gmail.com")};
 
   auto const config_path = osutil::get_config_dir();
-  auto res{DNS::Resolver{config_path}};
-  auto snd{Send(res, dom_to)};
+  auto       res{DNS::Resolver{config_path}};
+  auto       snd{Send(config_path, res, dom_from, dom_to)};
 
   Mailbox from("gene", dom_from);
   Mailbox to("gene.hightower", dom_to);
 
   auto const date{Now{}};
   auto const pill{Pill{}};
-  auto const mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill, dom_from.ascii());
+  auto const mid_str
+      = fmt::format("<{}.{}@{}>", date.sec(), pill, dom_from.ascii());
 
   fmt::memory_buffer msg;
 
