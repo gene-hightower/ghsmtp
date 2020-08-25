@@ -15,10 +15,10 @@ public:
 
 private:
   Domain domain_;
+  std::vector<Domain> exchangers_;
+
   Mailbox from_;
   std::vector<Mailbox> to_;
-
-  std::vector<Domain> exchangers_;
 };
 
 #endif // SEND_DOT_HPP

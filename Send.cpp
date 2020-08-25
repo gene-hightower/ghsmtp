@@ -1,16 +1,23 @@
 #include "Send.hpp"
 
+#include <random>
+
+using namespace std::string_literals;
+
 namespace {
+bool is_localhost(DNS::RR const& rr)
+{
+  if (std::holds_alternative<DNS::RR_MX>(rr)) {
+    if (iequal(std::get<DNS::RR_MX>(rr).exchange(), "localhost"))
+      return true;
+  }
+  return false;
+}
+
 std::vector<Domain>
-get_exchangers(DNS::Resolver& res, Domain const& domain, bool& enforce_dane)
+get_exchangers(DNS::Resolver& res, Domain const& domain)
 {
   auto exchangers{std::vector<Domain>{}};
-
-  // User provided explicit host to receive mail.
-  if (!FLAGS_mx_host.empty()) {
-    exchangers.emplace_back(FLAGS_mx_host);
-    return exchangers;
-  }
 
   // Non-local part is an address literal.
   if (domain.is_address_literal()) {
@@ -29,30 +36,7 @@ get_exchangers(DNS::Resolver& res, Domain const& domain, bool& enforce_dane)
 
   auto const& dom = domain.ascii();
 
-  auto q_sts{DNS::Query{res, DNS::RR_type::TXT, "_mta-sts."s + dom}};
-  if (q_sts.has_record()) {
-    auto sts_records = q_sts.get_strings();
-    sts_records.erase(std::remove_if(begin(sts_records), end(sts_records),
-                                     std::not_fn(sts_rec)),
-                      end(sts_records));
-    if (size(sts_records) == 1) {
-      LOG(INFO) << "### This domain implements MTA-STS ###";
-    }
-  }
-  else {
-    LOG(INFO) << "MTA-STS record not found for domain " << dom;
-  }
-
   auto q{DNS::Query{res, DNS::RR_type::MX, dom}};
-  if (q.has_record()) {
-    if (q.authentic_data()) {
-      LOG(INFO) << "### MX records authentic for domain " << dom << " ###";
-    }
-    else {
-      LOG(INFO) << "MX records can't be authenticated for domain " << dom;
-      enforce_dane = false;
-    }
-  }
   auto mxs{q.get_records()};
 
   mxs.erase(std::remove_if(begin(mxs), end(mxs), is_localhost), end(mxs));
@@ -112,6 +96,27 @@ get_exchangers(DNS::Resolver& res, Domain const& domain, bool& enforce_dane)
 Send::Send(DNS::Resolver& res, Domain domain)
   : domain_(domain)
 {
-  auto const& dom = domain_.ascii();
   exchangers_ = get_exchangers(res, domain);
+
+  // connect to exchanger
+  // STARTTLS if available
+}
+
+bool Send::mail_from(Mailbox mailbox)
+{
+  return true;
+}
+
+bool Send::rcpt_to(Mailbox mailbox)
+{
+  if (domain_ != mailbox.domain()) {
+    LOG(WARNING) << "mailbox " << mailbox << " not in domain " << domain_;
+  }
+
+  return true;
+}
+
+bool Send::data(char const* data, size_t length)
+{
+  return true;
 }

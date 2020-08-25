@@ -129,6 +129,7 @@ TESTS := \
 	POSIX-test \
 	Pill-test \
 	SPF-test \
+	Send-test \
 	Session-test \
 	Sock-test \
 	SockBuffer-test \
@@ -154,6 +155,7 @@ OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc osutil
 osutil-test_STEMS := osutil
 
 Session-test_STEMS := \

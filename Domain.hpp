@@ -20,6 +20,7 @@ public:
     set(dom);
     return *this;
   }
+  Domain& operator=(Domain const& dom) = default;
 
   void set(std::string_view dom);
 

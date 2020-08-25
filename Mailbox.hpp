@@ -15,9 +15,15 @@ public:
     set_local(local_part);
     set_domain(domain);
   }
+  Mailbox(std::string_view local_part, Domain domain)
+  {
+    set_local(local_part);
+    set_domain(domain);
+  }
 
   void set_local(std::string_view local_part) { local_part_ = local_part; }
   void set_domain(std::string_view d) { domain_.set(d); }
+  void set_domain(Domain d) { domain_ = d; }
   void clear()
   {
     local_part_.clear();
