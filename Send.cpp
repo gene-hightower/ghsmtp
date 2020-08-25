@@ -598,18 +598,18 @@ bool Send::open_session_(DNS::Resolver& res, Domain const& sender)
       continue;
     }
 
-    if (FLAGS_use_esmtp) {
+    auto use_esmtp = FLAGS_use_esmtp;
+    if (use_esmtp) {
       LOG(INFO) << "C: EHLO " << sender.ascii();
       conn_->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
 
       if (!parse<RFC5321::ehlo_rsp, RFC5321::action>(in, *conn_)
           || !conn_->ehlo_ok) {
         LOG(WARNING) << "ehlo response was bad, trying HELO";
-        FLAGS_use_esmtp = false;
+        use_esmtp = false;
       }
     }
-
-    if (!FLAGS_use_esmtp) {
+    if (!use_esmtp) {
       LOG(INFO) << "C: HELO " << sender.ascii();
       conn_->sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
       if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, *conn_)) {
