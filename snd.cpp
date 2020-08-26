@@ -575,6 +575,7 @@ struct action<ehlo_keyword> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_keyword = in.string();
+    boost::to_upper(cnn.ehlo_keyword);
   }
 };
 
@@ -671,7 +672,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
         continue;
       }
 
-      LOG(INFO) << " connected to [" << addr << "]:" << port;
+      LOG(INFO) << fd << " connected to [" << addr << "]:" << port;
       return fd;
     }
 
@@ -718,7 +719,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
         continue;
       }
 
-      LOG(INFO) << "connected to " << addr << ":" << port;
+      LOG(INFO) << fd << " connected to " << addr << ":" << port;
       return fd;
     }
 
@@ -1422,7 +1423,8 @@ bool snd(fs::path                    config_path,
         cnn.sock.out() << ch << std::flush;
         sleep(1);
       }
-    } else {
+    }
+    else {
       cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
     }
 
@@ -1881,7 +1883,7 @@ int main(int argc, char* argv[])
   auto const receivers = get_receivers(res, to_mbx, enforce_dane);
 
   if (receivers.empty()) {
-    LOG(INFO) << "noplace to send this mail";
+    LOG(INFO) << "no place to send this mail";
     return EXIT_SUCCESS;
   }
 
