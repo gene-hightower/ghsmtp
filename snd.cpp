@@ -593,7 +593,6 @@ struct action<ehlo_line> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    boost::to_upper(cnn.ehlo_keyword);
     cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword),
                             std::move(cnn.ehlo_param));
   }
