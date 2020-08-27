@@ -20,7 +20,7 @@ int main(int argc, char* argv[])
   auto       snd{Send(config_path, dom_from, dom_to)};
 
   Mailbox from("gene", dom_from);
-  Mailbox to("gene.hightower", dom_to);
+  Mailbox to("♥=gene=digilicious.com", dom_to);
 
   auto const date{Now{}};
   auto const pill{Pill{}};

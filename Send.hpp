@@ -6,13 +6,10 @@
 #include "Sock.hpp"
 #include "fs.hpp"
 
-namespace Config {
-constexpr auto read_timeout = std::chrono::seconds(30);
-constexpr auto write_timeout = std::chrono::minutes(3);
-} // namespace Config
-
 namespace RFC5321 {
 struct Connection {
+  Connection(int fd_in, int fd_out, std::function<void(void)> read_hook);
+
   Sock sock;
 
   std::string server_id;
@@ -29,12 +26,6 @@ struct Connection {
   bool has_extension(char const* name) const
   {
     return ehlo_params.find(name) != end(ehlo_params);
-  }
-
-  Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
-    : sock(
-        fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
-  {
   }
 };
 } // namespace RFC5321

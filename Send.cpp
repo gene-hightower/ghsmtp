@@ -28,6 +28,20 @@ using namespace std::string_literals;
 using std::begin;
 using std::end;
 
+namespace Config {
+constexpr auto read_timeout = std::chrono::seconds(30);
+constexpr auto write_timeout = std::chrono::minutes(3);
+} // namespace Config
+
+namespace RFC5321 {
+Connection::Connection(int                       fd_in,
+                       int                       fd_out,
+                       std::function<void(void)> read_hook)
+  : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+{
+}
+} // namespace RFC5321
+
 // clang-format off
 
 namespace chars {
@@ -639,7 +653,7 @@ bool Send::mail_from(Exchangers& exchangers, Mailbox mailbox)
   auto const param_str = param_stream.str();
 
   LOG(INFO) << "C: MAIL FROM:<" << mailbox << '>' << param_str;
-  conn.sock.out() << "MAIL FROM:<" << mailbox << '>' << param_str "\r\n"
+  conn.sock.out() << "MAIL FROM:<" << mailbox << '>' << param_str << "\r\n"
                   << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   return conn.reply_code.at(0) == '2';
