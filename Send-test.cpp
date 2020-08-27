@@ -7,14 +7,17 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-int main()
+int main(int argc, char* argv[])
 {
+  std::ios::sync_with_stdio(false);
+
+  google::ParseCommandLineFlags(&argc, &argv, true);
+
   auto const dom_from{Domain("digilicious.com")};
-  auto const dom_to{Domain("gmail.com")};
+  auto const dom_to{Domain("digilicious.com")};
 
   auto const config_path = osutil::get_config_dir();
-  auto       res{DNS::Resolver{config_path}};
-  auto       snd{Send(config_path, res, dom_from, dom_to)};
+  auto       snd{Send(config_path, dom_from, dom_to)};
 
   Mailbox from("gene", dom_from);
   Mailbox to("gene.hightower", dom_to);
@@ -37,7 +40,11 @@ int main()
   fmt::format_to(msg, "This is the body of the email.\r\n");
   auto const msg_str = fmt::to_string(msg);
 
-  CHECK(snd.mail_from(from));
-  CHECK(snd.rcpt_to(to));
-  CHECK(snd.data(msg_str.data(), msg_str.length()));
+  auto       res{DNS::Resolver{config_path}};
+  Exchangers exchngrs;
+
+  CHECK(snd.connect(res, exchngrs));
+  CHECK(snd.mail_from(exchngrs, from));
+  CHECK(snd.rcpt_to(exchngrs, to));
+  CHECK(snd.data(exchngrs, msg_str.data(), msg_str.length()));
 }

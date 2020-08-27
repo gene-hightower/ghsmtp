@@ -26,6 +26,11 @@ struct Connection {
   bool greeting_ok{false};
   bool ehlo_ok{false};
 
+  bool has_extension(std::string_view name) const
+  {
+    return ehlo_params.find("STARTTLS") != end(ehlo_params);
+  }
+
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
     : sock(
         fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
@@ -34,26 +39,43 @@ struct Connection {
 };
 } // namespace RFC5321
 
-class Send {
+class Exchangers {
 public:
-  Send(fs::path config_path, DNS::Resolver& res, Domain sender, Domain domain);
+  RFC5321::Connection& conn(Domain address) { return *exchangers_[address]; }
 
-  bool mail_from(Mailbox sender);
-  bool rcpt_to(Mailbox recipient);
+  bool contains(Domain address) const { return exchangers_.contains(address); }
 
-  bool data(char const* data, size_t length);
-
-  void quit();
+  void add(Domain dom, std::unique_ptr<RFC5321::Connection> conn)
+  {
+    exchangers_.insert({dom, std::move(conn)});
+  }
 
 private:
-  Domain              domain_;
-  std::vector<Domain> exchangers_;
+  std::unordered_map<Domain, std::unique_ptr<RFC5321::Connection>> exchangers_;
+};
+
+class Send {
+public:
+  Send(fs::path config_path, Domain sender, Domain receiver);
+
+  bool connect(DNS::Resolver& res, Exchangers& exchangers);
+
+  bool mail_from(Exchangers& exchangers, Mailbox from);
+  bool rcpt_to(Exchangers& exchangers, Mailbox to);
+  bool data(Exchangers& exchangers, char const* data, size_t length);
+
+  void quit(Exchangers& exchangers);
+
+private:
+  fs::path config_path_;
+  Domain   sender_;
+  Domain   receiver_;
 
   Mailbox              from_;
   std::vector<Mailbox> to_;
 
-  std::unique_ptr<RFC5321::Connection> conn_;
-  bool open_session_(DNS::Resolver& res, Domain const& sender);
+  std::vector<Domain> mxs_; // ordered MX list for this receiver_
+  Domain              mx_active_;
 };
 
 #endif // SEND_DOT_HPP

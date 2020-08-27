@@ -11,9 +11,6 @@
 // This needs to be at least the length of each string it's trying to match.
 DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
-DEFINE_bool(4, false, "use only IP version 4");
-DEFINE_bool(6, false, "use only IP version 6");
-
 DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 
 DEFINE_string(local_address, "", "local address to bind");
@@ -299,7 +296,7 @@ struct action<greeting_ok> {
     imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
-      LOG(INFO) << " S: " << line;
+      LOG(INFO) << "S: " << line;
     }
   }
 };
@@ -313,7 +310,7 @@ struct action<ehlo_ok_rsp> {
     imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
-      LOG(INFO) << " S: " << line;
+      LOG(INFO) << "S: " << line;
     }
   }
 };
@@ -324,6 +321,7 @@ struct action<ehlo_keyword> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_keyword = in.string();
+    boost::to_upper(cnn.ehlo_keyword);
   }
 };
 
@@ -333,7 +331,6 @@ struct action<ehlo_param> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_param.push_back(in.string());
-    boost::to_upper(cnn.ehlo_param.back());
   }
 };
 
@@ -342,7 +339,6 @@ struct action<ehlo_line> {
   template <typename Input>
   static void apply(Input const& in, Connection& cnn)
   {
-    boost::to_upper(cnn.ehlo_keyword);
     cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword),
                             std::move(cnn.ehlo_param));
   }
@@ -356,7 +352,7 @@ struct action<reply_lines> {
     imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
-      LOG(INFO) << " S: " << line;
+      LOG(INFO) << "S: " << line;
     }
   }
 };
@@ -381,14 +377,14 @@ bool is_localhost(DNS::RR const& rr)
   return false;
 }
 
-std::vector<Domain> get_exchangers(DNS::Resolver& res, Domain const& domain)
+std::vector<Domain> get_mxs(DNS::Resolver& res, Domain const& domain)
 {
-  auto exchangers{std::vector<Domain>{}};
+  auto mxs{std::vector<Domain>{}};
 
   // Non-local part is an address literal.
   if (domain.is_address_literal()) {
-    exchangers.emplace_back(domain);
-    return exchangers;
+    mxs.emplace_back(domain);
+    return mxs;
   }
 
   // RFC 5321 section 5.1 "Locating the Target Host"
@@ -403,23 +399,25 @@ std::vector<Domain> get_exchangers(DNS::Resolver& res, Domain const& domain)
   auto const& dom = domain.ascii();
 
   auto q{DNS::Query{res, DNS::RR_type::MX, dom}};
-  auto mxs{q.get_records()};
+  auto mx_recs{q.get_records()};
 
-  mxs.erase(std::remove_if(begin(mxs), end(mxs), is_localhost), end(mxs));
+  mx_recs.erase(std::remove_if(begin(mx_recs), end(mx_recs), is_localhost),
+                end(mx_recs));
 
-  auto const nmx = std::count_if(begin(mxs), end(mxs), [](auto const& rr) {
-    return std::holds_alternative<DNS::RR_MX>(rr);
-  });
+  auto const nmx
+      = std::count_if(begin(mx_recs), end(mx_recs), [](auto const& rr) {
+          return std::holds_alternative<DNS::RR_MX>(rr);
+        });
 
   if (nmx == 1) {
-    for (auto const& mx : mxs) {
+    for (auto const& mx : mx_recs) {
       if (std::holds_alternative<DNS::RR_MX>(mx)) {
         // RFC 7505 null MX record
         if ((std::get<DNS::RR_MX>(mx).preference() == 0)
             && (std::get<DNS::RR_MX>(mx).exchange().empty()
                 || (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
-          LOG(INFO) << "domain " << dom << " does not accept mail";
-          return exchangers;
+          LOG(WARNING) << "domain " << dom << " does not accept mail";
+          return mxs;
         }
       }
     }
@@ -427,14 +425,14 @@ std::vector<Domain> get_exchangers(DNS::Resolver& res, Domain const& domain)
 
   if (nmx == 0) {
     // domain must have address record
-    exchangers.emplace_back(dom);
-    return exchangers;
+    mxs.emplace_back(dom);
+    return mxs;
   }
 
   // […] then the sender-SMTP MUST randomize them to spread the load
   // across multiple mail exchangers for a specific organization.
-  std::shuffle(begin(mxs), end(mxs), std::random_device());
-  std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
+  std::shuffle(begin(mx_recs), end(mx_recs), std::random_device());
+  std::sort(begin(mx_recs), end(mx_recs), [](auto const& a, auto const& b) {
     if (std::holds_alternative<DNS::RR_MX>(a)
         && std::holds_alternative<DNS::RR_MX>(b)) {
       return std::get<DNS::RR_MX>(a).preference()
@@ -445,219 +443,238 @@ std::vector<Domain> get_exchangers(DNS::Resolver& res, Domain const& domain)
 
   if (nmx)
     LOG(INFO) << "MXs for " << domain << " are:";
-
-  for (auto const& mx : mxs) {
+  for (auto const& mx : mx_recs) {
     if (std::holds_alternative<DNS::RR_MX>(mx)) {
-      exchangers.emplace_back(std::get<DNS::RR_MX>(mx).exchange());
+      mxs.emplace_back(std::get<DNS::RR_MX>(mx).exchange());
       LOG(INFO) << std::setfill(' ') << std::setw(3)
                 << std::get<DNS::RR_MX>(mx).preference() << " "
                 << std::get<DNS::RR_MX>(mx).exchange();
     }
   }
 
-  return exchangers;
+  return mxs;
 }
 
 int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 {
-  auto const use_4{!FLAGS_6};
-  auto const use_6{!FLAGS_4};
+  int fd = socket(AF_INET, SOCK_STREAM, 0);
+  PCHECK(fd >= 0) << "socket() failed";
 
-  if (use_6) {
-    auto const fd{socket(AF_INET6, SOCK_STREAM, 0)};
-    PCHECK(fd >= 0) << "socket() failed";
-
-    if (!FLAGS_local_address.empty()) {
-      auto loc{sockaddr_in6{}};
-      loc.sin6_family = AF_INET6;
-      if (1
-          != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
-                       reinterpret_cast<void*>(&loc.sin6_addr))) {
-        LOG(FATAL) << "can't interpret " << FLAGS_local_address
-                   << " as IPv6 address";
-      }
-      PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
+  if (!FLAGS_local_address.empty()) {
+    auto loc{sockaddr_in{}};
+    loc.sin_family = AF_INET;
+    if (1
+        != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                     reinterpret_cast<void*>(&loc.sin_addr))) {
+      LOG(FATAL) << "can't interpret " << FLAGS_local_address
+                 << " as IPv4 address";
     }
-
-    auto addrs{std::vector<std::string>{}};
-
-    if (node.is_address_literal()) {
-      if (IP6::is_address(node.ascii())) {
-        addrs.push_back(node.ascii());
-      }
-      if (IP6::is_address_literal(node.ascii())) {
-        auto const addr = IP6::as_address(node.ascii());
-        addrs.push_back(std::string(addr.data(), addr.length()));
-      }
-    }
-    else {
-      addrs = res.get_strings(DNS::RR_type::AAAA, node.ascii());
-    }
-    for (auto const& addr : addrs) {
-      auto in6{sockaddr_in6{}};
-      in6.sin6_family = AF_INET6;
-      in6.sin6_port = htons(port);
-      CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
-                         reinterpret_cast<void*>(&in6.sin6_addr)),
-               1);
-      if (connect(fd, reinterpret_cast<const sockaddr*>(&in6), sizeof(in6))) {
-        PLOG(WARNING) << "connect failed [" << addr << "]:" << port;
-        continue;
-      }
-
-      LOG(INFO) << " connected to [" << addr << "]:" << port;
-      return fd;
-    }
-
-    close(fd);
-  }
-  if (use_4) {
-    auto fd{socket(AF_INET, SOCK_STREAM, 0)};
-    PCHECK(fd >= 0) << "socket() failed";
-
-    if (!FLAGS_local_address.empty()) {
-      auto loc{sockaddr_in{}};
-      loc.sin_family = AF_INET;
-      if (1
-          != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                       reinterpret_cast<void*>(&loc.sin_addr))) {
-        LOG(FATAL) << "can't interpret " << FLAGS_local_address
-                   << " as IPv4 address";
-      }
-      PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
-    }
-
-    auto addrs{std::vector<std::string>{}};
-    if (node.is_address_literal()) {
-      if (IP4::is_address(node.ascii())) {
-        addrs.push_back(node.ascii());
-      }
-      if (IP4::is_address_literal(node.ascii())) {
-        auto const addr = IP4::as_address(node.ascii());
-        addrs.push_back(std::string(addr.data(), addr.length()));
-      }
-    }
-    else {
-      addrs = res.get_strings(DNS::RR_type::A, node.ascii());
-    }
-    for (auto addr : addrs) {
-      auto in4{sockaddr_in{}};
-      in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
-      CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
-                         reinterpret_cast<void*>(&in4.sin_addr)),
-               1);
-      if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
-        PLOG(WARNING) << "connect failed " << addr << ":" << port;
-        continue;
-      }
-
-      LOG(INFO) << "connected to " << addr << ":" << port;
-      return fd;
-    }
-
-    close(fd);
+    PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
   }
 
+  auto addrs{std::vector<std::string>{}};
+  if (node.is_address_literal()) {
+    if (IP4::is_address(node.ascii())) {
+      addrs.push_back(node.ascii());
+    }
+    if (IP4::is_address_literal(node.ascii())) {
+      auto const addr = IP4::as_address(node.ascii());
+      addrs.push_back(std::string(addr.data(), addr.length()));
+    }
+  }
+  else {
+    addrs = res.get_strings(DNS::RR_type::A, node.ascii());
+  }
+  for (auto addr : addrs) {
+    auto in4{sockaddr_in{}};
+    in4.sin_family = AF_INET;
+    in4.sin_port = htons(port);
+    CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
+                       reinterpret_cast<void*>(&in4.sin_addr)),
+             1);
+    if (connect(fd, reinterpret_cast<const sockaddr*>(&in4), sizeof(in4))) {
+      PLOG(WARNING) << "connect failed " << addr << ":" << port;
+      continue;
+    }
+
+    // LOG(INFO) << fd << " connected to " << addr << ":" << port;
+    return fd;
+  }
+
+  close(fd);
   return -1;
 }
 
 } // namespace
 
-bool Send::open_session_(DNS::Resolver& res, Domain const& sender)
+Send::Send(fs::path config_path, Domain sender, Domain receiver)
+  : config_path_(config_path)
+  , sender_(sender)
+  , receiver_(receiver)
 {
-  int fd = -1;
+}
 
-  for (auto const& exchanger : exchangers_) {
-    LOG(INFO) << "trying " << exchanger;
+bool open_session(DNS::Resolver& res,
+                  Exchangers&    exchangers,
+                  fs::path       config_path,
+                  Domain         sender,
+                  Domain         receiver,
+                  Domain         mx)
+{
+  int fd = conn(res, mx, 25);
+  if (fd == -1) {
+    LOG(WARNING) << mx << " no connection";
+    return false;
+  }
 
-    fd = conn(res, exchanger, 25);
-    if (fd == -1) {
-      LOG(WARNING) << "no connection, skipping";
-      continue;
+  // Listen for greeting
+
+  auto constexpr read_hook{[]() {}};
+  auto conn = std::make_unique<RFC5321::Connection>(fd, fd, read_hook);
+
+  auto in
+      = istream_input<eol::crlf, 1>{conn->sock.in(), FLAGS_bfr_size, "session"};
+  if (!parse<RFC5321::greeting, RFC5321::action>(in, *conn)) {
+    LOG(WARNING) << "greeting was unrecognizable";
+    close(fd);
+    return false;
+  }
+  if (!conn->greeting_ok) {
+    LOG(WARNING) << "greeting was not in the affirmative";
+    close(fd);
+    return false;
+  }
+
+  // EHLO/HELO
+
+  auto use_esmtp = FLAGS_use_esmtp;
+  if (use_esmtp) {
+    LOG(INFO) << "C: EHLO " << sender.ascii();
+    conn->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+
+    if (!parse<RFC5321::ehlo_rsp, RFC5321::action>(in, *conn)
+        || !conn->ehlo_ok) {
+      LOG(WARNING) << "EHLO response was unrecognizable, trying HELO";
+      use_esmtp = false;
     }
-
-    // Listen for greeting
-
-    auto constexpr read_hook{[]() {}};
-
-    conn_ = std::make_unique<RFC5321::Connection>(fd, fd, read_hook);
-
-    auto in{istream_input<eol::crlf, 1>{conn_->sock.in(), FLAGS_bfr_size,
-                                        "session"}};
-    if (!parse<RFC5321::greeting, RFC5321::action>(in, *conn_)) {
-      LOG(WARNING) << "can't parse greeting";
-      conn_.reset(nullptr);
+  }
+  if (!use_esmtp) {
+    LOG(INFO) << "C: HELO " << sender.ascii();
+    conn->sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
+    if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, *conn)) {
+      LOG(WARNING) << "HELO response was unrecognizable";
       close(fd);
-      continue;
+      return false;
     }
-    if (!conn_->greeting_ok) {
-      LOG(WARNING) << "greeting was not in the affirmative, skipping";
-      conn_.reset(nullptr);
-      close(fd);
-      continue;
-    }
+  }
 
-    auto use_esmtp = FLAGS_use_esmtp;
-    if (use_esmtp) {
-      LOG(INFO) << "C: EHLO " << sender.ascii();
-      conn_->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+  // STARTTLS
 
-      if (!parse<RFC5321::ehlo_rsp, RFC5321::action>(in, *conn_)
-          || !conn_->ehlo_ok) {
-        LOG(WARNING) << "ehlo response was bad, trying HELO";
-        use_esmtp = false;
-      }
-    }
-    if (!use_esmtp) {
-      LOG(INFO) << "C: HELO " << sender.ascii();
-      conn_->sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
-      if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, *conn_)) {
-        LOG(WARNING) << "HELO didn't work, skipping";
-        conn_.reset(nullptr);
-        close(fd);
-        continue;
-      }
-    }
+  if (conn->has_extension("STARTTLS")) {
+    LOG(INFO) << "C: STARTTLS";
+    conn->sock.out() << "STARTTLS\r\n" << std::flush;
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *conn)));
 
+    DNS::RR_collection tlsa_rrs;
+    CHECK(conn->sock.starttls_client(config_path, sender.ascii().c_str(),
+                                     receiver.ascii().c_str(), tlsa_rrs,
+                                     false));
+  }
+
+  exchangers.add(mx, std::move(conn));
+  return true;
+}
+
+bool Send::connect(DNS::Resolver& res, Exchangers& exchangers)
+{
+  if (mxs_.empty())
+    mxs_ = get_mxs(res, receiver_);
+  CHECK(!mxs_.empty());
+
+  for (auto const& mx : mxs_) {
+    if (exchangers.contains(mx)) {
+      // LOG(INFO) << "already connected to " << mx;
+      return true;
+    }
+    LOG(INFO) << "trying " << mx;
+    if (!open_session(res, exchangers, config_path_, sender_, receiver_, mx)) {
+      LOG(WARNING) << "can't open session";
+      return false;
+    }
+    mx_active_ = mx;
+    LOG(INFO) << "connected to " << mx;
     return true;
   }
 
+  LOG(WARNING) << "can't connect to any MXs for " << receiver_;
   return false;
 }
 
-Send::Send(fs::path       config_path,
-           DNS::Resolver& res,
-           Domain         sender,
-           Domain         domain)
-  : domain_(domain)
+bool Send::mail_from(Exchangers& exchangers, Mailbox mailbox)
 {
-  exchangers_ = get_exchangers(res, domain);
-
-  // connect to exchanger
-  // STARTTLS if available
-}
-
-bool Send::mail_from(Mailbox mailbox)
-{
-  if (exchangers_.empty()) {
-    return false;
+  if (sender_ != mailbox.domain()) {
+    LOG(WARNING) << "mailbox " << mailbox << " not in sending domain "
+                 << sender_;
   }
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size,
+                                        "mail_from"};
 
+  LOG(INFO) << "C: MAIL FROM";
+  conn.sock.out() << "MAIL FROM:<" << mailbox << ">\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   return true;
 }
 
-bool Send::rcpt_to(Mailbox mailbox)
+bool Send::rcpt_to(Exchangers& exchangers, Mailbox mailbox)
 {
-  if (exchangers_.empty()) {
-    return false;
+  if (receiver_ != mailbox.domain()) {
+    LOG(WARNING) << "mailbox " << mailbox << " not in receiving domain "
+                 << receiver_;
   }
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  auto                 in
+      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rcpt_to"};
 
-  if (domain_ != mailbox.domain()) {
-    LOG(WARNING) << "mailbox " << mailbox << " not in domain " << domain_;
-  }
-
+  LOG(INFO) << "C: RCPT TO:";
+  conn.sock.out() << "RCPT TO:<" << mailbox << ">\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   return true;
 }
 
-bool Send::data(char const* data, size_t length) { return true; }
+bool Send::data(Exchangers& exchangers, char const* data, size_t length)
+{
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "quit"};
+  LOG(INFO) << "C: DATA";
+  conn.sock.out() << "DATA\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  if (conn.reply_code != "354") {
+    LOG(ERROR) << "DATA returned " << conn.reply_code;
+    return false;
+  }
+
+  // Done!
+  conn.sock.out() << ".\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+
+  LOG(INFO) << "reply_code == " << conn.reply_code;
+  return conn.reply_code.at(0) == '2';
+}
+
+void Send::quit(Exchangers& exchangers)
+{
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "quit"};
+  LOG(INFO) << "C: QUIT";
+  conn.sock.out() << "QUIT\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+}
