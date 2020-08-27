@@ -26,9 +26,9 @@ struct Connection {
   bool greeting_ok{false};
   bool ehlo_ok{false};
 
-  bool has_extension(std::string_view name) const
+  bool has_extension(char const* name) const
   {
-    return ehlo_params.find("STARTTLS") != end(ehlo_params);
+    return ehlo_params.find(name) != end(ehlo_params);
   }
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
@@ -62,7 +62,14 @@ public:
 
   bool mail_from(Exchangers& exchangers, Mailbox from);
   bool rcpt_to(Exchangers& exchangers, Mailbox to);
+
   bool data(Exchangers& exchangers, char const* data, size_t length);
+  bool data(Exchangers& exchangers, std::istream& isbody);
+
+  bool bdat(Exchangers& exchangers, char const* data, size_t length);
+  bool bdat(Exchangers& exchangers, std::istream& isbody);
+
+  void rset(Exchangers& exchangers);
 
   void quit(Exchangers& exchangers);
 

@@ -263,9 +263,9 @@ struct action : nothing<Rule> {
 template <>
 struct action<server_id> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.server_id = in.string();
+    conn.server_id = in.string();
   }
 };
 
@@ -290,9 +290,9 @@ struct action<non_local_part> {
 template <>
 struct action<greeting_ok> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.greeting_ok = true;
+    conn.greeting_ok = true;
     imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
@@ -304,9 +304,9 @@ struct action<greeting_ok> {
 template <>
 struct action<ehlo_ok_rsp> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.ehlo_ok = true;
+    conn.ehlo_ok = true;
     imemstream  stream{begin(in), size(in)};
     std::string line;
     while (std::getline(stream, line)) {
@@ -318,36 +318,36 @@ struct action<ehlo_ok_rsp> {
 template <>
 struct action<ehlo_keyword> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.ehlo_keyword = in.string();
-    boost::to_upper(cnn.ehlo_keyword);
+    conn.ehlo_keyword = in.string();
+    boost::to_upper(conn.ehlo_keyword);
   }
 };
 
 template <>
 struct action<ehlo_param> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.ehlo_param.push_back(in.string());
+    conn.ehlo_param.push_back(in.string());
   }
 };
 
 template <>
 struct action<ehlo_line> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.ehlo_params.emplace(std::move(cnn.ehlo_keyword),
-                            std::move(cnn.ehlo_param));
+    conn.ehlo_params.emplace(std::move(conn.ehlo_keyword),
+                             std::move(conn.ehlo_param));
   }
 };
 
 template <>
 struct action<reply_lines> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
     imemstream  stream{begin(in), size(in)};
     std::string line;
@@ -360,9 +360,9 @@ struct action<reply_lines> {
 template <>
 struct action<reply_code> {
   template <typename Input>
-  static void apply(Input const& in, Connection& cnn)
+  static void apply(Input const& in, Connection& conn)
   {
-    cnn.reply_code = in.string();
+    conn.reply_code = in.string();
   }
 };
 } // namespace RFC5321
@@ -521,7 +521,7 @@ bool open_session(DNS::Resolver& res,
                   Domain         receiver,
                   Domain         mx)
 {
-  int fd = conn(res, mx, 25);
+  int fd = conn(res, mx, 225);
   if (fd == -1) {
     LOG(WARNING) << mx << " no connection";
     return false;
@@ -619,13 +619,13 @@ bool Send::mail_from(Exchangers& exchangers, Mailbox mailbox)
   CHECK(!mxs_.empty());
   CHECK(exchangers.contains(mx_active_));
   RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size,
-                                        "mail_from"};
+  auto                 in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "mail_from"}};
 
-  LOG(INFO) << "C: MAIL FROM";
+  LOG(INFO) << "C: MAIL FROM:<" << mailbox << ">";
   conn.sock.out() << "MAIL FROM:<" << mailbox << ">\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
-  return true;
+  return conn.reply_code.at(0) == '2';
 }
 
 bool Send::rcpt_to(Exchangers& exchangers, Mailbox mailbox)
@@ -637,26 +637,59 @@ bool Send::rcpt_to(Exchangers& exchangers, Mailbox mailbox)
   CHECK(!mxs_.empty());
   CHECK(exchangers.contains(mx_active_));
   RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto                 in
-      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rcpt_to"};
+  auto                 in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rcpt_to"}};
 
-  LOG(INFO) << "C: RCPT TO:";
+  LOG(INFO) << "C: RCPT TO:<" << mailbox << ">";
   conn.sock.out() << "RCPT TO:<" << mailbox << ">\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
-  return true;
+  return conn.reply_code.at(0) == '2';
 }
 
-bool Send::data(Exchangers& exchangers, char const* data, size_t length)
+bool Send::data(Exchangers& exchangers, char const* dp, size_t length)
+{
+  auto isbody{imemstream{dp, length}};
+  return data(exchangers, isbody);
+}
+
+bool Send::data(Exchangers& exchangers, std::istream& is)
 {
   CHECK(!mxs_.empty());
   CHECK(exchangers.contains(mx_active_));
   RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "quit"};
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "data"}};
+
   LOG(INFO) << "C: DATA";
   conn.sock.out() << "DATA\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   if (conn.reply_code != "354") {
     LOG(ERROR) << "DATA returned " << conn.reply_code;
+    return false;
+  }
+
+  // We could do better with BDAT
+  auto lineno = 0;
+  auto line{std::string{}};
+
+  while (std::getline(is, line)) {
+    ++lineno;
+    if (!conn.sock.out().good()) {
+      conn.sock.log_stats();
+      LOG(ERROR) << "output no good at line " << lineno;
+      return false;
+    }
+    if (line.length() && (line.at(0) == '.')) {
+      conn.sock.out() << '.';
+    }
+    conn.sock.out() << line;
+    if (line.back() != '\r') {
+      LOG(WARNING) << "bare new line in message body at line " << lineno;
+      conn.sock.out() << '\r';
+    }
+    conn.sock.out() << '\n';
+  }
+  if (!conn.sock.out().good()) {
+    LOG(ERROR) << "socket error of some sort after DATA";
     return false;
   }
 
@@ -666,6 +699,65 @@ bool Send::data(Exchangers& exchangers, char const* data, size_t length)
 
   LOG(INFO) << "reply_code == " << conn.reply_code;
   return conn.reply_code.at(0) == '2';
+}
+
+bool Send::bdat(Exchangers& exchangers, char const* dp, size_t length)
+{
+  auto is{imemstream{dp, length}};
+  return bdat(exchangers, is);
+}
+
+bool Send::bdat(Exchangers& exchangers, std::istream& is)
+{
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  CHECK(conn.has_extension("CHUNKING"));
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "bdat"}};
+
+  auto                  bdat_error = false;
+  std::streamsize const bfr_size = 1024 * 1024;
+  iobuffer<char>        bfr(bfr_size);
+
+  while (!is.eof()) {
+    is.read(bfr.data(), bfr_size);
+    auto const size_read = is.gcount();
+
+    conn.sock.out() << "BDAT " << size_read << "\r\n";
+    LOG(INFO) << "C: BDAT " << size_read;
+
+    conn.sock.out().write(bfr.data(), size_read);
+    conn.sock.out() << std::flush;
+
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+    if (conn.reply_code != "250") {
+      LOG(ERROR) << "BDAT returned " << conn.reply_code;
+      bdat_error = true;
+      break;
+    }
+  }
+
+  conn.sock.out() << "BDAT 0 LAST\r\n" << std::flush;
+  LOG(INFO) << "C: BDAT 0 LAST";
+
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  if (conn.reply_code != "250") {
+    LOG(ERROR) << "BDAT 0 LAST returned " << conn.reply_code;
+    return false;
+  }
+
+  return !bdat_error;
+}
+
+void Send::rset(Exchangers& exchangers)
+{
+  CHECK(!mxs_.empty());
+  CHECK(exchangers.contains(mx_active_));
+  RFC5321::Connection& conn = exchangers.conn(mx_active_);
+  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rset"};
+  LOG(INFO) << "C: RSET";
+  conn.sock.out() << "RSET\r\n" << std::flush;
+  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
 }
 
 void Send::quit(Exchangers& exchangers)

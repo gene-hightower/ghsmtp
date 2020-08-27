@@ -46,5 +46,7 @@ int main(int argc, char* argv[])
   CHECK(snd.connect(res, exchngrs));
   CHECK(snd.mail_from(exchngrs, from));
   CHECK(snd.rcpt_to(exchngrs, to));
-  CHECK(snd.data(exchngrs, msg_str.data(), msg_str.length()));
+  // CHECK(snd.data(exchngrs, msg_str.data(), msg_str.length()));
+  CHECK(snd.bdat(exchngrs, msg_str.data(), msg_str.length()));
+  snd.quit(exchngrs);
 }
