@@ -598,8 +598,8 @@ bool Send::connect(DNS::Resolver& res, Exchangers& exchangers)
     }
     LOG(INFO) << "trying " << mx;
     if (!open_session(res, exchangers, config_path_, sender_, receiver_, mx)) {
-      LOG(WARNING) << "can't open session";
-      return false;
+      LOG(WARNING) << "can't open session, skipping";
+      continue;
     }
     mx_active_ = mx;
     LOG(INFO) << "connected to " << mx;
@@ -622,8 +622,25 @@ bool Send::mail_from(Exchangers& exchangers, Mailbox mailbox)
   auto                 in{
       istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "mail_from"}};
 
-  LOG(INFO) << "C: MAIL FROM:<" << mailbox << ">";
-  conn.sock.out() << "MAIL FROM:<" << mailbox << ">\r\n" << std::flush;
+  std::ostringstream param_stream;
+  // param_stream << " SIZE=" << total_size;
+
+  if (conn.has_extension("BINARYMIME")) {
+    param_stream << " BODY=BINARYMIME";
+  }
+  else if (conn.has_extension("8BITMIME")) {
+    param_stream << " BODY=8BITMIME";
+  }
+
+  if (conn.has_extension("SMTPUTF8")) {
+    param_stream << " SMTPUTF8";
+  }
+
+  auto const param_str = param_stream.str();
+
+  LOG(INFO) << "C: MAIL FROM:<" << mailbox << '>' << param_str;
+  conn.sock.out() << "MAIL FROM:<" << mailbox << '>' << param_str "\r\n"
+                  << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   return conn.reply_code.at(0) == '2';
 }
@@ -640,7 +657,7 @@ bool Send::rcpt_to(Exchangers& exchangers, Mailbox mailbox)
   auto                 in{
       istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rcpt_to"}};
 
-  LOG(INFO) << "C: RCPT TO:<" << mailbox << ">";
+  LOG(INFO) << "C: RCPT TO:<" << mailbox << '>';
   conn.sock.out() << "RCPT TO:<" << mailbox << ">\r\n" << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
   return conn.reply_code.at(0) == '2';
