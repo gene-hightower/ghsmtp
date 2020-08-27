@@ -585,7 +585,6 @@ struct action<ehlo_param> {
   static void apply(Input const& in, Connection& cnn)
   {
     cnn.ehlo_param.push_back(in.string());
-    boost::to_upper(cnn.ehlo_param.back());
   }
 };
 
