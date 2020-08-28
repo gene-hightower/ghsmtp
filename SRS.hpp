@@ -1,25 +1,19 @@
 #ifndef SRS_DOT_HPP
 #define SRS_DOT_HPP
 
-#include <srs2.h> 
+#include <string>
 
-#include "SRS.ipp"
+typedef struct _srs_t srs_t;
 
 class SRS {
 public:
-  SRS()
-    : srs_(srs_new())
-  {
-    add_secret(srs_secret);
-  }
-  ~SRS()
-  {
-    srs_free(srs_);
-  }
-  void add_secret(char const* secret)
-  {
-    srs_add_secret(srs_, secret);
-  }
+  SRS();
+  ~SRS();
+
+  std::string forward(char const* sender, char const* alias);
+  std::string reverse(char const* sender);
+
+  void add_secret(char const* secret);
 
 private:
   srs_t* srs_;
