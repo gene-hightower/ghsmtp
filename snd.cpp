@@ -123,7 +123,7 @@ using namespace tao::pegtl::abnf;
 using namespace std::string_literals;
 
 namespace Config {
-constexpr auto read_timeout = std::chrono::seconds(30);
+constexpr auto read_timeout  = std::chrono::seconds(30);
 constexpr auto write_timeout = std::chrono::minutes(3);
 } // namespace Config
 
@@ -303,6 +303,11 @@ struct Connection {
 
   bool greeting_ok{false};
   bool ehlo_ok{false};
+
+  bool has_extension(char const* name) const
+  {
+    return ehlo_params.find(name) != end(ehlo_params);
+  }
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
     : sock(
@@ -661,7 +666,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto const& addr : addrs) {
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port = htons(port);
+      in6.sin6_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, addr.c_str(),
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -708,7 +713,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     for (auto addr : addrs) {
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
+      in4.sin_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -1454,39 +1459,31 @@ bool snd(fs::path                    config_path,
 
   if (bad_dad) {
     FLAGS_use_chunking = false;
-    FLAGS_use_size = false;
+    FLAGS_use_size     = false;
   }
 
-  auto const ext_8bitmime{
-      FLAGS_use_8bitmime
-      && (cnn.ehlo_params.find("8BITMIME") != end(cnn.ehlo_params))};
+  auto const ext_8bitmime{FLAGS_use_8bitmime && cnn.has_extension("8BITMIME")};
 
-  auto const ext_chunking{FLAGS_use_chunking
-                          && cnn.ehlo_params.find("CHUNKING")
-                                 != end(cnn.ehlo_params)};
+  auto const ext_chunking{FLAGS_use_chunking && cnn.has_extension("CHUNKING")};
 
   auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking
-                            && cnn.ehlo_params.find("BINARYMIME")
-                                   != end(cnn.ehlo_params)};
+                            && cnn.has_extension("BINARYMIME")};
 
   auto const ext_deliverby{FLAGS_use_deliverby
-                           && cnn.ehlo_params.find("DELIVERBY")
-                                  != end(cnn.ehlo_params)};
+                           && cnn.has_extension("DELIVERBY")};
 
-  auto const ext_pipelining{
-      FLAGS_use_pipelining
-      && (cnn.ehlo_params.find("PIPELINING") != end(cnn.ehlo_params))};
+  auto const ext_pipelining{FLAGS_use_pipelining
+                            && cnn.has_extension("PIPELINING")};
 
-  auto const ext_size{FLAGS_use_size
-                      && cnn.ehlo_params.find("SIZE") != end(cnn.ehlo_params)};
+  auto const ext_size{FLAGS_use_size && cnn.has_extension("SIZE")};
 
   auto const ext_smtputf8{
       FLAGS_use_smtputf8
-      && (cnn.ehlo_params.find("SMTPUTF8") != end(cnn.ehlo_params))};
+      && cnn.has_extension("SMTPUTF8")};
 
   auto const ext_starttls{
       FLAGS_use_tls
-      && (cnn.ehlo_params.find("STARTTLS") != end(cnn.ehlo_params))};
+      && cnn.has_extension("STARTTLS")};
 
   if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "no SMTPUTF8, skipping";
@@ -1543,7 +1540,7 @@ bool snd(fs::path                    config_path,
   auto max_msg_size{0u};
   if (ext_size) {
     if (!cnn.ehlo_params["SIZE"].empty()) {
-      char* ep = nullptr;
+      char* ep     = nullptr;
       max_msg_size = strtoul(cnn.ehlo_params["SIZE"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in SIZE argument: "
@@ -1555,7 +1552,7 @@ bool snd(fs::path                    config_path,
   auto deliver_by{0u};
   if (ext_deliverby) {
     if (!cnn.ehlo_params["DELIVERBY"].empty()) {
-      char* ep = nullptr;
+      char* ep     = nullptr;
       max_msg_size = strtoul(cnn.ehlo_params["DELIVERBY"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in DELIVERBY argument: "
@@ -1878,7 +1875,7 @@ int main(int argc, char* argv[])
   }
 
   bool       enforce_dane = true;
-  auto const receivers = get_receivers(res, to_mbx, enforce_dane);
+  auto const receivers    = get_receivers(res, to_mbx, enforce_dane);
 
   if (receivers.empty()) {
     LOG(INFO) << "no place to send this mail";
