@@ -65,6 +65,8 @@ public:
   void log_stats() { return iostream_->log_stats(); }
   void log_totals() { return iostream_->log_totals(); }
 
+  void close_fds() { iostream_->close_fds(); }
+
 private:
   boost::iostreams::stream<SockBuffer> iostream_;
 

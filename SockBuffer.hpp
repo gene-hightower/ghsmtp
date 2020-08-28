@@ -25,15 +25,14 @@ constexpr std::chrono::seconds default_starttls_timeout{2};
 class SockBuffer
   : public boost::iostreams::device<boost::iostreams::bidirectional> {
 public:
-  SockBuffer(int                       fd_in,
-             int                       fd_out,
-             std::function<void(void)> read_hook = []() {},
-             std::chrono::milliseconds read_timeout
-             = Config::default_read_timeout,
-             std::chrono::milliseconds write_timeout
-             = Config::default_write_timeout,
-             std::chrono::milliseconds starttls_timeout
-             = Config::default_starttls_timeout);
+  SockBuffer(
+      int                       fd_in,
+      int                       fd_out,
+      std::function<void(void)> read_hook     = []() {},
+      std::chrono::milliseconds read_timeout  = Config::default_read_timeout,
+      std::chrono::milliseconds write_timeout = Config::default_write_timeout,
+      std::chrono::milliseconds starttls_timeout
+      = Config::default_starttls_timeout);
 
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(SockBuffer const& that);
@@ -84,6 +83,14 @@ public:
 
   void log_stats() const;
   void log_totals() const;
+
+  void close_fds()
+  {
+    if (fd_in_ != fd_out_)
+      ::close(fd_in_);
+    ::close(fd_out_);
+    fd_in_ = fd_out_ = -1;
+  }
 
 private:
   int fd_in_;
