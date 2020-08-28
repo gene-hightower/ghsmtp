@@ -1653,8 +1653,9 @@ void selftest()
       "Gene Hightower <gene@digilicious.com>",
       "via Relay <noreply@relay.firefox.com>",
       "[via Relay] <noreply@relay.firefox.com>",
-      "Gene Hightower <gene@digilicious.com> [via Relay] "
+      "\"Gene Hightower <gene@digilicious.com> [via Relay]\""
       "<noreply@relay.firefox.com>",
+      "\"Customer Care <care@bigcompany.com> via foo.com\" <noreply@foo.com>",
   };
 
   for (auto i : name_addr_list) {
