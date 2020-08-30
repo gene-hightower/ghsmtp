@@ -10,6 +10,7 @@
 class Mailbox {
 public:
   Mailbox() = default;
+  Mailbox(std::string_view mailbox);
   Mailbox(std::string_view local_part, std::string_view domain)
   {
     set_local(local_part);
@@ -65,6 +66,13 @@ public:
   }
 
   operator std::string() const { return as_string(domain_encoding::utf8); }
+
+  bool operator==(Mailbox const& rhs) const
+  {
+    return (local_part_ == rhs.local_part_) && (domain_ == rhs.domain_);
+  }
+
+  static bool validate(std::string_view mailbox);
 
 private:
   std::string local_part_;
