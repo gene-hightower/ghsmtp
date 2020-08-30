@@ -4,6 +4,7 @@
 
 #include "IP4.hpp"
 #include "IP6.hpp"
+#include "SRS.hpp"
 #include "imemstream.hpp"
 
 #include <gflags/gflags.h>
@@ -577,8 +578,8 @@ open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
 
 bool do_mail_from(SMTP::Connection& conn, Mailbox from)
 {
-  auto in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "mail_from"}};
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
+                                      "mail_from"}};
 
   std::ostringstream param_stream;
   // param_stream << " SIZE=" << total_size;
@@ -618,7 +619,8 @@ bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
     do_mail_from(conn, from);
   }
 
-  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to) != end(conn.rcpt_to)) {
+  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to)
+      != end(conn.rcpt_to)) {
     LOG(INFO) << to << " already in recpt_to list of " << conn.server_id;
     return true;
   }
@@ -769,7 +771,9 @@ Send::Send(fs::path config_path)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  mail_from_ = mailbox;
+  SRS srs;
+  mail_from_ = Mailbox(
+      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str()));
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
     conn->rcpt_to.clear();
@@ -835,7 +839,8 @@ bool Send::send(std::istream& is)
         LOG(WARNING) << "failed to send to " << conn->server_id;
         return false;
       }
-    } else {
+    }
+    else {
       LOG(INFO) << "no receivers, skipping MX " << dom;
     }
     conn->mail_from.clear();
