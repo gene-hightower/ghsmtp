@@ -35,15 +35,15 @@ public:
 
   enum class domain_encoding : bool { ascii, utf8 };
 
-  size_t length(domain_encoding enc = domain_encoding::utf8) const
+  size_t length(domain_encoding enc = domain_encoding::ascii) const
   {
-    // if (enc == domain_encoding::ascii) {
-    //   for (auto ch : local_part_) {
-    //     if (!isascii(static_cast<unsigned char>(ch))) {
-    //       throw std::range_error("non ascii chars in local part of mailbox");
-    //     }
-    //   }
-    // }
+    if (enc == domain_encoding::ascii) {
+      for (auto ch : local_part_) {
+        if (!isascii(static_cast<unsigned char>(ch))) {
+          throw std::range_error("non ascii chars in local part of mailbox");
+        }
+      }
+    }
     auto const& d
         = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
     return local_part_.length() + (d.length() ? (d.length() + 1) : 0);
@@ -51,8 +51,15 @@ public:
 
   bool empty() const { return length() == 0; }
 
-  std::string as_string(domain_encoding enc = domain_encoding::utf8) const
+  std::string as_string(domain_encoding enc = domain_encoding::ascii) const
   {
+    if (enc == domain_encoding::ascii) {
+      for (auto ch : local_part_) {
+        if (!isascii(static_cast<unsigned char>(ch))) {
+          throw std::range_error("non ascii chars in local part of mailbox");
+        }
+      }
+    }
     std::string s;
     s.reserve(length(enc));
     s = local_part();
