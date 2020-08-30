@@ -505,7 +505,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
       }
       fwd_path_.emplace_back(fwd);
       LOG(INFO) << "RCPT TO:<" << forward_path << ">"
-                << "forwarding to == <" << fwd_path_.back() << ">";
+                << " forwarding to == <" << fwd_path_.back() << ">";
     }
   }
   else {
