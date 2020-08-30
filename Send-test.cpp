@@ -10,17 +10,18 @@
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
-
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   auto const dom_from{Domain("digilicious.com")};
   auto const dom_to{Domain("digilicious.com")};
 
   auto const config_path = osutil::get_config_dir();
-  auto       snd{Send(config_path, dom_from, dom_to)};
+
+  auto snd{Send(config_path)};
+  snd.set_sender(Domain("digilicious.com"));
 
   Mailbox from("gene", dom_from);
-  Mailbox to("♥=gene=digilicious.com", dom_to);
+  Mailbox to("fwd", dom_to);
 
   auto const date{Now{}};
   auto const pill{Pill{}};
@@ -40,13 +41,11 @@ int main(int argc, char* argv[])
   fmt::format_to(msg, "This is the body of the email.\r\n");
   auto const msg_str = fmt::to_string(msg);
 
-  auto       res{DNS::Resolver{config_path}};
-  Exchangers exchngrs;
+  auto res{DNS::Resolver{config_path}};
 
-  CHECK(snd.connect(res, exchngrs));
-  CHECK(snd.mail_from(exchngrs, from));
-  CHECK(snd.rcpt_to(exchngrs, to));
-  // CHECK(snd.data(exchngrs, msg_str.data(), msg_str.length()));
-  CHECK(snd.bdat(exchngrs, msg_str.data(), msg_str.length()));
-  snd.quit(exchngrs);
+  CHECK(snd.mail_from(from));
+  std::string err;
+  CHECK(snd.rcpt_to(res, to, err));
+  CHECK(snd.send(msg_str.data(), msg_str.length()));
+  snd.quit();
 }

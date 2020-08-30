@@ -9,7 +9,7 @@
 #include <gflags/gflags.h>
 
 // This needs to be at least the length of each string it's trying to match.
-DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
+DEFINE_uint64(pbfr_size, 4 * 1024, "parser buffer size");
 
 DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 
@@ -27,20 +27,6 @@ using namespace std::string_literals;
 
 using std::begin;
 using std::end;
-
-namespace Config {
-constexpr auto read_timeout = std::chrono::seconds(30);
-constexpr auto write_timeout = std::chrono::minutes(3);
-} // namespace Config
-
-namespace RFC5321 {
-Connection::Connection(int                       fd_in,
-                       int                       fd_out,
-                       std::function<void(void)> read_hook)
-  : sock(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
-{
-}
-} // namespace RFC5321
 
 // clang-format off
 
@@ -69,7 +55,7 @@ struct ascii_only : seq<star<ch_1>, eof> {};
 struct utf8_only : seq<star<u8char>, eof> {};
 }
 
-namespace RFC5321 {
+namespace SMTP {
 
 // clang-format off
 
@@ -379,7 +365,7 @@ struct action<reply_code> {
     conn.reply_code = in.string();
   }
 };
-} // namespace RFC5321
+} // namespace SMTP
 
 namespace {
 bool is_localhost(DNS::RR const& rr)
@@ -455,8 +441,7 @@ std::vector<Domain> get_mxs(DNS::Resolver& res, Domain const& domain)
     return false;
   });
 
-  if (nmx)
-    LOG(INFO) << "MXs for " << domain << " are:";
+  LOG(INFO) << "MXs for " << domain << " are:";
   for (auto const& mx : mx_recs) {
     if (std::holds_alternative<DNS::RR_MX>(mx)) {
       mxs.emplace_back(std::get<DNS::RR_MX>(mx).exchange());
@@ -502,7 +487,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
   for (auto addr : addrs) {
     auto in4{sockaddr_in{}};
     in4.sin_family = AF_INET;
-    in4.sin_port = htons(port);
+    in4.sin_port   = htons(port);
     CHECK_EQ(inet_pton(AF_INET, addr.c_str(),
                        reinterpret_cast<void*>(&in4.sin_addr)),
              1);
@@ -519,44 +504,31 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
   return -1;
 }
 
-} // namespace
-
-Send::Send(fs::path config_path, Domain sender, Domain receiver)
-  : config_path_(config_path)
-  , sender_(sender)
-  , receiver_(receiver)
-{
-}
-
-bool open_session(DNS::Resolver& res,
-                  Exchangers&    exchangers,
-                  fs::path       config_path,
-                  Domain         sender,
-                  Domain         receiver,
-                  Domain         mx)
+std::optional<std::unique_ptr<SMTP::Connection>>
+open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
 {
   int fd = conn(res, mx, 225);
   if (fd == -1) {
     LOG(WARNING) << mx << " no connection";
-    return false;
+    return {};
   }
 
   // Listen for greeting
 
   auto constexpr read_hook{[]() {}};
-  auto conn = std::make_unique<RFC5321::Connection>(fd, fd, read_hook);
+  auto conn = std::make_unique<SMTP::Connection>(fd, fd, read_hook);
 
-  auto in
-      = istream_input<eol::crlf, 1>{conn->sock.in(), FLAGS_bfr_size, "session"};
-  if (!parse<RFC5321::greeting, RFC5321::action>(in, *conn)) {
+  auto in = istream_input<eol::crlf, 1>{conn->sock.in(), FLAGS_pbfr_size,
+                                        "session"};
+  if (!parse<SMTP::greeting, SMTP::action>(in, *conn)) {
     LOG(WARNING) << "greeting was unrecognizable";
     close(fd);
-    return false;
+    return {};
   }
   if (!conn->greeting_ok) {
     LOG(WARNING) << "greeting was not in the affirmative";
     close(fd);
-    return false;
+    return {};
   }
 
   // EHLO/HELO
@@ -566,8 +538,7 @@ bool open_session(DNS::Resolver& res,
     LOG(INFO) << "C: EHLO " << sender.ascii();
     conn->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
 
-    if (!parse<RFC5321::ehlo_rsp, RFC5321::action>(in, *conn)
-        || !conn->ehlo_ok) {
+    if (!parse<SMTP::ehlo_rsp, SMTP::action>(in, *conn) || !conn->ehlo_ok) {
       LOG(WARNING) << "EHLO response was unrecognizable, trying HELO";
       use_esmtp = false;
     }
@@ -575,10 +546,10 @@ bool open_session(DNS::Resolver& res,
   if (!use_esmtp) {
     LOG(INFO) << "C: HELO " << sender.ascii();
     conn->sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
-    if (!parse<RFC5321::helo_ok_rsp, RFC5321::action>(in, *conn)) {
+    if (!parse<SMTP::helo_ok_rsp, SMTP::action>(in, *conn)) {
       LOG(WARNING) << "HELO response was unrecognizable";
       close(fd);
-      return false;
+      return {};
     }
   }
 
@@ -587,118 +558,35 @@ bool open_session(DNS::Resolver& res,
   if (conn->has_extension("STARTTLS")) {
     LOG(INFO) << "C: STARTTLS";
     conn->sock.out() << "STARTTLS\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, *conn)));
+    CHECK((parse<SMTP::reply_lines, SMTP::action>(in, *conn)));
 
-    DNS::RR_collection tlsa_rrs;
-    CHECK(conn->sock.starttls_client(config_path, sender.ascii().c_str(),
-                                     receiver.ascii().c_str(), tlsa_rrs,
-                                     false));
-  }
-
-  exchangers.add(mx, std::move(conn));
-  return true;
-}
-
-bool Send::connect(DNS::Resolver& res, Exchangers& exchangers)
-{
-  if (mxs_.empty())
-    mxs_ = get_mxs(res, receiver_);
-  CHECK(!mxs_.empty());
-
-  for (auto const& mx : mxs_) {
-    if (exchangers.contains(mx)) {
-      // LOG(INFO) << "already connected to " << mx;
-      return true;
+    DNS::RR_collection tlsa_rrs; // FIXME
+    if (!conn->sock.starttls_client(config_path, sender.ascii().c_str(),
+                                    mx.ascii().c_str(), tlsa_rrs, false)) {
+      LOG(WARNING) << "failed to STARTTLS";
+      close(fd);
+      return {};
     }
-    LOG(INFO) << "trying " << mx;
-    if (!open_session(res, exchangers, config_path_, sender_, receiver_, mx)) {
-      LOG(WARNING) << "can't open session, skipping";
-      continue;
-    }
-    mx_active_ = mx;
-    LOG(INFO) << "connected to " << mx;
-    return true;
   }
 
-  LOG(WARNING) << "can't connect to any MXs for " << receiver_;
-  return false;
+  return std::optional<std::unique_ptr<SMTP::Connection>>(std::move(conn));
 }
 
-bool Send::mail_from(Exchangers& exchangers, Mailbox mailbox)
+bool data(SMTP::Connection& conn, std::istream& is)
 {
-  if (sender_ != mailbox.domain()) {
-    LOG(WARNING) << "mailbox " << mailbox << " not in sending domain "
-                 << sender_;
-  }
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto                 in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "mail_from"}};
-
-  std::ostringstream param_stream;
-  // param_stream << " SIZE=" << total_size;
-
-  if (conn.has_extension("BINARYMIME")) {
-    param_stream << " BODY=BINARYMIME";
-  }
-  else if (conn.has_extension("8BITMIME")) {
-    param_stream << " BODY=8BITMIME";
-  }
-
-  if (conn.has_extension("SMTPUTF8")) {
-    param_stream << " SMTPUTF8";
-  }
-
-  auto const param_str = param_stream.str();
-
-  LOG(INFO) << "C: MAIL FROM:<" << mailbox << '>' << param_str;
-  conn.sock.out() << "MAIL FROM:<" << mailbox << '>' << param_str << "\r\n"
-                  << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
-  return conn.reply_code.at(0) == '2';
-}
-
-bool Send::rcpt_to(Exchangers& exchangers, Mailbox mailbox)
-{
-  if (receiver_ != mailbox.domain()) {
-    LOG(WARNING) << "mailbox " << mailbox << " not in receiving domain "
-                 << receiver_;
-  }
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto                 in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rcpt_to"}};
-
-  LOG(INFO) << "C: RCPT TO:<" << mailbox << '>';
-  conn.sock.out() << "RCPT TO:<" << mailbox << ">\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
-  return conn.reply_code.at(0) == '2';
-}
-
-bool Send::data(Exchangers& exchangers, char const* dp, size_t length)
-{
-  auto isbody{imemstream{dp, length}};
-  return data(exchangers, isbody);
-}
-
-bool Send::data(Exchangers& exchangers, std::istream& is)
-{
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "data"}};
-
+  auto in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "session"}};
   LOG(INFO) << "C: DATA";
   conn.sock.out() << "DATA\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+    LOG(ERROR) << "DATA command reply unparseable";
+    return false;
+  }
   if (conn.reply_code != "354") {
     LOG(ERROR) << "DATA returned " << conn.reply_code;
     return false;
   }
 
-  // We could do better with BDAT
   auto lineno = 0;
   auto line{std::string{}};
 
@@ -726,28 +614,22 @@ bool Send::data(Exchangers& exchangers, std::istream& is)
 
   // Done!
   conn.sock.out() << ".\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+
+  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+    LOG(ERROR) << "DATA reply unparseable";
+    return false;
+  }
 
   LOG(INFO) << "reply_code == " << conn.reply_code;
   return conn.reply_code.at(0) == '2';
 }
 
-bool Send::bdat(Exchangers& exchangers, char const* dp, size_t length)
+bool bdat(SMTP::Connection& conn, std::istream& is)
 {
-  auto is{imemstream{dp, length}};
-  return bdat(exchangers, is);
-}
-
-bool Send::bdat(Exchangers& exchangers, std::istream& is)
-{
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  CHECK(conn.has_extension("CHUNKING"));
-  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "bdat"}};
-
+  auto in
+      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
   auto                  bdat_error = false;
-  std::streamsize const bfr_size = 1024 * 1024;
+  std::streamsize const bfr_size   = 1024 * 1024;
   iobuffer<char>        bfr(bfr_size);
 
   while (!is.eof()) {
@@ -760,7 +642,11 @@ bool Send::bdat(Exchangers& exchangers, std::istream& is)
     conn.sock.out().write(bfr.data(), size_read);
     conn.sock.out() << std::flush;
 
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+    if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+      LOG(ERROR) << "BDAT reply unparseable";
+      bdat_error = true;
+      break;
+    }
     if (conn.reply_code != "250") {
       LOG(ERROR) << "BDAT returned " << conn.reply_code;
       bdat_error = true;
@@ -771,7 +657,7 @@ bool Send::bdat(Exchangers& exchangers, std::istream& is)
   conn.sock.out() << "BDAT 0 LAST\r\n" << std::flush;
   LOG(INFO) << "C: BDAT 0 LAST";
 
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  CHECK((parse<SMTP::reply_lines, SMTP::action>(in, conn)));
   if (conn.reply_code != "250") {
     LOG(ERROR) << "BDAT 0 LAST returned " << conn.reply_code;
     return false;
@@ -780,24 +666,96 @@ bool Send::bdat(Exchangers& exchangers, std::istream& is)
   return !bdat_error;
 }
 
-void Send::rset(Exchangers& exchangers)
+bool do_send(SMTP::Connection& conn, std::istream& is)
 {
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "rset"};
-  LOG(INFO) << "C: RSET";
-  conn.sock.out() << "RSET\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  if (conn.has_extension("CHUNKING"))
+    return bdat(conn, is);
+  return data(conn, is);
 }
 
-void Send::quit(Exchangers& exchangers)
+bool do_rset(SMTP::Connection& conn)
 {
-  CHECK(!mxs_.empty());
-  CHECK(exchangers.contains(mx_active_));
-  RFC5321::Connection& conn = exchangers.conn(mx_active_);
-  auto in = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_bfr_size, "quit"};
+  auto in
+      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rset"};
+  LOG(INFO) << "C: RSET";
+  conn.sock.out() << "RSET\r\n" << std::flush;
+  return parse<SMTP::reply_lines, SMTP::action>(in, conn);
+}
+
+bool do_quit(SMTP::Connection& conn)
+{
+  auto in
+      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "quit"};
   LOG(INFO) << "C: QUIT";
   conn.sock.out() << "QUIT\r\n" << std::flush;
-  CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, conn)));
+  return parse<SMTP::reply_lines, SMTP::action>(in, conn);
+}
+
+} // namespace
+
+Send::Send(fs::path config_path)
+  : config_path_(config_path)
+{
+}
+
+bool Send::mail_from(Mailbox const& mailbox)
+{
+  mail_from_ = mailbox;
+  for (auto& [mx, conn] : exchangers_) {
+    conn->mail_from.clear();
+    conn->rcpt_to.clear();
+  }
+  return true;
+}
+
+bool Send::rcpt_to(DNS::Resolver& res,
+                   Mailbox const& to,
+                   std::string&   error_msg)
+{
+  // FIXME
+  return true;
+}
+
+bool Send::send(std::istream& is)
+{
+  // FIXME this needs to be done in parallel
+  for (auto& [dom, conn] : exchangers_) {
+    if (!conn->rcpt_to.empty()) {
+      if (!do_send(*conn, is)) {
+        LOG(WARNING) << "failed to send to " << conn->server_id;
+        return false;
+      }
+    }
+    conn->mail_from.clear();
+    conn->rcpt_to.clear();
+  }
+  return true;
+}
+
+bool Send::send(char const* dp, size_t length)
+{
+  auto in{imemstream{dp, length}};
+  return send(in);
+}
+
+void Send::rset()
+{
+  for (auto& [dom, conn] : exchangers_) {
+    if (!conn->rcpt_to.empty()) {
+      if (!do_rset(*conn)) {
+        LOG(WARNING) << "failed to rset " << conn->server_id;
+      }
+    }
+    conn->mail_from.clear();
+    conn->rcpt_to.clear();
+  }
+}
+
+void Send::quit()
+{
+  for (auto& [dom, conn] : exchangers_) {
+    do_quit(*conn);
+    conn->sock.close_fds();
+  }
+  exchangers_.clear();
 }
