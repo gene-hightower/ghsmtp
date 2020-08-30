@@ -21,7 +21,8 @@ int main(int argc, char* argv[])
   snd.set_sender(Domain("digilicious.com"));
 
   Mailbox from("gene", dom_from);
-  Mailbox to("fwd", dom_to);
+  Mailbox to("forward", dom_to);
+  // Mailbox to("anything", dom_to);
 
   auto const date{Now{}};
   auto const pill{Pill{}};

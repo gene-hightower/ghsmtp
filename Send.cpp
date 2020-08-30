@@ -537,7 +537,6 @@ open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
   if (use_esmtp) {
     LOG(INFO) << "C: EHLO " << sender.ascii();
     conn->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
-
     if (!parse<SMTP::ehlo_rsp, SMTP::action>(in, *conn) || !conn->ehlo_ok) {
       LOG(WARNING) << "EHLO response was unrecognizable, trying HELO";
       use_esmtp = false;
@@ -558,7 +557,11 @@ open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
   if (conn->has_extension("STARTTLS")) {
     LOG(INFO) << "C: STARTTLS";
     conn->sock.out() << "STARTTLS\r\n" << std::flush;
-    CHECK((parse<SMTP::reply_lines, SMTP::action>(in, *conn)));
+    if (!parse<SMTP::reply_lines, SMTP::action>(in, *conn)) {
+      LOG(WARNING) << "STARTTLS response was unrecognizable";
+      close(fd);
+      return {};
+    }
 
     DNS::RR_collection tlsa_rrs; // FIXME
     if (!conn->sock.starttls_client(config_path, sender.ascii().c_str(),
@@ -572,7 +575,73 @@ open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
   return std::optional<std::unique_ptr<SMTP::Connection>>(std::move(conn));
 }
 
-bool data(SMTP::Connection& conn, std::istream& is)
+bool do_mail_from(SMTP::Connection& conn, Mailbox from)
+{
+  auto in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "mail_from"}};
+
+  std::ostringstream param_stream;
+  // param_stream << " SIZE=" << total_size;
+
+  if (conn.has_extension("BINARYMIME")) {
+    param_stream << " BODY=BINARYMIME";
+  }
+  else if (conn.has_extension("8BITMIME")) {
+    param_stream << " BODY=8BITMIME";
+  }
+
+  if (conn.has_extension("SMTPUTF8")) {
+    param_stream << " SMTPUTF8";
+  }
+
+  auto const param_str = param_stream.str();
+
+  LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
+  conn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n"
+                  << std::flush;
+  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+    LOG(ERROR) << "MAIL FROM: reply unparseable";
+    return false;
+  }
+  if (conn.reply_code.at(0) != '2') {
+    LOG(WARNING) << "MAIL FROM: negative reply " << conn.reply_code;
+    return false;
+  }
+
+  conn.mail_from = from;
+  return true;
+}
+
+bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
+{
+  if (conn.mail_from != from) {
+    do_mail_from(conn, from);
+  }
+
+  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to) != end(conn.rcpt_to)) {
+    LOG(INFO) << to << " already in recpt_to list of " << conn.server_id;
+    return true;
+  }
+
+  auto in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
+
+  LOG(INFO) << "C: RCPT TO:<" << to << '>';
+  conn.sock.out() << "RCPT TO:<" << to << ">\r\n" << std::flush;
+  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+    LOG(ERROR) << "RCPT TO: reply unparseable";
+    return false;
+  }
+  if (conn.reply_code.at(0) != '2') {
+    LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
+    return false;
+  }
+
+  conn.rcpt_to.emplace_back(to);
+  return true;
+}
+
+bool do_data(SMTP::Connection& conn, std::istream& is)
 {
   auto in{
       istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "session"}};
@@ -624,7 +693,7 @@ bool data(SMTP::Connection& conn, std::istream& is)
   return conn.reply_code.at(0) == '2';
 }
 
-bool bdat(SMTP::Connection& conn, std::istream& is)
+bool do_bdat(SMTP::Connection& conn, std::istream& is)
 {
   auto in
       = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
@@ -669,8 +738,8 @@ bool bdat(SMTP::Connection& conn, std::istream& is)
 bool do_send(SMTP::Connection& conn, std::istream& is)
 {
   if (conn.has_extension("CHUNKING"))
-    return bdat(conn, is);
-  return data(conn, is);
+    return do_bdat(conn, is);
+  return do_data(conn, is);
 }
 
 bool do_rset(SMTP::Connection& conn)
@@ -712,8 +781,49 @@ bool Send::rcpt_to(DNS::Resolver& res,
                    Mailbox const& to,
                    std::string&   error_msg)
 {
-  // FIXME
-  return true;
+  if (mail_from_.empty()) {
+    LOG(WARNING) << "sequence error, must have MAIL FROM: before RCPT TO:";
+    return false;
+  }
+
+  // Check for existing receivers entry.
+  if (auto rec = receivers_.find(to.domain()); rec != receivers_.end()) {
+    if (auto ex = exchangers_.find(rec->second); ex != exchangers_.end()) {
+      auto& conn = ex->second;
+      return do_rcpt_to(*conn, mail_from_, to);
+    }
+    LOG(ERROR) << "found a receiver but not an exchanger "
+               << "from == " << mail_from_ << "  to == " << to;
+    return false;
+  }
+
+  // Get a connection to an MX for this domain
+  std::vector<Domain> mxs = get_mxs(res, to.domain());
+  CHECK(!mxs.empty());
+  for (auto& mx : mxs) {
+    // Check for existing connection.
+    if (auto ex = exchangers_.find(mx); ex != exchangers_.end()) {
+      LOG(INFO) << "found existing connection to " << mx;
+      receivers_.emplace(to.domain(), mx);
+      auto& conn = ex->second;
+      return do_rcpt_to(*conn, mail_from_, to);
+    }
+    // Open new connection.
+    if (auto new_conn
+        = open_session(res, config_path_, mail_from_.domain(), mx);
+        new_conn) {
+      LOG(INFO) << "opened new connection to " << mx;
+      exchangers_.emplace(mx, std::move(*new_conn));
+      auto ex = exchangers_.find(mx);
+      CHECK(ex != exchangers_.end());
+      receivers_.emplace(to.domain(), mx);
+      auto& conn = ex->second;
+      return do_rcpt_to(*conn, mail_from_, to);
+    }
+  }
+
+  LOG(WARNING) << "ran out of mail exchangers for " << to;
+  return false;
 }
 
 bool Send::send(std::istream& is)
@@ -725,6 +835,8 @@ bool Send::send(std::istream& is)
         LOG(WARNING) << "failed to send to " << conn->server_id;
         return false;
       }
+    } else {
+      LOG(INFO) << "no receivers, skipping MX " << dom;
     }
     conn->mail_from.clear();
     conn->rcpt_to.clear();
