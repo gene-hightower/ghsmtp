@@ -29,8 +29,8 @@ public:
   std::streamsize max_size() const { return max_size_; }
   std::streamsize size_left() const { return max_size() - size(); }
 
-  void save();
-  void trash();
+  fs::path save();
+  void     trash();
 
 private:
   Pill s_;

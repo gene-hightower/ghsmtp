@@ -74,7 +74,7 @@ void Message::try_close_()
   }
 }
 
-void Message::save()
+fs::path Message::save()
 {
   if (size_error()) {
     LOG(WARNING) << "message size error: " << size() << " exceeds "
@@ -88,6 +88,8 @@ void Message::save()
   if (ec) {
     LOG(ERROR) << "can't rename " << tmpfn_ << " to " << newfn_ << ": " << ec;
   }
+
+  return newfn_;
 }
 
 void Message::trash()
