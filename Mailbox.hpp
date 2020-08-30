@@ -78,6 +78,7 @@ public:
   {
     return (local_part_ == rhs.local_part_) && (domain_ == rhs.domain_);
   }
+  bool operator!=(Mailbox const& rhs) const { return !(*this == rhs); }
 
   static bool validate(std::string_view mailbox);
 
