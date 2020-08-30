@@ -13,14 +13,15 @@
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "SPF.hpp"
+#include "Send.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
 
 namespace Config {
-constexpr size_t kibibyte = 1024;
-constexpr size_t mebibyte = kibibyte * kibibyte;
+constexpr size_t kibibyte             = 1024;
+constexpr size_t mebibyte             = kibibyte * kibibyte;
 constexpr size_t max_msg_size_initial = 15 * mebibyte;
-constexpr size_t max_msg_size_bro = 150 * mebibyte;
+constexpr size_t max_msg_size_bro     = 150 * mebibyte;
 } // namespace Config
 
 class Session {
@@ -33,8 +34,8 @@ public:
   explicit Session(
       fs::path                  config_path,
       std::function<void(void)> read_hook = []() {},
-      int                       fd_in = STDIN_FILENO,
-      int                       fd_out = STDOUT_FILENO);
+      int                       fd_in     = STDIN_FILENO,
+      int                       fd_out    = STDOUT_FILENO);
 
   void greeting();
   void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
@@ -120,6 +121,10 @@ private:
   DNS::Resolver res_;
   Sock          sock_;
 
+  // forwarding
+  Send                 send_;
+  std::vector<Mailbox> fwd_path_; // for each "rcpt to"
+
   // per connection/session
   Domain              server_identity_; // who we identify as
   std::vector<Domain> client_fcrdns_;   // who they look-up as
@@ -140,7 +145,7 @@ private:
   // White and black lists for domains.
   CDB white_;
   CDB black_;
-  CDB folders_;
+  CDB forward_;
 
   // Domains we receive mail for.
   CDB accept_domains_;

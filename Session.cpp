@@ -11,6 +11,7 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "Message.hpp"
+#include "SRS.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
@@ -21,6 +22,8 @@
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+
+#include <boost/iostreams/device/mapped_file.hpp>
 
 #include <boost/xpressive/xpressive.hpp>
 
@@ -124,13 +127,13 @@ char const* uribls[]{
     "multi.surbl.org",
 };
 
-constexpr auto greeting_wait = std::chrono::seconds{2};
+constexpr auto greeting_wait              = std::chrono::seconds{2};
 constexpr int  max_recipients_per_message = 100;
-constexpr int  max_unrecognized_cmds = 20;
+constexpr int  max_unrecognized_cmds      = 20;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
-constexpr auto read_timeout = std::chrono::minutes{5};
+constexpr auto read_timeout  = std::chrono::minutes{5};
 constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
@@ -148,18 +151,19 @@ Session::Session(fs::path                  config_path,
                  int                       fd_in,
                  int                       fd_out)
   : config_path_(config_path)
-  , res_(config_path_)
+  , res_(config_path)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+  , send_(config_path)
 {
-  auto accept_db_name = config_path_ / "accept_domains";
-  auto black_db_name = config_path_ / "black";
-  auto white_db_name = config_path_ / "white";
-  auto folders_db_name = config_path_ / "folders";
+  auto accept_db_name  = config_path_ / "accept_domains";
+  auto black_db_name   = config_path_ / "black";
+  auto white_db_name   = config_path_ / "white";
+  auto forward_db_name = config_path_ / "forward";
 
   accept_domains_.open(accept_db_name);
   black_.open(black_db_name);
   white_.open(white_db_name);
-  folders_.open(folders_db_name);
+  forward_.open(forward_db_name);
 
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
@@ -168,7 +172,7 @@ Session::Session(fs::path                  config_path,
     }
   }
 
-  auto const our_id{[this] {
+  server_identity_ = [this] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
     if (id_from_env)
       return std::string{id_from_env};
@@ -188,9 +192,9 @@ Session::Session(fs::path                  config_path,
     }
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
-  }()};
+  }();
 
-  server_identity_.set(our_id);
+  send_.set_sender(server_identity_);
 
   max_msg_size(Config::max_msg_size_initial);
 }
@@ -226,13 +230,14 @@ void Session::reset_()
 
   // client_identity_.clear(); <-- not cleared!
 
+  fwd_path_.clear();
   reverse_path_.clear();
   forward_path_.clear();
   spf_received_.clear();
 
   binarymime_ = false;
-  smtputf8_ = false;
-  prdr_ = false;
+  smtputf8_   = false;
+  prdr_       = false;
 
   if (msg_) {
     msg_.reset();
@@ -241,6 +246,7 @@ void Session::reset_()
   max_msg_size(max_msg_size());
 
   state_ = xact_step::mail;
+  send_.rset();
 }
 
 // Return codes from connection establishment are 220 or 554, according
@@ -430,6 +436,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   reverse_path_ = std::move(reverse_path);
+  fwd_path_.clear();
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
@@ -444,6 +451,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
 
   state_ = xact_step::rcpt;
+
+  send_.mail_from(reverse_path_);
 }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
@@ -480,14 +489,36 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (!verify_recipient_(forward_path))
     return;
 
-  if (forward_path_.size() >= Config::max_recipients_per_message) {
-    out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
-    LOG(WARNING) << "too many recipients <" << forward_path << ">";
-    return;
+  auto const forward = forward_.find(
+      forward_path.as_string(Mailbox::domain_encoding::ascii).c_str());
+  if (forward) {
+    Mailbox const fwd{forward->c_str()};
+    if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd)
+        != std::end(fwd_path_)) {
+      LOG(INFO) << "forwarding to == " << fwd;
+
+      std::string error_msg;
+      if (!send_.rcpt_to(res_, fwd, error_msg)) {
+        // out_() << error_msg;
+        out_()
+            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+            << std::flush;
+        LOG(WARNING) << "failed to forward <" << fwd << "> " << error_msg;
+        return;
+      }
+      fwd_path_.emplace_back(fwd);
+    }
+  }
+  else {
+    if (forward_path_.size() >= Config::max_recipients_per_message) {
+      out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
+      LOG(WARNING) << "too many recipients <" << forward_path << ">";
+      return;
+    }
+    // no check for dups, postfix doesn't
+    forward_path_.emplace_back(std::move(forward_path));
   }
 
-  // no check for dups, postfix doesn't
-  forward_path_.emplace_back(std::move(forward_path));
   out_() << "250 2.1.5 RCPT TO OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
@@ -598,16 +629,11 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 }
 
 static std::string folder(Session::SpamStatus         status,
-                          CDB&                        cdb,
                           std::vector<Mailbox> const& forward_path,
                           Mailbox const&              reverse_path)
 {
   if (status == Session::SpamStatus::spam)
     return ".Junk";
-
-  auto const folder = cdb.find(reverse_path.domain().ascii());
-  if (folder)
-    return *folder;
 
   return "";
 }
@@ -634,7 +660,7 @@ bool Session::msg_new()
 
   try {
     msg_->open(server_id_(), FLAGS_max_write,
-               folder(status, folders_, forward_path_, reverse_path_));
+               folder(status, forward_path_, reverse_path_));
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
@@ -806,7 +832,12 @@ void Session::data_done()
 
   CHECK(msg_);
   try {
-    msg_->save();
+    auto const path = msg_->save();
+    if (!fwd_path_.empty()) {
+      boost::iostreams::mapped_file_source file;
+      file.open(path);
+      send_.send(file.data(), file.size());
+    }
   }
   catch (std::system_error const& e) {
     switch (errno) {
@@ -942,7 +973,12 @@ void Session::bdat_done(size_t n, bool last)
 
   CHECK(msg_);
   try {
-    msg_->save();
+    auto const path = msg_->save();
+    if (!fwd_path_.empty()) {
+      boost::iostreams::mapped_file_source file;
+      file.open(path);
+      send_.send(file.data(), file.size());
+    }
   }
   catch (std::system_error const& e) {
     switch (errno) {
@@ -1034,6 +1070,7 @@ void Session::help(std::string_view str)
 
 void Session::quit()
 {
+  send_.quit();
   // last_in_group_("QUIT");
   out_() << "221 2.0.0 closing connection\r\n" << std::flush;
   LOG(INFO) << "QUIT";
@@ -1547,7 +1584,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
                random_device_);
   for (auto uribl : Config::uribls) {
     auto const lookup = fmt::format("{}.{}", sender, uribl);
-    auto       as = DNS::get_strings(res_, DNS::RR_type::A, lookup);
+    auto       as     = DNS::get_strings(res_, DNS::RR_type::A, lookup);
     if (!as.empty()) {
       if (as.front() == "127.0.0.1")
         continue;
@@ -1576,7 +1613,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     return true;
   }
 
-  auto const spf_srv = SPF::Server{server_id_().c_str()};
+  auto const spf_srv     = SPF::Server{server_id_().c_str()};
   auto       spf_request = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
@@ -1597,8 +1634,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_request.set_env_from(from.c_str());
 
   auto const spf_res{SPF::Response{spf_request}};
-  spf_result_ = spf_res.result();
-  spf_received_ = spf_res.received_spf();
+  spf_result_        = spf_res.result();
+  spf_received_      = spf_res.received_spf();
   spf_sender_domain_ = spf_request.get_sender_dom();
 
   if (spf_result_ == SPF::Result::PASS) {
