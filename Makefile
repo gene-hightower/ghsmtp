@@ -176,6 +176,7 @@ Session-test_STEMS := \
 	POSIX \
 	Pill \
 	SPF \
+	SRS \
 	Send \
 	Session \
 	Sock \
