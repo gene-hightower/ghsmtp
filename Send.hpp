@@ -50,7 +50,6 @@ public:
   bool mail_from(Mailbox const& from);
   bool rcpt_to(DNS::Resolver& res, Mailbox const& to, std::string& error_msg);
 
-  bool send(std::istream&);
   bool send(char const* data, size_t length);
 
   void rset();

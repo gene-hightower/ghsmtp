@@ -830,11 +830,12 @@ bool Send::rcpt_to(DNS::Resolver& res,
   return false;
 }
 
-bool Send::send(std::istream& is)
+bool Send::send(char const* dp, size_t length)
 {
   // FIXME this needs to be done in parallel
   for (auto& [dom, conn] : exchangers_) {
     if (!conn->rcpt_to.empty()) {
+      auto is{imemstream{dp, length}};
       if (!do_send(*conn, is)) {
         LOG(WARNING) << "failed to send to " << conn->server_id;
         return false;
@@ -847,12 +848,6 @@ bool Send::send(std::istream& is)
     conn->rcpt_to.clear();
   }
   return true;
-}
-
-bool Send::send(char const* dp, size_t length)
-{
-  auto in{imemstream{dp, length}};
-  return send(in);
 }
 
 void Send::rset()
