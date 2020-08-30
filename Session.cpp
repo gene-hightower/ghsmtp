@@ -489,17 +489,22 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (!verify_recipient_(forward_path))
     return;
 
+  if (forward_path_.size() >= Config::max_recipients_per_message) {
+    out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
+    LOG(WARNING) << "too many recipients <" << forward_path << ">";
+    return;
+  }
+  // no check for dups, postfix doesn't
+  forward_path_.emplace_back(std::move(forward_path));
+
   auto const forward = forward_.find(
-      forward_path.as_string(Mailbox::domain_encoding::ascii).c_str());
+      forward_path_.back().as_string(Mailbox::domain_encoding::ascii).c_str());
   if (forward) {
     Mailbox const fwd{forward->c_str()};
     if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd)
-        != std::end(fwd_path_)) {
-      LOG(INFO) << "forwarding to == " << fwd;
-
+        == std::end(fwd_path_)) {
       std::string error_msg;
       if (!send_.rcpt_to(res_, fwd, error_msg)) {
-        // out_() << error_msg;
         out_()
             << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
             << std::flush;
@@ -507,21 +512,16 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
         return;
       }
       fwd_path_.emplace_back(fwd);
+      LOG(INFO) << "forwarding to == <" << fwd_path_.back() << ">";
     }
   }
   else {
-    if (forward_path_.size() >= Config::max_recipients_per_message) {
-      out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
-      LOG(WARNING) << "too many recipients <" << forward_path << ">";
-      return;
-    }
-    // no check for dups, postfix doesn't
-    forward_path_.emplace_back(std::move(forward_path));
+    LOG(INFO) << forward_path_.back() << " for local delivery";
   }
 
-  out_() << "250 2.1.5 RCPT TO OK\r\n";
-  // No flush RFC-2920 section 3.1, this could be part of a command group.
   LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
+  // No flush RFC-2920 section 3.1, this could be part of a command group.
+  out_() << "250 2.1.5 RCPT TO OK\r\n";
 
   state_ = xact_step::data;
 }
