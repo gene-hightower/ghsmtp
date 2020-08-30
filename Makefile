@@ -1,6 +1,6 @@
 USES := ldns libglog libidn2 opendkim openssl
 
-CXXFLAGS += -IPEGTL/include
+CXXFLAGS += -IPEGTL/include -Ijson/include
 
 LDLIBS += \
 	-lboost_filesystem \
@@ -13,6 +13,7 @@ LDLIBS += \
 	-lopendmarc \
 	-lpsl \
 	-lspf2 \
+	-lsrs2 \
 	-lunistring
 
 PROGRAMS := dns_tool smtp msg sasl snd socks5
@@ -70,10 +71,12 @@ smtp_STEMS := smtp \
 	IP \
 	IP4 \
 	IP6 \
+	Mailbox \
 	Message \
 	POSIX \
 	Pill \
 	SPF \
+	Send \
 	Session \
 	Sock \
 	SockBuffer \
@@ -129,6 +132,7 @@ TESTS := \
 	POSIX-test \
 	Pill-test \
 	SPF-test \
+	SRS-test \
 	Send-test \
 	Session-test \
 	Sock-test \
@@ -149,12 +153,13 @@ Domain-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL 
 IP4-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 IP6-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Magic-test_STEMS := Magic
-Mailbox-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+Mailbox-test_STEMS := Mailbox Domain IP IP4 IP6 osutil
 Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+SRS-test_STEMS := SRS
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc osutil
 osutil-test_STEMS := osutil
 
@@ -169,6 +174,7 @@ Session-test_STEMS := \
 	POSIX \
 	Pill \
 	SPF \
+	Send \
 	Session \
 	Sock \
 	SockBuffer \
@@ -186,7 +192,7 @@ databases := \
 	bad_recipients.cdb \
 	bad_senders.cdb \
 	black.cdb \
-	folders.cdb \
+	forward.cdb \
 	ip-black.cdb \
 	temp_fail.cdb \
 	white.cdb
@@ -214,7 +220,7 @@ clean::
 	rm -f accept_domains.cdb
 	rm -f black.cdb
 	rm -f cdb-gen
-	rm -f folders.cdb
+	rm -f forward.cdb
 	rm -f ip-black.cdb
 	rm -f white.cdb
 
@@ -224,11 +230,15 @@ ip-black.cdb: ip-black cdb-gen
 three-level-tlds.cdb: three-level-tlds cdb-gen
 white.cdb: white cdb-gen
 
-folders.cdb: folders
+forward.cdb: forward
 	cat $< | cdb -c $@
 
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
+
+opt_flags := -Og
+
+# gen_flags := -fPIC
 
 # safty_flags := # nada
 
