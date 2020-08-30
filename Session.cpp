@@ -230,8 +230,8 @@ void Session::reset_()
 
   // client_identity_.clear(); <-- not cleared!
 
-  fwd_path_.clear();
   reverse_path_.clear();
+  fwd_path_.clear();
   forward_path_.clear();
   spf_received_.clear();
 
@@ -489,16 +489,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (!verify_recipient_(forward_path))
     return;
 
-  if (forward_path_.size() >= Config::max_recipients_per_message) {
-    out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
-    LOG(WARNING) << "too many recipients <" << forward_path << ">";
-    return;
-  }
-  // no check for dups, postfix doesn't
-  forward_path_.emplace_back(std::move(forward_path));
-
   auto const forward = forward_.find(
-      forward_path_.back().as_string(Mailbox::domain_encoding::ascii).c_str());
+      forward_path.as_string(Mailbox::domain_encoding::ascii).c_str());
   if (forward) {
     Mailbox const fwd{forward->c_str()};
     if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd)
@@ -512,14 +504,22 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
         return;
       }
       fwd_path_.emplace_back(fwd);
-      LOG(INFO) << "forwarding to == <" << fwd_path_.back() << ">";
+      LOG(INFO) << "RCPT TO:<" << forward_path << ">"
+                << "forwarding to == <" << fwd_path_.back() << ">";
     }
   }
   else {
-    LOG(INFO) << forward_path_.back() << " for local delivery";
+    if (forward_path_.size() >= Config::max_recipients_per_message) {
+      out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
+      LOG(WARNING) << "too many recipients <" << forward_path << ">";
+      return;
+    }
+    // no check for dups, postfix doesn't
+    forward_path_.emplace_back(std::move(forward_path));
+
+    LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
   }
 
-  LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
 
@@ -542,7 +542,8 @@ std::string Session::added_headers_(Message const& msg)
   std::string const tls_info{sock_.tls_info()};
 
   fmt::memory_buffer headers;
-  fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
+  if (!is_forwarding_())
+    fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
 
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
   fmt::format_to(headers, "Received: from {}", client_identity_.utf8());
@@ -564,7 +565,7 @@ std::string Session::added_headers_(Message const& msg)
   fmt::format_to(headers, ";\r\n\t{}\r\n", msg.when());
 
   // Received-SPF:
-  if (!spf_received_.empty()) {
+  if (!is_forwarding_() && !spf_received_.empty()) {
     fmt::format_to(headers, "{}\r\n", spf_received_);
   }
 
@@ -664,10 +665,12 @@ bool Session::msg_new()
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
-    fmt::memory_buffer spam_status;
-    fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
-                   ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
-    msg_->write(spam_status.data(), spam_status.size());
+    if (!is_forwarding_()) {
+      fmt::memory_buffer spam_status;
+      fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
+                     ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
+      msg_->write(spam_status.data(), spam_status.size());
+    }
     return true;
   }
   catch (std::system_error const& e) {
@@ -807,9 +810,6 @@ bool Session::data_start()
     state_ = xact_step::rset; // RFC 3030 section 3 page 5
     return false;
   }
-  // for bounce messages
-  // CHECK(!reverse_path_.empty());
-  CHECK(!forward_path_.empty());
 
   if (!msg_new()) {
     LOG(ERROR) << "msg_new() failed";
@@ -941,8 +941,6 @@ bool Session::bdat_start(size_t n)
                  << (sock_.has_peername() ? " from " : "") << client_;
     return false;
   }
-
-  CHECK(!forward_path_.empty());
 
   state_ = xact_step::bdat;
 

@@ -114,6 +114,11 @@ private:
   bool verify_from_params_(parameters_t const& parameters);
   bool verify_rcpt_params_(parameters_t const& parameters);
 
+  bool is_forwarding_() const
+  {
+    return forward_path_.empty() && !fwd_path_.empty();
+  }
+
   void exit_() __attribute__((noreturn));
 
 private:
