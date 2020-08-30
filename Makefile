@@ -170,6 +170,7 @@ Session-test_STEMS := \
 	IP \
 	IP4 \
 	IP6 \
+	Mailbox \
 	Message \
 	POSIX \
 	Pill \
