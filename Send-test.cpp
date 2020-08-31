@@ -23,10 +23,11 @@ void do_arc(char const* msg, size_t len)
   imemstream  stream{msg, len};
   std::string line;
   while (std::getline(stream, line)) {
-    if (line.empty()) {
+    if (line == "\r") {
       CHECK_EQ(arc_msg.eoh(), ARC_STAT_OK);
       break;
     }
+    LOG(INFO) << "line «" << line << "»";
     CHECK_EQ(arc_msg.header_field(line.data(), line.length()), ARC_STAT_OK);
   }
   // body
