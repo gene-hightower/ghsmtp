@@ -4,8 +4,11 @@
 *.o
 *~
 SRS.ipp
+accept_domains
+bad_recipients
 cdb-gen
 dns_tool
+forward
 ghsmtp.private
 ghsmtp.txt
 mail.*
@@ -18,4 +21,5 @@ smtp.key
 smtp.pem
 snd
 socks5
+temp_fail
 test-credentials.ipp
