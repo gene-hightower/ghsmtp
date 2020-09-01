@@ -5,6 +5,8 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+#include <glog/logging.h>
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
@@ -168,6 +170,7 @@ Mailbox::Mailbox(std::string_view mailbox)
   if (!mailbox.empty()) {
     memory_input<> address_in(mailbox, "address");
     if (!parse<RFC5321::mailbox_only, RFC5321::action>(address_in, *this)) {
+      LOG(ERROR) << "invalid mailbox syntax «" << mailbox << "»";
       throw std::invalid_argument("invalid mailbox syntax");
     }
   }
@@ -175,10 +178,12 @@ Mailbox::Mailbox(std::string_view mailbox)
   // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
 
   if (local_part().length() > 64) { // Section 4.5.3.1.1.  Local-part
+    LOG(ERROR) << "local part too long «" << mailbox << "»";
     throw std::invalid_argument("local part > 64 octets");
   }
   if (domain().ascii().length() > 255) { // Section 4.5.3.1.2.
     // Also RFC 2181 section 11. Name syntax
+    LOG(ERROR) << "domain too long «" << mailbox << "»";
     throw std::invalid_argument("domain > 255 octets");
   }
 
