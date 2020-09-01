@@ -1,10 +1,6 @@
 #include "OpenDKIM.hpp"
 
-#include <cstdbool> // needs to be above <dkim.h>
-
-#ifdef __clang__
-using _Bool = bool; // Not nice to use _Bool in a public interface.
-#endif
+#include <stdbool.h> // needs to be above <dkim.h>
 
 #include <dkim.h>
 
@@ -20,7 +16,7 @@ u_char* uc(char const* cp)
 char const* c(unsigned char* ucp) { return reinterpret_cast<char const*>(ucp); }
 
 constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
-constexpr unsigned char id_s[]{"OpenDKIM::Verify"};
+constexpr unsigned char id_s[]{"OpenDKIM::Sign"};
 } // namespace
 
 namespace OpenDKIM {
