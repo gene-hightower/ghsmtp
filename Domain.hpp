@@ -45,7 +45,8 @@ public:
 private:
   std::string ascii_;
   std::string utf8_;
-  bool        is_address_literal_{false};
+
+  bool is_address_literal_{false};
 };
 
 inline void Domain::clear()
