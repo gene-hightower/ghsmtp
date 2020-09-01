@@ -219,7 +219,7 @@ clean-test::
 	rm -f smtp.profdata
 	rm -rf $(TEST_MAILDIR)/*
 
-%.cdb : %
+%.cdb : % cdb-gen
 	./cdb-gen < $< | cdb -c $@
 
 clean::
