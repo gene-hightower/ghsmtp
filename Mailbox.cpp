@@ -178,13 +178,11 @@ Mailbox::Mailbox(std::string_view mailbox)
   // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
 
   if (local_part().length() > 64) { // Section 4.5.3.1.1.  Local-part
-    LOG(ERROR) << "local part too long «" << mailbox << "»";
-    throw std::invalid_argument("local part > 64 octets");
+    LOG(WARNING) << "local part > 64 octets «" << mailbox << "»";
   }
   if (domain().ascii().length() > 255) { // Section 4.5.3.1.2.
     // Also RFC 2181 section 11. Name syntax
-    LOG(ERROR) << "domain too long «" << mailbox << "»";
-    throw std::invalid_argument("domain > 255 octets");
+    LOG(WARNING) << "domain > 255 octets «" << mailbox << "»";
   }
 
   // FIXME
