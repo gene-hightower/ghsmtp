@@ -230,6 +230,12 @@ clean::
 	rm -f ip-black.cdb
 	rm -f white.cdb
 
+bad_recipients::
+	echo nobody > $@
+
+accept_domains bad_senders black forward ip-black temp_fail white::
+	touch $@
+
 accept_domains.cdb: accept_domains cdb-gen
 black.cdb: black cdb-gen
 ip-black.cdb: ip-black cdb-gen
