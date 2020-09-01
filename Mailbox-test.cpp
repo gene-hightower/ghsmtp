@@ -6,6 +6,9 @@
 
 int main(int argc, char* argv[])
 {
+  Mailbox empty("");
+  Mailbox postmaster("postmaster@[127.0.0.1]");
+
   Mailbox mb;
   CHECK(mb.empty());
 
