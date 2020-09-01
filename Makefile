@@ -1,8 +1,9 @@
-USES := ldns libglog libidn2 opendkim openssl openarc
+USES := ldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -IPEGTL/include -Ijson/include
 
 LDLIBS += \
+	-lopenarc \
 	-lboost_filesystem \
 	-lboost_iostreams \
 	-lboost_system \
@@ -43,6 +44,7 @@ msg_STEMS := msg \
 	IP \
 	IP4 \
 	IP6 \
+	Mailbox \
 	POSIX \
 	SPF \
 	Sock \
@@ -93,6 +95,7 @@ snd_STEMS := snd \
 	IP \
 	IP4 \
 	IP6 \
+	Mailbox \
 	Message \
 	Magic \
 	POSIX \
@@ -239,7 +242,7 @@ forward.cdb: forward
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-opt_flags := -Og
+opt_flags := -Og -g
 
 # gen_flags := -fPIC
 

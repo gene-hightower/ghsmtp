@@ -190,3 +190,40 @@ Mailbox::Mailbox(std::string_view mailbox)
   // FIXME
   // Check that each label is limited to between 1 and 63 octets.
 }
+
+size_t Mailbox::length(domain_encoding enc) const
+{
+  if (enc == domain_encoding::ascii) {
+    for (auto ch : local_part_) {
+      if (!isascii(static_cast<unsigned char>(ch))) {
+        LOG(WARNING) << "non ascii chars in local part:" << local_part_;
+        // throw std::range_error("non ascii chars in local part of mailbox");
+      }
+    }
+  }
+  auto const& d
+      = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
+  return local_part_.length() + (d.length() ? (d.length() + 1) : 0);
+}
+
+std::string Mailbox::as_string(domain_encoding enc) const
+{
+  if (enc == domain_encoding::ascii) {
+    for (auto ch : local_part_) {
+      if (!isascii(static_cast<unsigned char>(ch))) {
+        LOG(WARNING) << "non ascii chars in local part:" << local_part_;
+        // throw std::range_error("non ascii chars in local part of mailbox");
+      }
+    }
+  }
+  std::string s;
+  s.reserve(length(enc));
+  s = local_part();
+  auto const& d
+      = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
+  if (!d.empty()) {
+    s += '@';
+    s += d;
+  }
+  return s;
+}
