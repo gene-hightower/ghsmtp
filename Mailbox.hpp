@@ -35,7 +35,7 @@ public:
 
   enum class domain_encoding : bool { ascii, utf8 };
 
-  size_t length(domain_encoding enc = domain_encoding::ascii) const
+  size_t length(domain_encoding enc = domain_encoding::utf8) const
   {
     if (enc == domain_encoding::ascii) {
       for (auto ch : local_part_) {
@@ -51,7 +51,7 @@ public:
 
   bool empty() const { return length() == 0; }
 
-  std::string as_string(domain_encoding enc = domain_encoding::ascii) const
+  std::string as_string(domain_encoding enc = domain_encoding::utf8) const
   {
     if (enc == domain_encoding::ascii) {
       for (auto ch : local_part_) {
