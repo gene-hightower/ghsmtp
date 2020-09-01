@@ -47,7 +47,7 @@ void do_arc(char const* dom, char const* msg, size_t len)
   CHECK_EQ(arc_msg.eom(), ARC_STAT_OK) << arc_msg.geterror();
 
   boost::iostreams::mapped_file_source priv;
-  priv.open("private.key");
+  priv.open("smtp.key");
 
   ARC_HDRFIELD* seal = nullptr;
 
