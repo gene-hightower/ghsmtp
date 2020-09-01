@@ -157,16 +157,19 @@ bool Mailbox::validate(std::string_view mailbox)
 {
   Mailbox        mbx;
   memory_input<> address_in(mailbox, "address");
-  return parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx)
+  return !mailbox.empty()
+         && parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx)
          && (mbx.local_part().length() <= 64)
          && (mbx.domain().ascii().length() <= 255);
 }
 
 Mailbox::Mailbox(std::string_view mailbox)
 {
-  memory_input<> address_in(mailbox, "address");
-  if (!parse<RFC5321::mailbox_only, RFC5321::action>(address_in, *this)) {
-    throw std::invalid_argument("invalid mailbox syntax");
+  if (!mailbox.empty()) {
+    memory_input<> address_in(mailbox, "address");
+    if (!parse<RFC5321::mailbox_only, RFC5321::action>(address_in, *this)) {
+      throw std::invalid_argument("invalid mailbox syntax");
+    }
   }
 
   // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
