@@ -1,21 +1,38 @@
 #ifndef ARC_DOT_HPP_INCLUDED
 #define ARC_DOT_HPP_INCLUDED
 
-#include <stdbool.h>
+#include <stdbool.h> // needs to be above <openarc/arc.h>
 
 #include <openarc/arc.h>
 
 namespace ARC {
 
-u_char* uc(char const* p)
+u_char* uc(char const* cp)
 {
-  return reinterpret_cast<u_char*>(const_cast<char*>(p));
+  return reinterpret_cast<u_char*>(const_cast<char*>(cp));
 }
+
+char const* c(u_char* ucp) { return reinterpret_cast<char const*>(ucp); }
+
+namespace hdr {
+std::string_view name(ARC_HDRFIELD* hp)
+{
+  size_t     sz;
+  auto const nm = c(arc_hdr_name(hp, &sz));
+  return {nm, sz};
+}
+
+std::string_view value(ARC_HDRFIELD* hp)
+{
+  auto const nm = c(arc_hdr_value(hp));
+  return {nm, strlen(nm)};
+}
+} // namespace hdr
 
 class msg {
 public:
   // move, no copy
-  msg(msg&&)   = default;
+  msg(msg&&) = default;
   msg& operator=(msg&&) = default;
 
   msg(ARC_MESSAGE* msg)
@@ -48,6 +65,8 @@ public:
                        uc(key), keylen, uc(ar));
   }
 
+  char const* geterror() const { return arc_geterror(msg_); }
+
 private:
   ARC_MESSAGE* msg_;
 };
@@ -55,7 +74,7 @@ private:
 class lib {
 public:
   // move, no copy
-  lib(lib&&)   = default;
+  lib(lib&&) = default;
   lib& operator=(lib&&) = default;
 
   lib()
