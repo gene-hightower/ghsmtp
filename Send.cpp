@@ -772,8 +772,10 @@ Send::Send(fs::path config_path)
 bool Send::mail_from(Mailbox const& mailbox)
 {
   SRS srs;
-  mail_from_ = Mailbox(
-      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str()));
+  auto const fwd = srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
+  if (Mailbox::validate(fwd))
+    mail_from_ = Mailbox(fwd);
+
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
     conn->rcpt_to.clear();
