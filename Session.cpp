@@ -1438,6 +1438,12 @@ bool Session::verify_client_(Domain const& client_identity,
       return true;
     }
 
+    // Give 'em a pass
+    if (ip_whitelisted_) {
+      LOG(INFO) << "white-listed IP address can claim to be " << client_identity;
+      return true;
+    }
+
     error_msg = fmt::format("liar, claimed to be {}", client_identity.ascii());
     out_() << "550 5.7.1 liar\r\n" << std::flush;
     return false;
