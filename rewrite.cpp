@@ -1,6 +1,7 @@
 #include "rewrite.hpp"
 
 #include "ARC.hpp"
+#include "esc.hpp"
 #include "imemstream.hpp"
 
 #include <cstring>
@@ -17,18 +18,27 @@ static void do_arc(char const* dom, char const* msg, size_t len)
                              ARC_SIGN_RSASHA256, ARC_MODE_SIGN, &error);
 
   imemstream  stream{msg, len};
+  std::string header;
   std::string line;
   while (std::getline(stream, line)) {
     if (!stream.eof() && !stream.fail()) {
       line.push_back('\n');
     }
-    if (line == "\r\n") {
-      CHECK_EQ(arc_msg.eoh(), ARC_STAT_OK) << arc_msg.geterror();
-      break;
+    if (line[0] == ' ' || line[0] == '\t') {
+      header += line;
     }
-    // LOG(INFO) << "line «" << line << "»";
-    CHECK_EQ(arc_msg.header_field(line.data(), line.length()), ARC_STAT_OK)
-        << arc_msg.geterror();
+    else {
+      if (!header.empty()) {
+        LOG(INFO) << "header «" << esc(header, esc_line_option::multi) << "»";
+        CHECK_EQ(arc_msg.header_field(line.data(), line.length()), ARC_STAT_OK)
+          << arc_msg.geterror();
+      }
+      if (line == "\r\n") {
+        CHECK_EQ(arc_msg.eoh(), ARC_STAT_OK) << arc_msg.geterror();
+        break;
+      }
+      header = line;
+    }
   }
   // body
   while (std::getline(stream, line)) {
