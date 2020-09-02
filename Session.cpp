@@ -139,6 +139,8 @@ constexpr auto write_timeout = std::chrono::seconds{30};
 
 #include <gflags/gflags.h>
 
+DEFINE_bool(test_mode, false, "ease up on some checks");
+
 DEFINE_bool(immortal, false, "don't set process timout");
 
 DEFINE_uint64(max_read, 0, "max data to read");
@@ -1438,9 +1440,15 @@ bool Session::verify_client_(Domain const& client_identity,
       return true;
     }
 
-    // Give 'em a pass
+    // Give 'em a pass.
     if (ip_whitelisted_) {
-      LOG(INFO) << "white-listed IP address can claim to be " << client_identity;
+      LOG(INFO) << "white-listed IP address can claim to be "
+                << client_identity;
+      return true;
+    }
+
+    // Ease up in test mode.
+    if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
       return true;
     }
 
@@ -1510,6 +1518,11 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
          && (accept_domains_.contains(sender.domain().ascii())
              || accept_domains_.contains(sender.domain().utf8())))
         || (sender.domain() == server_identity_)) {
+
+      // Ease up in test mode.
+      if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
+        return true;
+      }
       out_() << "550 5.7.1 liar\r\n" << std::flush;
       error_msg = fmt::format("liar, claimed to be {}", sender.domain());
       return false;
