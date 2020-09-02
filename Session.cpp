@@ -567,7 +567,7 @@ std::string Session::added_headers_(Message const& msg)
   fmt::format_to(headers, ";\r\n\t{}\r\n", msg.when());
 
   // Received-SPF:
-  if (!is_forwarding_() && !spf_received_.empty()) {
+  if (!spf_received_.empty()) {
     fmt::format_to(headers, "{}\r\n", spf_received_);
   }
 
