@@ -62,7 +62,8 @@ static void do_arc(char const* dom, char const* msg, size_t len)
 std::pair<std::unique_ptr<char[]>, size_t>
 rewrite(char const* dom, char const* dp_in, size_t length_in)
 {
-  // Dummy re-write for now...
+  do_arc(dom, dp_in, length_in);
+
   auto dp = std::make_unique<char[]>(length_in);
   std::memcpy(dp.get(), dp_in, length_in);
   return std::pair{std::move(dp), length_in};
