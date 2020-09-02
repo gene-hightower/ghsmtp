@@ -772,8 +772,9 @@ Send::Send(fs::path config_path)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  SRS srs;
-  auto const fwd = srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
+  SRS        srs;
+  auto const fwd
+      = srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
   if (Mailbox::validate(fwd))
     mail_from_ = Mailbox(fwd);
 
@@ -835,7 +836,8 @@ bool Send::rcpt_to(DNS::Resolver& res,
 
 bool Send::send(char const* dp_in, size_t length_in)
 {
-  auto [dp, length] = rewrite(dp_in, length_in);
+  auto const sender = sender_.ascii().c_str();
+  auto [dp, length] = rewrite(sender, dp_in, length_in);
 
   // FIXME this needs to be done in parallel
   for (auto& [dom, conn] : exchangers_) {
