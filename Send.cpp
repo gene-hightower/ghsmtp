@@ -6,6 +6,7 @@
 #include "IP6.hpp"
 #include "SRS.hpp"
 #include "imemstream.hpp"
+#include "rewrite.hpp"
 
 #include <gflags/gflags.h>
 
@@ -832,12 +833,14 @@ bool Send::rcpt_to(DNS::Resolver& res,
   return false;
 }
 
-bool Send::send(char const* dp, size_t length)
+bool Send::send(char const* dp_in, size_t length_in)
 {
+  auto [dp, length] = rewrite(dp_in, length_in);
+
   // FIXME this needs to be done in parallel
   for (auto& [dom, conn] : exchangers_) {
     if (!conn->rcpt_to.empty()) {
-      auto is{imemstream{dp, length}};
+      auto is{imemstream{dp.get(), length}};
       if (!do_send(*conn, is)) {
         LOG(WARNING) << "failed to send to " << conn->server_id;
         return false;
