@@ -1,9 +1,13 @@
 #ifndef ARC_DOT_HPP_INCLUDED
 #define ARC_DOT_HPP_INCLUDED
 
+#include <cstring>
+
 #include <stdbool.h> // needs to be above <openarc/arc.h>
 
 #include <openarc/arc.h>
+
+#include <glog/logging.h>
 
 namespace ARC {
 
@@ -32,7 +36,7 @@ std::string_view value(ARC_HDRFIELD* hp)
 class msg {
 public:
   // move, no copy
-  msg(msg&&) = default;
+  msg(msg&&)   = default;
   msg& operator=(msg&&) = default;
 
   msg(ARC_MESSAGE* msg)
@@ -74,7 +78,7 @@ private:
 class lib {
 public:
   // move, no copy
-  lib(lib&&) = default;
+  lib(lib&&)   = default;
   lib& operator=(lib&&) = default;
 
   lib()

@@ -15,6 +15,7 @@ mail.*
 mkm
 msg
 notes.txt
+public_suffix_list.dat
 sasl
 smtp
 smtp.key

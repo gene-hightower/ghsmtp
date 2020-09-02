@@ -85,7 +85,8 @@ smtp_STEMS := smtp \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	osutil
+	osutil \
+	rewrite
 
 snd_STEMS := snd \
 	Base64 \
@@ -146,7 +147,8 @@ TESTS := \
 	default_init_allocator-test \
 	esc-test \
 	iobuffer-test \
-	osutil-test
+	osutil-test \
+	rewrite-test
 
 Base64-test_STEMS := Base64
 CDB-test_STEMS := CDB osutil
@@ -164,8 +166,10 @@ POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS
-Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
+
 osutil-test_STEMS := osutil
+rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox osutil
 
 Session-test_STEMS := \
 	CDB \
@@ -186,7 +190,8 @@ Session-test_STEMS := \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	osutil
+	osutil \
+	rewrite
 
 Sock-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SockBuffer-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
