@@ -169,7 +169,7 @@ SRS-test_STEMS := SRS
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
 
 osutil-test_STEMS := osutil
-rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox osutil
+rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox osutil esc
 
 Session-test_STEMS := \
 	CDB \
