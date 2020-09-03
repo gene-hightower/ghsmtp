@@ -2,6 +2,7 @@
 #define OPENDKIM_DOT_HPP
 
 #include <functional>
+#include <string>
 #include <string_view>
 
 struct dkim_lib;
@@ -9,9 +10,14 @@ struct dkim;
 
 namespace OpenDKIM {
 
-class Lib {
-  Lib(Lib const&) = delete;
-  Lib& operator=(Lib const&) = delete;
+class lib {
+  // no copy
+  lib(lib const&) = delete;
+  lib& operator=(lib const&) = delete;
+
+  // move
+  lib(lib&&)   = default;
+  lib& operator=(lib&&) = default;
 
 public:
   void header(std::string_view header);
@@ -21,37 +27,38 @@ public:
   void eom();
 
 protected:
-  Lib();
-  ~Lib();
+  lib();
+  ~lib();
 
   dkim_lib* lib_{nullptr};
   dkim*     dkim_{nullptr};
   int       status_{0};
 };
 
-class Verify : public Lib {
-public:
-  Verify();
-
-  bool check();
-  bool sig_syntax(std::string_view sig);
-  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
-};
-
-class Sign : public Lib {
+class sign : public lib {
 public:
   enum class body_type : bool {
     binary,
     text,
   };
 
-  Sign(char const* secretkey,
+  sign(char const* secretkey,
        char const* selector,
        char const* domain,
        body_type   typ = body_type::text);
 
   std::string getsighdr();
 };
+
+class verify : public lib {
+public:
+  verify();
+
+  bool check();
+  bool sig_syntax(std::string_view sig);
+  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
+};
+
 } // namespace OpenDKIM
 
 #endif // OPENDKIM_DOT_HPP

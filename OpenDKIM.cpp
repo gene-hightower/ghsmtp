@@ -15,24 +15,24 @@ u_char* uc(char const* cp)
 
 char const* c(unsigned char* ucp) { return reinterpret_cast<char const*>(ucp); }
 
-constexpr unsigned char id_v[]{"DKIM::Verify"};
-constexpr unsigned char id_s[]{"DKIM::Sign"};
+constexpr unsigned char id_v[]{"DKIM::verify"};
+constexpr unsigned char id_s[]{"DKIM::sign"};
 } // namespace
 
 namespace OpenDKIM {
 
-Lib::Lib()
+lib::lib()
   : lib_(CHECK_NOTNULL(dkim_init(nullptr, nullptr)))
 {
 }
 
-Lib::~Lib()
+lib::~lib()
 {
   dkim_free(dkim_);
   dkim_close(lib_);
 }
 
-void Lib::header(std::string_view header)
+void lib::header(std::string_view header)
 {
   if (header.size() && header.back() == '\n')
     header.remove_suffix(1);
@@ -47,7 +47,7 @@ void Lib::header(std::string_view header)
   // header.length());
 }
 
-void Lib::eoh()
+void lib::eoh()
 {
   status_ = dkim_eoh(dkim_);
   switch (status_) {
@@ -62,21 +62,21 @@ void Lib::eoh()
   }
 }
 
-void Lib::body(std::string_view body)
+void lib::body(std::string_view body)
 {
   CHECK_EQ((status_ = dkim_body(dkim_, uc(body.data()), body.length())),
            DKIM_STAT_OK)
       << "dkim_body error: " << dkim_getresultstr(status_);
 }
 
-void Lib::chunk(std::string_view chunk)
+void lib::chunk(std::string_view chunk)
 {
   CHECK_EQ((status_ = dkim_chunk(dkim_, uc(chunk.data()), chunk.length())),
            DKIM_STAT_OK)
       << "dkim_chunk error: " << dkim_getresultstr(status_);
 }
 
-void Lib::eom()
+void lib::eom()
 {
   status_ = dkim_eom(dkim_, nullptr);
 
@@ -92,7 +92,32 @@ void Lib::eom()
   }
 }
 
-void Verify::foreach_sig(
+//.............................................................................
+
+sign::sign(char const* secretkey,
+           char const* selector,
+           char const* domain,
+           body_type   typ)
+{
+  dkim_ = CHECK_NOTNULL(dkim_sign(
+      lib_, id_s, nullptr, uc(secretkey), uc(selector), uc(domain),
+      DKIM_CANON_RELAXED,
+      (typ == body_type::binary) ? DKIM_CANON_SIMPLE : DKIM_CANON_RELAXED,
+      DKIM_SIGN_RSASHA256, -1, &status_));
+}
+
+std::string sign::getsighdr()
+{
+  auto const     initial{strlen(DKIM_SIGNHEADER) + 2};
+  unsigned char* buf = nullptr;
+  size_t         len = 0;
+  status_            = dkim_getsighdr_d(dkim_, initial, &buf, &len);
+  return std::string(c(buf), len);
+}
+
+//.............................................................................
+
+void verify::foreach_sig(
     std::function<void(char const* domain, bool passed)> func)
 {
   int            nsigs = 0;
@@ -145,12 +170,12 @@ void Verify::foreach_sig(
   }
 }
 
-Verify::Verify()
+verify::verify()
 {
   dkim_ = CHECK_NOTNULL(dkim_verify(lib_, id_v, nullptr, &status_));
 }
 
-bool Verify::check()
+bool verify::check()
 {
   int            nsigs = 0;
   DKIM_SIGINFO** sigs  = nullptr;
@@ -222,29 +247,9 @@ bool Verify::check()
   return false;
 }
 
-bool Verify::sig_syntax(std::string_view sig)
+bool verify::sig_syntax(std::string_view sig)
 {
   return dkim_sig_syntax(dkim_, uc(sig.data()), sig.length()) == DKIM_STAT_OK;
 }
 
-Sign::Sign(char const* secretkey,
-           char const* selector,
-           char const* domain,
-           body_type   typ)
-{
-  dkim_ = CHECK_NOTNULL(dkim_sign(
-      lib_, id_s, nullptr, uc(secretkey), uc(selector), uc(domain),
-      DKIM_CANON_RELAXED,
-      (typ == body_type::binary) ? DKIM_CANON_SIMPLE : DKIM_CANON_RELAXED,
-      DKIM_SIGN_RSASHA256, -1, &status_));
-}
-
-std::string Sign::getsighdr()
-{
-  auto const     initial{strlen(DKIM_SIGNHEADER) + 2};
-  unsigned char* buf = nullptr;
-  size_t         len = 0;
-  status_            = dkim_getsighdr_d(dkim_, initial, &buf, &len);
-  return std::string(c(buf), len);
-}
 } // namespace OpenDKIM

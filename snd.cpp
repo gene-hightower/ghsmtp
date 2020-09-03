@@ -1263,8 +1263,8 @@ void sign_eml(Eml&                        eml,
               std::vector<content> const& bodies)
 {
   auto const body_type = (bodies[0].type() == data_type::binary)
-                             ? OpenDKIM::Sign::body_type::binary
-                             : OpenDKIM::Sign::body_type::text;
+                             ? OpenDKIM::sign::body_type::binary
+                             : OpenDKIM::sign::body_type::text;
 
   auto const key_file = FLAGS_dkim_key_file.empty()
                             ? (FLAGS_selector + ".private")
@@ -1272,7 +1272,7 @@ void sign_eml(Eml&                        eml,
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string    key(std::istreambuf_iterator<char>{keyfs}, {});
-  OpenDKIM::Sign dks(key.c_str(), FLAGS_selector.c_str(),
+  OpenDKIM::sign dks(key.c_str(), FLAGS_selector.c_str(),
                      from_mbx.domain().ascii().c_str(), body_type);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
     auto header = name + ": "s + value;

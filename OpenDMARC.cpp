@@ -10,7 +10,7 @@ u_char* uc(char const* cp)
 } // namespace
 
 namespace OpenDMARC {
-Lib::Lib()
+lib::lib()
 {
 #define PUBLIC_SUFFIX_LIST_DAT "public_suffix_list.dat"
   auto const path{[] {
@@ -35,9 +35,9 @@ Lib::Lib()
   CHECK_EQ(status, DMARC_PARSE_OKAY) << opendmarc_policy_status_to_str(status);
 }
 
-Lib::~Lib() { opendmarc_policy_library_shutdown(&lib_); }
+lib::~lib() { opendmarc_policy_library_shutdown(&lib_); }
 
-Policy::~Policy()
+policy::~policy()
 {
   if (pctx_) {
     opendmarc_policy_connect_shutdown(pctx_);
@@ -45,13 +45,13 @@ Policy::~Policy()
   }
 }
 
-void Policy::init(char const* ip)
+void policy::connect(char const* ip)
 {
   auto const is_ipv6 = IP6::is_address(ip);
   pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip), is_ipv6));
 }
 
-bool Policy::store_from_domain(char const* from_domain)
+bool policy::store_from_domain(char const* from_domain)
 {
   auto const status
       = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
@@ -63,7 +63,7 @@ bool Policy::store_from_domain(char const* from_domain)
   return true;
 }
 
-bool Policy::store_dkim(char const* d_equal_domain,
+bool policy::store_dkim(char const* d_equal_domain,
                         int         dkim_result,
                         char const* human_result)
 {
@@ -77,7 +77,7 @@ bool Policy::store_dkim(char const* d_equal_domain,
   return true;
 }
 
-bool Policy::store_spf(char const* domain,
+bool policy::store_spf(char const* domain,
                        int         result,
                        int         origin,
                        char const* human_readable)
@@ -92,7 +92,7 @@ bool Policy::store_spf(char const* domain,
   return true;
 }
 
-bool Policy::query_dmarc(char const* domain)
+bool policy::query_dmarc(char const* domain)
 {
   auto const status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
   if (status != DMARC_PARSE_OKAY) {
@@ -102,24 +102,24 @@ bool Policy::query_dmarc(char const* domain)
   return true;
 }
 
-Advice Policy::get_advice()
+advice policy::get_advice()
 {
   auto const status = opendmarc_get_policy_to_enforce(pctx_);
 
   switch (status) {
   case DMARC_PARSE_ERROR_NULL_CTX:
     LOG(WARNING) << "NULL pctx value";
-    return Advice::NONE;
+    return advice::NONE;
 
   case DMARC_FROM_DOMAIN_ABSENT:
     LOG(WARNING) << "no From: domain";
-    return Advice::NONE;
+    return advice::NONE;
 
-  case DMARC_POLICY_ABSENT: return Advice::NONE;
-  case DMARC_POLICY_PASS: return Advice::ACCEPT;
-  case DMARC_POLICY_REJECT: return Advice::REJECT;
-  case DMARC_POLICY_QUARANTINE: return Advice::QUARANTINE;
-  case DMARC_POLICY_NONE: return Advice::NONE;
+  case DMARC_POLICY_ABSENT: return advice::NONE;
+  case DMARC_POLICY_PASS: return advice::ACCEPT;
+  case DMARC_POLICY_REJECT: return advice::REJECT;
+  case DMARC_POLICY_QUARANTINE: return advice::QUARANTINE;
+  case DMARC_POLICY_NONE: return advice::NONE;
   }
 
   LOG(FATAL) << "unknown status";

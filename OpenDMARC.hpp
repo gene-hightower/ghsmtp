@@ -9,30 +9,41 @@
 
 namespace OpenDMARC {
 
-enum class Advice;
-constexpr char const* Advice_to_string(Advice adv);
+enum class advice;
+constexpr char const* advice_to_string(advice adv);
 
-class Lib {
-  Lib(Lib const&) = delete;
-  Lib& operator=(Lib const&) = delete;
+class lib {
+  // no copy
+  lib(lib const&) = delete;
+  lib& operator=(lib const&) = delete;
 
 public:
-  Lib();
-  ~Lib();
+  // move
+  lib(lib&&)   = default;
+  lib& operator=(lib&&) = default;
+
+  lib();
+  ~lib();
 
 private:
   OPENDMARC_LIB_T lib_;
 };
 
-class Policy {
+class policy {
+  // no copy
+  policy(policy const&) = delete;
+  policy& operator=(policy const&) = delete;
+
 public:
-  Policy()              = default;
-  Policy(Policy const&) = delete;
-  Policy& operator=(Policy const&) = delete;
+  policy() = default;
 
-  ~Policy();
+  // move
+  policy(policy&&) = default;
+  policy& operator=(policy&&) = default;
 
-  void   init(char const* ip);
+  ~policy();
+
+  void   connect(char const* ip);
   bool   store_from_domain(char const* from_domain);
   bool   store_dkim(char const* d_equal_domain,
                     int         dkim_result,
@@ -42,26 +53,26 @@ public:
                    int         origin,
                    char const* human_readable);
   bool   query_dmarc(char const* domain);
-  Advice get_advice();
+  advice get_advice();
 
 private:
   DMARC_POLICY_T* pctx_{nullptr};
 };
 
-enum class Advice {
+enum class advice {
   ACCEPT,
   REJECT,
   QUARANTINE,
   NONE,
 };
 
-constexpr char const* Advice_to_string(Advice adv)
+constexpr char const* advice_to_string(advice adv)
 {
   switch (adv) {
-  case Advice::ACCEPT: return "accept";
-  case Advice::REJECT: return "reject";
-  case Advice::QUARANTINE: return "quarantine";
-  case Advice::NONE: break;
+  case advice::ACCEPT: return "accept";
+  case advice::REJECT: return "reject";
+  case advice::QUARANTINE: return "quarantine";
+  case advice::NONE: break;
   }
   return "none";
 }

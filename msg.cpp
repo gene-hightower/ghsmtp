@@ -119,9 +119,9 @@ struct ci_less {
 };
 
 struct Ctx {
-  OpenDKIM::Verify dkv;
+  OpenDKIM::verify dkv;
 
-  OpenDMARC::Policy dmp;
+  OpenDMARC::policy dmp;
 
   std::string mb_loc;
   std::string mb_dom;
@@ -1290,7 +1290,7 @@ struct action<received_spf> {
     }
 
     if (ctx.spf_info.find("client-ip") != end(ctx.spf_info)) {
-      ctx.dmp.init(ctx.spf_info["client-ip"].c_str());
+      ctx.dmp.connect(ctx.spf_info["client-ip"].c_str());
       // LOG(INFO) << "SPF: ip==" << ctx.spf_info["client-ip"] << ", "
       //           << ctx.spf_result;
     }

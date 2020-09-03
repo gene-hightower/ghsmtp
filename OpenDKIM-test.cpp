@@ -11,7 +11,7 @@
 
 int main(int argc, char* argv[])
 {
-  auto const body_type = OpenDKIM::Sign::body_type::text;
+  auto const body_type = OpenDKIM::sign::body_type::text;
 
   auto const    key_file = "ghsmtp.private";
   std::ifstream keyfs(key_file);
@@ -19,7 +19,7 @@ int main(int argc, char* argv[])
 
   std::string key(std::istreambuf_iterator<char>{keyfs}, {});
 
-  OpenDKIM::Sign dks(key.c_str(), "ghsmtp", "digilicious.com", body_type);
+  OpenDKIM::sign dks(key.c_str(), "ghsmtp", "digilicious.com", body_type);
 
   dks.header("from: gene@digilicious.com");
   dks.header("to: gene@digilicious.com");

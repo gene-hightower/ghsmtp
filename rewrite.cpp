@@ -18,6 +18,14 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+auto constexpr ARC_Authentication_Results = "ARC-Authentication-Results";
+auto constexpr ARC_Message_Signature      = "ARC-Message-Signature";
+auto constexpr ARC_Seal                   = "ARC-Seal";
+
+auto constexpr Authentication_Results = "Authentication-Results";
+auto constexpr DKIM_Signature         = "DKIM-Signature";
+auto constexpr Received_SPF           = "Received-SPF";
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
@@ -434,12 +442,26 @@ std::string message_parsed::as_string() const
 
 static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 {
+  CHECK(!msg.headers.empty());
+
+  for (auto header : msg.headers) {
+    // clang-format off
+    if (header == ARC_Seal ||
+        header == ARC_Message_Signature ||
+        header == ARC_Authentication_Results ||
+        header == Received_SPF ||
+        header == DKIM_Signature ||
+        header == Authentication_Results)
+      LOG(INFO) << '\n' << header.as_string() << '\n';
+    // clang-format on
+  }
+
   std::string spf_info_client_ip;
 
   for (auto header : msg.headers) {
-    if (header == "Received-SPF") {
+    if (header == Received_SPF) {
       auto const h = header.as_string();
-      LOG(INFO) << h;
+
       auto in{memory_input<>(h.data(), h.length(), "received_spf")};
       if (tao::pegtl::parse<RFC5322::received_spf, RFC5322::action>(in, msg)) {
         if (auto const ip = msg.spf_info.find("client-ip");
@@ -449,50 +471,54 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
         }
         break; // take just the 1st that parses
       }
-      LOG(WARNING) << "failed to parse Received-SPF";
+      LOG(WARNING) << "failed to parse " << Received_SPF;
     }
   }
 
   for (auto header : msg.headers) {
-    if (header == "Authentication-Results") {
-      LOG(INFO) << header.as_string();
+    if (header == Authentication_Results) {
+      // LOG(INFO) << header.as_string();
       // parse header.value
-      break; // take just the 1st
+      // break; // take just the 1st
     }
   }
 
-  OpenDKIM::Verify dkv;
+  OpenDKIM::verify dkv;
 
-  OpenARC::lib lib;
-  char const*  error = nullptr;
-  auto         arc   = lib.message(ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
-                         ARC_SIGN_RSASHA256, ARC_MODE_VERIFY, &error);
+  OpenARC::verify arv;
 
   for (auto header : msg.headers) {
     auto const hdr_str = fmt::format("{}:{}", header.name, header.value);
     // LOG(INFO) << "header «" << hdr_str << "»";
-    arc.header(hdr_str);
+    arv.header(hdr_str);
     dkv.header(hdr_str);
   }
   dkv.eoh();
-  arc.eoh();
+  arv.eoh();
 
   // LOG(INFO) << "body «" << msg.body << "»";
-  arc.body(msg.body);
+  arv.body(msg.body);
   dkv.body(msg.body);
 
-  arc.eom();
+  arv.eom();
   dkv.eom();
 
-  OpenDMARC::Policy dmp;
+  // Build up Authentication-Results header
+  fmt::memory_buffer bfr;
+  fmt::format_to(bfr, "{}: {};\r\n", Authentication_Results, domain);
+
+  OpenDMARC::policy dmp;
   if (!spf_info_client_ip.empty()) {
     LOG(INFO) << "OpenDMARC::Policy::init(" << spf_info_client_ip << ")";
-    dmp.init(spf_info_client_ip.c_str());
+    dmp.connect(spf_info_client_ip.c_str());
   }
+
+  // Get RFC5322.From
 
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), "From");
       hdr != end(msg.headers)) {
     auto const from = std::string{hdr->value.data(), hdr->value.length()};
+    LOG(INFO) << "RFC5322.From: == " << from;
     dmp.store_from_domain(from.c_str());
   }
   else {
@@ -500,7 +526,7 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     dmp.store_from_domain("unknown.domain");
   }
 
-  dkv.foreach_sig([&dmp](char const* domain, bool passed) {
+  dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed) {
     auto const human_result = (passed ? "passed" : "failed");
     LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
@@ -508,15 +534,21 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
                               : DMARC_POLICY_DKIM_OUTCOME_FAIL;
 
     dmp.store_dkim(domain, result, human_result);
+
+    fmt::format_to(bfr, "       dkim={}\r\n", human_result);
   });
 
-  LOG(INFO) << "ARC status  == " << arc.chain_status_str();
-  LOG(INFO) << "ARC custody == " << arc.chain_custody_str();
+  LOG(INFO) << "ARC status  == " << arv.chain_status_str();
+  LOG(INFO) << "ARC custody == " << arv.chain_custody_str();
 
-  if ("fail"s == arc.chain_status_str()) {
+  if ("fail"s == arv.chain_status_str()) {
     LOG(INFO) << "existing failed ARC set, doing nothing more";
     return;
   }
+
+  // if (msg.headers[0] == "Return-Path") {
+  // Set msg.headers[0] == our new ar header
+  // }
 
   /*
   ARC_HDRFIELD* seal = nullptr;
