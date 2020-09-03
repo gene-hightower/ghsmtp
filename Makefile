@@ -37,7 +37,7 @@ dns_tool_STEMS := dns_tool \
 
 msg_STEMS := msg \
 	CDB \
-	OpenDKIM \
+	DKIM \
 	DMARC \
 	$(DNS) \
 	Domain \
@@ -68,6 +68,8 @@ sasl_STEMS := sasl \
 
 smtp_STEMS := smtp \
 	CDB \
+	DKIM \
+	DMARC \
 	$(DNS) \
 	Domain \
 	IP \
@@ -75,7 +77,6 @@ smtp_STEMS := smtp \
 	IP6 \
 	Mailbox \
 	Message \
-	OpenDKIM \
 	POSIX \
 	Pill \
 	SPF \
@@ -91,7 +92,8 @@ smtp_STEMS := smtp \
 
 snd_STEMS := snd \
 	Base64 \
-	OpenDKIM \
+	DKIM \
+	DMARC \
 	$(DNS) \
 	Domain \
 	IP \
@@ -126,6 +128,7 @@ socks5_STEMS := socks5 \
 TESTS := \
 	Base64-test \
 	CDB-test \
+	DKIM-test \
 	DNS-test \
 	Domain-test \
 	IP4-test \
@@ -134,7 +137,6 @@ TESTS := \
 	Mailbox-test \
 	Message-test \
 	Now-test \
-	OpenDKIM-test \
 	POSIX-test \
 	Pill-test \
 	SPF-test \
@@ -162,18 +164,20 @@ IP6-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc
 Magic-test_STEMS := Magic
 Mailbox-test_STEMS := Mailbox Domain IP IP4 IP6 osutil
 Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-OpenDKIM-test_STEMS := OpenDKIM
+DKIM-test_STEMS := DKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS
-Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenDKIM POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox DKIM DMARC POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
 
 osutil-test_STEMS := osutil
-rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox OpenDKIM osutil esc
+rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox DKIM DMARC osutil esc
 
 Session-test_STEMS := \
 	CDB \
+	DKIM \
+	DMARC \
 	$(DNS) \
 	Domain \
 	IP \
@@ -181,7 +185,6 @@ Session-test_STEMS := \
 	IP6 \
 	Mailbox \
 	Message \
-	OpenDKIM \
 	POSIX \
 	Pill \
 	SPF \
@@ -251,7 +254,7 @@ public_suffix_list.dat:
 
 opt_flags := -Og -g
 
-# gen_flags := -fPIC
+gen_flags := -fPIC
 
 # visibility_flags := # nada
 

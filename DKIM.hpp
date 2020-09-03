@@ -7,7 +7,7 @@
 struct dkim_lib;
 struct dkim;
 
-namespace OpenDKIM {
+namespace DKIM {
 
 class Lib {
   Lib(Lib const&) = delete;
@@ -52,6 +52,6 @@ public:
 
   std::string getsighdr();
 };
-} // namespace OpenDKIM
+} // namespace DKIM
 
 #endif // DKIM_DOT_HPP

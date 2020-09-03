@@ -75,6 +75,7 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 DEFINE_string(dkim_key_file, "", "DKIM key file");
 
 #include "Base64.hpp"
+#include "DKIM.hpp"
 #include "DNS-fcrdns.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
@@ -84,7 +85,6 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Now.hpp"
-#include "OpenDKIM.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
 #include "fs.hpp"
@@ -1477,13 +1477,9 @@ bool snd(fs::path                    config_path,
 
   auto const ext_size{FLAGS_use_size && cnn.has_extension("SIZE")};
 
-  auto const ext_smtputf8{
-      FLAGS_use_smtputf8
-      && cnn.has_extension("SMTPUTF8")};
+  auto const ext_smtputf8{FLAGS_use_smtputf8 && cnn.has_extension("SMTPUTF8")};
 
-  auto const ext_starttls{
-      FLAGS_use_tls
-      && cnn.has_extension("STARTTLS")};
+  auto const ext_starttls{FLAGS_use_tls && cnn.has_extension("STARTTLS")};
 
   if (FLAGS_force_smtputf8 && !ext_smtputf8) {
     LOG(WARNING) << "no SMTPUTF8, skipping";

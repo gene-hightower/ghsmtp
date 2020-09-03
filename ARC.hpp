@@ -1,5 +1,5 @@
-#ifndef OPENARC_DOT_HPP_INCLUDED
-#define OPENARC_DOT_HPP_INCLUDED
+#ifndef ARC_DOT_HPP_INCLUDED
+#define ARC_DOT_HPP_INCLUDED
 
 #include "iobuffer.hpp"
 
@@ -11,7 +11,7 @@
 
 #include <glog/logging.h>
 
-namespace OpenARC {
+namespace ARC {
 
 u_char* uc(char const* cp)
 {
@@ -131,6 +131,6 @@ private:
   ARC_LIB* arc_;
 };
 
-} // namespace OpenARC
+} // namespace ARC
 
-#endif // OPENARC_DOT_HPP_INCLUDED
+#endif // ARC_DOT_HPP_INCLUDED

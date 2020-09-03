@@ -7,7 +7,7 @@
 
 #include <glog/logging.h>
 
-namespace OpenDMARC {
+namespace DMARC {
 
 enum class Advice;
 constexpr char const* Advice_to_string(Advice adv);
@@ -66,6 +66,6 @@ constexpr char const* Advice_to_string(Advice adv)
   return "none";
 }
 
-} // namespace OpenDMARC
+} // namespace DMARC
 
 #endif // DMARC_DOT_HPP

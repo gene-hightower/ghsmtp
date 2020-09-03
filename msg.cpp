@@ -21,9 +21,9 @@ DEFINE_bool(selftest, false, "run a self test");
 
 #include <iostream>
 
+#include "DKIM.hpp"
 #include "DMARC.hpp"
 #include "Mailbox.hpp"
-#include "OpenDKIM.hpp"
 #include "SPF.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
@@ -119,10 +119,10 @@ struct ci_less {
 };
 
 struct Ctx {
-  OpenDKIM::Verify dkv;
+  DKIM::Verify dkv;
 
-  OpenDMARC::Lib    dml;
-  OpenDMARC::Policy dmp;
+  DMARC::Lib    dml;
+  DMARC::Policy dmp;
 
   std::string mb_loc;
   std::string mb_dom;
@@ -1298,11 +1298,11 @@ struct action<received_spf> {
 
     // Google sometimes doesn't put in anything but client-ip
     if (ctx.spf_info.find("envelope-from") != end(ctx.spf_info)) {
-      auto dom = ctx.spf_info["envelope-from"];
+      auto dom    = ctx.spf_info["envelope-from"];
       auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
       if (dom == "<>") {
-        dom = ctx.spf_info["helo"];
+        dom    = ctx.spf_info["helo"];
         origin = DMARC_POLICY_SPF_ORIGIN_HELO;
         LOG(INFO) << "SPF: origin HELO " << dom;
       }
@@ -1311,7 +1311,7 @@ struct action<received_spf> {
         if (!parse<RFC5322::addr_spec, RFC5322::action>(addr_in, ctx)) {
           LOG(FATAL) << "Failed to parse domain: " << dom;
         }
-        dom = ctx.mb_dom;
+        dom    = ctx.mb_dom;
         origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
         LOG(INFO) << "SPF: origin MAIL FROM " << dom;
 
@@ -1370,7 +1370,7 @@ struct action<discrete_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.discrete_type = true;
-    ctx.type = in.string();
+    ctx.type          = in.string();
   }
 };
 
@@ -1380,7 +1380,7 @@ struct action<composite_type> {
   static void apply(const Input& in, Ctx& ctx)
   {
     ctx.composite_type = true;
-    ctx.type = in.string();
+    ctx.type           = in.string();
   }
 };
 

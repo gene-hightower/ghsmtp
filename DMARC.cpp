@@ -9,7 +9,7 @@ u_char* uc(char const* cp)
 }
 } // namespace
 
-namespace OpenDMARC {
+namespace DMARC {
 Lib::Lib()
 {
 #define PUBLIC_SUFFIX_LIST_DAT "public_suffix_list.dat"
@@ -125,4 +125,4 @@ Advice Policy::get_advice()
   LOG(FATAL) << "unknown status";
 }
 
-} // namespace OpenDMARC
+} // namespace DMARC

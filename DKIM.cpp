@@ -1,4 +1,4 @@
-#include "OpenDKIM.hpp"
+#include "DKIM.hpp"
 
 #include <stdbool.h> // needs to be above <dkim.h>
 
@@ -15,11 +15,11 @@ u_char* uc(char const* cp)
 
 char const* c(unsigned char* ucp) { return reinterpret_cast<char const*>(ucp); }
 
-constexpr unsigned char id_v[]{"OpenDKIM::Verify"};
-constexpr unsigned char id_s[]{"OpenDKIM::Sign"};
+constexpr unsigned char id_v[]{"DKIM::Verify"};
+constexpr unsigned char id_s[]{"DKIM::Sign"};
 } // namespace
 
-namespace OpenDKIM {
+namespace DKIM {
 
 Lib::Lib()
   : lib_(CHECK_NOTNULL(dkim_init(nullptr, nullptr)))
@@ -247,4 +247,4 @@ std::string Sign::getsighdr()
   status_            = dkim_getsighdr_d(dkim_, initial, &buf, &len);
   return std::string(c(buf), len);
 }
-} // namespace OpenDKIM
+} // namespace DKIM
