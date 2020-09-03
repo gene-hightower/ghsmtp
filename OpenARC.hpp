@@ -48,16 +48,17 @@ public:
   }
   ~msg() { arc_free(msg_); }
 
-  ARC_STAT header_field(char const* hname, size_t hlen)
+  void header(std::string_view h)
   {
-    return arc_header_field(msg_, uc(hname), hlen);
+    CHECK_EQ(arc_header_field(msg_, uc(h.data()), h.length()), ARC_STAT_OK);
   }
-  ARC_STAT eoh() { return arc_eoh(msg_); }
-  ARC_STAT body(char const* buf, size_t len)
+  void eoh() { CHECK_EQ(arc_eoh(msg_), ARC_STAT_OK); }
+
+  void body(std::string_view b)
   {
-    return arc_body(msg_, uc(buf), len);
+    CHECK_EQ(arc_body(msg_, uc(b.data()), b.length()), ARC_STAT_OK);
   }
-  ARC_STAT eom() { return arc_eom(msg_); }
+  void eom() { CHECK_EQ(arc_eom(msg_), ARC_STAT_OK); }
 
   char const* chain_status_str() { return arc_chain_status_str(msg_); }
 
@@ -70,6 +71,7 @@ public:
         return std::string(buf.data(), len);
     }
     LOG(FATAL) << "custody chain way too large...";
+    return "";
   }
 
   ARC_STAT seal(ARC_HDRFIELD** seal,

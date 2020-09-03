@@ -20,6 +20,14 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
+namespace {
+template <typename Input>
+std::string_view make_view(Input const& in)
+{
+  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
+}
+} // namespace
+
 namespace RFC5322 {
 
 // clang-format off
@@ -94,12 +102,6 @@ struct message {
 };
 } // namespace data
 
-template <typename Input>
-std::string_view make_view(Input const& in)
-{
-  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
-}
-
 template <typename Rule>
 struct action : nothing<Rule> {
 };
@@ -173,29 +175,31 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
 {
   OpenDKIM::Verify dkv;
 
-  OpenARC::lib arc;
-
-  char const* error = nullptr;
-
-  auto arc_msg = arc.message(ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
-                             ARC_SIGN_RSASHA256, ARC_MODE_VERIFY, &error);
+  OpenARC::lib lib;
+  char const*  error = nullptr;
+  auto         arc   = lib.message(ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
+                         ARC_SIGN_RSASHA256, ARC_MODE_VERIFY, &error);
 
   for (auto field : msg.headers) {
     auto const header = fmt::format("{}:{}", field.name, field.value);
-    LOG(INFO) << "header «" << header << "»";
-    CHECK_EQ(arc_msg.header_field(header.data(), header.length()), ARC_STAT_OK);
+    // LOG(INFO) << "header «" << header << "»";
+    arc.header(header);
+    dkv.header(header);
   }
-  CHECK_EQ(arc_msg.eoh(), ARC_STAT_OK) << arc_msg.geterror();
+  dkv.eoh();
+  arc.eoh();
 
-  LOG(INFO) << "body «" << msg.body << "»";
-  CHECK_EQ(arc_msg.body(msg.body.data(), msg.body.length()), ARC_STAT_OK)
-      << arc_msg.geterror();
-  CHECK_EQ(arc_msg.eom(), ARC_STAT_OK) << arc_msg.geterror();
+  // LOG(INFO) << "body «" << msg.body << "»";
+  arc.body(msg.body);
+  dkv.body(msg.body);
 
-  LOG(INFO) << "status  == " << arc_msg.chain_status_str();
-  LOG(INFO) << "custody == " << arc_msg.chain_custody_str();
+  arc.eom();
+  dkv.eom();
 
-  if ("fail"s == arc_msg.chain_status_str()) {
+  LOG(INFO) << "status  == " << arc.chain_status_str();
+  LOG(INFO) << "custody == " << arc.chain_custody_str();
+
+  if ("fail"s == arc.chain_status_str()) {
     LOG(INFO) << "existing failed ARC set, doing nothing more";
     return;
   }
@@ -207,9 +211,9 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
   priv.open("ghsmtp.private");
 
   CHECK_EQ(
-      arc_msg.seal(&seal, dom, "arc", dom, priv.data(), priv.size(), nullptr),
+      arc.seal(&seal, dom, "arc", dom, priv.data(), priv.size(), nullptr),
       ARC_STAT_OK)
-      << arc_msg.geterror();
+      << arc.geterror();
   */
 
   if (seal) {
