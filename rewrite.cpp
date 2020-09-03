@@ -1,6 +1,7 @@
 #include "rewrite.hpp"
 
 #include "OpenARC.hpp"
+#include "OpenDKIM.hpp"
 #include "esc.hpp"
 #include "imemstream.hpp"
 
@@ -164,7 +165,9 @@ std::string data::message::as_string() const
 
 static void do_arc(char const* domain, RFC5322::data::message& msg)
 {
-  ARC::lib arc;
+  OpenDKIM::Verify dkv;
+
+  OpenARC::lib arc;
 
   char const* error = nullptr;
 
@@ -204,8 +207,8 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
   */
 
   if (seal) {
-    auto const nam = ARC::hdr::name(seal);
-    auto const val = ARC::hdr::value(seal);
+    auto const nam = OpenARC::hdr::name(seal);
+    auto const val = OpenARC::hdr::value(seal);
     LOG(INFO) << nam << ": " << val;
   }
   else {

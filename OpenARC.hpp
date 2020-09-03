@@ -11,7 +11,7 @@
 
 #include <glog/logging.h>
 
-namespace ARC {
+namespace OpenARC {
 
 u_char* uc(char const* cp)
 {
@@ -129,6 +129,6 @@ private:
   ARC_LIB* arc_;
 };
 
-} // namespace ARC
+} // namespace OpenARC
 
 #endif // OPENARC_DOT_HPP_INCLUDED

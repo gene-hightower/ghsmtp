@@ -75,6 +75,7 @@ smtp_STEMS := smtp \
 	IP6 \
 	Mailbox \
 	Message \
+	OpenDKIM \
 	POSIX \
 	Pill \
 	SPF \
@@ -166,10 +167,10 @@ POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS
-Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenDKIM POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc osutil rewrite
 
 osutil-test_STEMS := osutil
-rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox osutil esc
+rewrite-test_STEMS := rewrite Domain IP IP4 IP6 Mailbox OpenDKIM osutil esc
 
 Session-test_STEMS := \
 	CDB \
@@ -180,6 +181,7 @@ Session-test_STEMS := \
 	IP6 \
 	Mailbox \
 	Message \
+	OpenDKIM \
 	POSIX \
 	Pill \
 	SPF \
