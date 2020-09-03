@@ -1,5 +1,5 @@
-#ifndef DMARC_DOT_HPP
-#define DMARC_DOT_HPP
+#ifndef OPENDMARC_DOT_HPP
+#define OPENDMARC_DOT_HPP
 
 #include "IP6.hpp"
 
@@ -7,7 +7,7 @@
 
 #include <glog/logging.h>
 
-namespace DMARC {
+namespace OpenDMARC {
 
 enum class Advice;
 constexpr char const* Advice_to_string(Advice adv);
@@ -66,6 +66,6 @@ constexpr char const* Advice_to_string(Advice adv)
   return "none";
 }
 
-} // namespace DMARC
+} // namespace OpenDMARC
 
 #endif // DMARC_DOT_HPP

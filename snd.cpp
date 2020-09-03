@@ -75,7 +75,6 @@ DEFINE_string(selector, "ghsmtp", "DKIM selector");
 DEFINE_string(dkim_key_file, "", "DKIM key file");
 
 #include "Base64.hpp"
-#include "DKIM.hpp"
 #include "DNS-fcrdns.hpp"
 #include "DNS.hpp"
 #include "Domain.hpp"
@@ -85,6 +84,7 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include "Mailbox.hpp"
 #include "Message.hpp"
 #include "Now.hpp"
+#include "OpenDKIM.hpp"
 #include "Pill.hpp"
 #include "Sock.hpp"
 #include "fs.hpp"

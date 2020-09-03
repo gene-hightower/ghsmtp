@@ -21,9 +21,9 @@ DEFINE_bool(selftest, false, "run a self test");
 
 #include <iostream>
 
-#include "DKIM.hpp"
-#include "DMARC.hpp"
 #include "Mailbox.hpp"
+#include "OpenDKIM.hpp"
+#include "OpenDMARC.hpp"
 #include "SPF.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
@@ -119,10 +119,10 @@ struct ci_less {
 };
 
 struct Ctx {
-  DKIM::Verify dkv;
+  OpenDKIM::Verify dkv;
 
-  DMARC::Lib    dml;
-  DMARC::Policy dmp;
+  OpenDMARC::Lib    dml;
+  OpenDMARC::Policy dmp;
 
   std::string mb_loc;
   std::string mb_dom;
