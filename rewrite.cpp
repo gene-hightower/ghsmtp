@@ -197,14 +197,16 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
   arc.eom();
   dkv.eom();
 
-  dkv.foreach_sig([](char const* domain, bool passed) {
+  OpenDMARC::Policy dmp;
+
+  dkv.foreach_sig([&dmp](char const* domain, bool passed) {
     LOG(INFO) << "DKIM check for " << domain
               << (passed ? " passed" : " failed");
 
     int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                         : DMARC_POLICY_DKIM_OUTCOME_FAIL;
 
-    // ctx.dmp.store_dkim(domain, result, nullptr);
+    dmp.store_dkim(domain, result, nullptr);
   });
 
   LOG(INFO) << "status  == " << arc.chain_status_str();

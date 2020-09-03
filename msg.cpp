@@ -121,7 +121,6 @@ struct ci_less {
 struct Ctx {
   OpenDKIM::Verify dkv;
 
-  OpenDMARC::Lib    dml;
   OpenDMARC::Policy dmp;
 
   std::string mb_loc;

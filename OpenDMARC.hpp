@@ -68,4 +68,4 @@ constexpr char const* Advice_to_string(Advice adv)
 
 } // namespace OpenDMARC
 
-#endif // DMARC_DOT_HPP
+#endif // OPENDMARC_DOT_HPP
