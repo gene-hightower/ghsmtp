@@ -1,6 +1,6 @@
 #include "rewrite.hpp"
 
-#include "ARC.hpp"
+#include "OpenARC.hpp"
 #include "esc.hpp"
 #include "imemstream.hpp"
 

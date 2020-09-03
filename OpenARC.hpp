@@ -1,5 +1,5 @@
-#ifndef ARC_DOT_HPP_INCLUDED
-#define ARC_DOT_HPP_INCLUDED
+#ifndef OPENARC_DOT_HPP_INCLUDED
+#define OPENARC_DOT_HPP_INCLUDED
 
 #include "iobuffer.hpp"
 
@@ -131,4 +131,4 @@ private:
 
 } // namespace ARC
 
-#endif // ARC_DOT_HPP_INCLUDED
+#endif // OPENARC_DOT_HPP_INCLUDED
