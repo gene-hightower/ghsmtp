@@ -260,7 +260,7 @@ struct spf_header       : seq<opt<CFWS>,
 
 struct received_spf     : seq<TAO_PEGTL_ISTRING("Received-SPF:"),
                               spf_header,
-                              eol> {};
+                              eof> {};
 // clang-format on
 
 struct header {
@@ -440,11 +440,13 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     if (header == "Received-SPF") {
       auto const h = header.as_string();
       LOG(INFO) << h;
-      auto in{memory_input<>(h.data(), h.length(), "spf_header")};
-      if (tao::pegtl::parse<RFC5322::spf_header, RFC5322::action>(in, msg)) {
+      auto in{memory_input<>(h.data(), h.length(), "received_spf")};
+      if (tao::pegtl::parse<RFC5322::received_spf, RFC5322::action>(in, msg)) {
         if (auto const ip = msg.spf_info.find("client-ip");
-            ip != msg.spf_info.end())
+            ip != msg.spf_info.end()) {
           spf_info_client_ip = ip->second;
+          LOG(INFO) << "client-ip == " << spf_info_client_ip;
+        }
         break; // take just the 1st that parses
       }
       LOG(WARNING) << "failed to parse Received-SPF";
@@ -483,17 +485,29 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   dkv.eom();
 
   OpenDMARC::Policy dmp;
-  if (!spf_info_client_ip.empty())
+  if (!spf_info_client_ip.empty()) {
+    LOG(INFO) << "OpenDMARC::Policy::init(" << spf_info_client_ip << ")";
     dmp.init(spf_info_client_ip.c_str());
+  }
+
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), "From");
+      hdr != end(msg.headers)) {
+    auto const from = std::string{hdr->value.data(), hdr->value.length()};
+    dmp.store_from_domain(from.c_str());
+  }
+  else {
+    LOG(ERROR) << "no From: header";
+    dmp.store_from_domain("unknown.domain");
+  }
 
   dkv.foreach_sig([&dmp](char const* domain, bool passed) {
-    LOG(INFO) << "DKIM check for " << domain
-              << (passed ? " passed" : " failed");
+    auto const human_result = (passed ? "passed" : "failed");
+    LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
-    int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
-                        : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+    int const result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
+                              : DMARC_POLICY_DKIM_OUTCOME_FAIL;
 
-    dmp.store_dkim(domain, result, nullptr);
+    dmp.store_dkim(domain, result, human_result);
   });
 
   LOG(INFO) << "ARC status  == " << arc.chain_status_str();
