@@ -78,11 +78,15 @@ struct field {
 struct message {
 
   bool parse(std::string_view msg);
+  void index();
 
   std::string as_string() const;
 
   std::vector<field> headers;
-  std::string_view   body;
+
+  std::unordered_map<std::string_view, std::string_view> header_index;
+
+  std::string_view body;
 
   std::string_view field_name;
   std::string_view field_value;
@@ -133,6 +137,14 @@ bool data::message::parse(std::string_view input)
 {
   auto in{memory_input<>(input.data(), input.size(), "message")};
   return tao::pegtl::parse<RFC5322::message, RFC5322::action>(in, *this);
+}
+
+void data::message::index()
+{
+  header_index.clear();
+  header_index.reserve(headers.size());
+  for (auto const h : headers)
+    header_index[h.name] = h.value;
 }
 
 std::string data::message::as_string() const
@@ -209,6 +221,7 @@ std::optional<std::string> rewrite(char const* domain, std::string_view input)
     LOG(WARNING) << "failed to parse message";
     return {};
   }
+  msg.index();
 
   do_arc(domain, msg);
 
