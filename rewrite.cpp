@@ -7,10 +7,12 @@
 #include "imemstream.hpp"
 
 #include <cstring>
+#include <map>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
 #include <tao/pegtl.hpp>
@@ -21,6 +23,292 @@ using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
+namespace RFC5322 {
+
+using dot   = one<'.'>;
+using colon = one<':'>;
+
+// clang-format off
+
+struct UTF8_tail        : range<'\x80', '\xBF'> {};
+
+struct UTF8_1           : range<0x00, 0x7F> {};
+
+struct UTF8_2           : seq<range<'\xC2', '\xDF'>, UTF8_tail> {};
+
+struct UTF8_3           : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
+                              seq<range<'\xE1', '\xEC'>, rep<2, UTF8_tail>>,
+                              seq<one<'\xED'>, range<'\x80', '\x9F'>, UTF8_tail>,
+                              seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {};
+
+struct UTF8_4           : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
+                              seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
+                              seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {};
+
+struct UTF8_non_ascii   : sor<UTF8_2, UTF8_3, UTF8_4> {};
+
+struct VUCHAR           : sor<VCHAR, UTF8_non_ascii> {};
+
+/////////////////////////////////////////////////////////////////////////////
+
+struct ftext            : ranges<33, 57, 59, 126> {};
+
+struct field_name       : plus<ftext> {};
+
+struct FWS              : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
+
+// *([FWS] VCHAR) *WSP
+struct field_value      : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
+
+struct field            : seq<field_name, one<':'>, field_value, eol> {};
+
+struct fields           : star<field> {};
+
+struct body             : until<eof> {};
+
+struct message          : seq<fields, opt<seq<eol, body>>, eof> {};
+
+/////////////////////////////////////////////////////////////////////////////
+
+// <https://tools.ietf.org/html/rfc2047>
+
+//   especials = "(" / ")" / "<" / ">" / "@" / "," / ";" / ":" / "
+//               <"> / "/" / "[" / "]" / "?" / "." / "="
+
+//   token = 1*<Any CHAR except SPACE, CTLs, and especials>
+
+struct tchar47          : ranges<        // NUL..' '
+                                 33, 33, // !
+                              // 34, 34, // "
+                                 35, 39, // #$%&'
+                              // 40, 41, // ()
+                                 42, 43, // *+
+                              // 44, 44, // ,
+                                 45, 45, // -
+                              // 46, 47, // ./
+                                 48, 57, // 0123456789
+                              // 58, 64, // ;:<=>?@
+                                 65, 90, // A..Z
+                              // 91, 91, // [
+                                 92, 92, // '\\'
+                              // 93, 93, // ]
+                                 94, 126 // ^_` a..z {|}~
+                              // 127,127 // DEL
+                                > {};
+
+struct token47           : plus<tchar47> {};
+
+struct charset           : token47 {};
+struct encoding          : token47 {};
+
+//   encoded-text = 1*<Any printable ASCII character other than "?"
+//                     or SPACE>
+
+struct echar            : ranges<        // NUL..' '
+                                 33, 62, // !..>
+                              // 63, 63, // ?
+                                 64, 126 // @A..Z[\]^_` a..z {|}~
+                              // 127,127 // DEL
+                                > {};
+
+struct encoded_text     : plus<echar> {};
+
+//   encoded-word = "=?" charset "?" encoding "?" encoded-text "?="
+
+// leading opt<FWS> is not in RFC 2047
+
+struct encoded_word_book: seq<string<'=', '?'>,
+                              charset, string<'?'>,
+                              encoding, string<'?'>,
+                              encoded_text,
+                              string<'=', '?'>
+                              > {};
+
+struct encoded_word     : seq<opt<FWS>, encoded_word_book> {};
+
+/////////////////////////////////////////////////////////////////////////////
+
+// Comments are recursive, so the forward decl
+struct comment;
+
+struct quoted_pair      : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
+
+// ctext is ASCII not '(' or ')' or '\\'
+struct ctext            : sor<ranges<33, 39, 42, 91, 93, 126>, UTF8_non_ascii> {};
+
+struct ccontent         : sor<ctext, quoted_pair, comment, encoded_word> {};
+
+// from <https://tools.ietf.org/html/rfc2047>
+// comment = "(" *(ctext / quoted-pair / comment / encoded-word) ")"
+
+struct comment          : seq<one<'('>,
+                              star<seq<opt<FWS>, ccontent>>,
+                              opt<FWS>,
+                              one<')'>
+                              > {};
+
+struct CFWS             : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>,
+                              FWS> {};
+
+struct qtext            : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {};
+
+struct qcontent         : sor<qtext, quoted_pair> {};
+
+// Corrected in RFC-5322, errata ID: 3135 <https://www.rfc-editor.org/errata/eid3135>
+struct quoted_string    : seq<opt<CFWS>,
+                              DQUOTE,
+                              sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
+                              DQUOTE,
+                              opt<CFWS>
+                              > {};
+
+struct atext            : sor<ALPHA, DIGIT,
+                              one<'!', '#',
+                                  '$', '%',
+                                  '&', '\'',
+                                  '*', '+',
+                                  '-', '/',
+                                  '=', '?',
+                                  '^', '_',
+                                  '`', '{',
+                                  '|', '}',
+                                  '~'>,
+                              UTF8_non_ascii> {};
+
+struct atom             : seq<opt<CFWS>, plus<atext>, opt<CFWS>> {};
+
+struct dot_atom_text    : list<plus<atext>, dot> {};
+
+struct dot_atom         : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {};
+
+struct word             : sor<atom, quoted_string> {};
+
+// struct phrase        : plus<sor<encoded_word, word>> {};
+
+struct dec_octet        : sor<seq<string<'2','5'>, range<'0','5'>>,
+                              seq<one<'2'>, range<'0','4'>, DIGIT>,
+                              seq<range<'0', '1'>, rep<2, DIGIT>>,
+                              rep_min_max<1, 2, DIGIT>> {};
+
+struct ipv4_address     : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
+
+struct h16              : rep_min_max<1, 4, HEXDIG> {};
+
+struct ls32             : sor<seq<h16, colon, h16>, ipv4_address> {};
+
+struct dcolon           : two<':'> {};
+
+struct ipv6_address     : sor<seq<                                          rep<6, h16, colon>, ls32>,
+                              seq<                                  dcolon, rep<5, h16, colon>, ls32>,
+                              seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
+                              seq<opt<h16,     opt<   colon, h16>>, dcolon, rep<3, h16, colon>, ls32>,
+                              seq<opt<h16, rep_opt<2, colon, h16>>, dcolon, rep<2, h16, colon>, ls32>,
+                              seq<opt<h16, rep_opt<3, colon, h16>>, dcolon,        h16, colon,  ls32>,
+                              seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
+                              seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
+                              seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
+
+struct ip               : sor<ipv4_address, ipv6_address> {};
+
+struct local_part       : sor<dot_atom, quoted_string> {};
+
+struct dtext            : ranges<33, 90, 94, 126> {};
+
+struct domain_literal   : seq<opt<CFWS>,
+                              one<'['>,
+                              star<seq<opt<FWS>, dtext>>,
+                              opt<FWS>,
+                              one<']'>,
+                              opt<CFWS>> {};
+
+struct domain           : sor<dot_atom, domain_literal> {};
+
+struct addr_spec        : seq<local_part, one<'@'>, domain> {};
+
+struct result           : sor<TAO_PEGTL_ISTRING("Pass"),
+                              TAO_PEGTL_ISTRING("Fail"),
+                              TAO_PEGTL_ISTRING("SoftFail"),
+                              TAO_PEGTL_ISTRING("Neutral"),
+                              TAO_PEGTL_ISTRING("None"),
+                              TAO_PEGTL_ISTRING("TempError"),
+                              TAO_PEGTL_ISTRING("PermError")> {};
+
+struct spf_key          : sor<TAO_PEGTL_ISTRING("client-ip"),
+                              TAO_PEGTL_ISTRING("envelope-from"),
+                              TAO_PEGTL_ISTRING("helo"),
+                              TAO_PEGTL_ISTRING("problem"),
+                              TAO_PEGTL_ISTRING("receiver"),
+                              TAO_PEGTL_ISTRING("identity"),
+                              TAO_PEGTL_ISTRING("mechanism")> {};
+
+// This value syntax (allowing addr_spec) is not in accordance with RFC
+// 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
+// before.
+
+struct spf_value        : sor<ip, addr_spec, dot_atom, quoted_string> {};
+
+struct spf_kv_pair      : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {};
+
+struct spf_kv_list      : seq<spf_kv_pair,
+                              star<seq<one<';'>, opt<CFWS>, spf_kv_pair>>,
+                              opt<one<';'>>> {};
+
+struct spf_header       : seq<opt<CFWS>,
+                              result,
+                              opt<seq<FWS, comment>>,
+                              opt<seq<FWS, spf_kv_list>>> {};
+
+struct received_spf     : seq<TAO_PEGTL_ISTRING("Received-SPF:"),
+                              spf_header,
+                              eol> {};
+// clang-format on
+
+struct header {
+  header(std::string_view n, std::string_view v)
+    : name(n)
+    , value(v)
+  {
+  }
+
+  std::string as_string() const { return fmt::format("{}:{}", name, value); }
+
+  bool operator==(std::string_view n) const { return name == n; }
+
+  std::string_view name;
+  std::string_view value;
+};
+
+struct ci_less {
+  bool operator()(std::string const& lhs, std::string const& rhs) const
+  {
+    // strcasecmp(3) is POSIX, FIXME: should force C locale
+    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
+  }
+};
+
+struct message_parsed {
+  bool parse(std::string_view msg);
+
+  std::string as_string() const;
+
+  std::vector<header> headers;
+
+  std::string_view body;
+
+  std::string_view field_name;
+  std::string_view field_value;
+
+  // SPF
+  std::string spf_result;
+
+  std::string spf_key;
+  std::string spf_value;
+
+  std::vector<std::pair<std::string, std::string>> spf_kv_list;
+
+  std::map<std::string, std::string, ci_less> spf_info;
+};
+
 namespace {
 template <typename Input>
 std::string_view make_view(Input const& in)
@@ -29,80 +317,6 @@ std::string_view make_view(Input const& in)
 }
 } // namespace
 
-namespace RFC5322 {
-
-// clang-format off
-
-struct UTF8_tail : range<'\x80', '\xBF'> {};
-
-struct UTF8_1 : range<0x00, 0x7F> {};
-
-struct UTF8_2 : seq<range<'\xC2', '\xDF'>, UTF8_tail> {};
-
-struct UTF8_3 : sor<seq<one<'\xE0'>, range<'\xA0', '\xBF'>, UTF8_tail>,
-                    seq<range<'\xE1', '\xEC'>, rep<2, UTF8_tail>>,
-                    seq<one<'\xED'>, range<'\x80', '\x9F'>, UTF8_tail>,
-                    seq<range<'\xEE', '\xEF'>, rep<2, UTF8_tail>>> {};
-
-struct UTF8_4
-  : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
-        seq<range<'\xF1', '\xF3'>, rep<3, UTF8_tail>>,
-        seq<one<'\xF4'>, range<'\x80', '\x8F'>, rep<2, UTF8_tail>>> {};
-
-struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
-
-struct VUCHAR         : sor<VCHAR, UTF8_non_ascii> {};
-
-struct ftext          : ranges<33, 57, 59, 126> {};
-
-struct field_name     : plus<ftext> {};
-
-struct FWS            : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
-
-// *([FWS] VCHAR) *WSP
-struct field_value    : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
-
-struct field          : seq<field_name, one<':'>, field_value, eol> {};
-
-struct fields         : star<field> {};
-
-struct body           : until<eof> {};
-
-struct message        : seq<fields, opt<seq<eol, body>>, eof> {};
-
-// clang-format on
-
-namespace data {
-
-struct field {
-  field(std::string_view n, std::string_view v)
-    : name(n)
-    , value(v)
-  {
-  }
-
-  std::string_view name;
-  std::string_view value;
-};
-
-struct message {
-
-  bool parse(std::string_view msg);
-  void index();
-
-  std::string as_string() const;
-
-  std::vector<field> headers;
-
-  std::unordered_map<std::string_view, std::string_view> header_index;
-
-  std::string_view body;
-
-  std::string_view field_name;
-  std::string_view field_value;
-};
-} // namespace data
-
 template <typename Rule>
 struct action : nothing<Rule> {
 };
@@ -110,7 +324,7 @@ struct action : nothing<Rule> {
 template <>
 struct action<field_name> {
   template <typename Input>
-  static void apply(Input const& in, data::message& msg)
+  static void apply(Input const& in, message_parsed& msg)
   {
     msg.field_name = make_view(in);
   }
@@ -119,7 +333,7 @@ struct action<field_name> {
 template <>
 struct action<field_value> {
   template <typename Input>
-  static void apply(Input const& in, data::message& msg)
+  static void apply(Input const& in, message_parsed& msg)
   {
     msg.field_value = make_view(in);
   }
@@ -128,41 +342,87 @@ struct action<field_value> {
 template <>
 struct action<field> {
   template <typename Input>
-  static void apply(Input const& in, data::message& msg)
+  static void apply(Input const& in, message_parsed& msg)
   {
-    msg.headers.emplace_back(data::field(msg.field_name, msg.field_value));
+    msg.headers.emplace_back(header(msg.field_name, msg.field_value));
   }
 };
 
 template <>
 struct action<body> {
   template <typename Input>
-  static void apply(Input const& in, data::message& msg)
+  static void apply(Input const& in, message_parsed& msg)
   {
     msg.body = make_view(in);
   }
 };
 
-bool data::message::parse(std::string_view input)
+/////////////////////////////////////////////////////////////////////////////
+
+template <>
+struct action<result> {
+  template <typename Input>
+  static void apply(const Input& in, message_parsed& msg)
+  {
+    msg.spf_result = std::move(in.string());
+    boost::to_lower(msg.spf_result);
+  }
+};
+
+template <>
+struct action<spf_key> {
+  template <typename Input>
+  static void apply(const Input& in, message_parsed& msg)
+  {
+    msg.spf_key = std::move(in.string());
+  }
+};
+
+template <>
+struct action<spf_value> {
+  template <typename Input>
+  static void apply(const Input& in, message_parsed& msg)
+  {
+    msg.spf_value = std::move(in.string());
+    boost::trim(msg.spf_value);
+  }
+};
+
+template <>
+struct action<spf_kv_pair> {
+  template <typename Input>
+  static void apply(const Input& in, message_parsed& msg)
+  {
+    msg.spf_kv_list.emplace_back(msg.spf_key, msg.spf_value);
+    msg.spf_key.clear();
+    msg.spf_value.clear();
+  }
+};
+
+template <>
+struct action<spf_kv_list> {
+  static void apply0(message_parsed& msg)
+  {
+    for (auto kvp : msg.spf_kv_list) {
+      CHECK(!msg.spf_info.contains(kvp.first))
+          << "dup: " << kvp.first << " = " << kvp.second;
+      msg.spf_info[kvp.first] = kvp.second;
+    }
+  }
+};
+
+bool message_parsed::parse(std::string_view input)
 {
   auto in{memory_input<>(input.data(), input.size(), "message")};
   return tao::pegtl::parse<RFC5322::message, RFC5322::action>(in, *this);
 }
 
-void data::message::index()
-{
-  header_index.clear();
-  header_index.reserve(headers.size());
-  for (auto const h : headers)
-    header_index[h.name] = h.value;
-}
-
-std::string data::message::as_string() const
+std::string message_parsed::as_string() const
 {
   fmt::memory_buffer bfr;
 
   for (auto const h : headers)
-    fmt::format_to(bfr, "{}:{}\r\n", h.name, h.value);
+    fmt::format_to(bfr, "{}\r\n", h.as_string());
 
   if (!body.empty())
     fmt::format_to(bfr, "\r\n{}", body);
@@ -172,8 +432,33 @@ std::string data::message::as_string() const
 
 } // namespace RFC5322
 
-static void do_arc(char const* domain, RFC5322::data::message& msg)
+static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 {
+  std::string spf_info_client_ip;
+
+  for (auto header : msg.headers) {
+    if (header == "Received-SPF") {
+      auto const h = header.as_string();
+      LOG(INFO) << h;
+      auto in{memory_input<>(h.data(), h.length(), "spf_header")};
+      if (tao::pegtl::parse<RFC5322::spf_header, RFC5322::action>(in, msg)) {
+        if (auto const ip = msg.spf_info.find("client-ip");
+            ip != msg.spf_info.end())
+          spf_info_client_ip = ip->second;
+        break; // take just the 1st that parses
+      }
+      LOG(WARNING) << "failed to parse Received-SPF";
+    }
+  }
+
+  for (auto header : msg.headers) {
+    if (header == "Authentication-Results") {
+      LOG(INFO) << header.as_string();
+      // parse header.value
+      break; // take just the 1st
+    }
+  }
+
   OpenDKIM::Verify dkv;
 
   OpenARC::lib lib;
@@ -181,11 +466,11 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
   auto         arc   = lib.message(ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
                          ARC_SIGN_RSASHA256, ARC_MODE_VERIFY, &error);
 
-  for (auto field : msg.headers) {
-    auto const header = fmt::format("{}:{}", field.name, field.value);
-    // LOG(INFO) << "header «" << header << "»";
-    arc.header(header);
-    dkv.header(header);
+  for (auto header : msg.headers) {
+    auto const hdr_str = fmt::format("{}:{}", header.name, header.value);
+    // LOG(INFO) << "header «" << hdr_str << "»";
+    arc.header(hdr_str);
+    dkv.header(hdr_str);
   }
   dkv.eoh();
   arc.eoh();
@@ -198,6 +483,8 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
   dkv.eom();
 
   OpenDMARC::Policy dmp;
+  if (!spf_info_client_ip.empty())
+    dmp.init(spf_info_client_ip.c_str());
 
   dkv.foreach_sig([&dmp](char const* domain, bool passed) {
     LOG(INFO) << "DKIM check for " << domain
@@ -209,25 +496,23 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
     dmp.store_dkim(domain, result, nullptr);
   });
 
-  LOG(INFO) << "status  == " << arc.chain_status_str();
-  LOG(INFO) << "custody == " << arc.chain_custody_str();
+  LOG(INFO) << "ARC status  == " << arc.chain_status_str();
+  LOG(INFO) << "ARC custody == " << arc.chain_custody_str();
 
   if ("fail"s == arc.chain_status_str()) {
     LOG(INFO) << "existing failed ARC set, doing nothing more";
     return;
   }
 
+  /*
   ARC_HDRFIELD* seal = nullptr;
 
-  /*
+  auto const priv_path = "ghsmtp.private";
+  CHECK(fs::exists(priv_path));
   boost::iostreams::mapped_file_source priv;
-  priv.open("ghsmtp.private");
+  priv.open(priv_path);
 
-  CHECK_EQ(
-      arc.seal(&seal, dom, "arc", dom, priv.data(), priv.size(), nullptr),
-      ARC_STAT_OK)
-      << arc.geterror();
-  */
+  arc.seal(&seal, domain, "arc", dom, nullptr, 0, nullptr);
 
   if (seal) {
     auto const nam = OpenARC::hdr::name(seal);
@@ -235,19 +520,19 @@ static void do_arc(char const* domain, RFC5322::data::message& msg)
     LOG(INFO) << nam << ": " << val;
   }
   else {
-    LOG(INFO) << "no seal";
+    LOG(INFO) << "Can't generate seal";
   }
+  */
 }
 
 std::optional<std::string> rewrite(char const* domain, std::string_view input)
 {
-  RFC5322::data::message msg;
+  RFC5322::message_parsed msg;
 
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
     return {};
   }
-  msg.index();
 
   do_arc(domain, msg);
 
