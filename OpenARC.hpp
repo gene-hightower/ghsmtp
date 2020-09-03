@@ -74,17 +74,18 @@ public:
     return "";
   }
 
-  ARC_STAT seal(ARC_HDRFIELD** seal,
-                char const*    authservid,
-                char const*    selector,
-                char const*    domain,
-                char const*    key,
-                size_t         keylen,
-                char const*    ar)
+  void seal(ARC_HDRFIELD** seal,
+            char const*    authservid,
+            char const*    selector,
+            char const*    domain,
+            char const*    key,
+            size_t         keylen,
+            char const*    ar)
   {
-    return arc_getseal(msg_, seal, const_cast<char*>(authservid),
-                       const_cast<char*>(selector), const_cast<char*>(domain),
-                       uc(key), keylen, uc(ar));
+    CHECK_EQ(arc_getseal(msg_, seal, const_cast<char*>(authservid),
+                         const_cast<char*>(selector), const_cast<char*>(domain),
+                         uc(key), keylen, uc(ar)),
+             ARC_STAT_OK);
   }
 
   char const* geterror() const { return arc_geterror(msg_); }
