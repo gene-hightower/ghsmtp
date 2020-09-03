@@ -1,6 +1,8 @@
 #ifndef ARC_DOT_HPP_INCLUDED
 #define ARC_DOT_HPP_INCLUDED
 
+#include "iobuffer.hpp"
+
 #include <cstring>
 
 #include <stdbool.h> // needs to be above <openarc/arc.h>
@@ -56,6 +58,20 @@ public:
     return arc_body(msg_, uc(buf), len);
   }
   ARC_STAT eom() { return arc_eom(msg_); }
+
+  char const* chain_status_str() { return arc_chain_status_str(msg_); }
+
+  std::string chain_custody_str()
+  {
+    for (iobuffer<char> buf{256}; buf.size() < 10 * 1024 * 1024;
+         buf.resize(buf.size() * 2)) {
+      size_t len = arc_chain_custody_str(msg_, uc(buf.data()), buf.size());
+      if (len < buf.size())
+        return std::string(buf.data(), len);
+    }
+    LOG(FATAL) << "custody chain way too large...";
+  }
+
   ARC_STAT seal(ARC_HDRFIELD** seal,
                 char const*    authservid,
                 char const*    selector,
