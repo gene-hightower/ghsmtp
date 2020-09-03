@@ -50,7 +50,7 @@ public:
   bool mail_from(Mailbox const& from);
   bool rcpt_to(DNS::Resolver& res, Mailbox const& to, std::string& error_msg);
 
-  bool send(char const* data, size_t length);
+  bool send(std::string_view msg);
 
   void rset();
   void quit();

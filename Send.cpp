@@ -772,11 +772,17 @@ Send::Send(fs::path config_path)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  SRS        srs;
+  SRS srs;
+
   auto const fwd
       = srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
+
   if (Mailbox::validate(fwd))
+    // If the SRS2 algo works, fine
     mail_from_ = Mailbox(fwd);
+  else
+    // Otherwise, use a generic address
+    mail_from_ = Mailbox("noreply", sender_);
 
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
@@ -834,18 +840,26 @@ bool Send::rcpt_to(DNS::Resolver& res,
   return false;
 }
 
-bool Send::send(char const* dp_in, size_t length_in)
+bool Send::send(std::string_view msg_input)
 {
   auto const sender = sender_.ascii().c_str();
-  auto [dp, length] = rewrite(sender, dp_in, length_in);
+  auto const msg    = rewrite(sender, msg_input);
 
-  // FIXME this needs to be done in parallel
+  if (!msg) {
+    LOG(FATAL) << "failed to pase message";
+    rset();
+    return false;
+  }
+
+  // FIXME this should be done in parallel
   for (auto& [dom, conn] : exchangers_) {
     if (!conn->rcpt_to.empty()) {
-      auto is{imemstream{dp.get(), length}};
-      if (!do_send(*conn, is)) {
-        LOG(WARNING) << "failed to send to " << conn->server_id;
-        return false;
+      if (msg) {
+        auto is{imemstream{msg->data(), msg->length()}};
+        if (!do_send(*conn, is)) {
+          LOG(WARNING) << "failed to send to " << conn->server_id;
+          return false;
+        }
       }
     }
     else {

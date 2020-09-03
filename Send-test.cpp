@@ -62,6 +62,6 @@ int main(int argc, char* argv[])
   CHECK(snd.mail_from(from));
   std::string err;
   CHECK(snd.rcpt_to(res, to, err));
-  CHECK(snd.send(msg_str.data(), msg_str.length()));
+  CHECK(snd.send(msg_str));
   snd.quit();
 }

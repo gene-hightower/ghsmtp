@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
   std::ios::sync_with_stdio(false);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  auto sender = [] {
+  auto const sender = [] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
     if (id_from_env)
       return std::string{id_from_env};
@@ -38,6 +38,7 @@ int main(int argc, char* argv[])
     boost::iostreams::mapped_file_source file;
     file.open(argv[a]);
 
-    auto [dp, length] = rewrite(sender.c_str(), file.data(), file.size());
+    auto const rewritten
+        = rewrite(sender.c_str(), std::string_view(file.data(), file.size()));
   }
 }

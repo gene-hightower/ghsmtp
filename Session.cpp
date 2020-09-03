@@ -838,7 +838,7 @@ void Session::data_done()
     if (!fwd_path_.empty()) {
       boost::iostreams::mapped_file_source file;
       file.open(path);
-      send_.send(file.data(), file.size());
+      send_.send(std::string_view(file.data(), file.size()));
     }
   }
   catch (std::system_error const& e) {
@@ -976,8 +976,10 @@ void Session::bdat_done(size_t n, bool last)
     auto const path = msg_->save();
     if (!fwd_path_.empty()) {
       boost::iostreams::mapped_file_source file;
+      LOG(INFO) << "about to open " << path;
       file.open(path);
-      send_.send(file.data(), file.size());
+      LOG(INFO) << "worked " << path;
+      send_.send(std::string_view(file.data(), file.size()));
     }
   }
   catch (std::system_error const& e) {
