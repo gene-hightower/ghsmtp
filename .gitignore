@@ -4,6 +4,7 @@
 *.o
 *~
 SRS.ipp
+TAGS
 accept_domains
 bad_recipients
 cdb-gen
