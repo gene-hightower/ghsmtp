@@ -599,7 +599,7 @@ struct spf_key : sor<TAO_PEGTL_ISTRING("client-ip"),
                      TAO_PEGTL_ISTRING("identity"),
                      TAO_PEGTL_ISTRING("mechanism")> {};
 
-// This value syntax (allowing mailbox) is not in accordance with RFC
+// This value syntax (allowing addr_spec) is not in accordance with RFC
 // 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
 // before.
 
