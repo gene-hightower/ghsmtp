@@ -252,13 +252,13 @@ forward.cdb: forward
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-opt_flags := -Og -g
+# opt_flags := -Og
 
-gen_flags := -fPIC
+# safty_flags := # nada
 
 # visibility_flags := # nada
 
-lto_flags := # nada
+# lto_flags := # nada
 
 include MKUltra/rules
 
