@@ -94,6 +94,12 @@ struct message {
 };
 } // namespace data
 
+template <typename Input>
+std::string_view make_view(Input const& in)
+{
+  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
+}
+
 template <typename Rule>
 struct action : nothing<Rule> {
 };
@@ -103,7 +109,7 @@ struct action<field_name> {
   template <typename Input>
   static void apply(Input const& in, data::message& msg)
   {
-    msg.field_name = std::string_view{in.begin(), in.end()};
+    msg.field_name = make_view(in);
   }
 };
 
@@ -112,7 +118,7 @@ struct action<field_value> {
   template <typename Input>
   static void apply(Input const& in, data::message& msg)
   {
-    msg.field_value = std::string_view{in.begin(), in.end()};
+    msg.field_value = make_view(in);
   }
 };
 
@@ -130,7 +136,7 @@ struct action<body> {
   template <typename Input>
   static void apply(Input const& in, data::message& msg)
   {
-    msg.body = std::string_view{in.begin(), in.end()};
+    msg.body = make_view(in);
   }
 };
 
