@@ -544,8 +544,7 @@ std::string Session::added_headers_(Message const& msg)
   std::string const tls_info{sock_.tls_info()};
 
   fmt::memory_buffer headers;
-  if (!is_forwarding_())
-    fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
+  fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
 
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
   fmt::format_to(headers, "Received: from {}", client_identity_.utf8());

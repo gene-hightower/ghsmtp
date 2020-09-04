@@ -24,7 +24,9 @@ auto constexpr ARC_Seal                   = "ARC-Seal";
 
 auto constexpr Authentication_Results = "Authentication-Results";
 auto constexpr DKIM_Signature         = "DKIM-Signature";
+auto constexpr Delivered_To           = "Delivered-To";
 auto constexpr Received_SPF           = "Received-SPF";
+auto constexpr Return_Path            = "Return-Path";
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -315,6 +317,9 @@ struct message_parsed {
   std::vector<std::pair<std::string, std::string>> spf_kv_list;
 
   std::map<std::string, std::string, ci_less> spf_info;
+
+  // New Authentication_Results field
+  std::string ar_str;
 };
 
 namespace {
@@ -505,7 +510,15 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, "{}: {};\r\n", Authentication_Results, domain);
+  fmt::format_to(bfr, " {};\r\n", domain);
+
+  for (auto header : msg.headers) {
+    if (header == Received_SPF) {
+      auto v = std::string{header.value.data(), header.value.length()};
+      boost::trim(v);
+      fmt::format_to(bfr, "       spf={}\r\n", v);
+    }
+  }
 
   OpenDMARC::policy dmp;
   if (!spf_info_client_ip.empty()) {
@@ -527,7 +540,7 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   }
 
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed) {
-    auto const human_result = (passed ? "passed" : "failed");
+    auto const human_result = (passed ? "pass" : "fail");
     LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
     int const result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
@@ -546,9 +559,18 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     return;
   }
 
-  // if (msg.headers[0] == "Return-Path") {
-  // Set msg.headers[0] == our new ar header
-  // }
+  msg.ar_str = fmt::to_string(bfr);
+
+  auto const ar = RFC5322::header(Authentication_Results, msg.ar_str);
+
+  LOG(INFO) << ar.as_string();
+
+  if (msg.headers[0] == Return_Path || msg.headers[0] == Delivered_To) {
+    msg.headers[0] = ar;
+  }
+  else {
+    msg.headers.insert(msg.headers.begin(), ar);
+  }
 
   /*
   ARC_HDRFIELD* seal = nullptr;
