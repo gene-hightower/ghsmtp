@@ -25,6 +25,7 @@ auto constexpr ARC_Seal                   = "ARC-Seal";
 auto constexpr Authentication_Results = "Authentication-Results";
 auto constexpr DKIM_Signature         = "DKIM-Signature";
 auto constexpr Delivered_To           = "Delivered-To";
+auto constexpr From                   = "From";
 auto constexpr Received_SPF           = "Received-SPF";
 auto constexpr Return_Path            = "Return-Path";
 
@@ -235,6 +236,8 @@ struct domain           : sor<dot_atom, domain_literal> {};
 
 struct addr_spec        : seq<local_part, one<'@'>, domain> {};
 
+struct addr_spec_only   : seq<addr_spec, eof> {};
+
 struct result           : sor<TAO_PEGTL_ISTRING("Pass"),
                               TAO_PEGTL_ISTRING("Fail"),
                               TAO_PEGTL_ISTRING("SoftFail"),
@@ -317,6 +320,8 @@ struct message_parsed {
   std::vector<std::pair<std::string, std::string>> spf_kv_list;
 
   std::map<std::string, std::string, ci_less> spf_info;
+
+  std::string spf_domain;
 
   // New Authentication_Results field
   std::string ar_str;
@@ -424,6 +429,15 @@ struct action<spf_kv_list> {
   }
 };
 
+template <>
+struct action<domain> {
+  template <typename Input>
+  static void apply(const Input& in, message_parsed& msg)
+  {
+    msg.spf_domain = in.string();
+  }
+};
+
 bool message_parsed::parse(std::string_view input)
 {
   auto in{memory_input<>(input.data(), input.size(), "message")};
@@ -463,20 +477,21 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   std::string spf_info_client_ip;
 
-  for (auto header : msg.headers) {
-    if (header == Received_SPF) {
-      auto const h = header.as_string();
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
+      hdr != end(msg.headers)) {
 
-      auto in{memory_input<>(h.data(), h.length(), "received_spf")};
-      if (tao::pegtl::parse<RFC5322::received_spf, RFC5322::action>(in, msg)) {
-        if (auto const ip = msg.spf_info.find("client-ip");
-            ip != msg.spf_info.end()) {
-          spf_info_client_ip = ip->second;
-          LOG(INFO) << "client-ip == " << spf_info_client_ip;
-        }
-        break; // take just the 1st that parses
+    auto const h = hdr->as_string();
+
+    auto in{memory_input<>(h.data(), h.length(), "received_spf")};
+    if (tao::pegtl::parse<RFC5322::received_spf, RFC5322::action>(in, msg)) {
+      if (auto const ip = msg.spf_info.find("client-ip");
+          ip != msg.spf_info.end()) {
+        spf_info_client_ip = ip->second;
+        LOG(INFO) << "client-ip == " << spf_info_client_ip;
       }
-      LOG(WARNING) << "failed to parse " << Received_SPF;
+    }
+    else {
+      LOG(WARNING) << "failed to parse " << Received_SPF << " '" << h << "'";
     }
   }
 
@@ -488,18 +503,17 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     }
   }
 
+  OpenARC::verify  arv;
   OpenDKIM::verify dkv;
 
-  OpenARC::verify arv;
-
   for (auto header : msg.headers) {
-    auto const hdr_str = fmt::format("{}:{}", header.name, header.value);
+    auto const hdr_str = header.as_string();
     // LOG(INFO) << "header «" << hdr_str << "»";
     arv.header(hdr_str);
     dkv.header(hdr_str);
   }
-  dkv.eoh();
   arv.eoh();
+  dkv.eoh();
 
   // LOG(INFO) << "body «" << msg.body << "»";
   arv.body(msg.body);
@@ -510,27 +524,61 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, " {};\r\n", domain);
+  fmt::format_to(bfr, " {};", domain);
 
-  for (auto header : msg.headers) {
-    if (header == Received_SPF) {
-      auto v = std::string{header.value.data(), header.value.length()};
-      boost::trim(v);
-      fmt::format_to(bfr, "       spf={}\r\n", v);
-    }
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
+      hdr != end(msg.headers)) {
+    auto v = std::string{hdr->value.data(), hdr->value.length()};
+    boost::trim(v);
+    fmt::format_to(bfr, "\r\n       spf={}", v);
   }
 
   OpenDMARC::policy dmp;
   if (!spf_info_client_ip.empty()) {
-    LOG(INFO) << "OpenDMARC::Policy::init(" << spf_info_client_ip << ")";
     dmp.connect(spf_info_client_ip.c_str());
   }
+  int spf_pol = DMARC_POLICY_SPF_OUTCOME_PASS;
+  if (msg.spf_result == "none") {
+    spf_pol = DMARC_POLICY_SPF_OUTCOME_NONE;
+  }
+  if (msg.spf_result == "temperror") {
+    spf_pol = DMARC_POLICY_SPF_OUTCOME_TMPFAIL;
+  }
+  if ((msg.spf_result == "fail") || (msg.spf_result == "permerror")) {
+    spf_pol = DMARC_POLICY_SPF_OUTCOME_FAIL;
+  }
 
+  if (msg.spf_info.find("envelope-from") != end(msg.spf_info)) {
+    std::string spf_dom;
+
+    auto efrom  = msg.spf_info["envelope-from"];
+    auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+
+    if (efrom == "<>") {
+      spf_dom = msg.spf_info["helo"];
+      origin  = DMARC_POLICY_SPF_ORIGIN_HELO;
+      LOG(INFO) << "SPF: origin HELO " << spf_dom;
+    }
+    else {
+      // pull domain from addr_spec
+      memory_input<> addr_in(efrom, "dom");
+      if (!parse<RFC5322::addr_spec_only, RFC5322::action>(addr_in, msg)) {
+        LOG(WARNING) << "Failed to parse domain: " << efrom;
+      }
+      spf_dom = msg.spf_domain;
+      origin  = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+      LOG(INFO) << "SPF: origin MAIL FROM " << spf_dom;
+    }
+
+    dmp.store_spf(spf_dom.c_str(), spf_pol, origin, msg.spf_result.c_str());
+  }
+  // look for smtp.mailfrom
   // Get RFC5322.From
 
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), "From");
+  std::string from;
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
       hdr != end(msg.headers)) {
-    auto const from = std::string{hdr->value.data(), hdr->value.length()};
+    from = std::string{hdr->value.data(), hdr->value.length()};
     LOG(INFO) << "RFC5322.From: == " << from;
     dmp.store_from_domain(from.c_str());
   }
@@ -539,7 +587,9 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     dmp.store_from_domain("unknown.domain");
   }
 
-  dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed) {
+  dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
+                               char const* identity, char const* selector,
+                               char const* b) {
     auto const human_result = (passed ? "pass" : "fail");
     LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
@@ -548,7 +598,13 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
     dmp.store_dkim(domain, result, human_result);
 
-    fmt::format_to(bfr, "       dkim={}\r\n", human_result);
+    auto bs = std::string_view(b, strlen(b)).substr(0, 8);
+
+    fmt::format_to(bfr, "\r\n       dkim={}", human_result);
+    fmt::format_to(bfr, " header.i={}", identity);
+    fmt::format_to(bfr, " header.s={}", selector);
+    fmt::format_to(bfr, " header.b=\"{}\"", bs);
+    fmt::format_to(bfr, ";");
   });
 
   LOG(INFO) << "ARC status  == " << arv.chain_status_str();
@@ -571,6 +627,8 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   else {
     msg.headers.insert(msg.headers.begin(), ar);
   }
+
+  dmp.query_dmarc(from.c_str());
 
   /*
   ARC_HDRFIELD* seal = nullptr;
