@@ -117,8 +117,11 @@ std::string sign::getsighdr()
 
 //.............................................................................
 
-void verify::foreach_sig(
-    std::function<void(char const* domain, bool passed)> func)
+void verify::foreach_sig(std::function<void(char const* domain,
+                                            bool        passed,
+                                            char const* identity,
+                                            char const* selector,
+                                            char const* b)> func)
 {
   int            nsigs = 0;
   DKIM_SIGINFO** sigs  = nullptr;
@@ -166,7 +169,15 @@ void verify::foreach_sig(
     auto const passed
         = ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
 
-    func(c(dom), passed);
+    u_char identity[256] = {};
+    CHECK_EQ(dkim_sig_getidentity(dkim_, sigs[i], identity, sizeof(identity)),
+             DKIM_STAT_OK);
+
+    auto const selector = dkim_sig_getselector(sigs[i]);
+
+    auto const b = dkim_sig_gettagvalue(sigs[i], false, uc("b"));
+
+    func(c(dom), passed, c(identity), c(selector), c(b));
   }
 }
 

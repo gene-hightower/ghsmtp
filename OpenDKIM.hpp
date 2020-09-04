@@ -56,7 +56,11 @@ public:
 
   bool check();
   bool sig_syntax(std::string_view sig);
-  void foreach_sig(std::function<void(char const* domain, bool passed)> func);
+  void foreach_sig(std::function<void(char const* domain,
+                                      bool        passed,
+                                      char const* identity,
+                                      char const* selector,
+                                      char const* b)> func);
 };
 
 } // namespace OpenDKIM

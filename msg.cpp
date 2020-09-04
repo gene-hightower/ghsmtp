@@ -1551,7 +1551,9 @@ struct action<message> {
 
     ctx.dmp.store_from_domain(from_domain.ascii().c_str());
 
-    ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed) {
+    ctx.dkv.foreach_sig([&ctx](char const* domain, bool passed,
+                               char const* identity, char const* selector,
+                               char const* b) {
       LOG(INFO) << "DKIM check for " << domain
                 << (passed ? " passed" : " failed");
 
