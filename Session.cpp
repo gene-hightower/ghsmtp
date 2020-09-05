@@ -378,7 +378,11 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     }
     out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
               "250-PIPELINING\r\n"          // RFC 2920
-              "250-BINARYMIME\r\n"          // RFC 3030
+//-----------------------------------------------
+// Disable this right now, nobody uses it anyhow,
+//  but this might break DKIM signing for relay.
+//            "250-BINARYMIME\r\n"          // RFC 3030
+//-----------------------------------------------
               "250-CHUNKING\r\n"            // RFC 3030
               "250 SMTPUTF8\r\n";           // RFC 6531
   }
