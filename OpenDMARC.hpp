@@ -77,6 +77,19 @@ constexpr char const* advice_to_string(advice adv)
   return "none";
 }
 
+constexpr char const* policy_spf_to_string(int pol)
+{
+  switch (pol) {
+  case DMARC_POLICY_SPF_OUTCOME_NONE: return "SPF_OUTCOME_NONE";
+  case DMARC_POLICY_SPF_OUTCOME_PASS: return "SPF_OUTCOME_PASS";
+  case DMARC_POLICY_SPF_OUTCOME_FAIL: return "SPF_OUTCOME_FAIL";
+  case DMARC_POLICY_SPF_OUTCOME_TMPFAIL: return "SPF_OUTCOME_TMPFAIL";
+  case DMARC_POLICY_SPF_ALIGNMENT_PASS: return "SPF_ALIGNMENT_PASS";
+  case DMARC_POLICY_SPF_ALIGNMENT_FAIL: return "SPF_ALIGNMENT_FAIL";
+  }
+  return "none";
+}
+
 } // namespace OpenDMARC
 
 #endif // OPENDMARC_DOT_HPP

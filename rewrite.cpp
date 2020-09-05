@@ -1,9 +1,11 @@
 #include "rewrite.hpp"
 
+#include "Mailbox.hpp"
 #include "OpenARC.hpp"
 #include "OpenDKIM.hpp"
 #include "OpenDMARC.hpp"
 #include "esc.hpp"
+#include "iequal.hpp"
 #include "imemstream.hpp"
 
 #include <cstring>
@@ -29,10 +31,18 @@ auto constexpr From                   = "From";
 auto constexpr Received_SPF           = "Received-SPF";
 auto constexpr Return_Path            = "Return-Path";
 
+auto constexpr client_ip = "client-ip";
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
+
+static std::string make_string(std::string_view v)
+{
+  return std::string(v.begin(),
+                     static_cast<size_t>(std::distance(v.begin(), v.end())));
+}
 
 namespace RFC5322 {
 
@@ -60,7 +70,7 @@ struct UTF8_non_ascii   : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
 struct VUCHAR           : sor<VCHAR, UTF8_non_ascii> {};
 
-/////////////////////////////////////////////////////////////////////////////
+//.............................................................................
 
 struct ftext            : ranges<33, 57, 59, 126> {};
 
@@ -79,7 +89,7 @@ struct body             : until<eof> {};
 
 struct message          : seq<fields, opt<seq<eol, body>>, eof> {};
 
-/////////////////////////////////////////////////////////////////////////////
+//.............................................................................
 
 // <https://tools.ietf.org/html/rfc2047>
 
@@ -137,7 +147,7 @@ struct encoded_word_book: seq<string<'=', '?'>,
 
 struct encoded_word     : seq<opt<FWS>, encoded_word_book> {};
 
-/////////////////////////////////////////////////////////////////////////////
+//.............................................................................
 
 // Comments are recursive, so the forward decl
 struct comment;
@@ -194,7 +204,7 @@ struct dot_atom         : seq<opt<CFWS>, dot_atom_text, opt<CFWS>> {};
 
 struct word             : sor<atom, quoted_string> {};
 
-// struct phrase        : plus<sor<encoded_word, word>> {};
+struct phrase          : plus<sor<encoded_word, word>> {};
 
 struct dec_octet        : sor<seq<string<'2','5'>, range<'0','5'>>,
                               seq<one<'2'>, range<'0','4'>, DIGIT>,
@@ -234,6 +244,9 @@ struct domain_literal   : seq<opt<CFWS>,
 
 struct domain           : sor<dot_atom, domain_literal> {};
 
+// This addr_spec should be exactly the same as RFC5321 Mailbox
+  // 
+
 struct addr_spec        : seq<local_part, one<'@'>, domain> {};
 
 struct addr_spec_only   : seq<addr_spec, eof> {};
@@ -271,9 +284,35 @@ struct spf_header       : seq<opt<CFWS>,
                               opt<seq<FWS, comment>>,
                               opt<seq<FWS, spf_kv_list>>> {};
 
-struct received_spf     : seq<TAO_PEGTL_ISTRING("Received-SPF:"),
-                              spf_header,
-                              eof> {};
+struct spf_header_only  : seq<spf_header, eof> {};
+
+//.............................................................................
+
+struct display_name     : phrase {};
+
+struct angle_addr       : seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>> {};
+
+struct name_addr        : seq<opt<display_name>, angle_addr> {};
+
+struct mailbox          : sor<name_addr, addr_spec> {};
+
+struct obs_mbox_list    : seq<star<seq<opt<CFWS>, one<','>>>,
+                              mailbox,
+                              star<one<','>, opt<sor<mailbox, CFWS>>>
+                              > {};
+
+struct mailbox_list     : sor<list<mailbox, one<','>>,
+                              obs_mbox_list
+                              > {};
+
+struct from             : seq<TAO_PEGTL_ISTRING("From:"),
+                              mailbox_list
+                              > {};
+
+struct mailbox_list_only: seq<mailbox_list, eof> {};
+
+//.............................................................................
+
 // clang-format on
 
 struct header {
@@ -285,62 +324,54 @@ struct header {
 
   std::string as_string() const { return fmt::format("{}:{}", name, value); }
 
-  bool operator==(std::string_view n) const { return name == n; }
+  std::string_view as_view() const
+  {
+    return {name.begin(),
+            static_cast<size_t>(std::distance(name.begin(), value.end()))};
+  }
+
+  bool operator==(std::string_view n) const { return iequal(n, name); }
 
   std::string_view name;
   std::string_view value;
 };
 
-struct ci_less {
-  bool operator()(std::string const& lhs, std::string const& rhs) const
-  {
-    // strcasecmp(3) is POSIX, FIXME: should force C locale
-    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
-  }
-};
-
 struct message_parsed {
-  bool parse(std::string_view msg);
+  bool parse(std::string_view input);
 
   std::string as_string() const;
 
   std::vector<header> headers;
 
-  std::string_view body;
-
   std::string_view field_name;
   std::string_view field_value;
 
-  // SPF
-  std::string spf_result;
-
-  std::string spf_key;
-  std::string spf_value;
-
-  std::vector<std::pair<std::string, std::string>> spf_kv_list;
-
-  std::map<std::string, std::string, ci_less> spf_info;
-
-  std::string spf_domain;
+  std::string_view body;
 
   // New Authentication_Results field
-  std::string ar_str;
+  std::string ar_bfr;
 };
 
-namespace {
+static std::string_view trim(std::string_view v)
+{
+  auto constexpr WS = " \t";
+  v.remove_prefix(std::min(v.find_first_not_of(WS), v.size()));
+  v.remove_suffix(std::min(v.size() - v.find_last_not_of(WS) - 1, v.size()));
+  return v;
+}
+
 template <typename Input>
-std::string_view make_view(Input const& in)
+static std::string_view make_view(Input const& in)
 {
   return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
 }
-} // namespace
 
 template <typename Rule>
-struct action : nothing<Rule> {
+struct msg_action : nothing<Rule> {
 };
 
 template <>
-struct action<field_name> {
+struct msg_action<field_name> {
   template <typename Input>
   static void apply(Input const& in, message_parsed& msg)
   {
@@ -349,7 +380,7 @@ struct action<field_name> {
 };
 
 template <>
-struct action<field_value> {
+struct msg_action<field_value> {
   template <typename Input>
   static void apply(Input const& in, message_parsed& msg)
   {
@@ -358,7 +389,7 @@ struct action<field_value> {
 };
 
 template <>
-struct action<field> {
+struct msg_action<field> {
   template <typename Input>
   static void apply(Input const& in, message_parsed& msg)
   {
@@ -367,7 +398,7 @@ struct action<field> {
 };
 
 template <>
-struct action<body> {
+struct msg_action<body> {
   template <typename Input>
   static void apply(Input const& in, message_parsed& msg)
   {
@@ -375,73 +406,12 @@ struct action<body> {
   }
 };
 
-/////////////////////////////////////////////////////////////////////////////
-
-template <>
-struct action<result> {
-  template <typename Input>
-  static void apply(const Input& in, message_parsed& msg)
-  {
-    msg.spf_result = std::move(in.string());
-    boost::to_lower(msg.spf_result);
-  }
-};
-
-template <>
-struct action<spf_key> {
-  template <typename Input>
-  static void apply(const Input& in, message_parsed& msg)
-  {
-    msg.spf_key = std::move(in.string());
-  }
-};
-
-template <>
-struct action<spf_value> {
-  template <typename Input>
-  static void apply(const Input& in, message_parsed& msg)
-  {
-    msg.spf_value = std::move(in.string());
-    boost::trim(msg.spf_value);
-  }
-};
-
-template <>
-struct action<spf_kv_pair> {
-  template <typename Input>
-  static void apply(const Input& in, message_parsed& msg)
-  {
-    msg.spf_kv_list.emplace_back(msg.spf_key, msg.spf_value);
-    msg.spf_key.clear();
-    msg.spf_value.clear();
-  }
-};
-
-template <>
-struct action<spf_kv_list> {
-  static void apply0(message_parsed& msg)
-  {
-    for (auto kvp : msg.spf_kv_list) {
-      CHECK(!msg.spf_info.contains(kvp.first))
-          << "dup: " << kvp.first << " = " << kvp.second;
-      msg.spf_info[kvp.first] = kvp.second;
-    }
-  }
-};
-
-template <>
-struct action<domain> {
-  template <typename Input>
-  static void apply(const Input& in, message_parsed& msg)
-  {
-    msg.spf_domain = in.string();
-  }
-};
+//.............................................................................
 
 bool message_parsed::parse(std::string_view input)
 {
   auto in{memory_input<>(input.data(), input.size(), "message")};
-  return tao::pegtl::parse<RFC5322::message, RFC5322::action>(in, *this);
+  return tao::pegtl::parse<message, msg_action>(in, *this);
 }
 
 std::string message_parsed::as_string() const
@@ -457,60 +427,114 @@ std::string message_parsed::as_string() const
   return fmt::to_string(bfr);
 }
 
+//.............................................................................
+
+struct received_spf_parsed {
+  bool parse(std::string_view input);
+
+  std::string_view result;
+
+  std::string_view key;
+  std::string_view value;
+
+  std::vector<std::pair<std::string_view, std::string_view>> kv_list;
+  std::map<std::string_view, std::string_view, ci_less>      kv_map;
+};
+
+template <typename Rule>
+struct spf_action : nothing<Rule> {
+};
+
+template <>
+struct spf_action<result> {
+  template <typename Input>
+  static void apply(const Input& in, received_spf_parsed& spf)
+  {
+    spf.result = make_view(in);
+  }
+};
+
+template <>
+struct spf_action<spf_key> {
+  template <typename Input>
+  static void apply(const Input& in, received_spf_parsed& spf)
+  {
+    spf.key = make_view(in);
+  }
+};
+
+template <>
+struct spf_action<spf_value> {
+  template <typename Input>
+  static void apply(const Input& in, received_spf_parsed& spf)
+  {
+    // RFC5322 syntax is full of optional WS, so we trim
+    spf.value = trim(make_view(in));
+  }
+};
+
+template <>
+struct spf_action<spf_kv_pair> {
+  template <typename Input>
+  static void apply(const Input& in, received_spf_parsed& spf)
+  {
+    spf.kv_list.emplace_back(spf.key, spf.value);
+    spf.key = spf.value = "";
+  }
+};
+
+template <>
+struct spf_action<spf_kv_list> {
+  static void apply0(received_spf_parsed& spf)
+  {
+    for (auto kvp : spf.kv_list) {
+      if (spf.kv_map.contains(kvp.first)) {
+        LOG(WARNING) << "dup key: " << kvp.first << "=" << kvp.second;
+        LOG(WARNING) << "    and: " << kvp.first << "="
+                     << spf.kv_map[kvp.first];
+      }
+      spf.kv_map[kvp.first] = kvp.second;
+    }
+  }
+};
+
+bool received_spf_parsed::parse(std::string_view input)
+{
+  auto in{memory_input<>(input.data(), input.size(), "spf_header")};
+  return tao::pegtl::parse<spf_header_only, spf_action>(in, *this);
+}
+
+//.............................................................................
+
+// Parse a grammar and extract each addr_spec
+
+template <typename Rule>
+struct addr_specs_action : nothing<Rule> {
+};
+
+template <>
+struct addr_specs_action<addr_spec> {
+  template <typename Input>
+  static void apply(Input const& in, std::vector<std::string>& addr_specs)
+  {
+    addr_specs.push_back(in.string());
+  }
+};
+
 } // namespace RFC5322
 
 static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 {
   CHECK(!msg.headers.empty());
 
-  for (auto header : msg.headers) {
-    // clang-format off
-    if (header == ARC_Seal ||
-        header == ARC_Message_Signature ||
-        header == ARC_Authentication_Results ||
-        header == Received_SPF ||
-        header == DKIM_Signature ||
-        header == Authentication_Results)
-      LOG(INFO) << '\n' << header.as_string() << '\n';
-    // clang-format on
-  }
-
-  std::string spf_info_client_ip;
-
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
-      hdr != end(msg.headers)) {
-
-    auto const h = hdr->as_string();
-
-    auto in{memory_input<>(h.data(), h.length(), "received_spf")};
-    if (tao::pegtl::parse<RFC5322::received_spf, RFC5322::action>(in, msg)) {
-      if (auto const ip = msg.spf_info.find("client-ip");
-          ip != msg.spf_info.end()) {
-        spf_info_client_ip = ip->second;
-        LOG(INFO) << "client-ip == " << spf_info_client_ip;
-      }
-    }
-    else {
-      LOG(WARNING) << "failed to parse " << Received_SPF << " '" << h << "'";
-    }
-  }
-
-  for (auto header : msg.headers) {
-    if (header == Authentication_Results) {
-      // LOG(INFO) << header.as_string();
-      // parse header.value
-      // break; // take just the 1st
-    }
-  }
-
   OpenARC::verify  arv;
   OpenDKIM::verify dkv;
 
   for (auto header : msg.headers) {
-    auto const hdr_str = header.as_string();
-    // LOG(INFO) << "header «" << hdr_str << "»";
-    arv.header(hdr_str);
-    dkv.header(hdr_str);
+    auto const hv = header.as_view();
+    // LOG(INFO) << "header «" << hv << "»";
+    arv.header(hv);
+    dkv.header(hv);
   }
   arv.eoh();
   dkv.eoh();
@@ -524,31 +548,40 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, " {};", domain);
+  fmt::format_to(bfr, "{}: {};", Authentication_Results, domain);
 
+  RFC5322::received_spf_parsed spf_parsed;
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
-    auto v = std::string{hdr->value.data(), hdr->value.length()};
-    boost::trim(v);
-    fmt::format_to(bfr, "\r\n       spf={}", v);
+    if (spf_parsed.parse(hdr->value)) {
+      fmt::format_to(bfr, "\r\n       spf={}", hdr->as_string());
+    }
+    else {
+      LOG(WARNING) << "failed to parse " << hdr->value;
+    }
   }
 
   OpenDMARC::policy dmp;
-  if (!spf_info_client_ip.empty()) {
-    dmp.connect(spf_info_client_ip.c_str());
+  if (spf_parsed.kv_map.contains(client_ip)) {
+    std::string ip = make_string(spf_parsed.kv_map[client_ip]);
+    LOG(INFO) << "dmp.connect(" << ip << ");";
+    dmp.connect(ip.c_str());
   }
+
   int spf_pol = DMARC_POLICY_SPF_OUTCOME_PASS;
-  if (msg.spf_result == "none") {
+  if (iequal(spf_parsed.result, "None")) {
     spf_pol = DMARC_POLICY_SPF_OUTCOME_NONE;
   }
-  if (msg.spf_result == "temperror") {
+  if (iequal(spf_parsed.result, "TempError")) {
     spf_pol = DMARC_POLICY_SPF_OUTCOME_TMPFAIL;
   }
-  if ((msg.spf_result == "fail") || (msg.spf_result == "permerror")) {
+  if (iequal(spf_parsed.result, "Fail") ||
+      iequal(spf_parsed.result, "PermError")) {
     spf_pol = DMARC_POLICY_SPF_OUTCOME_FAIL;
   }
 
-  if (msg.spf_info.find("envelope-from") != end(msg.spf_info)) {
+#if 0
+  if (spf_parsed.kv_map.find("envelope-from") != end(msg.spf_info)) {
     std::string spf_dom;
 
     auto efrom  = msg.spf_info["envelope-from"];
@@ -560,31 +593,68 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
       LOG(INFO) << "SPF: origin HELO " << spf_dom;
     }
     else {
-      // pull domain from addr_spec
-      memory_input<> addr_in(efrom, "dom");
-      if (!parse<RFC5322::addr_spec_only, RFC5322::action>(addr_in, msg)) {
-        LOG(WARNING) << "Failed to parse domain: " << efrom;
+      // pull domain from RFC5321.FROM
+      std::vector<std::string> addr_specs;
+      memory_input<>           addr_in(efrom, "envelope-from");
+      if (parse<RFC5322::addr_spec_only, RFC5322::addr_specs_action>(
+              addr_in, addr_specs)) {
+        CHECK_EQ(addr_specs.count(), 1);
+        spf_dom = Mailbox(addr_specs[0]).domain.ascii();
+        origin  = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+        LOG(INFO) << "SPF: origin MAIL FROM " << spf_dom;
       }
-      spf_dom = msg.spf_domain;
-      origin  = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
-      LOG(INFO) << "SPF: origin MAIL FROM " << spf_dom;
+      else {
+        LOG(WARNING) << "Failed to parse RFC5322.FROM: " << efrom;
+      }
     }
-
+    LOG(INFO) << "dmp.store_spf(\"" << spf_dom << "\", "
+              << OpenDMARC::policy_spf_to_string(spf_pol) << ","
+              << OpenDMARC::policy_spf_to_string(origin) << ", \""
+              << msg.spf_result << "\")";
     dmp.store_spf(spf_dom.c_str(), spf_pol, origin, msg.spf_result.c_str());
   }
   // look for smtp.mailfrom
   // Get RFC5322.From
+#endif
 
-  std::string from;
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
-      hdr != end(msg.headers)) {
-    from = std::string{hdr->value.data(), hdr->value.length()};
-    LOG(INFO) << "RFC5322.From: == " << from;
-    dmp.store_from_domain(from.c_str());
+  Domain from_dom;
+
+  std::vector<std::string> addr_specs;
+  for (auto hdr : msg.headers) {
+    if (hdr == From) {
+      auto const from_str = make_string(hdr.value);
+
+      memory_input<> from_in(from_str, "from");
+      if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
+              from_in, addr_specs)) {
+        LOG(WARNING) << "Failed to parse From:" << from_str;
+      }
+    }
   }
-  else {
-    LOG(ERROR) << "no From: header";
-    dmp.store_from_domain("unknown.domain");
+  if (addr_specs.empty()) {
+    LOG(WARNING) << "no from address";
+  }
+
+  // FIXME see of all the domains are the same in addr_specs
+
+  /*
+    <https://tools.ietf.org/html/rfc7489#section-6.6>
+    6.6.1.  Extract Author Domain
+
+    The case of a syntactically valid multi-valued RFC5322.From field
+    presents a particular challenge.  The process in this case is to
+    apply the DMARC check using each of those domains found in the
+    RFC5322.From field as the Author Domain and apply the most strict
+    policy selected among the checks that fail.
+
+  */
+
+  std::string dmarc_from_domain;
+  if (!addr_specs.empty()) {
+    Mailbox from_mbx(addr_specs[0]);
+    dmarc_from_domain = from_mbx.domain().ascii();
+    LOG(INFO) << "dmp.store_from_domain(\"" << dmarc_from_domain << "\")";
+    dmp.store_from_domain(dmarc_from_domain.c_str());
   }
 
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
@@ -615,9 +685,9 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     return;
   }
 
-  msg.ar_str = fmt::to_string(bfr);
+  msg.ar_bfr = fmt::to_string(bfr);
 
-  auto const ar = RFC5322::header(Authentication_Results, msg.ar_str);
+  auto const ar = RFC5322::header(Authentication_Results, msg.ar_bfr);
 
   LOG(INFO) << ar.as_string();
 
@@ -628,7 +698,7 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     msg.headers.insert(msg.headers.begin(), ar);
   }
 
-  dmp.query_dmarc(from.c_str());
+  dmp.query_dmarc(dmarc_from_domain.c_str());
 
   /*
   ARC_HDRFIELD* seal = nullptr;
@@ -651,13 +721,46 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   */
 }
 
+void print_spf_envelope_froms(char const* file, std::string_view input)
+{
+  RFC5322::message_parsed msg;
+  if (!msg.parse(input)) {
+    LOG(WARNING) << "failed to parse message";
+    return;
+  }
+  CHECK(!msg.headers.empty());
+  for (auto hdr : msg.headers) {
+    if (hdr == Received_SPF) {
+      RFC5322::received_spf_parsed spf_parsed;
+      if (spf_parsed.parse(hdr.value)) {
+        std::cout << spf_parsed.kv_map["envelope-from"] << '\n';
+        break;
+      }
+      else {
+        LOG(WARNING) << "failed to parse " << file << ":\n" << hdr.as_string();
+      }
+    }
+  }
+}
+
 std::optional<std::string> rewrite(char const* domain, std::string_view input)
 {
   RFC5322::message_parsed msg;
-
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
     return {};
+  }
+
+  for (auto header : msg.headers) {
+    // clang-format off
+    if (header == ARC_Seal ||
+        header == ARC_Authentication_Results ||
+        header == ARC_Message_Signature ||
+        header == Authentication_Results ||
+        header == DKIM_Signature ||
+        header == Received_SPF)
+      LOG(INFO) << '\n' << header.as_string() << '\n';
+    // clang-format on
   }
 
   do_arc(domain, msg);
