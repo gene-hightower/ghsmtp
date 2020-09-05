@@ -99,11 +99,22 @@ sign::sign(char const* secretkey,
            char const* domain,
            body_type   typ)
 {
-  dkim_ = CHECK_NOTNULL(dkim_sign(
-      lib_, id_s, nullptr, uc(secretkey), uc(selector), uc(domain),
-      DKIM_CANON_RELAXED,
-      (typ == body_type::binary) ? DKIM_CANON_SIMPLE : DKIM_CANON_RELAXED,
-      DKIM_SIGN_RSASHA256, -1, &status_));
+  // clang-format off
+  dkim_ = dkim_sign(lib_,
+                    id_s,
+                    nullptr,
+                    uc(secretkey),
+                    uc(selector),
+                    uc(domain),
+                    DKIM_CANON_RELAXED,
+                    (typ == body_type::binary) ? DKIM_CANON_SIMPLE
+                                               : DKIM_CANON_RELAXED,
+                    DKIM_SIGN_RSASHA256,
+                    -1,
+                    &status_);
+  // clang-format on
+  CHECK_NOTNULL(dkim_);
+  CHECK_EQ(status_, DKIM_STAT_OK);
 }
 
 std::string sign::getsighdr()
