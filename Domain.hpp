@@ -42,6 +42,8 @@ public:
   std::string const& ascii() const { return ascii_; }
   std::string const& utf8() const { return utf8_; }
 
+  static bool validate(std::string_view dom);
+
 private:
   std::string ascii_;
   std::string utf8_;

@@ -38,6 +38,12 @@ int main(int argc, char const* argv[])
   Domain const norm1{"hi5.com"};
   CHECK_EQ(norm0, norm1);
 
+  CHECK(Domain::validate("hi⒌com"));
+  CHECK(Domain::validate("hi5.com"));
+
+  // FIXME
+  // CHECK(!Domain::validate("$?%^&*("));
+
   try {
     Domain const junk{"$?%^&*("};
     // idn2 allows this

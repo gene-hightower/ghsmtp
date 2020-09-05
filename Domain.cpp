@@ -31,6 +31,45 @@ std::string nfkc(std::string_view str)
   return std::string{bfr, length};
 }
 
+bool Domain::validate(std::string_view dom)
+{
+  if (dom.length() > max_length) {
+    return false;
+  }
+
+  // Handle "bare" IP addresses, without the brackets.
+  if (IP::is_address(dom)) {
+    return true;
+  }
+
+  if (IP::is_address_literal(dom)) {
+    return true;
+  }
+
+  dom = remove_trailing_dot(dom);
+
+  auto const norm = nfkc(dom);
+
+  // idn2_to_ascii_8z() converts (ASCII) to lower case
+
+  char* ptr  = nullptr;
+  auto  code = idn2_to_ascii_8z(norm.c_str(), &ptr, IDN2_TRANSITIONAL);
+  if (code != IDN2_OK)
+    return false;
+  std::string ascii(ptr);
+  idn2_free(ptr);
+
+  ptr  = nullptr;
+  code = idn2_to_unicode_8z8z(ascii.c_str(), &ptr, IDN2_TRANSITIONAL);
+  if (code != IDN2_OK)
+    return false;
+  idn2_free(ptr);
+
+  // FIXME: check syntax is dot-string?
+
+  return true;
+}
+
 void Domain::set(std::string_view dom)
 {
   if (dom.length() > max_length) {
