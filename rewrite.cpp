@@ -1,3 +1,9 @@
+// What you get where:
+
+// RFC5321.HELO/.EHLO domain
+// RFC5321.MailFrom   mailbox
+// RFC5322.From       mailbox-list
+
 #include "rewrite.hpp"
 
 #include "Mailbox.hpp"
@@ -5,6 +11,7 @@
 #include "OpenDKIM.hpp"
 #include "OpenDMARC.hpp"
 #include "esc.hpp"
+#include "fs.hpp"
 #include "iequal.hpp"
 #include "imemstream.hpp"
 
@@ -20,6 +27,7 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+// RFC-5322 header names
 auto constexpr ARC_Authentication_Results = "ARC-Authentication-Results";
 auto constexpr ARC_Message_Signature      = "ARC-Message-Signature";
 auto constexpr ARC_Seal                   = "ARC-Seal";
@@ -31,7 +39,27 @@ auto constexpr From                   = "From";
 auto constexpr Received_SPF           = "Received-SPF";
 auto constexpr Return_Path            = "Return-Path";
 
-auto constexpr client_ip = "client-ip";
+// SPF Results
+auto constexpr Pass      = "Pass";
+auto constexpr Fail      = "Fail";
+auto constexpr SoftFail  = "SoftFail";
+auto constexpr Neutral   = "Neutral";
+auto constexpr None      = "None";
+auto constexpr TempError = "TempError";
+auto constexpr PermError = "PermError";
+
+// SPF keys
+auto constexpr client_ip     = "client-ip";
+auto constexpr envelope_from = "envelope-from";
+auto constexpr problem       = "problem";
+auto constexpr receiver      = "receiver";
+auto constexpr identity      = "identity";
+auto constexpr mechanism     = "mechanism";
+// auto constexpr helo       = "helo"; // both key and value
+
+// SPF identities
+auto constexpr helo     = "helo";
+auto constexpr mailfrom = "mailfrom";
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -82,6 +110,8 @@ struct FWS              : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 struct field_value      : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
 
 struct field            : seq<field_name, one<':'>, field_value, eol> {};
+
+struct raw_field        : seq<field_name, one<':'>, field_value, eof> {};
 
 struct fields           : star<field> {};
 
@@ -244,8 +274,7 @@ struct domain_literal   : seq<opt<CFWS>,
 
 struct domain           : sor<dot_atom, domain_literal> {};
 
-// This addr_spec should be exactly the same as RFC5321 Mailbox
-  // 
+// This addr_spec should be exactly the same as RFC5321 Mailbox, but it's not.
 
 struct addr_spec        : seq<local_part, one<'@'>, domain> {};
 
@@ -305,9 +334,9 @@ struct mailbox_list     : sor<list<mailbox, one<','>>,
                               obs_mbox_list
                               > {};
 
-struct from             : seq<TAO_PEGTL_ISTRING("From:"),
-                              mailbox_list
-                              > {};
+// struct from             : seq<TAO_PEGTL_ISTRING("From:"),
+//                               mailbox_list
+//                               > {};
 
 struct mailbox_list_only: seq<mailbox_list, eof> {};
 
@@ -338,8 +367,11 @@ struct header {
 
 struct message_parsed {
   bool parse(std::string_view input);
+  bool parse_hdr(std::string_view input);
 
   std::string as_string() const;
+
+  bool write(std::ostream& out) const;
 
   std::vector<header> headers;
 
@@ -349,7 +381,12 @@ struct message_parsed {
   std::string_view body;
 
   // New Authentication_Results field
-  std::string ar_bfr;
+  std::string ar_str;
+
+  // New DKIM-Signature that includes above AR
+  std::string sig_str;
+
+  std::vector<std::string> arc_hdrs;
 };
 
 static std::string_view trim(std::string_view v)
@@ -414,6 +451,16 @@ bool message_parsed::parse(std::string_view input)
   return tao::pegtl::parse<message, msg_action>(in, *this);
 }
 
+bool message_parsed::parse_hdr(std::string_view input)
+{
+  auto in{memory_input<>(input.data(), input.size(), "message")};
+  if (tao::pegtl::parse<raw_field, msg_action>(in, *this)) {
+    std::rotate(headers.rbegin(), headers.rbegin() + 1, headers.rend());
+    return true;
+  }
+  return false;
+}
+
 std::string message_parsed::as_string() const
 {
   fmt::memory_buffer bfr;
@@ -425,6 +472,17 @@ std::string message_parsed::as_string() const
     fmt::format_to(bfr, "\r\n{}", body);
 
   return fmt::to_string(bfr);
+}
+
+bool message_parsed::write(std::ostream& os) const
+{
+  for (auto const h : headers)
+    fmt::print(os, "{}\r\n", h.as_string());
+
+  if (!body.empty())
+    fmt::print(os, "\r\n{}", body);
+
+  return true;
 }
 
 //.............................................................................
@@ -523,12 +581,162 @@ struct addr_specs_action<addr_spec> {
 
 } // namespace RFC5322
 
+// Map SPF result string to DMARC policy code.
+
+// FIXME: This mapping needs to be examined and confirmed, no time now.
+
+static int result_to_pol(std::string_view result)
+{
+  // clang-format off
+  if (iequal(result, Pass))      return DMARC_POLICY_SPF_OUTCOME_PASS;
+  if (iequal(result, Fail))      return DMARC_POLICY_SPF_OUTCOME_FAIL;
+  if (iequal(result, SoftFail))  return DMARC_POLICY_SPF_OUTCOME_TMPFAIL;
+  if (iequal(result, Neutral))   return DMARC_POLICY_SPF_OUTCOME_NONE;
+  if (iequal(result, None))      return DMARC_POLICY_SPF_OUTCOME_NONE;
+  if (iequal(result, TempError)) return DMARC_POLICY_SPF_OUTCOME_NONE;
+  if (iequal(result, PermError)) return DMARC_POLICY_SPF_OUTCOME_NONE;
+  LOG(WARNING) << "unknown SPF result: \"" << result << "\"";
+  return DMARC_POLICY_SPF_OUTCOME_NONE;
+  // clang-format on
+}
+
+static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
+                                RFC5322::received_spf_parsed& spf)
+{
+  if (spf.kv_map.contains(problem)) {
+    LOG(WARNING) << "SPF problem: " << spf.kv_map[problem];
+  }
+
+  auto const spf_pol = result_to_pol(spf.result);
+
+  std::string spf_dom;
+
+  int spf_origin;
+
+  if (spf.kv_map.contains(identity)) {
+    if (iequal(spf.kv_map[identity], mailfrom)) {
+      if (spf.kv_map.contains(envelope_from)) {
+        if (Mailbox::validate(spf.kv_map[envelope_from])) {
+          Mailbox mbx(spf.kv_map[envelope_from]);
+          spf_dom                 = mbx.domain().ascii();
+          spf_origin              = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+          auto const human_result = fmt::format(
+              "{}, explicit origin mail from, mailbox {}", spf.result, mbx);
+          LOG(INFO) << human_result;
+          dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin,
+                        human_result.c_str());
+          return;
+        }
+        else {
+          LOG(WARNING) << "invalid mailbox in envelope-from: "
+                       << spf.kv_map[envelope_from];
+        }
+      }
+      else {
+        LOG(WARNING)
+            << "identity checked was mail from, but no envelope_from key";
+      }
+    }
+    else if (iequal(spf.kv_map[identity], helo)) {
+      if (spf.kv_map.contains(helo)) {
+        if (Domain::validate(spf.kv_map[helo])) {
+          Domain dom(spf.kv_map[helo]);
+          spf_dom    = dom.ascii();
+          spf_origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+
+          auto const human_result = fmt::format(
+              "{}, explicit origin hello, domain {}", spf.result, dom);
+          LOG(INFO) << human_result;
+          dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin,
+                        human_result.c_str());
+          return;
+        }
+        else {
+          LOG(WARNING) << "invalid domain in helo: " << spf.kv_map[helo];
+        }
+      }
+      else {
+        LOG(WARNING) << "identity checked was helo, but no helo key";
+      }
+    }
+    else {
+      LOG(WARNING) << "unknown identity " << spf.kv_map[identity];
+    }
+  }
+  else {
+    LOG(INFO) << "no explicit tag for which identity was checked";
+  }
+
+  if (spf.kv_map.contains(envelope_from)) {
+    auto const efrom = spf.kv_map[envelope_from];
+
+    if (efrom == "<>") {
+      if (spf.kv_map.contains(helo)) {
+        if (Domain::validate(spf.kv_map[helo])) {
+          Domain dom(spf.kv_map[helo]);
+          spf_dom    = dom.ascii();
+          spf_origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+
+          auto const human_result = fmt::format(
+              "{}, RFC-5321.FROM is <>, implicit origin hello, domain {}",
+              spf.result, dom);
+          LOG(INFO) << human_result;
+          dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin,
+                        human_result.c_str());
+          return;
+        }
+        else {
+          LOG(WARNING) << "RFC-5321.FROM is <> but helo is invalid domain: "
+                       << spf.kv_map[helo];
+        }
+      }
+      else {
+        LOG(WARNING) << "envelope-from is <> but no helo key";
+      }
+    }
+    else if (Mailbox::validate(efrom)) {
+      // We're good to go
+      Mailbox mbx(efrom);
+      spf_dom    = mbx.domain().ascii();
+      spf_origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
+
+      auto const human_result = fmt::format(
+          "{}, implicit origin mail from, mailbox {}", spf.result, mbx);
+      LOG(INFO) << human_result;
+      dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin, human_result.c_str());
+      return;
+    }
+    else {
+      LOG(WARNING) << "envelope-from invalid mailbox: " << efrom;
+    }
+  }
+  else if (spf.kv_map.contains(helo)) {
+  }
+  else {
+    LOG(WARNING)
+        << "no explicit \"identity\" key, and no envelope-from or helo key";
+  }
+}
+
 static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 {
   CHECK(!msg.headers.empty());
 
+  // Remove headers that are added by the "delivery agent"
+  // aka (Session::added_headers_)
+  msg.headers.erase(
+      std::remove(msg.headers.begin(), msg.headers.end(), Return_Path),
+      msg.headers.end());
+
+  // just in case, but right now this header should not exist.
+  msg.headers.erase(
+      std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
+      msg.headers.end());
+
   OpenARC::verify  arv;
   OpenDKIM::verify dkv;
+
+  // Run our message through ARC::verify and OpenDKIM verify
 
   for (auto header : msg.headers) {
     auto const hv = header.as_view();
@@ -546,96 +754,31 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   arv.eom();
   dkv.eom();
 
+  OpenDMARC::policy dmp;
+
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
   fmt::format_to(bfr, "{}: {};", Authentication_Results, domain);
 
+  // Grab 1st SPF record
   RFC5322::received_spf_parsed spf_parsed;
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      fmt::format_to(bfr, "\r\n       spf={}", hdr->as_string());
+      fmt::format_to(bfr, "\r\n       spf={};", hdr->as_string());
+
+      if (spf_parsed.kv_map.contains(client_ip)) {
+        std::string ip = make_string(spf_parsed.kv_map[client_ip]);
+        LOG(INFO) << "dmp.connect(" << ip << ");";
+        dmp.connect(ip.c_str());
+      }
+
+      spf_result_to_dmarc(dmp, spf_parsed);
     }
     else {
       LOG(WARNING) << "failed to parse " << hdr->value;
     }
   }
-
-  OpenDMARC::policy dmp;
-  if (spf_parsed.kv_map.contains(client_ip)) {
-    std::string ip = make_string(spf_parsed.kv_map[client_ip]);
-    LOG(INFO) << "dmp.connect(" << ip << ");";
-    dmp.connect(ip.c_str());
-  }
-
-  int spf_pol = DMARC_POLICY_SPF_OUTCOME_PASS;
-  if (iequal(spf_parsed.result, "None")) {
-    spf_pol = DMARC_POLICY_SPF_OUTCOME_NONE;
-  }
-  if (iequal(spf_parsed.result, "TempError")) {
-    spf_pol = DMARC_POLICY_SPF_OUTCOME_TMPFAIL;
-  }
-  if (iequal(spf_parsed.result, "Fail") ||
-      iequal(spf_parsed.result, "PermError")) {
-    spf_pol = DMARC_POLICY_SPF_OUTCOME_FAIL;
-  }
-
-#if 0
-  if (spf_parsed.kv_map.find("envelope-from") != end(msg.spf_info)) {
-    std::string spf_dom;
-
-    auto efrom  = msg.spf_info["envelope-from"];
-    auto origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
-
-    if (efrom == "<>") {
-      spf_dom = msg.spf_info["helo"];
-      origin  = DMARC_POLICY_SPF_ORIGIN_HELO;
-      LOG(INFO) << "SPF: origin HELO " << spf_dom;
-    }
-    else {
-      // pull domain from RFC5321.FROM
-      std::vector<std::string> addr_specs;
-      memory_input<>           addr_in(efrom, "envelope-from");
-      if (parse<RFC5322::addr_spec_only, RFC5322::addr_specs_action>(
-              addr_in, addr_specs)) {
-        CHECK_EQ(addr_specs.count(), 1);
-        spf_dom = Mailbox(addr_specs[0]).domain.ascii();
-        origin  = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
-        LOG(INFO) << "SPF: origin MAIL FROM " << spf_dom;
-      }
-      else {
-        LOG(WARNING) << "Failed to parse RFC5322.FROM: " << efrom;
-      }
-    }
-    LOG(INFO) << "dmp.store_spf(\"" << spf_dom << "\", "
-              << OpenDMARC::policy_spf_to_string(spf_pol) << ","
-              << OpenDMARC::policy_spf_to_string(origin) << ", \""
-              << msg.spf_result << "\")";
-    dmp.store_spf(spf_dom.c_str(), spf_pol, origin, msg.spf_result.c_str());
-  }
-  // look for smtp.mailfrom
-  // Get RFC5322.From
-#endif
-
-  Domain from_dom;
-
-  std::vector<std::string> addr_specs;
-  for (auto hdr : msg.headers) {
-    if (hdr == From) {
-      auto const from_str = make_string(hdr.value);
-
-      memory_input<> from_in(from_str, "from");
-      if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
-              from_in, addr_specs)) {
-        LOG(WARNING) << "Failed to parse From:" << from_str;
-      }
-    }
-  }
-  if (addr_specs.empty()) {
-    LOG(WARNING) << "no from address";
-  }
-
-  // FIXME see of all the domains are the same in addr_specs
 
   /*
     <https://tools.ietf.org/html/rfc7489#section-6.6>
@@ -649,22 +792,57 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   */
 
-  std::string dmarc_from_domain;
-  if (!addr_specs.empty()) {
-    Mailbox from_mbx(addr_specs[0]);
-    dmarc_from_domain = from_mbx.domain().ascii();
+  // Should be only one From:
+  std::vector<std::string> addr_specs;
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
+      hdr != end(msg.headers)) {
+    auto const from_str = make_string(hdr->value);
+
+    memory_input<> from_in(from_str, "from");
+    if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
+            from_in, addr_specs)) {
+      LOG(WARNING) << "failed to parse From:" << from_str;
+    }
+  }
+
+  // FIXME see of all the domains are the same in addr_specs, for
+  // right now just take the first domain.
+
+  std::string const dmarc_from_domain = [&addr_specs]() {
+    if (!addr_specs.empty()) {
+      if (Mailbox::validate(addr_specs[0])) {
+        Mailbox from_mbx(addr_specs[0]);
+        return from_mbx.domain().ascii();
+      }
+      else {
+        LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: "
+                     << addr_specs[0];
+      }
+    }
+    else {
+      LOG(WARNING) << "RFC5322.From is missing or empty";
+    }
+    return ""s;
+  }();
+
+  if (dmarc_from_domain.empty()) {
+    LOG(WARNING) << "no from address";
+  }
+  else {
     LOG(INFO) << "dmp.store_from_domain(\"" << dmarc_from_domain << "\")";
     dmp.store_from_domain(dmarc_from_domain.c_str());
   }
 
+  // Check each DKIM sig, inform DMARC processor
+
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
                                char const* identity, char const* selector,
                                char const* b) {
-    auto const human_result = (passed ? "pass" : "fail");
-    LOG(INFO) << "DKIM check for " << domain << " " << human_result;
-
     int const result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                               : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+    auto const human_result = (passed ? "pass" : "fail");
+
+    LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
     dmp.store_dkim(domain, result, human_result);
 
@@ -677,48 +855,86 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     fmt::format_to(bfr, ";");
   });
 
+  auto const dmarc_passed = dmp.query_dmarc(dmarc_from_domain.c_str());
+
+  LOG(INFO) << "DMARC " << (dmarc_passed ? "passed" : "failed");
+
+  // Set DMARC status in AR
+  // Set ARC status in AR
+
   LOG(INFO) << "ARC status  == " << arv.chain_status_str();
   LOG(INFO) << "ARC custody == " << arv.chain_custody_str();
 
-  if ("fail"s == arv.chain_status_str()) {
-    LOG(INFO) << "existing failed ARC set, doing nothing more";
+  if (!iequal(arv.chain_status_str(), "fail")) {
+    // FIXME
+    // Add ARC status to AR header somehow
+  }
+  else {
+    LOG(INFO) << "existing failed ARC set, can't do anythig more with ARC";
+  }
+
+  // New AR header on the top
+  msg.ar_str = fmt::to_string(bfr);
+
+  LOG(INFO) << "new AR header " << msg.ar_str;
+  CHECK(msg.parse_hdr(msg.ar_str));
+
+  // Make a ARC set and add it:
+
+  auto const selector = "ghsmtp"s;
+  auto const key_file = selector + ".private"s;
+  if (!fs::exists(key_file)) {
+    LOG(WARNING) << "can't find key file " << key_file;
     return;
   }
 
-  msg.ar_bfr = fmt::to_string(bfr);
-
-  auto const ar = RFC5322::header(Authentication_Results, msg.ar_bfr);
-
-  LOG(INFO) << ar.as_string();
-
-  if (msg.headers[0] == Return_Path || msg.headers[0] == Delivered_To) {
-    msg.headers[0] = ar;
-  }
-  else {
-    msg.headers.insert(msg.headers.begin(), ar);
-  }
-
-  dmp.query_dmarc(dmarc_from_domain.c_str());
-
-  /*
-  ARC_HDRFIELD* seal = nullptr;
-
-  auto const priv_path = "ghsmtp.private";
-  CHECK(fs::exists(priv_path));
   boost::iostreams::mapped_file_source priv;
-  priv.open(priv_path);
+  priv.open(key_file);
 
-  arc.seal(&seal, domain, "arc", dom, nullptr, 0, nullptr);
+  auto const key_str = std::string(priv.data(), priv.size());
 
-  if (seal) {
-    auto const nam = OpenARC::hdr::name(seal);
-    auto const val = OpenARC::hdr::value(seal);
-    LOG(INFO) << nam << ": " << val;
+  // Run our message through DKIM::sign
+  OpenDKIM::sign dks(key_str.c_str(), // textual data
+                     selector.c_str(),
+                     domain, // this may be an additional sig
+                     OpenDKIM::sign::body_type::text);
+  for (auto header : msg.headers) {
+    auto const hv = header.as_view();
+    dks.header(hv);
+  }
+  dks.eoh();
+  dks.body(msg.body);
+  dks.eom();
+
+  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
+  CHECK(msg.parse_hdr(msg.sig_str));
+
+  // Run our message through ARC::sign
+  if (iequal(arv.chain_status_str(), "fail")) {
+    LOG(INFO) << "previous ARC state is \"fail\" so we're bailing...";
+    return;
+  }
+
+  OpenARC::sign ars;
+
+  for (auto header : msg.headers) {
+    auto const hv = header.as_view();
+    ars.header(hv);
+  }
+  ars.eoh();
+  ars.body(msg.body);
+  ars.eom();
+
+  if (ars.seal(domain, selector.c_str(), domain, priv.data(), priv.size(),
+               msg.ar_str.c_str())) {
+    msg.arc_hdrs = ars.whole_seal();
+    for (auto const hdr : msg.arc_hdrs) {
+      CHECK(msg.parse_hdr(hdr));
+    }
   }
   else {
-    LOG(INFO) << "Can't generate seal";
+    LOG(INFO) << "failed to generate seal";
   }
-  */
 }
 
 void print_spf_envelope_froms(char const* file, std::string_view input)
@@ -733,7 +949,7 @@ void print_spf_envelope_froms(char const* file, std::string_view input)
     if (hdr == Received_SPF) {
       RFC5322::received_spf_parsed spf_parsed;
       if (spf_parsed.parse(hdr.value)) {
-        std::cout << spf_parsed.kv_map["envelope-from"] << '\n';
+        std::cout << spf_parsed.kv_map[envelope_from] << '\n';
         break;
       }
       else {

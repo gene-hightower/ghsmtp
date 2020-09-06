@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <string_view>
+#include <vector>
 
 // Forward to keep from including <openarc/arc.h>
 struct arc_hdrfield;
@@ -43,13 +44,20 @@ public:
   sign();
   ~sign();
 
-  void seal(arc_hdrfield** seal,
-            char const*    authservid,
-            char const*    selector,
-            char const*    domain,
-            char const*    key,
-            size_t         keylen,
-            char const*    ar);
+  bool seal(char const* authservid,
+            char const* selector,
+            char const* domain,
+            char const* key,
+            size_t      keylen,
+            char const* ar);
+
+  std::string name() const;
+  std::string value() const;
+
+  std::vector<std::string> whole_seal() const;
+
+private:
+  arc_hdrfield* seal_ = nullptr;
 };
 
 class verify : public lib {

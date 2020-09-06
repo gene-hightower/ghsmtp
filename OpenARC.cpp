@@ -6,6 +6,9 @@
 
 #include "iobuffer.hpp"
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 #include <glog/logging.h>
 
 namespace {
@@ -60,18 +63,55 @@ OpenARC::sign::sign()
 
 OpenARC::sign::~sign() { arc_free(msg_); }
 
-void OpenARC::sign::seal(ARC_HDRFIELD** seal,
-                         char const*    authservid,
-                         char const*    selector,
-                         char const*    domain,
-                         char const*    key,
-                         size_t         keylen,
-                         char const*    ar)
+bool OpenARC::sign::seal(char const* authservid,
+                         char const* selector,
+                         char const* domain,
+                         char const* key,
+                         size_t      keylen,
+                         char const* ar)
 {
-  CHECK_EQ(arc_getseal(msg_, seal, const_cast<char*>(authservid),
-                       const_cast<char*>(selector), const_cast<char*>(domain),
-                       uc(key), keylen, uc(ar)),
-           ARC_STAT_OK);
+  // clang-format off
+  auto const stat = arc_getseal(msg_,
+                                &seal_,
+                                const_cast<char*>(authservid),
+                                const_cast<char*>(selector),
+                                const_cast<char*>(domain),
+                                uc(key),
+                                keylen,
+                                uc(ar));
+  // clang-format on
+
+  return stat == ARC_STAT_OK;
+}
+
+static std::string get_name(arc_hdrfield* hdr)
+{
+  CHECK_NOTNULL(hdr);
+  size_t     len = 0;
+  auto const p   = c(arc_hdr_name(hdr, &len));
+  return std::string(p, len);
+}
+
+static std::string get_value(arc_hdrfield* hdr)
+{
+  CHECK_NOTNULL(hdr);
+  auto const p = c(arc_hdr_value(hdr));
+  return std::string(p, strlen(p));
+}
+std::string OpenARC::sign::name() const { return get_name(seal_); }
+
+std::string OpenARC::sign::value() const { return get_value(seal_); }
+
+std::vector<std::string> OpenARC::sign::whole_seal() const
+{
+  std::vector<std::string> hdrs;
+
+  for (auto sealhdr = seal_; sealhdr; sealhdr = arc_hdr_next(sealhdr)) {
+    hdrs.emplace_back(
+        fmt::format("{}:{}", get_name(sealhdr), get_value(sealhdr)));
+  }
+
+  return hdrs;
 }
 
 OpenARC::verify::verify()
