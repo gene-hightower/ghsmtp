@@ -866,8 +866,8 @@ void print_spf_envelope_froms(char const* file, std::string_view input)
 
 parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
 {
+  LOG(INFO) << "rewrite";
   parsed msg;
-
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
   }
@@ -919,18 +919,6 @@ authentication(fs::path config_path, char const* domain, std::string_view input)
   parsed msg;
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
-  }
-
-  for (auto const& header : msg.headers) {
-    // clang-format off
-    if (header == ARC_Seal ||
-        header == ARC_Authentication_Results ||
-        header == ARC_Message_Signature ||
-        header == Authentication_Results ||
-        header == DKIM_Signature ||
-        header == Received_SPF)
-      LOG(INFO) << '\n' << header.as_string() << '\n';
-    // clang-format on
   }
 
   if (!msg.body.empty())
