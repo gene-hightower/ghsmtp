@@ -4,6 +4,8 @@
 #include <fstream>
 #include <string_view>
 
+#include <boost/iostreams/device/mapped_file.hpp>
+
 #include "Now.hpp"
 #include "Pill.hpp"
 
@@ -29,8 +31,9 @@ public:
   std::streamsize max_size() const { return max_size_; }
   std::streamsize size_left() const { return max_size() - size(); }
 
-  fs::path save();
-  void     trash();
+  std::string_view freeze();
+  fs::path         deliver();
+  void             trash();
 
 private:
   Pill s_;
@@ -40,10 +43,13 @@ private:
   std::streamsize size_{0};
   std::streamsize max_size_{0};
 
-  fs::path tmpfn_;
   fs::path newfn_;
+  fs::path tmpfn_;
+  fs::path tmp2fn_;
 
   bool size_error_{false};
+
+  boost::iostreams::mapped_file_source mapping_;
 
   void try_close_();
 };

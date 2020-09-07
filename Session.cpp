@@ -15,6 +15,7 @@
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
+#include "message.hpp"
 #include "osutil.hpp"
 
 #include <fmt/format.h>
@@ -23,11 +24,11 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
-#include <boost/iostreams/device/mapped_file.hpp>
-
 #include <boost/xpressive/xpressive.hpp>
 
 #include <syslog.h>
+
+using namespace std::string_literals;
 
 namespace Config {
 char const* wls[]{
@@ -194,6 +195,7 @@ Session::Session(fs::path                  config_path,
     }
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
+    return ""s;
   }();
 
   send_.set_sender(server_identity_);
@@ -378,20 +380,20 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     }
     out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
               "250-PIPELINING\r\n"          // RFC 2920
-//-----------------------------------------------
-// Disable this right now, nobody uses it anyhow,
-//  but this might break DKIM signing for relay.
-//            "250-BINARYMIME\r\n"          // RFC 3030
-//-----------------------------------------------
-              "250-CHUNKING\r\n"            // RFC 3030
-              "250 SMTPUTF8\r\n";           // RFC 6531
+              //-----------------------------------------------
+              // Disable this right now, nobody uses it anyhow,
+              //  but this might break DKIM signing for relay.
+              //            "250-BINARYMIME\r\n"          // RFC 3030
+              //-----------------------------------------------
+              "250-CHUNKING\r\n"  // RFC 3030
+              "250 SMTPUTF8\r\n"; // RFC 6531
   }
 
   out_() << std::flush;
 
   if (sock_.has_peername()) {
-    if (std::find(begin(client_fcrdns_), end(client_fcrdns_), client_identity_)
-        != end(client_fcrdns_)) {
+    if (std::find(begin(client_fcrdns_), end(client_fcrdns_),
+                  client_identity_) != end(client_fcrdns_)) {
       LOG(INFO) << verb << " " << client_identity << " from "
                 << sock_.them_address_literal();
     }
@@ -488,19 +490,25 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     return;
   }
 
-  if (!verify_rcpt_params_(parameters)) {
+  if (!verify_rcpt_params_(parameters))
     return;
-  }
 
   if (!verify_recipient_(forward_path))
     return;
 
-  auto const forward = forward_.find(
-      forward_path.as_string(Mailbox::domain_encoding::ascii).c_str());
+  if (forward_path_.size() >= Config::max_recipients_per_message) {
+    out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
+    LOG(WARNING) << "too many recipients <" << forward_path << ">";
+    return;
+  }
+  // no check for dups, postfix doesn't
+  forward_path_.emplace_back(std::move(forward_path));
+
+  auto const forward = forward_.find(forward_path_.back().as_string().c_str());
   if (forward) {
     Mailbox const fwd{forward->c_str()};
-    if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd)
-        == std::end(fwd_path_)) {
+    if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd) ==
+        std::end(fwd_path_)) {
       std::string error_msg;
       if (!send_.rcpt_to(res_, fwd, error_msg)) {
         out_()
@@ -510,22 +518,17 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
         return;
       }
       fwd_path_.emplace_back(fwd);
-      LOG(INFO) << "RCPT TO:<" << forward_path << ">"
+      LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">"
                 << " forwarding to == <" << fwd_path_.back() << ">";
+    }
+    else {
+      LOG(INFO) << "RCPT TO:<" << forward_path_.back()
+                << "> already forwarding";
     }
   }
   else {
-    if (forward_path_.size() >= Config::max_recipients_per_message) {
-      out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
-      LOG(WARNING) << "too many recipients <" << forward_path << ">";
-      return;
-    }
-    // no check for dups, postfix doesn't
-    forward_path_.emplace_back(std::move(forward_path));
-
     LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
   }
-
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
 
@@ -598,8 +601,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     return {SpamStatus::spam, "SPF failed"};
 
   // These should have already been rejected by verify_client_().
-  if ((reverse_path_.domain() == "localhost.local")
-      || (reverse_path_.domain() == "localhost"))
+  if ((reverse_path_.domain() == "localhost.local") ||
+      (reverse_path_.domain() == "localhost"))
     return {SpamStatus::spam, "bogus reverse_path"};
 
   std::vector<std::string> why_ham;
@@ -670,12 +673,15 @@ bool Session::msg_new()
     auto const hdrs{added_headers_(*(msg_.get()))};
     msg_->write(hdrs);
 
-    if (!is_forwarding_()) {
-      fmt::memory_buffer spam_status;
-      fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
-                     ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
-      msg_->write(spam_status.data(), spam_status.size());
-    }
+    // fmt::memory_buffer spam_status;
+    // fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
+    //                ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
+    // msg_->write(spam_status.data(), spam_status.size());
+
+    LOG(INFO) << "Spam-Status: "
+              << ((status == SpamStatus::spam) ? "Yes" : "No") << ", "
+              << reason;
+
     return true;
   }
   catch (std::system_error const& e) {
@@ -826,22 +832,37 @@ bool Session::data_start()
   return true;
 }
 
-void Session::data_done()
+void Session::deliver_()
 {
-  CHECK((state_ == xact_step::data));
-
-  if (msg_ && msg_->size_error()) {
-    data_size_error();
-    return;
-  }
-
   CHECK(msg_);
+
   try {
-    auto const path = msg_->save();
+    auto const server = server_identity_.ascii().c_str();
+    auto const msg    = message::authentication(server, msg_->freeze());
+
+    for (auto const h : msg.headers) {
+      auto const hstr = fmt::format("{}\r\n", h.as_string());
+      msg_->write(hstr);
+    }
+    if (!msg.body.empty()) {
+      msg_->write("\r\n");
+      msg_->write(msg.body);
+    }
+
+    auto const pth = msg_->deliver();
+
     if (!fwd_path_.empty()) {
-      boost::iostreams::mapped_file_source file;
-      file.open(path);
-      send_.send(std::string_view(file.data(), file.size()));
+      boost::iostreams::mapped_file_source mfs;
+      mfs.open(pth);
+      auto const server = server_identity_.ascii().c_str();
+      auto const rewritten =
+          message::rewrite(server, std::string_view(mfs.data(), mfs.size()));
+      if (send_.send(rewritten.as_string())) {
+        LOG(INFO) << "successfully sent";
+      }
+      else {
+        LOG(WARNING) << "failed to send";
+      }
     }
   }
   catch (std::system_error const& e) {
@@ -855,13 +876,26 @@ void Session::data_done()
 
     default:
       out_() << "550 5.0.0 mail system error\r\n" << std::flush;
-      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+      if (errno)
+        LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
       LOG(ERROR) << e.what();
       msg_->trash();
       reset_();
       return;
     }
   }
+}
+
+void Session::data_done()
+{
+  CHECK((state_ == xact_step::data));
+
+  if (msg_ && msg_->size_error()) {
+    data_size_error();
+    return;
+  }
+
+  deliver_();
 
   if (prdr_) {
     out_() << "353\r\n";
@@ -974,35 +1008,7 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
-  CHECK(msg_);
-  try {
-    auto const path = msg_->save();
-    if (!fwd_path_.empty()) {
-      boost::iostreams::mapped_file_source file;
-      LOG(INFO) << "about to open " << path;
-      file.open(path);
-      LOG(INFO) << "worked " << path;
-      send_.send(std::string_view(file.data(), file.size()));
-    }
-  }
-  catch (std::system_error const& e) {
-    switch (errno) {
-    case ENOSPC:
-      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
-      LOG(ERROR) << "no space";
-      msg_->trash();
-      reset_();
-      return;
-
-    default:
-      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
-      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
-      LOG(ERROR) << e.what();
-      msg_->trash();
-      reset_();
-      return;
-    }
-  }
+  deliver_();
 
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
 
@@ -1277,16 +1283,16 @@ bool Session::verify_ip_address_(std::string& error_msg)
   auto ip_black_db_name = config_path_ / "ip-black";
   CDB  ip_black{ip_black_db_name};
   if (ip_black.contains(sock_.them_c_str())) {
-    error_msg
-        = fmt::format("IP address {} on static blacklist", sock_.them_c_str());
+    error_msg =
+        fmt::format("IP address {} on static blacklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
   client_fcrdns_.clear();
 
-  if ((sock_.them_address_literal() == IP4::loopback_literal)
-      || (sock_.them_address_literal() == IP6::loopback_literal)) {
+  if ((sock_.them_address_literal() == IP4::loopback_literal) ||
+      (sock_.them_address_literal() == IP6::loopback_literal)) {
     LOG(INFO) << "loopback address whitelisted";
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
@@ -1321,8 +1327,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // check blacklist
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (black_.contains(client_fcrdns.ascii())) {
-        error_msg = fmt::format("FCrDNS {} on static blacklist",
-                                client_fcrdns.ascii());
+        error_msg =
+            fmt::format("FCrDNS {} on static blacklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
         return false;
       }
@@ -1435,13 +1441,12 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername()
-      && ((client_identity == server_identity_)
-          || (client_identity == "localhost")
-          || (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername() && ((client_identity == server_identity_) ||
+                               (client_identity == "localhost") ||
+                               (client_identity == "localhost.localdomain"))) {
 
-    if ((sock_.them_address_literal() == IP4::loopback_literal)
-        || (sock_.them_address_literal() == IP6::loopback_literal)) {
+    if ((sock_.them_address_literal() == IP4::loopback_literal) ||
+        (sock_.them_address_literal() == IP6::loopback_literal)) {
       return true;
     }
 
@@ -1466,8 +1471,8 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg
-        = fmt::format("claimed bogus identity {}", client_identity.ascii());
+    error_msg =
+        fmt::format("claimed bogus identity {}", client_identity.ascii());
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1478,8 +1483,8 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (lookup_domain(black_, client_identity)) {
-    error_msg = fmt::format("claimed blacklisted identity {}",
-                            client_identity.ascii());
+    error_msg =
+        fmt::format("claimed blacklisted identity {}", client_identity.ascii());
     out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
     return false;
   }
@@ -1519,10 +1524,10 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // mail for on an external network connection.
 
   if (sock_.them_address_literal() != sock_.us_address_literal()) {
-    if ((accept_domains_.is_open()
-         && (accept_domains_.contains(sender.domain().ascii())
-             || accept_domains_.contains(sender.domain().utf8())))
-        || (sender.domain() == server_identity_)) {
+    if ((accept_domains_.is_open() &&
+         (accept_domains_.contains(sender.domain().ascii()) ||
+          accept_domains_.contains(sender.domain().utf8()))) ||
+        (sender.domain() == server_identity_)) {
 
       // Ease up in test mode.
       if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
@@ -1628,10 +1633,10 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     if (!sock_.has_peername()) {
       ip_addr = "127.0.0.1"; // use localhost for local socket
     }
-    spf_received_
-        = fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
-                      "envelope-from={}; helo={};",
-                      server_id_(), ip_addr, sender, client_identity_);
+    spf_received_ =
+        fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
+                    "envelope-from={}; helo={};",
+                    server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
     return true;
   }
@@ -1790,8 +1795,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
     // Domains we accept mail for.
     if (accept_domains_.is_open()) {
-      if (accept_domains_.contains(recipient.domain().ascii())
-          || accept_domains_.contains(recipient.domain().utf8())) {
+      if (accept_domains_.contains(recipient.domain().ascii()) ||
+          accept_domains_.contains(recipient.domain().utf8())) {
         return true;
       }
     }

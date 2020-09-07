@@ -1,4 +1,4 @@
-#include "rewrite.hpp"
+#include "message.hpp"
 
 #include "osutil.hpp"
 
@@ -39,11 +39,10 @@ int main(int argc, char* argv[])
     for (int a = 1; a < argc; ++a) {
       if (!fs::exists(argv[a]))
         LOG(FATAL) << "can't find mail file " << argv[a];
-
       boost::iostreams::mapped_file_source file;
       file.open(argv[a]);
-      print_spf_envelope_froms(argv[a],
-                               std::string_view(file.data(), file.size()));
+      auto const input = std::string_view(file.data(), file.size());
+      message::print_spf_envelope_froms(argv[a], input);
     }
     return 0;
   }
@@ -51,14 +50,10 @@ int main(int argc, char* argv[])
   for (int a = 1; a < argc; ++a) {
     if (!fs::exists(argv[a]))
       LOG(FATAL) << "can't find mail file " << argv[a];
-
     boost::iostreams::mapped_file_source file;
     file.open(argv[a]);
-
-    auto const rewritten =
-        rewrite(sender.c_str(), std::string_view(file.data(), file.size()));
-
-    if (rewritten)
-      std::cout << *rewritten;
+    auto const input     = std::string_view(file.data(), file.size());
+    auto const rewritten = message::rewrite(sender.c_str(), input);
+    std::cout << rewritten.as_string();
   }
 }

@@ -32,17 +32,21 @@ void Message::open(std::string_view fqdn,
     maildir /= folder;
   }
 
-  tmpfn_ = maildir / "tmp";
   newfn_ = maildir / "new";
+  tmpfn_ = maildir / "tmp";
+  tmp2fn_ = maildir / "tmp";
 
   error_code ec;
-  create_directories(tmpfn_, ec);
   create_directories(newfn_, ec);
+  create_directories(tmpfn_, ec);
 
   // Unique name, see: <https://cr.yp.to/proto/maildir.html>
   auto const uniq{fmt::format("{}.R{}.{}", then_.sec(), s_, fqdn)};
-  tmpfn_ /= uniq;
   newfn_ /= uniq;
+  tmpfn_ /= uniq;
+
+  auto const uniq2{fmt::format("{}.R{}2.{}", then_.sec(), s_, fqdn)};
+  tmp2fn_ /= uniq2;
 
   // open
   ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -74,7 +78,22 @@ void Message::try_close_()
   }
 }
 
-fs::path Message::save()
+std::string_view Message::freeze()
+{
+  try_close_();
+  error_code ec;
+  rename(tmpfn_, tmp2fn_, ec);
+  if (ec) {
+    LOG(ERROR) << "can't rename " << tmpfn_ << " to " << tmp2fn_ << ": " << ec;
+  }
+  ofs_.open(tmpfn_);
+  mapping_.open(tmp2fn_);
+  LOG(INFO) << tmp2fn_ << " mapped " << mapping_.size() << " bytes";
+  size_ = 0;
+  return std::string_view(mapping_.data(), mapping_.size());
+}
+
+fs::path Message::deliver()
 {
   if (size_error()) {
     LOG(WARNING) << "message size error: " << size() << " exceeds "
@@ -89,6 +108,16 @@ fs::path Message::save()
     LOG(ERROR) << "can't rename " << tmpfn_ << " to " << newfn_ << ": " << ec;
   }
 
+  if (fs::exists(tmp2fn_)) {
+    fs::remove(tmp2fn_, ec);
+    if (ec) {
+      LOG(ERROR) << "can't remove " << tmp2fn_ << ": " << ec;
+    }
+  }
+
+  if (mapping_.is_open())
+    mapping_.close();
+
   return newfn_;
 }
 
@@ -100,5 +129,11 @@ void Message::trash()
   fs::remove(tmpfn_, ec);
   if (ec) {
     LOG(ERROR) << "can't remove " << tmpfn_ << ": " << ec;
+  }
+  if (fs::exists(tmp2fn_)) {
+    fs::remove(tmp2fn_, ec);
+    if (ec) {
+      LOG(ERROR) << "can't remove " << tmp2fn_ << ": " << ec;
+    }
   }
 }

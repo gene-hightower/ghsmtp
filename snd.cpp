@@ -1779,7 +1779,7 @@ bool snd(fs::path                    config_path,
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   if (cnn.reply_code.at(0) == '2') {
-    msg->save();
+    msg->deliver();
     LOG(INFO) << "mail was sent successfully";
   }
   in.discard();

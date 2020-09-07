@@ -99,6 +99,8 @@ private:
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
+  void deliver_();
+
   // clear per transaction data, preserve per connection data
   void reset_();
 

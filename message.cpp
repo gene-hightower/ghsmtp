@@ -4,7 +4,7 @@
 // RFC5321.MailFrom   mailbox
 // RFC5322.From       mailbox-list
 
-#include "rewrite.hpp"
+#include "message.hpp"
 
 #include "Mailbox.hpp"
 #include "OpenARC.hpp"
@@ -344,51 +344,6 @@ struct mailbox_list_only: seq<mailbox_list, eof> {};
 
 // clang-format on
 
-struct header {
-  header(std::string_view n, std::string_view v)
-    : name(n)
-    , value(v)
-  {
-  }
-
-  std::string as_string() const { return fmt::format("{}:{}", name, value); }
-
-  std::string_view as_view() const
-  {
-    return {name.begin(),
-            static_cast<size_t>(std::distance(name.begin(), value.end()))};
-  }
-
-  bool operator==(std::string_view n) const { return iequal(n, name); }
-
-  std::string_view name;
-  std::string_view value;
-};
-
-struct message_parsed {
-  bool parse(std::string_view input);
-  bool parse_hdr(std::string_view input);
-
-  std::string as_string() const;
-
-  bool write(std::ostream& out) const;
-
-  std::vector<header> headers;
-
-  std::string_view field_name;
-  std::string_view field_value;
-
-  std::string_view body;
-
-  // New Authentication_Results field
-  std::string ar_str;
-
-  // New DKIM-Signature that includes above AR
-  std::string sig_str;
-
-  std::vector<std::string> arc_hdrs;
-};
-
 static std::string_view trim(std::string_view v)
 {
   auto constexpr WS = " \t";
@@ -410,7 +365,7 @@ struct msg_action : nothing<Rule> {
 template <>
 struct msg_action<field_name> {
   template <typename Input>
-  static void apply(Input const& in, message_parsed& msg)
+  static void apply(Input const& in, ::message::parsed& msg)
   {
     msg.field_name = make_view(in);
   }
@@ -419,7 +374,7 @@ struct msg_action<field_name> {
 template <>
 struct msg_action<field_value> {
   template <typename Input>
-  static void apply(Input const& in, message_parsed& msg)
+  static void apply(Input const& in, ::message::parsed& msg)
   {
     msg.field_value = make_view(in);
   }
@@ -428,62 +383,31 @@ struct msg_action<field_value> {
 template <>
 struct msg_action<field> {
   template <typename Input>
-  static void apply(Input const& in, message_parsed& msg)
+  static void apply(Input const& in, ::message::parsed& msg)
   {
-    msg.headers.emplace_back(header(msg.field_name, msg.field_value));
+    msg.headers.emplace_back(
+        ::message::header(msg.field_name, msg.field_value));
+  }
+};
+
+template <>
+struct msg_action<raw_field> {
+  template <typename Input>
+  static void apply(Input const& in, ::message::parsed& msg)
+  {
+    msg.headers.emplace_back(
+        ::message::header(msg.field_name, msg.field_value));
   }
 };
 
 template <>
 struct msg_action<body> {
   template <typename Input>
-  static void apply(Input const& in, message_parsed& msg)
+  static void apply(Input const& in, ::message::parsed& msg)
   {
     msg.body = make_view(in);
   }
 };
-
-//.............................................................................
-
-bool message_parsed::parse(std::string_view input)
-{
-  auto in{memory_input<>(input.data(), input.size(), "message")};
-  return tao::pegtl::parse<message, msg_action>(in, *this);
-}
-
-bool message_parsed::parse_hdr(std::string_view input)
-{
-  auto in{memory_input<>(input.data(), input.size(), "message")};
-  if (tao::pegtl::parse<raw_field, msg_action>(in, *this)) {
-    std::rotate(headers.rbegin(), headers.rbegin() + 1, headers.rend());
-    return true;
-  }
-  return false;
-}
-
-std::string message_parsed::as_string() const
-{
-  fmt::memory_buffer bfr;
-
-  for (auto const h : headers)
-    fmt::format_to(bfr, "{}\r\n", h.as_string());
-
-  if (!body.empty())
-    fmt::format_to(bfr, "\r\n{}", body);
-
-  return fmt::to_string(bfr);
-}
-
-bool message_parsed::write(std::ostream& os) const
-{
-  for (auto const h : headers)
-    fmt::print(os, "{}\r\n", h.as_string());
-
-  if (!body.empty())
-    fmt::print(os, "\r\n{}", body);
-
-  return true;
-}
 
 //.............................................................................
 
@@ -718,20 +642,10 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   }
 }
 
-static void do_arc(char const* domain, RFC5322::message_parsed& msg)
+static void do_arc(char const* domain, message::parsed& msg)
 {
+  LOG(INFO) << "do_arc";
   CHECK(!msg.headers.empty());
-
-  // Remove headers that are added by the "delivery agent"
-  // aka (Session::added_headers_)
-  msg.headers.erase(
-      std::remove(msg.headers.begin(), msg.headers.end(), Return_Path),
-      msg.headers.end());
-
-  // just in case, but right now this header should not exist.
-  msg.headers.erase(
-      std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
-      msg.headers.end());
 
   OpenARC::verify  arv;
   OpenDKIM::verify dkv;
@@ -810,13 +724,15 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   std::string const dmarc_from_domain = [&addr_specs]() {
     if (!addr_specs.empty()) {
+      boost::trim(addr_specs[0]);
       if (Mailbox::validate(addr_specs[0])) {
         Mailbox from_mbx(addr_specs[0]);
         return from_mbx.domain().ascii();
       }
       else {
-        LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: "
-                     << addr_specs[0];
+        LOG(WARNING)
+            << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
+            << addr_specs[0] << "\"";
       }
     }
     else {
@@ -833,7 +749,7 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     dmp.store_from_domain(dmarc_from_domain.c_str());
   }
 
-  // Check each DKIM sig, inform DMARC processor
+  // Check each DKIM sig, inform DMARC processor, put in AR
 
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
                                char const* identity, char const* selector,
@@ -855,11 +771,15 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
     fmt::format_to(bfr, ";");
   });
 
+  // Set DMARC status in AR
+
   auto const dmarc_passed = dmp.query_dmarc(dmarc_from_domain.c_str());
 
-  LOG(INFO) << "DMARC " << (dmarc_passed ? "passed" : "failed");
+  auto const dmarc_result = (dmarc_passed ? "passed" : "failed");
+  LOG(INFO) << "DMARC " << dmarc_result;
+  fmt::format_to(bfr, "\r\n       dmarc={} header.from={};", dmarc_result,
+                 dmarc_from_domain);
 
-  // Set DMARC status in AR
   // Set ARC status in AR
 
   LOG(INFO) << "ARC status  == " << arv.chain_status_str();
@@ -893,21 +813,20 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   auto const key_str = std::string(priv.data(), priv.size());
 
-  // Run our message through DKIM::sign
-  OpenDKIM::sign dks(key_str.c_str(), // textual data
-                     selector.c_str(),
-                     domain, // this may be an additional sig
-                     OpenDKIM::sign::body_type::text);
-  for (auto header : msg.headers) {
-    auto const hv = header.as_view();
-    dks.header(hv);
-  }
-  dks.eoh();
-  dks.body(msg.body);
-  dks.eom();
+  // // Run our message through DKIM::sign
+  // OpenDKIM::sign dks(key_str.c_str(), // textual data
+  //                    selector.c_str(),
+  //                    domain, // this may be an additional sig
+  //                    OpenDKIM::sign::body_type::text);
+  // for (auto const& header : msg.headers) {
+  //   dks.header(header.as_view());
+  // }
+  // dks.eoh();
+  // dks.body(msg.body);
+  // dks.eom();
 
-  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
-  CHECK(msg.parse_hdr(msg.sig_str));
+  // msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
+  // CHECK(msg.parse_hdr(msg.sig_str));
 
   // Run our message through ARC::sign
   if (iequal(arv.chain_status_str(), "fail")) {
@@ -917,9 +836,8 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
 
   OpenARC::sign ars;
 
-  for (auto header : msg.headers) {
-    auto const hv = header.as_view();
-    ars.header(hv);
+  for (auto const& header : msg.headers) {
+    ars.header(header.as_view());
   }
   ars.eoh();
   ars.body(msg.body);
@@ -928,7 +846,7 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   if (ars.seal(domain, selector.c_str(), domain, priv.data(), priv.size(),
                msg.ar_str.c_str())) {
     msg.arc_hdrs = ars.whole_seal();
-    for (auto const hdr : msg.arc_hdrs) {
+    for (auto const& hdr : msg.arc_hdrs) {
       CHECK(msg.parse_hdr(hdr));
     }
   }
@@ -937,15 +855,17 @@ static void do_arc(char const* domain, RFC5322::message_parsed& msg)
   }
 }
 
+namespace message {
+
 void print_spf_envelope_froms(char const* file, std::string_view input)
 {
-  RFC5322::message_parsed msg;
+  message::parsed msg;
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
     return;
   }
   CHECK(!msg.headers.empty());
-  for (auto hdr : msg.headers) {
+  for (auto const& hdr : msg.headers) {
     if (hdr == Received_SPF) {
       RFC5322::received_spf_parsed spf_parsed;
       if (spf_parsed.parse(hdr.value)) {
@@ -959,15 +879,37 @@ void print_spf_envelope_froms(char const* file, std::string_view input)
   }
 }
 
-std::optional<std::string> rewrite(char const* domain, std::string_view input)
+parsed rewrite(char const* domain, std::string_view input)
 {
-  RFC5322::message_parsed msg;
+  parsed msg;
+
   if (!msg.parse(input)) {
     LOG(WARNING) << "failed to parse message";
-    return {};
   }
 
-  for (auto header : msg.headers) {
+  // Remove headers that are added by the "delivery agent"
+  // aka (Session::added_headers_)
+  msg.headers.erase(
+      std::remove(msg.headers.begin(), msg.headers.end(), Return_Path),
+      msg.headers.end());
+
+  // just in case, but right now this header should not exist.
+  msg.headers.erase(
+      std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
+      msg.headers.end());
+
+  return msg;
+}
+
+parsed authentication(char const* domain, std::string_view input)
+{
+  LOG(INFO) << "authentication";
+  parsed msg;
+  if (!msg.parse(input)) {
+    LOG(WARNING) << "failed to parse message";
+  }
+
+  for (auto const& header : msg.headers) {
     // clang-format off
     if (header == ARC_Seal ||
         header == ARC_Authentication_Results ||
@@ -979,7 +921,56 @@ std::optional<std::string> rewrite(char const* domain, std::string_view input)
     // clang-format on
   }
 
-  do_arc(domain, msg);
+  if (!msg.body.empty())
+    do_arc(domain, msg);
 
-  return msg.as_string();
+  return msg;
 }
+
+//.............................................................................
+
+bool parsed::parse(std::string_view input)
+{
+  auto in{memory_input<>(input.data(), input.size(), "message")};
+  return tao::pegtl::parse<RFC5322::message, RFC5322::msg_action>(in, *this);
+}
+
+bool parsed::parse_hdr(std::string_view input)
+{
+  auto in{memory_input<>(input.data(), input.size(), "message")};
+  if (tao::pegtl::parse<RFC5322::raw_field, RFC5322::msg_action>(in, *this)) {
+    std::rotate(headers.rbegin(), headers.rbegin() + 1, headers.rend());
+    return true;
+  }
+  return false;
+}
+
+std::string parsed::as_string() const
+{
+  fmt::memory_buffer bfr;
+
+  for (auto const& h : headers)
+    fmt::format_to(bfr, "{}\r\n", h.as_string());
+
+  if (!body.empty())
+    fmt::format_to(bfr, "\r\n{}", body);
+
+  return fmt::to_string(bfr);
+}
+
+bool parsed::write(std::ostream& os) const
+{
+  for (auto const& h : headers)
+    os << h.as_string() << "\r\n";
+
+  if (!body.empty())
+    os << "\r\n" << body;
+
+  return true;
+}
+
+std::string message::header::as_string() const
+{
+  return fmt::format("{}:{}", name, value);
+}
+} // namespace message

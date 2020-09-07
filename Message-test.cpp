@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
 
   std::string ms{"foo bar baz"};
   msg.write(ms.data(), ms.size());
-  msg.save();
+  msg.deliver();
 
   Message msg2;
   msg2.open("example.com", 4096, ".Junk");
