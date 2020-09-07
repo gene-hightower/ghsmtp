@@ -406,18 +406,18 @@ std::vector<Domain> get_mxs(DNS::Resolver& res, Domain const& domain)
   mx_recs.erase(std::remove_if(begin(mx_recs), end(mx_recs), is_localhost),
                 end(mx_recs));
 
-  auto const nmx
-      = std::count_if(begin(mx_recs), end(mx_recs), [](auto const& rr) {
-          return std::holds_alternative<DNS::RR_MX>(rr);
-        });
+  auto const nmx =
+      std::count_if(begin(mx_recs), end(mx_recs), [](auto const& rr) {
+        return std::holds_alternative<DNS::RR_MX>(rr);
+      });
 
   if (nmx == 1) {
     for (auto const& mx : mx_recs) {
       if (std::holds_alternative<DNS::RR_MX>(mx)) {
         // RFC 7505 null MX record
-        if ((std::get<DNS::RR_MX>(mx).preference() == 0)
-            && (std::get<DNS::RR_MX>(mx).exchange().empty()
-                || (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
+        if ((std::get<DNS::RR_MX>(mx).preference() == 0) &&
+            (std::get<DNS::RR_MX>(mx).exchange().empty() ||
+             (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
           LOG(WARNING) << "domain " << dom << " does not accept mail";
           return mxs;
         }
@@ -435,10 +435,10 @@ std::vector<Domain> get_mxs(DNS::Resolver& res, Domain const& domain)
   // across multiple mail exchangers for a specific organization.
   std::shuffle(begin(mx_recs), end(mx_recs), std::random_device());
   std::sort(begin(mx_recs), end(mx_recs), [](auto const& a, auto const& b) {
-    if (std::holds_alternative<DNS::RR_MX>(a)
-        && std::holds_alternative<DNS::RR_MX>(b)) {
-      return std::get<DNS::RR_MX>(a).preference()
-             < std::get<DNS::RR_MX>(b).preference();
+    if (std::holds_alternative<DNS::RR_MX>(a) &&
+        std::holds_alternative<DNS::RR_MX>(b)) {
+      return std::get<DNS::RR_MX>(a).preference() <
+             std::get<DNS::RR_MX>(b).preference();
     }
     return false;
   });
@@ -464,9 +464,8 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
   if (!FLAGS_local_address.empty()) {
     auto loc{sockaddr_in{}};
     loc.sin_family = AF_INET;
-    if (1
-        != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                     reinterpret_cast<void*>(&loc.sin_addr))) {
+    if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                       reinterpret_cast<void*>(&loc.sin_addr))) {
       LOG(FATAL) << "can't interpret " << FLAGS_local_address
                  << " as IPv4 address";
     }
@@ -509,7 +508,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 std::optional<std::unique_ptr<SMTP::Connection>>
 open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
 {
-  int fd = conn(res, mx, 225);
+  int fd = conn(res, mx, 25);
   if (fd == -1) {
     LOG(WARNING) << mx << " no connection";
     return {};
@@ -520,8 +519,8 @@ open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
   auto constexpr read_hook{[]() {}};
   auto conn = std::make_unique<SMTP::Connection>(fd, fd, read_hook);
 
-  auto in = istream_input<eol::crlf, 1>{conn->sock.in(), FLAGS_pbfr_size,
-                                        "session"};
+  auto in =
+      istream_input<eol::crlf, 1>{conn->sock.in(), FLAGS_pbfr_size, "session"};
   if (!parse<SMTP::greeting, SMTP::action>(in, *conn)) {
     LOG(WARNING) << "greeting was unrecognizable";
     close(fd);
@@ -620,8 +619,8 @@ bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
     do_mail_from(conn, from);
   }
 
-  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to)
-      != end(conn.rcpt_to)) {
+  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to) !=
+      end(conn.rcpt_to)) {
     LOG(INFO) << to << " already in recpt_to list of " << conn.server_id;
     return true;
   }
@@ -698,8 +697,8 @@ bool do_data(SMTP::Connection& conn, std::istream& is)
 
 bool do_bdat(SMTP::Connection& conn, std::istream& is)
 {
-  auto in
-      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
   auto                  bdat_error = false;
   std::streamsize const bfr_size   = 1024 * 1024;
   iobuffer<char>        bfr(bfr_size);
@@ -747,8 +746,8 @@ bool do_send(SMTP::Connection& conn, std::istream& is)
 
 bool do_rset(SMTP::Connection& conn)
 {
-  auto in
-      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rset"};
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rset"};
   LOG(INFO) << "C: RSET";
   conn.sock.out() << "RSET\r\n" << std::flush;
   return parse<SMTP::reply_lines, SMTP::action>(in, conn);
@@ -756,8 +755,8 @@ bool do_rset(SMTP::Connection& conn)
 
 bool do_quit(SMTP::Connection& conn)
 {
-  auto in
-      = istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "quit"};
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "quit"};
   LOG(INFO) << "C: QUIT";
   conn.sock.out() << "QUIT\r\n" << std::flush;
   return parse<SMTP::reply_lines, SMTP::action>(in, conn);
@@ -774,8 +773,8 @@ bool Send::mail_from(Mailbox const& mailbox)
 {
   SRS srs;
 
-  auto const fwd
-      = srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
+  auto const fwd =
+      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
 
   if (Mailbox::validate(fwd))
     // If the SRS2 algo works, fine
@@ -823,8 +822,8 @@ bool Send::rcpt_to(DNS::Resolver& res,
       return do_rcpt_to(*conn, mail_from_, to);
     }
     // Open new connection.
-    if (auto new_conn
-        = open_session(res, config_path_, mail_from_.domain(), mx);
+    if (auto new_conn =
+            open_session(res, config_path_, mail_from_.domain(), mx);
         new_conn) {
       LOG(INFO) << "opened new connection to " << mx;
       exchangers_.emplace(mx, std::move(*new_conn));
