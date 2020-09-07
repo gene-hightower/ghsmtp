@@ -27,6 +27,9 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+// DKIM key "selector"
+auto constexpr selector = "ghsmtp";
+
 // RFC-5322 header names
 auto constexpr ARC_Authentication_Results = "ARC-Authentication-Results";
 auto constexpr ARC_Message_Signature      = "ARC-Message-Signature";
@@ -801,35 +804,6 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   LOG(INFO) << "new AR header " << msg.ar_str;
   CHECK(msg.parse_hdr(msg.ar_str));
 
-  // Make a ARC set and add it:
-
-  auto const selector = "ghsmtp"s;
-  auto const key_file = (config_path / selector).replace_extension("private");
-  if (!fs::exists(key_file)) {
-    LOG(WARNING) << "can't find key file " << key_file;
-    return;
-  }
-
-  boost::iostreams::mapped_file_source priv;
-  priv.open(key_file);
-
-  auto const key_str = std::string(priv.data(), priv.size());
-
-  // // Run our message through DKIM::sign
-  // OpenDKIM::sign dks(key_str.c_str(), // textual data
-  //                    selector.c_str(),
-  //                    domain, // this may be an additional sig
-  //                    OpenDKIM::sign::body_type::text);
-  // for (auto const& header : msg.headers) {
-  //   dks.header(header.as_view());
-  // }
-  // dks.eoh();
-  // dks.body(msg.body);
-  // dks.eom();
-
-  // msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
-  // CHECK(msg.parse_hdr(msg.sig_str));
-
   // Run our message through ARC::sign
   if (iequal(arv.chain_status_str(), "fail")) {
     LOG(INFO) << "previous ARC state is \"fail\" so we're bailing...";
@@ -845,7 +819,16 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   ars.body(msg.body);
   ars.eom();
 
-  if (ars.seal(domain, selector.c_str(), domain, priv.data(), priv.size(),
+  auto const key_file = (config_path / selector).replace_extension("private");
+  if (!fs::exists(key_file)) {
+    LOG(WARNING) << "can't find key file " << key_file;
+    return;
+  }
+
+  boost::iostreams::mapped_file_source priv;
+  priv.open(key_file);
+
+  if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
                msg.ar_str.c_str())) {
     msg.arc_hdrs = ars.whole_seal();
     for (auto const& hdr : msg.arc_hdrs) {
@@ -899,6 +882,32 @@ parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
   msg.headers.erase(
       std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
       msg.headers.end());
+
+  auto const key_file = (config_path / selector).replace_extension("private");
+  if (!fs::exists(key_file)) {
+    LOG(WARNING) << "can't find key file " << key_file;
+    return msg;
+  }
+
+  boost::iostreams::mapped_file_source priv;
+  priv.open(key_file);
+
+  auto const key_str = std::string(priv.data(), priv.size());
+
+  // Run our message through DKIM::sign
+  OpenDKIM::sign dks(key_str.c_str(), // textual data
+                     selector,
+                     domain, // this may be an additional sig
+                     OpenDKIM::sign::body_type::text);
+  for (auto const& header : msg.headers) {
+    dks.header(header.as_view());
+  }
+  dks.eoh();
+  dks.body(msg.body);
+  dks.eom();
+
+  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
+  CHECK(msg.parse_hdr(msg.sig_str));
 
   return msg;
 }
