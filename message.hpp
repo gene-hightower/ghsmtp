@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 
+#include "fs.hpp"
 #include "iequal.hpp"
 
 namespace message {
@@ -55,8 +56,11 @@ struct parsed {
   std::vector<std::string> arc_hdrs;
 };
 
-parsed authentication(char const* domain, std::string_view input);
-parsed rewrite(char const* domain, std::string_view input);
+parsed authentication(fs::path         config_path,
+                      char const*      domain,
+                      std::string_view input);
+parsed
+     rewrite(fs::path config_path, char const* domain, std::string_view input);
 void print_spf_envelope_froms(char const* domain, std::string_view input);
 
 } // namespace message

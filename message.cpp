@@ -642,7 +642,8 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   }
 }
 
-static void do_arc(char const* domain, message::parsed& msg)
+static void
+do_arc(fs::path config_path, char const* domain, message::parsed& msg)
 {
   LOG(INFO) << "do_arc";
   CHECK(!msg.headers.empty());
@@ -802,7 +803,7 @@ static void do_arc(char const* domain, message::parsed& msg)
   // Make a ARC set and add it:
 
   auto const selector = "ghsmtp"s;
-  auto const key_file = selector + ".private"s;
+  auto const key_file = (config_path / selector).replace_extension("private");
   if (!fs::exists(key_file)) {
     LOG(WARNING) << "can't find key file " << key_file;
     return;
@@ -879,7 +880,7 @@ void print_spf_envelope_froms(char const* file, std::string_view input)
   }
 }
 
-parsed rewrite(char const* domain, std::string_view input)
+parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
 {
   parsed msg;
 
@@ -901,7 +902,8 @@ parsed rewrite(char const* domain, std::string_view input)
   return msg;
 }
 
-parsed authentication(char const* domain, std::string_view input)
+parsed
+authentication(fs::path config_path, char const* domain, std::string_view input)
 {
   LOG(INFO) << "authentication";
   parsed msg;
@@ -922,7 +924,7 @@ parsed authentication(char const* domain, std::string_view input)
   }
 
   if (!msg.body.empty())
-    do_arc(domain, msg);
+    do_arc(config_path, domain, msg);
 
   return msg;
 }

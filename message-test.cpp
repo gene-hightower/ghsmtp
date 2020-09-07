@@ -47,13 +47,15 @@ int main(int argc, char* argv[])
     return 0;
   }
 
+  auto const config_path = osutil::get_config_dir();
+
   for (int a = 1; a < argc; ++a) {
     if (!fs::exists(argv[a]))
       LOG(FATAL) << "can't find mail file " << argv[a];
     boost::iostreams::mapped_file_source file;
     file.open(argv[a]);
     auto const input     = std::string_view(file.data(), file.size());
-    auto const rewritten = message::rewrite(sender.c_str(), input);
+    auto const rewritten = message::rewrite(config_path, sender.c_str(), input);
     std::cout << rewritten.as_string();
   }
 }

@@ -844,7 +844,7 @@ bool Send::send(std::string_view msg_input)
 {
   auto const sender = sender_.ascii().c_str();
 
-  auto msg = message::rewrite(sender, msg_input);
+  auto msg = message::rewrite(config_path_, sender, msg_input);
 
   // FIXME this should be done in parallel
   for (auto& [dom, conn] : exchangers_) {

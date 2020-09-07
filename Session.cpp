@@ -838,7 +838,8 @@ void Session::deliver_()
 
   try {
     auto const server = server_identity_.ascii().c_str();
-    auto const msg    = message::authentication(server, msg_->freeze());
+    auto const msg =
+        message::authentication(config_path_, server, msg_->freeze());
 
     for (auto const h : msg.headers) {
       auto const hstr = fmt::format("{}\r\n", h.as_string());
@@ -854,9 +855,9 @@ void Session::deliver_()
     if (!fwd_path_.empty()) {
       boost::iostreams::mapped_file_source mfs;
       mfs.open(pth);
-      auto const server = server_identity_.ascii().c_str();
-      auto const rewritten =
-          message::rewrite(server, std::string_view(mfs.data(), mfs.size()));
+      auto const server    = server_identity_.ascii().c_str();
+      auto const rewritten = message::rewrite(
+          config_path_, server, std::string_view(mfs.data(), mfs.size()));
       if (send_.send(rewritten.as_string())) {
         LOG(INFO) << "successfully sent";
       }
