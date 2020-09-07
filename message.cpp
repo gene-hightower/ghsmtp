@@ -680,7 +680,8 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      fmt::format_to(bfr, "\r\n       spf={};", hdr->as_string());
+      fmt::format_to(bfr, "\r\n       spf={}",
+                     hdr->as_string()); // ';' already there
 
       if (spf_parsed.kv_map.contains(client_ip)) {
         std::string ip = make_string(spf_parsed.kv_map[client_ip]);
