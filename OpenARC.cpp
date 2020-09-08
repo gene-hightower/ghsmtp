@@ -24,6 +24,10 @@ OpenARC::lib::lib()
 {
   arc_ = arc_init();
   CHECK_NOTNULL(arc_);
+  uint32_t arcl_flags;
+  get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+  arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
+  set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
 }
 
 OpenARC::lib::~lib() { arc_close(arc_); }
