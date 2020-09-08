@@ -16,6 +16,7 @@
 using namespace std::string_literals;
 
 DEFINE_bool(arc, false, "check ARC set");
+DEFINE_bool(dkim, false, "check DKIM sigs");
 DEFINE_bool(print_from, false, "print envelope froms");
 
 int main(int argc, char* argv[])
@@ -47,6 +48,19 @@ int main(int argc, char* argv[])
       auto const input = std::string_view(file.data(), file.size());
       auto const authed =
           message::authentication(config_path, sender.c_str(), input);
+      std::cout << authed.as_string();
+    }
+    return 0;
+  }
+
+  if (FLAGS_dkim) {
+    for (int a = 1; a < argc; ++a) {
+      if (!fs::exists(argv[a]))
+        LOG(FATAL) << "can't find mail file " << argv[a];
+      boost::iostreams::mapped_file_source file;
+      file.open(argv[a]);
+      auto const input = std::string_view(file.data(), file.size());
+      message::dkim_check(config_path, sender.c_str(), input);
     }
     return 0;
   }

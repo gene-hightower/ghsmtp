@@ -59,8 +59,14 @@ struct parsed {
 parsed authentication(fs::path         config_path,
                       char const*      domain,
                       std::string_view input);
+
+void dkim_check(fs::path         config_path,
+                char const*      domain,
+                std::string_view input);
+
 parsed
-     rewrite(fs::path config_path, char const* domain, std::string_view input);
+rewrite(fs::path config_path, char const* domain, std::string_view input);
+
 void print_spf_envelope_froms(char const* domain, std::string_view input);
 
 } // namespace message

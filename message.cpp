@@ -196,7 +196,7 @@ struct encoded_word     : seq<opt<FWS>, encoded_word_book> {};
 
 //.............................................................................
 
-// Comments are recursive, so the forward decl
+// Comments are recursive, hence the forward declaration:
 struct comment;
 
 struct quoted_pair      : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
@@ -351,11 +351,16 @@ struct mailbox_list     : sor<list<mailbox, one<','>>,
                               obs_mbox_list
                               > {};
 
-// struct from             : seq<TAO_PEGTL_ISTRING("From:"),
-//                               mailbox_list
-//                               > {};
+// struct from          : seq<TAO_PEGTL_ISTRING("From:"),
+//                            mailbox_list
+//                            > {};
 
 struct mailbox_list_only: seq<mailbox_list, eof> {};
+
+//.............................................................................
+
+// struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
+//                                  authres_payload> {};
 
 //.............................................................................
 
@@ -780,7 +785,7 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
 
   auto const dmarc_passed = dmp.query_dmarc(dmarc_from_domain.c_str());
 
-  auto const dmarc_result = (dmarc_passed ? "passed" : "failed");
+  auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
   fmt::format_to(bfr, "\r\n       dmarc={} header.from={};", dmarc_result,
                  dmarc_from_domain);
@@ -838,6 +843,17 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   else {
     LOG(INFO) << "failed to generate seal";
   }
+
+  OpenARC::verify arv2;
+  for (auto const& header : msg.headers) {
+    arv2.header(header.as_view());
+  }
+  arv2.eoh();
+  arv2.body(msg.body);
+  arv2.eom();
+
+  LOG(INFO) << "check ARC status  == " << arv2.chain_status_str();
+  LOG(INFO) << "check ARC custody == " << arv2.chain_custody_str();
 }
 
 namespace message {
@@ -925,6 +941,45 @@ authentication(fs::path config_path, char const* domain, std::string_view input)
     do_arc(config_path, domain, msg);
 
   return msg;
+}
+
+void dkim_check(fs::path         config_path,
+                char const*      domain,
+                std::string_view input)
+{
+  LOG(INFO) << "dkim";
+  parsed msg;
+  if (!msg.parse(input)) {
+    LOG(WARNING) << "failed to parse message";
+  }
+
+  CHECK(!msg.body.empty());
+
+  OpenDKIM::verify dkv;
+
+  // Run our message through OpenDKIM verify
+
+  for (auto header : msg.headers) {
+    auto const hv = header.as_view();
+    dkv.header(hv);
+  }
+  dkv.eoh();
+  dkv.body(msg.body);
+  dkv.eom();
+
+  // Check each DKIM sig, inform DMARC processor, put in AR
+
+  dkv.foreach_sig([](char const* domain, bool passed, char const* identity,
+                     char const* selector, char const* b) {
+    auto const human_result = (passed ? "pass" : "fail");
+
+    auto bs = std::string_view(b, strlen(b)).substr(0, 8);
+
+    LOG(INFO) << "DKIM check bfor " << domain << " " << human_result;
+    LOG(INFO) << " header.i=" << identity;
+    LOG(INFO) << " header.s=" << selector;
+    LOG(INFO) << " header.b=\"" << bs << "\"";
+  });
 }
 
 //.............................................................................
