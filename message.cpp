@@ -787,7 +787,8 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
 
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
-  fmt::format_to(bfr, "\r\n       dmarc={} header.from={};", dmarc_result,
+  // Skip the ';' on this last one:
+  fmt::format_to(bfr, "\r\n       dmarc={} header.from={}", dmarc_result,
                  dmarc_from_domain);
 
   // Set ARC status in AR
