@@ -834,15 +834,22 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
-  if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
-               msg.ar_str.c_str())) {
-    msg.arc_hdrs = ars.whole_seal();
-    for (auto const& hdr : msg.arc_hdrs) {
-      CHECK(msg.parse_hdr(hdr));
+  // Find that new AR we just added and parsed.
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers),
+                           Authentication_Results);
+      hdr != end(msg.headers)) {
+    auto const ar = make_string(hdr->value);
+
+    if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
+                 ar.c_str())) {
+      msg.arc_hdrs = ars.whole_seal();
+      for (auto const& hdr : msg.arc_hdrs) {
+        CHECK(msg.parse_hdr(hdr));
+      }
     }
-  }
-  else {
-    LOG(INFO) << "failed to generate seal";
+    else {
+      LOG(INFO) << "failed to generate seal";
+    }
   }
 
   OpenARC::verify arv2;
