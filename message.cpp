@@ -75,6 +75,20 @@ static std::string make_string(std::string_view v)
                      static_cast<size_t>(std::distance(v.begin(), v.end())));
 }
 
+static std::string_view trim(std::string_view v)
+{
+  auto constexpr WS = " \t";
+  v.remove_prefix(std::min(v.find_first_not_of(WS), v.size()));
+  v.remove_suffix(std::min(v.size() - v.find_last_not_of(WS) - 1, v.size()));
+  return v;
+}
+
+template <typename Input>
+static std::string_view make_view(Input const& in)
+{
+  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
+}
+
 namespace RFC5322 {
 
 using dot   = one<'.'>;
@@ -346,20 +360,6 @@ struct mailbox_list_only: seq<mailbox_list, eof> {};
 //.............................................................................
 
 // clang-format on
-
-static std::string_view trim(std::string_view v)
-{
-  auto constexpr WS = " \t";
-  v.remove_prefix(std::min(v.find_first_not_of(WS), v.size()));
-  v.remove_suffix(std::min(v.size() - v.find_last_not_of(WS) - 1, v.size()));
-  return v;
-}
-
-template <typename Input>
-static std::string_view make_view(Input const& in)
-{
-  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
-}
 
 template <typename Rule>
 struct msg_action : nothing<Rule> {
@@ -684,8 +684,7 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      fmt::format_to(bfr, "\r\n       spf={}",
-                     hdr->value); // ';' already there
+      fmt::format_to(bfr, "\r\n       spf={}", trim(hdr->value));
 
       if (spf_parsed.kv_map.contains(client_ip)) {
         std::string ip = make_string(spf_parsed.kv_map[client_ip]);
