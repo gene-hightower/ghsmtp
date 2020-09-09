@@ -855,10 +855,7 @@ void Session::deliver_()
     if (!fwd_path_.empty()) {
       boost::iostreams::mapped_file_source mfs;
       mfs.open(pth);
-      auto const server    = server_identity_.ascii().c_str();
-      auto const rewritten = message::rewrite(
-          config_path_, server, std::string_view(mfs.data(), mfs.size()));
-      if (send_.send(rewritten.as_string())) {
+      if (send_.send(std::string_view(mfs.data(), mfs.size()))) {
         LOG(INFO) << "successfully sent";
       }
       else {
