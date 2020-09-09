@@ -651,31 +651,27 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   }
 }
 
-static void
-do_arc(fs::path config_path, char const* domain, message::parsed& msg)
+static void add_authentication_results(fs::path         config_path,
+                                       char const*      domain,
+                                       message::parsed& msg)
 {
-  LOG(INFO) << "do_arc";
+  LOG(INFO) << "add_authentication_results";
   CHECK(!msg.headers.empty());
 
-  OpenARC::verify  arv;
   OpenDKIM::verify dkv;
 
   // Run our message through ARC::verify and OpenDKIM verify
 
   for (auto header : msg.headers) {
     auto const hv = header.as_view();
-    // LOG(INFO) << "header «" << hv << "»";
-    arv.header(hv);
+    // LOG(INFO) << "header «" << esc(hv, esc_line_option::multi) << "»";
     dkv.header(hv);
   }
-  arv.eoh();
   dkv.eoh();
 
   // LOG(INFO) << "body «" << msg.body << "»";
-  arv.body(msg.body);
   dkv.body(msg.body);
 
-  arv.eom();
   dkv.eom();
 
   OpenDMARC::policy dmp;
@@ -689,7 +685,23 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      fmt::format_to(bfr, "\r\n       spf={}", trim(hdr->value));
+      LOG(INFO) << spf_parsed.result;
+      fmt::format_to(bfr, "\r\n       spf={}", spf_parsed.result);
+
+      // FIXME get comment in here
+      // fmt::format_to(bfr, " ({}) ", );
+
+      Mailbox mbx(spf_parsed.kv_map[envelope_from]);
+      if (mbx.local_part() != "postmaster") {
+        LOG(INFO) << "smtp.mailfrom=" << spf_parsed.kv_map[envelope_from];
+        fmt::format_to(bfr, " smtp.mailfrom={}",
+                       spf_parsed.kv_map[envelope_from]);
+      }
+      else {
+        LOG(INFO) << "helo=" << spf_parsed.kv_map[helo];
+        fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
+      }
+      fmt::format_to(bfr, ";");
 
       if (spf_parsed.kv_map.contains(client_ip)) {
         std::string ip = make_string(spf_parsed.kv_map[client_ip]);
@@ -790,25 +802,24 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   // Skip the ';' on this last one:
   fmt::format_to(bfr, "\r\n       dmarc={} header.from={}", dmarc_result,
                  dmarc_from_domain);
+}
 
-  // Set ARC status in AR
+static void
+do_arc(fs::path config_path, char const* domain, message::parsed& msg)
+{
+  LOG(INFO) << "do_arc";
+  CHECK(!msg.headers.empty());
+
+  OpenARC::verify arv;
+  for (auto header : msg.headers) {
+    arv.header(header.as_view());
+  }
+  arv.eoh();
+  arv.body(msg.body);
+  arv.eom();
 
   LOG(INFO) << "ARC status  == " << arv.chain_status_str();
   LOG(INFO) << "ARC custody == " << arv.chain_custody_str();
-
-  if (!iequal(arv.chain_status_str(), "fail")) {
-    // FIXME
-    // Add ARC status to AR header somehow
-  }
-  else {
-    LOG(INFO) << "existing failed ARC set, can't do anythig more with ARC";
-  }
-
-  // New AR header on the top
-  msg.ar_str = fmt::to_string(bfr);
-
-  LOG(INFO) << "new AR header " << msg.ar_str;
-  CHECK(msg.parse_hdr(msg.ar_str));
 
   // Run our message through ARC::sign
   if (iequal(arv.chain_status_str(), "fail")) {
@@ -817,7 +828,6 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   }
 
   OpenARC::sign ars;
-
   for (auto const& header : msg.headers) {
     ars.header(header.as_view());
   }
@@ -830,16 +840,14 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
     LOG(WARNING) << "can't find key file " << key_file;
     return;
   }
-
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
-  // Find that new AR we just added and parsed.
+  // Find AR header
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers),
                            Authentication_Results);
       hdr != end(msg.headers)) {
     auto const ar = make_string(hdr->value);
-
     if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
                  ar.c_str())) {
       msg.arc_hdrs = ars.whole_seal();
@@ -930,6 +938,7 @@ parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
   dks.body(msg.body);
   dks.eom();
 
+  fmt::memory_buffer bfr;
   msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
   CHECK(msg.parse_hdr(msg.sig_str));
 
@@ -945,8 +954,10 @@ authentication(fs::path config_path, char const* domain, std::string_view input)
     LOG(WARNING) << "failed to parse message";
   }
 
-  if (!msg.body.empty())
+  if (!msg.body.empty()) {
+    add_authentication_results(config_path, domain, msg);
     do_arc(config_path, domain, msg);
+  }
 
   return msg;
 }
