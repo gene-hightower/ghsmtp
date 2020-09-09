@@ -685,7 +685,6 @@ static void add_authentication_results(fs::path         config_path,
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      LOG(INFO) << spf_parsed.result;
       fmt::format_to(bfr, "\r\n       spf={}", spf_parsed.result);
 
       // FIXME get comment in here
@@ -693,19 +692,16 @@ static void add_authentication_results(fs::path         config_path,
 
       Mailbox mbx(spf_parsed.kv_map[envelope_from]);
       if (mbx.local_part() != "postmaster") {
-        LOG(INFO) << "smtp.mailfrom=" << spf_parsed.kv_map[envelope_from];
         fmt::format_to(bfr, " smtp.mailfrom={}",
                        spf_parsed.kv_map[envelope_from]);
       }
       else {
-        LOG(INFO) << "helo=" << spf_parsed.kv_map[helo];
         fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
       }
       fmt::format_to(bfr, ";");
 
       if (spf_parsed.kv_map.contains(client_ip)) {
         std::string ip = make_string(spf_parsed.kv_map[client_ip]);
-        LOG(INFO) << "dmp.connect(" << ip << ");";
         dmp.connect(ip.c_str());
       }
 
@@ -802,6 +798,12 @@ static void add_authentication_results(fs::path         config_path,
   // Skip the ';' on this last one:
   fmt::format_to(bfr, "\r\n       dmarc={} header.from={}", dmarc_result,
                  dmarc_from_domain);
+
+  // New AR header on the top
+  msg.ar_str = fmt::to_string(bfr);
+
+  LOG(INFO) << "new AR header " << msg.ar_str;
+  CHECK(msg.parse_hdr(msg.ar_str));
 }
 
 static void
