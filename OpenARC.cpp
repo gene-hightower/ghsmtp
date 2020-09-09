@@ -24,10 +24,10 @@ OpenARC::lib::lib()
 {
   arc_ = arc_init();
   CHECK_NOTNULL(arc_);
-  uint32_t arcl_flags;
-  get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
-  arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
-  set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+  // uint32_t arcl_flags;
+  // get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+  // arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
+  // set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
 }
 
 OpenARC::lib::~lib() { arc_close(arc_); }
@@ -60,7 +60,7 @@ void OpenARC::lib::eom() { CHECK_EQ(arc_eom(msg_), ARC_STAT_OK); }
 OpenARC::sign::sign()
 {
   u_char const* error;
-  msg_ = arc_message(arc_, ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
+  msg_ = arc_message(arc_, ARC_CANON_RELAXED, ARC_CANON_SIMPLE,
                      ARC_SIGN_RSASHA256, ARC_MODE_SIGN, &error);
   CHECK_NOTNULL(msg_);
 }
@@ -102,6 +102,7 @@ static std::string get_value(arc_hdrfield* hdr)
   auto const p = c(arc_hdr_value(hdr));
   return std::string(p, strlen(p));
 }
+
 std::string OpenARC::sign::name() const { return get_name(seal_); }
 
 std::string OpenARC::sign::value() const { return get_value(seal_); }
