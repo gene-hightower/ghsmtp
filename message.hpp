@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 
+#include "Mailbox.hpp"
 #include "fs.hpp"
 #include "iequal.hpp"
 
@@ -62,7 +63,10 @@ void authentication(fs::path         config_path,
 
 void dkim_check(fs::path config_path, char const* domain, message::parsed& msg);
 
-bool rewrite(fs::path config_path, char const* domain, message::parsed& msg);
+bool rewrite(fs::path         config_path,
+             Mailbox const&   mail_from,
+             Domain const&    sender,
+             message::parsed& msg);
 
 void print_spf_envelope_froms(char const* domain, message::parsed& msg);
 

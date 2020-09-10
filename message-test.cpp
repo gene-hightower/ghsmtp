@@ -86,7 +86,8 @@ int main(int argc, char* argv[])
     file.open(argv[a]);
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
-    message::rewrite(config_path, sender.c_str(), msg);
+    message::rewrite(config_path, Mailbox("local-part", sender), Domain(sender),
+                     msg);
     std::cout << msg.as_string();
   }
 }

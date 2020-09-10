@@ -771,17 +771,7 @@ Send::Send(fs::path config_path)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  SRS srs;
-
-  auto const fwd =
-      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
-
-  if (Mailbox::validate(fwd))
-    // If the SRS2 algo works, fine
-    mail_from_ = Mailbox(fwd);
-  else
-    // Otherwise, use a generic address
-    mail_from_ = Mailbox("noreply", sender_);
+  mail_from_ = mailbox;
 
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
@@ -841,15 +831,13 @@ bool Send::rcpt_to(DNS::Resolver& res,
 
 bool Send::send(std::string_view msg_input)
 {
-  auto const sender = sender_.ascii().c_str();
-
   message::parsed msg;
   if (!msg.parse(msg_input)) {
     LOG(WARNING) << "failed to parse message";
     return false;
   }
 
-  if (!message::rewrite(config_path_, sender, msg)) {
+  if (!message::rewrite(config_path_, mail_from_, sender_, msg)) {
     LOG(WARNING) << "failed to rewrite message";
     return false;
   }

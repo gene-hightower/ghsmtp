@@ -11,7 +11,6 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 #include "Message.hpp"
-#include "SRS.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"

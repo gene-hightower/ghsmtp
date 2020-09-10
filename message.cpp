@@ -734,26 +734,32 @@ static void add_authentication_results(fs::path         config_path,
             from_in, addr_specs)) {
       LOG(WARNING) << "failed to parse From:" << from_str;
     }
+
+    for (auto hdr_next = std::next(hdr); hdr_next != end(msg.headers);
+         hdr_next      = std::next(hdr_next)) {
+      if (*hdr_next == From) {
+        LOG(WARNING) << "additional RFC5322.From header found: "
+                     << hdr_next->as_string();
+      }
+    }
   }
 
   // FIXME see of all the domains are the same in addr_specs, for
   // right now just take the first domain.
 
   std::string const dmarc_from_domain = [&addr_specs]() {
-    if (!addr_specs.empty()) {
-      boost::trim(addr_specs[0]);
-      if (Mailbox::validate(addr_specs[0])) {
-        Mailbox from_mbx(addr_specs[0]);
-        return from_mbx.domain().ascii();
-      }
-      else {
-        LOG(WARNING)
-            << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
-            << addr_specs[0] << "\"";
-      }
+    if (addr_specs.empty()) {
+      LOG(WARNING) << "RFC5322.From is missing or empty";
+      return ""s;
+    }
+    boost::trim(addr_specs[0]);
+    if (Mailbox::validate(addr_specs[0])) {
+      Mailbox from_mbx(addr_specs[0]);
+      return from_mbx.domain().ascii();
     }
     else {
-      LOG(WARNING) << "RFC5322.From is missing or empty";
+      LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
+                   << addr_specs[0] << "\"";
     }
     return ""s;
   }();
@@ -793,8 +799,8 @@ static void add_authentication_results(fs::path         config_path,
 
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
-  // Skip the ';' on this last one:
-  fmt::format_to(bfr, ";\r\n       dmarc={} header.from={};", dmarc_result,
+
+  fmt::format_to(bfr, ";\r\n       dmarc={} header.from={}", dmarc_result,
                  dmarc_from_domain);
 
   // ARC
@@ -887,7 +893,10 @@ void print_spf_envelope_froms(char const* file, message::parsed& msg)
   }
 }
 
-bool rewrite(fs::path config_path, char const* domain, message::parsed& msg)
+bool rewrite(fs::path         config_path,
+             Mailbox const&   mail_from,
+             Domain const&    sender,
+             message::parsed& msg)
 {
   LOG(INFO) << "rewrite";
 
@@ -908,6 +917,10 @@ bool rewrite(fs::path config_path, char const* domain, message::parsed& msg)
     return false;
   }
 
+  // munge?
+
+  // DKIM sign
+
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
@@ -915,8 +928,7 @@ bool rewrite(fs::path config_path, char const* domain, message::parsed& msg)
 
   // Run our message through DKIM::sign
   OpenDKIM::sign dks(key_str.c_str(), // textual data
-                     selector,
-                     domain, // this may be an additional sig
+                     selector, sender.ascii().c_str(),
                      OpenDKIM::sign::body_type::text);
   for (auto const& header : msg.headers) {
     dks.header(header.as_view());
