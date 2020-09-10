@@ -799,18 +799,7 @@ static void add_authentication_results(fs::path         config_path,
   fmt::format_to(bfr, "\r\n       dmarc={} header.from={}", dmarc_result,
                  dmarc_from_domain);
 
-  // New AR header on the top
-  msg.ar_str = fmt::to_string(bfr);
-
-  LOG(INFO) << "new AR header " << msg.ar_str;
-  CHECK(msg.parse_hdr(msg.ar_str));
-}
-
-static void
-do_arc(fs::path config_path, char const* domain, message::parsed& msg)
-{
-  LOG(INFO) << "do_arc";
-  CHECK(!msg.headers.empty());
+  // ARC
 
   OpenARC::verify arv;
   for (auto header : msg.headers) {
@@ -823,11 +812,18 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
   LOG(INFO) << "ARC status  == " << arv.chain_status_str();
   LOG(INFO) << "ARC custody == " << arv.chain_custody_str();
 
+  auto const arc_status = arv.chain_status_str();
+
+  fmt::format_to(bfr, "\r\n       arc={};", arc_status);
+
+  // New AR header on the top
+
+  msg.ar_str = fmt::to_string(bfr);
+
+  LOG(INFO) << "new AR header " << msg.ar_str;
+  CHECK(msg.parse_hdr(msg.ar_str));
+
   // Run our message through ARC::sign
-  if (iequal(arv.chain_status_str(), "fail")) {
-    LOG(INFO) << "previous ARC state is \"fail\" so we're bailing...";
-    return;
-  }
 
   OpenARC::sign ars;
   for (auto const& header : msg.headers) {
@@ -946,7 +942,6 @@ void authentication(fs::path         config_path,
 
   if (!msg.body.empty()) {
     add_authentication_results(config_path, domain, msg);
-    do_arc(config_path, domain, msg);
   }
 }
 
