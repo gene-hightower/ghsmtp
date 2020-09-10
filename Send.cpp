@@ -771,7 +771,17 @@ Send::Send(fs::path config_path)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  mail_from_ = mailbox;
+  SRS srs;
+
+  auto const fwd =
+      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
+
+  if (Mailbox::validate(fwd))
+    // If the SRS2 algo works, fine
+    mail_from_ = Mailbox(fwd);
+  else
+    // Otherwise, use a generic address
+    mail_from_ = Mailbox("noreply", sender_);
 
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
