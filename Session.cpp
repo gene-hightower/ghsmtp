@@ -848,7 +848,8 @@ void Session::deliver_()
       if (header == Return_Path) {
         auto hs = header.as_string();
         if (hs != return_path) {
-          LOG(INFO) << "replacing " << hs << " with " << return_path;
+          LOG(INFO) << "old \"" << esc(hs) << "\"";
+          LOG(INFO) << "new \"" << esc(return_path) << "\"";
         }
       }
     }
