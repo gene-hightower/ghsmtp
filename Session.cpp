@@ -842,7 +842,7 @@ void Session::deliver_()
     msg.parse(msg_data);
 
     auto const return_path =
-        fmt::format("{}: <{}>\r\n", Return_Path, reverse_path_);
+        fmt::format("{}: <{}>", Return_Path, reverse_path_);
 
     for (auto const& header : msg.headers) {
       if (header == Return_Path) {
@@ -862,9 +862,10 @@ void Session::deliver_()
     message::authentication(config_path_, server, msg);
 
     msg_->write(return_path);
+    msg_->write("\r\n");
     for (auto const h : msg.headers) {
-      auto const hstr = fmt::format("{}\r\n", h.as_string());
-      msg_->write(hstr);
+      msg_->write(h.as_string());
+      msg_->write("\r\n");
     }
     if (!msg.body.empty()) {
       msg_->write("\r\n");
