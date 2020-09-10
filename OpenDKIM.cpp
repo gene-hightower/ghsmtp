@@ -115,6 +115,19 @@ sign::sign(char const* secretkey,
   // clang-format on
   CHECK_NOTNULL(dkim_);
   CHECK_EQ(status_, DKIM_STAT_OK);
+
+  char const* hdrlist[] = {"to",
+                           "from",
+                           "subject",
+                           "message-id",
+                           "date",
+                           "user-agent",
+                           "mime-version",
+                           "content-language",
+                           "content-transfer-encoding",
+                           nullptr};
+
+  dkim_signhdrs(dkim_, hdrlist);
 }
 
 std::string sign::getsighdr()
@@ -177,8 +190,8 @@ void verify::foreach_sig(std::function<void(char const* domain,
                    << dkim_getresultstr(status_);
     }
 
-    auto const passed
-        = ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
+    auto const passed =
+        ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
 
     u_char identity[256] = {};
     CHECK_EQ(dkim_sig_getidentity(dkim_, sigs[i], identity, sizeof(identity)),
@@ -255,8 +268,8 @@ bool verify::check()
       auto constexpr hdr_sz{DKIM_MAXHEADER + 1};
       auto signedhdrs{std::vector<unsigned char>(nhdrs * hdr_sz, '\0')};
 
-      status_
-          = dkim_sig_getsignedhdrs(dkim_, sig, &signedhdrs[0], hdr_sz, &nhdrs);
+      status_ =
+          dkim_sig_getsignedhdrs(dkim_, sig, &signedhdrs[0], hdr_sz, &nhdrs);
       CHECK_EQ(status_, DKIM_STAT_OK);
 
       for (auto i{0u}; i < nhdrs; ++i)
