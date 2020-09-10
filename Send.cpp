@@ -508,7 +508,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 std::optional<std::unique_ptr<SMTP::Connection>>
 open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
 {
-  int fd = conn(res, mx, 25);
+  int fd = conn(res, mx, 225);
   if (fd == -1) {
     LOG(WARNING) << mx << " no connection";
     return {};
@@ -843,7 +843,15 @@ bool Send::send(std::string_view msg_input)
 {
   auto const sender = sender_.ascii().c_str();
 
-  auto msg = message::rewrite(config_path_, sender, msg_input);
+  message::parsed msg;
+  if (!msg.parse(msg_input)) {
+    LOG(WARNING) << "failed to parse message";
+    return false;
+  }
+  if (!message::rewrite(config_path_, sender, msg)) {
+    LOG(WARNING) << "failed to rewrite message";
+    return false;
+  }
 
   // FIXME this should be done in parallel
   for (auto& [dom, conn] : exchangers_) {

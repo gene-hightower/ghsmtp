@@ -876,13 +876,8 @@ do_arc(fs::path config_path, char const* domain, message::parsed& msg)
 
 namespace message {
 
-void print_spf_envelope_froms(char const* file, std::string_view input)
+void print_spf_envelope_froms(char const* file, message::parsed& msg)
 {
-  message::parsed msg;
-  if (!msg.parse(input)) {
-    LOG(WARNING) << "failed to parse message";
-    return;
-  }
   CHECK(!msg.headers.empty());
   for (auto const& hdr : msg.headers) {
     if (hdr == Received_SPF) {
@@ -898,13 +893,9 @@ void print_spf_envelope_froms(char const* file, std::string_view input)
   }
 }
 
-parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
+bool rewrite(fs::path config_path, char const* domain, message::parsed& msg)
 {
   LOG(INFO) << "rewrite";
-  parsed msg;
-  if (!msg.parse(input)) {
-    LOG(WARNING) << "failed to parse message";
-  }
 
   // Remove headers that are added by the "delivery agent"
   // aka (Session::added_headers_)
@@ -920,7 +911,7 @@ parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
   auto const key_file = (config_path / selector).replace_extension("private");
   if (!fs::exists(key_file)) {
     LOG(WARNING) << "can't find key file " << key_file;
-    return msg;
+    return false;
   }
 
   boost::iostreams::mapped_file_source priv;
@@ -944,35 +935,24 @@ parsed rewrite(fs::path config_path, char const* domain, std::string_view input)
   msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
   CHECK(msg.parse_hdr(msg.sig_str));
 
-  return msg;
+  return true;
 }
 
-parsed
-authentication(fs::path config_path, char const* domain, std::string_view input)
+void authentication(fs::path         config_path,
+                    char const*      domain,
+                    message::parsed& msg)
 {
   LOG(INFO) << "authentication";
-  parsed msg;
-  if (!msg.parse(input)) {
-    LOG(WARNING) << "failed to parse message";
-  }
 
   if (!msg.body.empty()) {
     add_authentication_results(config_path, domain, msg);
     do_arc(config_path, domain, msg);
   }
-
-  return msg;
 }
 
-void dkim_check(fs::path         config_path,
-                char const*      domain,
-                std::string_view input)
+void dkim_check(fs::path config_path, char const* domain, message::parsed& msg)
 {
   LOG(INFO) << "dkim";
-  parsed msg;
-  if (!msg.parse(input)) {
-    LOG(WARNING) << "failed to parse message";
-  }
 
   CHECK(!msg.body.empty());
 

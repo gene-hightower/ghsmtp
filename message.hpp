@@ -56,18 +56,15 @@ struct parsed {
   std::vector<std::string> arc_hdrs;
 };
 
-parsed authentication(fs::path         config_path,
-                      char const*      domain,
-                      std::string_view input);
+void authentication(fs::path         config_path,
+                    char const*      domain,
+                    message::parsed& msg);
 
-void dkim_check(fs::path         config_path,
-                char const*      domain,
-                std::string_view input);
+void dkim_check(fs::path config_path, char const* domain, message::parsed& msg);
 
-parsed
-rewrite(fs::path config_path, char const* domain, std::string_view input);
+bool rewrite(fs::path config_path, char const* domain, message::parsed& msg);
 
-void print_spf_envelope_froms(char const* domain, std::string_view input);
+void print_spf_envelope_froms(char const* domain, message::parsed& msg);
 
 } // namespace message
 

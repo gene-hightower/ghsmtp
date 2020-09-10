@@ -45,10 +45,10 @@ int main(int argc, char* argv[])
         LOG(FATAL) << "can't find mail file " << argv[a];
       boost::iostreams::mapped_file_source file;
       file.open(argv[a]);
-      auto const input = std::string_view(file.data(), file.size());
-      auto const authed =
-          message::authentication(config_path, sender.c_str(), input);
-      std::cout << authed.as_string();
+      message::parsed msg;
+      CHECK(msg.parse(std::string_view(file.data(), file.size())));
+      message::authentication(config_path, sender.c_str(), msg);
+      std::cout << msg.as_string();
     }
     return 0;
   }
@@ -59,8 +59,9 @@ int main(int argc, char* argv[])
         LOG(FATAL) << "can't find mail file " << argv[a];
       boost::iostreams::mapped_file_source file;
       file.open(argv[a]);
-      auto const input = std::string_view(file.data(), file.size());
-      message::dkim_check(config_path, sender.c_str(), input);
+      message::parsed msg;
+      CHECK(msg.parse(std::string_view(file.data(), file.size())));
+      message::dkim_check(config_path, sender.c_str(), msg);
     }
     return 0;
   }
@@ -71,8 +72,9 @@ int main(int argc, char* argv[])
         LOG(FATAL) << "can't find mail file " << argv[a];
       boost::iostreams::mapped_file_source file;
       file.open(argv[a]);
-      auto const input = std::string_view(file.data(), file.size());
-      message::print_spf_envelope_froms(argv[a], input);
+      message::parsed msg;
+      CHECK(msg.parse(std::string_view(file.data(), file.size())));
+      message::print_spf_envelope_froms(argv[a], msg);
     }
     return 0;
   }
@@ -82,8 +84,9 @@ int main(int argc, char* argv[])
       LOG(FATAL) << "can't find mail file " << argv[a];
     boost::iostreams::mapped_file_source file;
     file.open(argv[a]);
-    auto const input     = std::string_view(file.data(), file.size());
-    auto const rewritten = message::rewrite(config_path, sender.c_str(), input);
-    std::cout << rewritten.as_string();
+    message::parsed msg;
+    CHECK(msg.parse(std::string_view(file.data(), file.size())));
+    message::rewrite(config_path, sender.c_str(), msg);
+    std::cout << msg.as_string();
   }
 }

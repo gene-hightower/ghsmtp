@@ -830,14 +830,37 @@ bool Session::data_start()
 
 void Session::deliver_()
 {
+  auto constexpr Return_Path = "Return-Path";
+
   CHECK(msg_);
 
   try {
-    auto const server = server_identity_.ascii().c_str();
-    auto const msg =
-        message::authentication(config_path_, server, msg_->freeze());
+    auto const server   = server_identity_.ascii().c_str();
+    auto const msg_data = msg_->freeze();
 
-    msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
+    message::parsed msg;
+    msg.parse(msg_data);
+
+    auto const return_path =
+        fmt::format("{}: <{}>\r\n", Return_Path, reverse_path_);
+
+    for (auto const& header : msg.headers) {
+      if (header == Return_Path) {
+        auto hs = header.as_string();
+        if (hs != return_path) {
+          LOG(INFO) << "replacing " << hs << " with " << return_path;
+        }
+      }
+    }
+
+    // remove any Return-Path
+    msg.headers.erase(
+        std::remove(msg.headers.begin(), msg.headers.end(), Return_Path),
+        msg.headers.end());
+
+    message::authentication(config_path_, server, msg);
+
+    msg_->write(return_path);
     for (auto const h : msg.headers) {
       auto const hstr = fmt::format("{}\r\n", h.as_string());
       msg_->write(hstr);
