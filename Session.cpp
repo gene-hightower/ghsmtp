@@ -535,10 +535,10 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   state_ = xact_step::data;
 }
 
+// The headers Received and Received-SPF are returned as a string.
+
 std::string Session::added_headers_(Message const& msg)
 {
-  // The headers Return-Path, Received-SPF, and Received are returned
-  // as a string.
   auto const protocol{[this]() {
     if (smtputf8_)
       return sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
@@ -548,10 +548,7 @@ std::string Session::added_headers_(Message const& msg)
       return sock_.tls() ? "SMTPS" : "SMTP";
   }()};
 
-  std::string const tls_info{sock_.tls_info()};
-
   fmt::memory_buffer headers;
-  fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
 
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
   fmt::format_to(headers, "Received: from {}", client_identity_.utf8());
@@ -560,13 +557,12 @@ std::string Session::added_headers_(Message const& msg)
   }
   fmt::format_to(headers, "\r\n\tby {} with {} id {}", server_identity_.utf8(),
                  protocol, msg.id());
-
   if (forward_path_.size()) {
     fmt::format_to(headers, "\r\n\tfor <{}>", forward_path_[0]);
     for (auto i = 1u; i < forward_path_.size(); ++i)
       fmt::format_to(headers, ",\r\n\t   <{}>", forward_path_[i]);
   }
-
+  std::string const tls_info{sock_.tls_info()};
   if (tls_info.length()) {
     fmt::format_to(headers, "\r\n\t({})", tls_info);
   }
@@ -841,6 +837,7 @@ void Session::deliver_()
     auto const msg =
         message::authentication(config_path_, server, msg_->freeze());
 
+    msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
     for (auto const h : msg.headers) {
       auto const hstr = fmt::format("{}\r\n", h.as_string());
       msg_->write(hstr);
