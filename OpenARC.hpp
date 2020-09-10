@@ -25,6 +25,11 @@ public:
   void get_option(int arg, void* val = nullptr, size_t valsz = 0);
   void set_option(int arg, void* val = nullptr, size_t valsz = 0);
 
+  void set_cv_unkn();
+  void set_cv_none();
+  void set_cv_fail();
+  void set_cv_pass();
+
   void header(std::string_view header);
   void eoh();
   void body(std::string_view body);

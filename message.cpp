@@ -678,7 +678,6 @@ static void add_authentication_results(fs::path         config_path,
 
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, "{}: {}", Authentication_Results, domain);
 
   // Grab 1st SPF record
   RFC5322::received_spf_parsed spf_parsed;
@@ -822,7 +821,16 @@ static void add_authentication_results(fs::path         config_path,
 
   // New AR header on the top
 
-  msg.ar_str = fmt::to_string(bfr);
+  auto const ar_results = [&bfr]() {
+    // Ug, OpenARC adds an extra one, arc.c:3213
+    auto s = fmt::to_string(bfr);
+    if (s.length() && s[0] == ';')
+      s.erase(0, 1);
+    return s;
+  }();
+
+  msg.ar_str =
+      fmt::format("{}: {};{}", Authentication_Results, domain, ar_results);
 
   LOG(INFO) << "new AR header " << msg.ar_str;
   CHECK(msg.parse_hdr(msg.ar_str));
@@ -830,6 +838,20 @@ static void add_authentication_results(fs::path         config_path,
   // Run our message through ARC::sign
 
   OpenARC::sign ars;
+
+  if (iequal(arc_status, "none")) {
+    ars.set_cv_none();
+  }
+  else if (iequal(arc_status, "fail")) {
+    ars.set_cv_fail();
+  }
+  else if (iequal(arc_status, "pass")) {
+    ars.set_cv_pass();
+  }
+  else {
+    ars.set_cv_unkn();
+  }
+
   for (auto const& header : msg.headers) {
     ars.header(header.as_view());
   }
@@ -845,21 +867,15 @@ static void add_authentication_results(fs::path         config_path,
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
-  // Find AR header
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers),
-                           Authentication_Results);
-      hdr != end(msg.headers)) {
-    auto const ar = make_string(hdr->value);
-    if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
-                 ar.c_str())) {
-      msg.arc_hdrs = ars.whole_seal();
-      for (auto const& hdr : msg.arc_hdrs) {
-        CHECK(msg.parse_hdr(hdr));
-      }
+  if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
+               ar_results.c_str())) {
+    msg.arc_hdrs = ars.whole_seal();
+    for (auto const& hdr : msg.arc_hdrs) {
+      CHECK(msg.parse_hdr(hdr));
     }
-    else {
-      LOG(INFO) << "failed to generate seal";
-    }
+  }
+  else {
+    LOG(INFO) << "failed to generate seal";
   }
 
   OpenARC::verify arv2;

@@ -42,6 +42,11 @@ void OpenARC::lib::set_option(int arg, void* val, size_t valsz)
   CHECK_EQ(arc_options(arc_, ARC_OP_SETOPT, arg, val, valsz), ARC_STAT_OK);
 }
 
+void OpenARC::lib::set_cv_unkn() { arc_set_cv(msg_, ARC_CHAIN_UNKNOWN); }
+void OpenARC::lib::set_cv_none() { arc_set_cv(msg_, ARC_CHAIN_NONE); }
+void OpenARC::lib::set_cv_fail() { arc_set_cv(msg_, ARC_CHAIN_FAIL); }
+void OpenARC::lib::set_cv_pass() { arc_set_cv(msg_, ARC_CHAIN_PASS); }
+
 void OpenARC::lib::header(std::string_view header)
 {
   CHECK_EQ(arc_header_field(msg_, uc(header.data()), header.length()),
