@@ -1,6 +1,6 @@
 USES := ldns libglog libidn2 opendkim openssl
 
-CXXFLAGS += -IPEGTL/include -Ijson/include
+CXXFLAGS += -IPEGTL/include -Ijson/include -Icppcodec
 
 LDLIBS += \
 	-lopenarc \
