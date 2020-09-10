@@ -1407,7 +1407,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
           }
         }
 
-        // Any match skips check on black list
+        // Any A record skips check on black list
         return true;
       }
     }
@@ -1426,7 +1426,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         }
         else {
           error_msg = fmt::format("blocked on advice from {}", bl);
-          // LOG(INFO) << sock_.them_c_str() << " " << error_msg;
+          LOG(INFO) << sock_.them_c_str() << " " << error_msg;
           out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
         }
