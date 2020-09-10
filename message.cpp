@@ -678,14 +678,14 @@ static void add_authentication_results(fs::path         config_path,
 
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, "{}: {};", Authentication_Results, domain);
+  fmt::format_to(bfr, "{}: {}", Authentication_Results, domain);
 
   // Grab 1st SPF record
   RFC5322::received_spf_parsed spf_parsed;
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
       hdr != end(msg.headers)) {
     if (spf_parsed.parse(hdr->value)) {
-      fmt::format_to(bfr, "\r\n       spf={}", spf_parsed.result);
+      fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
 
       // FIXME get comment in here
       // fmt::format_to(bfr, " ({}) ", );
@@ -698,7 +698,6 @@ static void add_authentication_results(fs::path         config_path,
       else {
         fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
       }
-      fmt::format_to(bfr, ";");
 
       if (spf_parsed.kv_map.contains(client_ip)) {
         std::string ip = make_string(spf_parsed.kv_map[client_ip]);
@@ -782,11 +781,10 @@ static void add_authentication_results(fs::path         config_path,
 
     auto bs = std::string_view(b, strlen(b)).substr(0, 8);
 
-    fmt::format_to(bfr, "\r\n       dkim={}", human_result);
+    fmt::format_to(bfr, ";\r\n       dkim={}", human_result);
     fmt::format_to(bfr, " header.i={}", identity);
     fmt::format_to(bfr, " header.s={}", selector);
     fmt::format_to(bfr, " header.b=\"{}\"", bs);
-    fmt::format_to(bfr, ";");
   });
 
   // Set DMARC status in AR
@@ -796,7 +794,7 @@ static void add_authentication_results(fs::path         config_path,
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
   // Skip the ';' on this last one:
-  fmt::format_to(bfr, "\r\n       dmarc={} header.from={}", dmarc_result,
+  fmt::format_to(bfr, ";\r\n       dmarc={} header.from={};", dmarc_result,
                  dmarc_from_domain);
 
   // ARC
@@ -814,7 +812,7 @@ static void add_authentication_results(fs::path         config_path,
 
   auto const arc_status = arv.chain_status_str();
 
-  fmt::format_to(bfr, "\r\n       arc={};", arc_status);
+  fmt::format_to(bfr, ";\r\n       arc={}", arc_status);
 
   // New AR header on the top
 
