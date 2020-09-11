@@ -7,6 +7,7 @@
 #include "SRS.hpp"
 #include "imemstream.hpp"
 #include "message.hpp"
+#include "osutil.hpp"
 
 #include <gflags/gflags.h>
 
@@ -506,9 +507,15 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
 }
 
 std::optional<std::unique_ptr<SMTP::Connection>>
-open_session(DNS::Resolver& res, fs::path config_path, Domain sender, Domain mx)
+open_session(DNS::Resolver& res,
+             fs::path       config_path,
+             Domain         sender,
+             Domain         mx,
+             char const*    service)
 {
-  int fd = conn(res, mx, 25);
+  auto const port{osutil::get_port(service, "tcp")};
+
+  int fd = conn(res, mx, port);
   if (fd == -1) {
     LOG(WARNING) << mx << " no connection";
     return {};
@@ -764,8 +771,9 @@ bool do_quit(SMTP::Connection& conn)
 
 } // namespace
 
-Send::Send(fs::path config_path)
+Send::Send(fs::path config_path, char const* service)
   : config_path_(config_path)
+  , service_(service)
 {
 }
 
@@ -822,8 +830,8 @@ bool Send::rcpt_to(DNS::Resolver& res,
       return do_rcpt_to(*conn, mail_from_, to);
     }
     // Open new connection.
-    if (auto new_conn =
-            open_session(res, config_path_, mail_from_.domain(), mx);
+    if (auto new_conn = open_session(res, config_path_, mail_from_.domain(), mx,
+                                     service_.c_str());
         new_conn) {
       LOG(INFO) << "opened new connection to " << mx;
       exchangers_.emplace(mx, std::move(*new_conn));

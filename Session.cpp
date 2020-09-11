@@ -155,7 +155,7 @@ Session::Session(fs::path                  config_path,
   : config_path_(config_path)
   , res_(config_path)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
-  , send_(config_path)
+  , send_(config_path, "smtp")
 {
   auto accept_db_name  = config_path_ / "accept_domains";
   auto black_db_name   = config_path_ / "black";

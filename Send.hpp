@@ -43,7 +43,7 @@ struct Connection {
 
 class Send {
 public:
-  Send(fs::path config_path);
+  Send(fs::path config_path, char const* service);
 
   void set_sender(Domain sender) { sender_ = sender; }
 
@@ -57,6 +57,7 @@ public:
 
 private:
   fs::path config_path_;
+  std::string service_;
 
   Domain sender_;
 

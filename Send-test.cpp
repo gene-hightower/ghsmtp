@@ -32,12 +32,12 @@ int main(int argc, char* argv[])
 
   auto const config_path = osutil::get_config_dir();
 
-  auto snd{Send(config_path)};
+  auto snd{Send(config_path, "smtp-test")};
   snd.set_sender(Domain(server_identity));
 
   Mailbox from("gene", dom_from);
-  Mailbox to("forward", dom_to);
-  // Mailbox to("anything", dom_to);
+  // Mailbox to("forward", dom_to);
+  Mailbox to("anything", dom_to);
 
   auto const date{Now{}};
   auto const pill{Pill{}};
