@@ -56,7 +56,7 @@ OpenARC::lib::lib()
                            "to",
                            nullptr};
 
-  set_option(ARC_OPTS_SIGNHDRS, hdrlist, sizeof(hdrlist));
+  set_option(ARC_OPTS_SIGNHDRS, hdrlist, sizeof(char**));
 }
 
 OpenARC::lib::~lib() { arc_close(arc_); }
