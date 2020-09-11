@@ -1,6 +1,7 @@
 #include "IP6.hpp"
 
 #include "DNS.hpp"
+#include "iequal.hpp"
 
 #include <fmt/format.h>
 
@@ -65,14 +66,6 @@ struct ipv6_address_literal
 struct ipv6_address_only : seq<ipv6_address, eof> {};
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
 // clang-format on
-
-namespace {
-bool istarts_with(std::string_view str, std::string_view prefix)
-{
-  return (str.size() >= prefix.size())
-         && iequal(str.substr(0, prefix.size()), prefix);
-}
-} // namespace
 
 // <https://en.wikipedia.org/wiki/Private_network#Private_IPv6_addresses>
 

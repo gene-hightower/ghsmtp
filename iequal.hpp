@@ -31,6 +31,12 @@ inline bool iless(std::string_view a, std::string_view b)
                                       iless_char);
 }
 
+inline bool istarts_with(std::string_view str, std::string_view prefix)
+{
+  return (str.size() >= prefix.size()) &&
+         iequal(str.substr(0, prefix.size()), prefix);
+}
+
 struct ci_less {
   bool operator()(std::string_view a, std::string_view b) const
   {
