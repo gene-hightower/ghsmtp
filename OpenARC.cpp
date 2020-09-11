@@ -29,16 +29,29 @@ OpenARC::lib::lib()
   // arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
   // set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
 
-  char const* hdrlist[] = {"date",
-                           "dkim-signature",
+  char const* hdrlist[] = {"cc",
+                           "content-language",
+                           "content-transfer-encoding",
+                           "date",
                            "feedback-id",
                            "from",
+                           "in-reply-to",
+                           "list-archive",
+                           "list-help",
                            "list-id",
-                           "list-unsubscribe"
+                           "list-owner",
+                           "list-post",
+                           "list-subscribe",
+                           "list-unsubscribe",
                            "message-id",
                            "mime-version",
                            "precedence",
+                           "references",
                            "reply-to",
+                           "resent-cc",
+                           "resent-date",
+                           "resent-from",
+                           "resent-to",
                            "subject",
                            "to",
                            nullptr};
