@@ -27,6 +27,9 @@
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
+using std::begin;
+using std::end;
+
 // DKIM key "selector"
 auto constexpr selector = "ghsmtp";
 
@@ -41,6 +44,10 @@ auto constexpr Delivered_To           = "Delivered-To";
 auto constexpr From                   = "From";
 auto constexpr Received_SPF           = "Received-SPF";
 auto constexpr Return_Path            = "Return-Path";
+
+// MIME headers
+auto constexpr MIME_Version = "MIME-Version";
+auto constexpr Content_Type = "Content-Type";
 
 // SPF Results
 auto constexpr Pass      = "Pass";
@@ -689,13 +696,12 @@ static void add_authentication_results(fs::path         config_path,
       // FIXME get comment in here
       // fmt::format_to(bfr, " ({}) ", );
 
-      Mailbox mbx(spf_parsed.kv_map[envelope_from]);
-      if (mbx.local_part() != "postmaster") {
-        fmt::format_to(bfr, " smtp.mailfrom={}",
-                       spf_parsed.kv_map[envelope_from]);
+      if (spf_parsed.kv_map[envelope_from] != spf_parsed.kv_map[helo]) {
+        fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
       }
       else {
-        fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
+        fmt::format_to(bfr, " smtp.mailfrom={}",
+                       spf_parsed.kv_map[envelope_from]);
       }
 
       if (spf_parsed.kv_map.contains(client_ip)) {
@@ -927,13 +933,51 @@ bool rewrite(fs::path         config_path,
       std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
       msg.headers.end());
 
+  // munge RFC-5322.From address
+
+  std::string              new_from;
+  std::vector<std::string> addr_specs;
+  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
+      hdr != end(msg.headers)) {
+    auto const from_str = make_string(hdr->value);
+
+    memory_input<> from_in(from_str, "from");
+    if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
+            from_in, addr_specs)) {
+      LOG(WARNING) << "failed to parse From:" << from_str;
+    }
+
+    // Okay if parse fails after 1st valid addr_spec in From:
+    if (addr_specs.size() == 1) {
+      // msg.headers.erase(hdr);
+      new_from = fmt::format("From: was {} <no-reply@{}>", addr_specs[0],
+                             sender.ascii());
+      LOG(INFO) << "munged: " << new_from;
+      // FIXME parse new_from
+    }
+  }
+
+  // modify plain text body
+
+  if (iequal(msg.get_header(MIME_Version), "1.0") &&
+      iequal(msg.get_header(Content_Type), "text/plain; charset=utf-8")) {
+    LOG(INFO) << "Adding footer to message body.";
+    msg.body_str = msg.body;
+    msg.body_str.append("\r\n\r\n\t-- Added Footer --\r\n");
+    msg.body = msg.body_str;
+  }
+  else {
+    LOG(INFO) << "Not adding footer to message body.";
+    LOG(INFO) << "MIME-Version == " << msg.get_header(MIME_Version);
+    LOG(INFO) << "Content-Type == " << msg.get_header(Content_Type);
+  }
+  LOG(INFO) << "body == " << msg.body;
+
   auto const key_file = (config_path / selector).replace_extension("private");
   if (!fs::exists(key_file)) {
     LOG(WARNING) << "can't find key file " << key_file;
     return false;
   }
-
-  // munge?
 
   // DKIM sign
 
@@ -1046,8 +1090,17 @@ bool parsed::write(std::ostream& os) const
   return true;
 }
 
-std::string message::header::as_string() const
+std::string header::as_string() const
 {
   return fmt::format("{}:{}", name, value);
+}
+
+std::string_view parsed::get_header(std::string_view name) const
+{
+  if (auto hdr = std::find(begin(headers), end(headers), name);
+      hdr != end(headers)) {
+    return trim(hdr->value);
+  }
+  return "";
 }
 } // namespace message

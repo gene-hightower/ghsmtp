@@ -43,10 +43,15 @@ struct parsed {
 
   std::vector<header> headers;
 
+  std::string_view get_header(std::string_view hdr) const;
+
   std::string_view field_name;
   std::string_view field_value;
 
   std::string_view body;
+
+  // New body
+  std::string body_str;
 
   // New Authentication_Results field
   std::string ar_str;
@@ -54,6 +59,7 @@ struct parsed {
   // New DKIM-Signature that includes above AR
   std::string sig_str;
 
+  // Added ARC headers
   std::vector<std::string> arc_hdrs;
 };
 
