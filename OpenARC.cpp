@@ -1,5 +1,7 @@
 #include "OpenARC.hpp"
 
+#include <regex>
+
 #include <stdbool.h> // needs to be above <openarc/arc.h>
 
 #include <openarc/arc.h>
@@ -156,9 +158,11 @@ std::vector<std::string> OpenARC::sign::whole_seal() const
 {
   std::vector<std::string> hdrs;
 
+  auto const re = std::regex("(?:\\r\\n|\\n|\\r)");
   for (auto sealhdr = seal_; sealhdr; sealhdr = arc_hdr_next(sealhdr)) {
-    hdrs.emplace_back(
-        fmt::format("{}:{}", get_name(sealhdr), get_value(sealhdr)));
+    auto const hdr =
+        fmt::format("{}:{}", get_name(sealhdr), get_value(sealhdr));
+    hdrs.emplace_back(std::regex_replace(hdr, re, "\r\n"));
   }
 
   return hdrs;
