@@ -41,8 +41,8 @@ int main(int argc, char* argv[])
 
   auto const date{Now{}};
   auto const pill{Pill{}};
-  auto const mid_str
-      = fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
+  auto const mid_str =
+      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
 
   fmt::memory_buffer bfr;
   fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
@@ -51,6 +51,8 @@ int main(int argc, char* argv[])
   fmt::format_to(bfr, "Subject: Testing, one, two, three.\r\n");
   fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
   fmt::format_to(bfr, "Authentication-Results: {}; none\r\n", server_identity);
+  fmt::format_to(bfr, "MIME-Version: 1.0\r\n");
+  fmt::format_to(bfr, "Content-Type: text/plain; charset=utf-8\r\n");
 
   fmt::format_to(bfr, "\r\n");
 
