@@ -94,7 +94,7 @@ void OpenARC::lib::eom() { CHECK_EQ(arc_eom(msg_), ARC_STAT_OK); }
 OpenARC::sign::sign()
 {
   u_char const* error;
-  msg_ = arc_message(arc_, ARC_CANON_RELAXED, ARC_CANON_SIMPLE,
+  msg_ = arc_message(arc_, ARC_CANON_RELAXED, ARC_CANON_RELAXED,
                      ARC_SIGN_RSASHA256, ARC_MODE_SIGN, &error);
   CHECK_NOTNULL(msg_);
 }
@@ -156,7 +156,7 @@ std::vector<std::string> OpenARC::sign::whole_seal() const
 OpenARC::verify::verify()
 {
   u_char const* error;
-  msg_ = arc_message(arc_, ARC_CANON_SIMPLE, ARC_CANON_RELAXED,
+  msg_ = arc_message(arc_, ARC_CANON_RELAXED, ARC_CANON_RELAXED,
                      ARC_SIGN_RSASHA256, ARC_MODE_VERIFY, &error);
   CHECK_NOTNULL(msg_);
 }
