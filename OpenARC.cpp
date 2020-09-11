@@ -28,6 +28,22 @@ OpenARC::lib::lib()
   // get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
   // arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
   // set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+
+  char const* hdrlist[] = {"date",
+                           "dkim-signature",
+                           "feedback-id",
+                           "from",
+                           "list-id",
+                           "list-unsubscribe"
+                           "message-id",
+                           "mime-version",
+                           "precedence",
+                           "reply-to",
+                           "subject",
+                           "to",
+                           nullptr};
+
+  set_option(ARC_OPTS_SIGNHDRS, hdrlist, sizeof(hdrlist));
 }
 
 OpenARC::lib::~lib() { arc_close(arc_); }
