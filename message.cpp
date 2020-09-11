@@ -960,7 +960,7 @@ bool rewrite(fs::path         config_path,
   // modify plain text body
 
   if (iequal(msg.get_header(MIME_Version), "1.0") &&
-      iequal(msg.get_header(Content_Type), "text/plain; charset=utf-8")) {
+      istarts_with(msg.get_header(Content_Type), "text/plain;")) {
     LOG(INFO) << "Adding footer to message body.";
     msg.body_str = msg.body;
     msg.body_str.append("\r\n\r\n\t-- Added Footer --\r\n");
