@@ -1647,11 +1647,8 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
 
 bool Session::verify_sender_spf_(Mailbox const& sender)
 {
-  if (!sock_.has_peername() || ip_whitelisted_) {
-    auto ip_addr = sock_.them_c_str();
-    if (!sock_.has_peername()) {
-      ip_addr = "127.0.0.1"; // use localhost for local socket
-    }
+  if (!sock_.has_peername()) {
+    auto const ip_addr = "127.0.0.1"; // use localhost for local socket
     spf_received_ =
         fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
                     "envelope-from={}; helo={};",
