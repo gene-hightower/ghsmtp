@@ -29,37 +29,47 @@ OpenARC::lib::lib()
   // arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
   // set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
 
-  char const* hdrlist[] = {"cc",
-                           "content-language",
-                           "content-transfer-encoding",
-                           "date",
-                           "feedback-id",
-                           "from",
-                           "in-reply-to",
-                           "list-archive",
-                           "list-help",
-                           "list-id",
-                           "list-owner",
-                           "list-post",
-                           "list-subscribe",
-                           "list-unsubscribe",
-                           "message-id",
-                           "mime-version",
-                           "precedence",
-                           "references",
-                           "reply-to",
-                           "resent-cc",
-                           "resent-date",
-                           "resent-from",
-                           "resent-to",
-                           "subject",
-                           "to",
-                           nullptr};
+  char const* signhdrs[] = {"cc",
+                            "content-language",
+                            "content-transfer-encoding",
+                            "content-type",
+                            "date",
+                            "feedback-id",
+                            "from",
+                            "in-reply-to",
+                            "list-archive",
+                            "list-help",
+                            "list-id",
+                            "list-owner",
+                            "list-post",
+                            "list-subscribe",
+                            "list-unsubscribe",
+                            "message-id",
+                            "mime-version",
+                            "precedence",
+                            "references",
+                            "reply-to",
+                            "resent-cc",
+                            "resent-date",
+                            "resent-from",
+                            "resent-to",
+                            "subject",
+                            "to",
+                            nullptr};
 
-  set_option(ARC_OPTS_SIGNHDRS, hdrlist, sizeof(char**));
+  set_option(ARC_OPTS_SIGNHDRS, signhdrs, sizeof(char**));
+
+  char const* oversignhdrs[] = {"from", nullptr};
+  set_option(ARC_OPTS_OVERSIGNHDRS, oversignhdrs, sizeof(char**));
 }
 
-OpenARC::lib::~lib() { arc_close(arc_); }
+OpenARC::lib::~lib()
+{
+  set_option(ARC_OPTS_SIGNHDRS, nullptr, sizeof(char**));
+  set_option(ARC_OPTS_OVERSIGNHDRS, nullptr, sizeof(char**));
+
+  arc_close(arc_);
+}
 
 void OpenARC::lib::get_option(int arg, void* val, size_t valsz)
 {
