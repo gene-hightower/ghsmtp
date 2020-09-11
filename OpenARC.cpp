@@ -24,10 +24,11 @@ OpenARC::lib::lib()
 {
   arc_ = arc_init();
   CHECK_NOTNULL(arc_);
-  // uint32_t arcl_flags;
-  // get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
-  // arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
-  // set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+
+  uint32_t arcl_flags;
+  get_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
+  arcl_flags |= ARC_LIBFLAGS_FIXCRLF;
+  set_option(ARC_OPTS_FLAGS, &arcl_flags, sizeof(arcl_flags));
 
   char const* signhdrs[] = {"cc",
                             "content-language",
