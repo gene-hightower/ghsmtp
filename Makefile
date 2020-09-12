@@ -1,4 +1,4 @@
-USES := ldns libglog libidn2 opendkim openssl
+USES := ldns libglog libidn2 opendkim openssl snappy
 
 CXXFLAGS += -IPEGTL/include -Ijson/include -Icppcodec
 
@@ -130,7 +130,6 @@ socks5_STEMS := socks5 \
 TESTS := \
 	Base64-test \
 	CDB-test \
-	OpenDKIM-test \
 	DNS-test \
 	Domain-test \
 	IP4-test \
@@ -139,10 +138,12 @@ TESTS := \
 	Mailbox-test \
 	Message-test \
 	Now-test \
+	OpenDKIM-test \
 	POSIX-test \
 	Pill-test \
 	SPF-test \
 	SRS-test \
+	SRS0-test \
 	Send-test \
 	Session-test \
 	Sock-test \
@@ -171,6 +172,7 @@ POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS
+SRS0-test_STEMS := SRS0
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc message osutil
 
 osutil-test_STEMS := osutil
@@ -255,13 +257,13 @@ forward.cdb: forward
 public_suffix_list.dat:
 	wget --timestamping https://publicsuffix.org/list/public_suffix_list.dat
 
-# opt_flags := -Og
+opt_flags := -Og
 
 # safty_flags := # nada
 
 # visibility_flags := # nada
 
-# lto_flags := # nada
+lto_flags := # nada
 
 include MKUltra/rules
 
