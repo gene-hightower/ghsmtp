@@ -1,5 +1,7 @@
 #include "OpenDKIM.hpp"
 
+#include "iobuffer.hpp"
+
 #include <stdbool.h> // needs to be above <dkim.h>
 
 #include <dkim.h>
@@ -172,6 +174,8 @@ void verify::foreach_sig(std::function<void(char const* domain,
   }
   CHECK_EQ(status_, DKIM_STAT_OK);
 
+  iobuffer<u_char> identity(4 * 1024);
+
   for (auto i{0}; i < nsigs; ++i) {
     auto const dom = CHECK_NOTNULL(dkim_sig_getdomain(sigs[i]));
 
@@ -209,15 +213,15 @@ void verify::foreach_sig(std::function<void(char const* domain,
     auto const passed =
         ((flg & DKIM_SIGFLAG_PASSED) != 0) && (bh == DKIM_SIGBH_MATCH);
 
-    u_char identity[256] = {};
-    CHECK_EQ(dkim_sig_getidentity(dkim_, sigs[i], identity, sizeof(identity)),
-             DKIM_STAT_OK);
+    CHECK_EQ(
+        dkim_sig_getidentity(dkim_, sigs[i], identity.data(), identity.size()),
+        DKIM_STAT_OK);
 
     auto const selector = dkim_sig_getselector(sigs[i]);
 
     auto const b = dkim_sig_gettagvalue(sigs[i], false, uc("b"));
 
-    func(c(dom), passed, c(identity), c(selector), c(b));
+    func(c(dom), passed, c(identity.data()), c(selector), c(b));
   }
 }
 
