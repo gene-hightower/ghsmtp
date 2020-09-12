@@ -88,7 +88,6 @@ std::string_view Message::freeze()
   }
   ofs_.open(tmpfn_);
   mapping_.open(tmp2fn_);
-  LOG(INFO) << tmp2fn_ << " mapped " << mapping_.size() << " bytes";
   size_ = 0;
   return std::string_view(mapping_.data(), mapping_.size());
 }
@@ -106,6 +105,13 @@ fs::path Message::deliver()
   rename(tmpfn_, newfn_, ec);
   if (ec) {
     LOG(ERROR) << "can't rename " << tmpfn_ << " to " << newfn_ << ": " << ec;
+  }
+
+  if (fs::exists(newfn_)) {
+    LOG(INFO) << "successfully deliverd " << newfn_;
+  }
+  else {
+    LOG(ERROR) << "failed to deliver " << newfn_;
   }
 
   if (fs::exists(tmp2fn_)) {
