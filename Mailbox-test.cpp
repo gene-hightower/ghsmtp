@@ -89,7 +89,7 @@ int main(int argc, char* argv[])
   CHECK(!Mailbox::validate("this\\ still\\\"not\\\\allowed@example.com"));
 
   // (local part is longer than 64 characters)
-  CHECK(!Mailbox::validate(
+  CHECK(!Mailbox::validate_strict_lengths(
       "1234567890123456789012345678901234567890123456789012345"
       "678901234+x@example.com"));
 
