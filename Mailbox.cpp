@@ -159,10 +159,18 @@ bool Mailbox::validate(std::string_view mailbox)
 {
   Mailbox        mbx;
   memory_input<> address_in(mailbox, "address");
-  return !mailbox.empty()
-         && parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx)
-         && (mbx.local_part().length() <= 64)
-         && (mbx.domain().ascii().length() <= 255);
+  return !mailbox.empty() &&
+         parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx);
+}
+
+bool Mailbox::validate_strict_lengths(std::string_view mailbox)
+{
+  Mailbox        mbx;
+  memory_input<> address_in(mailbox, "address");
+  return !mailbox.empty() &&
+         parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx) &&
+         (mbx.local_part().length() <= 64) &&
+         (mbx.domain().ascii().length() <= 255);
 }
 
 Mailbox::Mailbox(std::string_view mailbox)

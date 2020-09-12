@@ -50,6 +50,7 @@ public:
   bool operator!=(Mailbox const& rhs) const { return !(*this == rhs); }
 
   static bool validate(std::string_view mailbox);
+  static bool validate_strict_lengths(std::string_view mailbox);
 
 private:
   std::string local_part_;
