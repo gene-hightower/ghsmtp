@@ -760,7 +760,7 @@ static void add_authentication_results(fs::path         config_path,
     boost::trim(addr_specs[0]);
     if (Mailbox::validate(addr_specs[0])) {
       Mailbox from_mbx(addr_specs[0]);
-      return from_mbx.domain().ascii();
+      return std::string(from_mbx.domain().ascii());
     }
     else {
       LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
