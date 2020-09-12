@@ -1,4 +1,4 @@
-USES := ldns libglog libidn2 opendkim openssl snappy
+USES := ldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -IPEGTL/include -Ijson/include -Icppcodec
 
@@ -143,7 +143,6 @@ TESTS := \
 	Pill-test \
 	SPF-test \
 	SRS-test \
-	SRS0-test \
 	Send-test \
 	Session-test \
 	Sock-test \
@@ -171,7 +170,7 @@ OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-SRS-test_STEMS := SRS
+SRS-test_STEMS := SRS Mailbox Domain IP IP4 IP6
 SRS0-test_STEMS := SRS0
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF SRS Send Sock SockBuffer TLS-OpenSSL esc message osutil
 
