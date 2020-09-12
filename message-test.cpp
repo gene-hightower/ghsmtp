@@ -21,7 +21,6 @@ DEFINE_bool(print_from, false, "print envelope froms");
 
 int main(int argc, char* argv[])
 {
-  std::ios::sync_with_stdio(false);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   auto const sender = [] {
