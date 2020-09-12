@@ -47,14 +47,16 @@ policy::~policy()
 
 void policy::connect(char const* ip)
 {
+  CHECK_NOTNULL(ip);
   auto const is_ipv6 = IP6::is_address(ip);
   pctx_ = CHECK_NOTNULL(opendmarc_policy_connect_init(uc(ip), is_ipv6));
 }
 
 bool policy::store_from_domain(char const* from_domain)
 {
-  auto const status
-      = opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
+  CHECK_NOTNULL(from_domain);
+  auto const status =
+      opendmarc_policy_store_from_domain(pctx_, uc(from_domain));
   if (status != DMARC_PARSE_OKAY) {
     LOG(WARNING) << "from_domain == " << from_domain;
     LOG(WARNING) << opendmarc_policy_status_to_str(status);
@@ -67,6 +69,9 @@ bool policy::store_dkim(char const* d_equal_domain,
                         int         dkim_result,
                         char const* human_result)
 {
+  CHECK_NOTNULL(d_equal_domain);
+  CHECK_NOTNULL(human_result);
+  LOG(INFO) << "d_equal_domain == " << d_equal_domain;
   auto const status = opendmarc_policy_store_dkim(
       pctx_, uc(d_equal_domain), dkim_result, uc(human_result));
   if (status != DMARC_PARSE_OKAY) {
@@ -82,6 +87,8 @@ bool policy::store_spf(char const* domain,
                        int         origin,
                        char const* human_readable)
 {
+  CHECK_NOTNULL(domain);
+  CHECK_NOTNULL(human_readable);
   auto const status = opendmarc_policy_store_spf(pctx_, uc(domain), result,
                                                  origin, uc(human_readable));
   if (status != DMARC_PARSE_OKAY) {
@@ -94,6 +101,7 @@ bool policy::store_spf(char const* domain,
 
 bool policy::query_dmarc(char const* domain)
 {
+  CHECK_NOTNULL(domain);
   auto const status = opendmarc_policy_query_dmarc(pctx_, uc(domain));
   if (status != DMARC_PARSE_OKAY) {
     LOG(WARNING) << domain << ": " << opendmarc_policy_status_to_str(status);
