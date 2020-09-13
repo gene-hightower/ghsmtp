@@ -1,4 +1,4 @@
-#include "Message.hpp"
+#include "MessageStore.hpp"
 
 #include "osutil.hpp"
 
@@ -20,9 +20,9 @@ auto locate_maildir() -> fs::path
 }
 } // namespace
 
-void Message::open(std::string_view fqdn,
-                   std::streamsize  max_size,
-                   std::string_view folder)
+void MessageStore::open(std::string_view fqdn,
+                        std::streamsize  max_size,
+                        std::string_view folder)
 {
   max_size_ = max_size;
 
@@ -32,8 +32,8 @@ void Message::open(std::string_view fqdn,
     maildir /= folder;
   }
 
-  newfn_ = maildir / "new";
-  tmpfn_ = maildir / "tmp";
+  newfn_  = maildir / "new";
+  tmpfn_  = maildir / "tmp";
   tmp2fn_ = maildir / "tmp";
 
   error_code ec;
@@ -53,7 +53,7 @@ void Message::open(std::string_view fqdn,
   ofs_.open(tmpfn_);
 }
 
-std::ostream& Message::write(char const* s, std::streamsize count)
+std::ostream& MessageStore::write(char const* s, std::streamsize count)
 {
   if (!size_error_ && (size_ + count) <= max_size_) {
     size_ += count;
@@ -65,7 +65,7 @@ std::ostream& Message::write(char const* s, std::streamsize count)
   }
 }
 
-void Message::try_close_()
+void MessageStore::try_close_()
 {
   try {
     ofs_.close();
@@ -78,7 +78,7 @@ void Message::try_close_()
   }
 }
 
-std::string_view Message::freeze()
+std::string_view MessageStore::freeze()
 {
   try_close_();
   error_code ec;
@@ -92,7 +92,7 @@ std::string_view Message::freeze()
   return std::string_view(mapping_.data(), mapping_.size());
 }
 
-fs::path Message::deliver()
+fs::path MessageStore::deliver()
 {
   if (size_error()) {
     LOG(WARNING) << "message size error: " << size() << " exceeds "
@@ -127,7 +127,7 @@ fs::path Message::deliver()
   return newfn_;
 }
 
-void Message::trash()
+void MessageStore::trash()
 {
   try_close_();
 

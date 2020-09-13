@@ -1,5 +1,5 @@
-#ifndef MESSAGE_DOT_HPP
-#define MESSAGE_DOT_HPP
+#ifndef MESSAGESTORE_DOT_HPP
+#define MESSAGESTORE_DOT_HPP
 
 #include <fstream>
 #include <string_view>
@@ -11,7 +11,7 @@
 
 #include "fs.hpp"
 
-class Message {
+class MessageStore {
 public:
   void open(std::string_view fqdn,
             std::streamsize  max_size,
@@ -54,4 +54,4 @@ private:
   void try_close_();
 };
 
-#endif // MESSAGE_DOT_HPP
+#endif // MESSAGESTORE_DOT_HPP

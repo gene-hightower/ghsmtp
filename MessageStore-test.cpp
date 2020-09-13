@@ -1,4 +1,4 @@
-#include "Message.hpp"
+#include "MessageStore.hpp"
 
 #include <iostream>
 
@@ -9,14 +9,14 @@ int main(int argc, char* argv[])
   char env[] = "MAILDIR=/tmp/Maildir";
   PCHECK(putenv(env) == 0);
 
-  Message msg;
+  MessageStore msg;
   msg.open("example.com", 4096, "");
 
   std::string ms{"foo bar baz"};
   msg.write(ms.data(), ms.size());
   msg.deliver();
 
-  Message msg2;
+  MessageStore msg2;
   msg2.open("example.com", 4096, ".Junk");
 
   CHECK(msg.id() != msg2.id());
@@ -30,5 +30,5 @@ int main(int argc, char* argv[])
 
   msg2.trash();
 
-  std::cout << "sizeof(Message) == " << sizeof(Message) << '\n';
+  std::cout << "sizeof(MessageStore) == " << sizeof(MessageStore) << '\n';
 }

@@ -11,7 +11,7 @@
 #include "DNS-fcrdns.hpp"
 #include "Domain.hpp"
 #include "Mailbox.hpp"
-#include "Message.hpp"
+#include "MessageStore.hpp"
 #include "SPF.hpp"
 #include "Send.hpp"
 #include "Sock.hpp"
@@ -90,7 +90,7 @@ private:
 
   std::tuple<SpamStatus, std::string> spam_status_();
 
-  std::string added_headers_(Message const& msg);
+  std::string added_headers_(MessageStore const& msg);
 
   std::ostream& out_() { return sock_.out(); }
   void          lo_(char const* verb, std::string_view client_identity);
@@ -139,11 +139,11 @@ private:
   std::string         client_;          // (fcrdns_ [sock_.them_c_str()])
 
   // per transaction
-  Domain                   client_identity_; // from ehlo/helo
-  Mailbox                  reverse_path_;    // "mail from"
-  std::vector<Mailbox>     forward_path_;    // for each "rcpt to"
-  std::string              spf_received_;
-  std::unique_ptr<Message> msg_;
+  Domain                        client_identity_; // from ehlo/helo
+  Mailbox                       reverse_path_;    // "mail from"
+  std::vector<Mailbox>          forward_path_;    // for each "rcpt to"
+  std::string                   spf_received_;
+  std::unique_ptr<MessageStore> msg_;
 
   TLD tld_db_;
 

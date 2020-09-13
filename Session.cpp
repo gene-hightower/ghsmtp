@@ -10,7 +10,7 @@
 #include "IP.hpp"
 #include "IP4.hpp"
 #include "IP6.hpp"
-#include "Message.hpp"
+#include "MessageStore.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
@@ -536,7 +536,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
 // The headers Received and Received-SPF are returned as a string.
 
-std::string Session::added_headers_(Message const& msg)
+std::string Session::added_headers_(MessageStore const& msg)
 {
   auto const protocol{[this]() {
     if (smtputf8_)
@@ -657,7 +657,7 @@ bool Session::msg_new()
       alarm(5 * 60);
   }
 
-  msg_ = std::make_unique<Message>();
+  msg_ = std::make_unique<MessageStore>();
 
   if (!FLAGS_max_write)
     FLAGS_max_write = max_msg_size();

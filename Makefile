@@ -73,7 +73,7 @@ smtp_STEMS := smtp \
 	IP4 \
 	IP6 \
 	Mailbox \
-	Message \
+	MessageStore \
 	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
@@ -99,7 +99,7 @@ snd_STEMS := snd \
 	IP6 \
 	Magic \
 	Mailbox \
-	Message \
+	MessageStore \
 	OpenDKIM \
 	OpenDMARC \
 	POSIX \
@@ -134,7 +134,7 @@ TESTS := \
 	IP6-test \
 	Magic-test \
 	Mailbox-test \
-	Message-test \
+	MessageStore-test \
 	Now-test \
 	OpenDKIM-test \
 	POSIX-test \
@@ -163,7 +163,7 @@ IP4-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc
 IP6-test_STEMS := $(DNS) Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 Magic-test_STEMS := Magic
 Mailbox-test_STEMS := Mailbox Domain IP IP4 IP6 osutil
-Message-test_STEMS := $(DNS) Domain IP IP4 IP6 Message Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
+MessageStore-test_STEMS := $(DNS) Domain IP IP4 IP6 MessageStore Pill POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
@@ -182,7 +182,7 @@ Session-test_STEMS := \
 	IP4 \
 	IP6 \
 	Mailbox \
-	Message \
+	MessageStore \
 	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
@@ -298,3 +298,7 @@ check:: msg snd
 show::
 	llvm-profdata merge -sparse /tmp/smtp-profile/* -o smtp.profdata
 	llvm-cov show ./smtp -instr-profile=smtp.profdata
+
+init::
+	touch accept_domains bad_recipients bad_senders black ip-black temp_fail
+	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel

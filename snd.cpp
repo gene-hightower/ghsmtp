@@ -82,7 +82,7 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include "IP6.hpp"
 #include "Magic.hpp"
 #include "Mailbox.hpp"
-#include "Message.hpp"
+#include "MessageStore.hpp"
 #include "Now.hpp"
 #include "OpenDKIM.hpp"
 #include "Pill.hpp"
@@ -311,7 +311,7 @@ struct Connection {
 
   Connection(int fd_in, int fd_out, std::function<void(void)> read_hook)
     : sock(
-        fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+          fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
   {
   }
 };
@@ -640,9 +640,8 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     if (!FLAGS_local_address.empty()) {
       auto loc{sockaddr_in6{}};
       loc.sin6_family = AF_INET6;
-      if (1
-          != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
-                       reinterpret_cast<void*>(&loc.sin6_addr))) {
+      if (1 != inet_pton(AF_INET6, FLAGS_local_address.c_str(),
+                         reinterpret_cast<void*>(&loc.sin6_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv6 address";
       }
@@ -688,9 +687,8 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     if (!FLAGS_local_address.empty()) {
       auto loc{sockaddr_in{}};
       loc.sin_family = AF_INET;
-      if (1
-          != inet_pton(AF_INET, FLAGS_local_address.c_str(),
-                       reinterpret_cast<void*>(&loc.sin_addr))) {
+      if (1 != inet_pton(AF_INET, FLAGS_local_address.c_str(),
+                         reinterpret_cast<void*>(&loc.sin_addr))) {
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv4 address";
       }
@@ -1116,9 +1114,9 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
     for (auto const& mx : mxs) {
       if (std::holds_alternative<DNS::RR_MX>(mx)) {
         // RFC 7505 null MX record
-        if ((std::get<DNS::RR_MX>(mx).preference() == 0)
-            && (std::get<DNS::RR_MX>(mx).exchange().empty()
-                || (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
+        if ((std::get<DNS::RR_MX>(mx).preference() == 0) &&
+            (std::get<DNS::RR_MX>(mx).exchange().empty() ||
+             (std::get<DNS::RR_MX>(mx).exchange() == "."))) {
           LOG(INFO) << "domain " << domain << " does not accept mail";
           return receivers;
         }
@@ -1136,10 +1134,10 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
   // across multiple mail exchangers for a specific organization.
   std::shuffle(begin(mxs), end(mxs), std::random_device());
   std::sort(begin(mxs), end(mxs), [](auto const& a, auto const& b) {
-    if (std::holds_alternative<DNS::RR_MX>(a)
-        && std::holds_alternative<DNS::RR_MX>(b)) {
-      return std::get<DNS::RR_MX>(a).preference()
-             < std::get<DNS::RR_MX>(b).preference();
+    if (std::holds_alternative<DNS::RR_MX>(a) &&
+        std::holds_alternative<DNS::RR_MX>(b)) {
+      return std::get<DNS::RR_MX>(a).preference() <
+             std::get<DNS::RR_MX>(b).preference();
     }
     return false;
   });
@@ -1299,8 +1297,8 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   }
 
   // Perfer PLAIN mechanism.
-  if (std::find(begin(auth->second), end(auth->second), "PLAIN")
-      != end(auth->second)) {
+  if (std::find(begin(auth->second), end(auth->second), "PLAIN") !=
+      end(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
     auto const tok = fmt::format("\0{}\0{}"s, FLAGS_username, FLAGS_password);
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok) << "\r\n" << std::flush;
@@ -1311,8 +1309,8 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
     }
   }
   // The LOGIN SASL mechanism is obsolete.
-  else if (std::find(begin(auth->second), end(auth->second), "LOGIN")
-           != end(auth->second)) {
+  else if (std::find(begin(auth->second), end(auth->second), "LOGIN") !=
+           end(auth->second)) {
     LOG(INFO) << "C: AUTH LOGIN";
     cnn.sock.out() << "AUTH LOGIN\r\n" << std::flush;
     CHECK((parse<RFC5321::auth_login_username>(in)));
@@ -1466,14 +1464,14 @@ bool snd(fs::path                    config_path,
 
   auto const ext_chunking{FLAGS_use_chunking && cnn.has_extension("CHUNKING")};
 
-  auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking
-                            && cnn.has_extension("BINARYMIME")};
+  auto const ext_binarymime{FLAGS_use_binarymime && ext_chunking &&
+                            cnn.has_extension("BINARYMIME")};
 
-  auto const ext_deliverby{FLAGS_use_deliverby
-                           && cnn.has_extension("DELIVERBY")};
+  auto const ext_deliverby{FLAGS_use_deliverby &&
+                           cnn.has_extension("DELIVERBY")};
 
-  auto const ext_pipelining{FLAGS_use_pipelining
-                            && cnn.has_extension("PIPELINING")};
+  auto const ext_pipelining{FLAGS_use_pipelining &&
+                            cnn.has_extension("PIPELINING")};
 
   auto const ext_size{FLAGS_use_size && cnn.has_extension("SIZE")};
 
@@ -1565,8 +1563,8 @@ bool snd(fs::path                    config_path,
 
   std::string from = smtp_from_mbx.empty() ? from_mbx.as_string(enc)
                                            : smtp_from_mbx.as_string(enc);
-  std::string to = smtp_to_mbx.empty() ? to_mbx.as_string(enc)
-                                       : smtp_to_mbx.as_string(enc);
+  std::string to =
+      smtp_to_mbx.empty() ? to_mbx.as_string(enc) : smtp_to_mbx.as_string(enc);
 
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
@@ -1661,7 +1659,7 @@ bool snd(fs::path                    config_path,
     return true;
   }
 
-  auto msg = std::make_unique<Message>();
+  auto msg = std::make_unique<MessageStore>();
 
   // if service is smtp (i.e. sending real mail, not smtp-test)
   try {
@@ -1908,8 +1906,7 @@ int main(int argc, char* argv[])
       switch (us_addr_len) {
       case sizeof(sockaddr_in):
         PCHECK(inet_ntop(AF_INET, &us_addr.addr_in.sin_addr, us_addr_str,
-                         sizeof us_addr_str)
-               != nullptr);
+                         sizeof us_addr_str) != nullptr);
         if (IP4::is_private(us_addr_str))
           private_addr = true;
         else
@@ -1918,8 +1915,7 @@ int main(int argc, char* argv[])
 
       case sizeof(sockaddr_in6):
         PCHECK(inet_ntop(AF_INET6, &us_addr.addr_in6.sin6_addr, us_addr_str,
-                         sizeof us_addr_str)
-               != nullptr);
+                         sizeof us_addr_str) != nullptr);
         if (IP6::is_private(us_addr_str))
           private_addr = true;
         else
