@@ -24,7 +24,8 @@ public:
   std::string enc_bounce(bounce_address const& bounce_info) const;
 
   std::optional<reply_address>  dec_reply(std::string_view addr) const;
-  std::optional<bounce_address> dec_bounce(std::string_view addr) const;
+  std::optional<bounce_address> dec_bounce(std::string_view addr,
+                                           uint16_t         days_valid) const;
 
 private:
   // key info, secrets

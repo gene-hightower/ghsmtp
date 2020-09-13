@@ -8,8 +8,7 @@
 
 #include <cppcodec/base32_crockford.hpp>
 
-#include <snappy.h>
-
+#include <arpa/inet.h>
 #include <time.h>
 
 #include <glog/logging.h>
@@ -24,15 +23,9 @@ constexpr int hash_bytes_bounce = 4;
 constexpr int hash_bytes_reply  = 6;
 
 constexpr std::string_view SRS_PREFIX = "SRS0=";
+constexpr std::string_view REP_PREFIX = "REP=";
 
-template <typename Input>
-static std::string_view make_view(Input const& in)
-{
-  return std::string_view(reinterpret_cast<char const*>(begin(in)),
-                          std::distance(begin(in), end(in)));
-}
-
-std::string SRS0::enc_reply(SRS0::reply_address const& rep) const
+static std::string hash_rep(SRS0::reply_address const& rep)
 {
   auto const hb =
       fmt::format("{}{}{}", srs_secret, rep.mail_from, rep.rcpt_to_local_part);
@@ -40,17 +33,18 @@ std::string SRS0::enc_reply(SRS0::reply_address const& rep) const
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
 
-  auto hash_view = make_view(hash);
-  hash_view.remove_suffix(hash_view.size() - hash_bytes_reply);
+  return std::string(reinterpret_cast<char const*>(hash), hash_bytes_reply);
+}
 
-  auto const pkt = fmt::format("{}{}{}{}", hash_view, rep.mail_from, '\0',
+std::string SRS0::enc_reply(SRS0::reply_address const& rep) const
+{
+  auto const hash = hash_rep(rep);
+
+  auto const pkt = fmt::format("{}{}{}{}", hash, rep.mail_from, '\0',
                                rep.rcpt_to_local_part);
 
-  std::string compressed;
-  snappy::Compress(pkt.data(), pkt.size(), &compressed);
-
-  auto const b32 = cppcodec::base32_crockford::encode(compressed);
-  return fmt::format("{}{}", SRS_PREFIX, b32);
+  auto const b32 = cppcodec::base32_crockford::encode(pkt);
+  return fmt::format("{}{}", REP_PREFIX, b32);
 }
 
 static bool starts_with(std::string_view str, std::string_view prefix)
@@ -61,19 +55,17 @@ static bool starts_with(std::string_view str, std::string_view prefix)
 
 std::optional<SRS0::reply_address> SRS0::dec_reply(std::string_view addr) const
 {
-  if (!starts_with(addr, SRS_PREFIX)) {
-    LOG(WARNING) << addr << " not a valid SRS0 address";
+  if (!starts_with(addr, REP_PREFIX)) {
+    LOG(WARNING) << addr << " not a valid reply address";
     return {};
   }
-  addr.remove_prefix(SRS_PREFIX.length());
+  addr.remove_prefix(REP_PREFIX.length());
 
-  auto const compressed = cppcodec::base32_crockford::decode(addr);
+  auto const pktv = cppcodec::base32_crockford::decode(addr);
+  auto       pkt =
+      std::string(reinterpret_cast<char const*>(pktv.data()), pktv.size());
 
-  std::string pkt;
-  snappy::Uncompress(reinterpret_cast<char const*>(compressed.data()),
-                     compressed.size(), &pkt);
-
-  auto const hash_pfx = pkt.substr(0, hash_bytes_reply);
+  auto const hash = pkt.substr(0, hash_bytes_reply);
   pkt.erase(0, hash_bytes_reply);
 
   reply_address rep;
@@ -81,15 +73,9 @@ std::optional<SRS0::reply_address> SRS0::dec_reply(std::string_view addr) const
   pkt.erase(0, rep.mail_from.length() + 1);
   rep.rcpt_to_local_part = pkt;
 
-  auto const hb =
-      fmt::format("{}{}{}", srs_secret, rep.mail_from, rep.rcpt_to_local_part);
+  auto const hash_computed = hash_rep(rep);
 
-  unsigned char hash[picosha2::k_digest_size];
-  picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
-
-  auto const hash_view = make_view(hash);
-
-  if (!starts_with(hash_view, hash_pfx)) {
+  if (hash_computed != hash) {
     LOG(WARNING) << "hash check failed";
     return {};
   }
@@ -97,14 +83,80 @@ std::optional<SRS0::reply_address> SRS0::dec_reply(std::string_view addr) const
   return rep;
 }
 
-std::string SRS0::enc_bounce(SRS0::bounce_address const& bounce_info) const
+static auto posix_day() { return time(nullptr) / (60 * 60 * 24); }
+
+static std::string enc_posix_day()
 {
-  // stuff
-  return "";
+  auto const d = htons(static_cast<uint16_t>(posix_day()));
+  return std::string(reinterpret_cast<char const*>(&d), sizeof(d));
 }
 
-std::optional<SRS0::bounce_address>
-SRS0::dec_bounce(std::string_view addr) const
+static uint16_t dec_posix_day(std::string_view posix_day)
 {
-  return {};
+  return (static_cast<uint8_t>(posix_day[0]) * 0x100) +
+         static_cast<uint8_t>(posix_day[1]);
+}
+
+static std::string hash_bounce(SRS0::bounce_address const& bounce_info,
+                               std::string_view            timestamp)
+{
+  auto const hb =
+      fmt::format("{}{}{}", srs_secret, timestamp, bounce_info.mail_from);
+
+  unsigned char hash[picosha2::k_digest_size];
+  picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
+
+  return std::string(reinterpret_cast<char const*>(hash), hash_bytes_bounce);
+}
+
+std::string SRS0::enc_bounce(SRS0::bounce_address const& bounce_info) const
+{
+  auto const timestamp = enc_posix_day();
+
+  auto const hash = hash_bounce(bounce_info, timestamp);
+
+  auto const pkt =
+      fmt::format("{}{}{}", hash, timestamp, bounce_info.mail_from);
+
+  auto const b32 = cppcodec::base32_crockford::encode(pkt);
+
+  return fmt::format("{}{}", SRS_PREFIX, b32);
+}
+
+std::optional<SRS0::bounce_address> SRS0::dec_bounce(std::string_view addr,
+                                                     uint16_t days_valid) const
+{
+  if (!starts_with(addr, SRS_PREFIX)) {
+    LOG(WARNING) << addr << " not a valid SRS0 address";
+    return {};
+  }
+  addr.remove_prefix(SRS_PREFIX.length());
+
+  auto const pktv = cppcodec::base32_crockford::decode(addr);
+  auto       pkt =
+      std::string(reinterpret_cast<char const*>(pktv.data()), pktv.size());
+
+  auto const hash = pkt.substr(0, hash_bytes_bounce);
+  pkt.erase(0, hash_bytes_bounce);
+
+  auto const timestamp = pkt.substr(0, sizeof(uint16_t));
+  pkt.erase(0, sizeof(uint16_t));
+
+  bounce_address bounce_info = {pkt.c_str()};
+
+  auto const hash_computed = hash_bounce(bounce_info, timestamp);
+
+  if (hash_computed != hash) {
+    LOG(WARNING) << "hash check failed";
+    return {};
+  }
+
+  // FIXME in 120 years or so when these numbers wrap
+  auto const day = dec_posix_day(timestamp);
+  if ((posix_day() - day) > 10) {
+    LOG(WARNING) << "bounce address has expired";
+    return {};
+  }
+
+  return bounce_info;
 }

@@ -143,6 +143,7 @@ TESTS := \
 	Pill-test \
 	SPF-test \
 	SRS-test \
+	SRS0-test \
 	Send-test \
 	Session-test \
 	Sock-test \

@@ -17,14 +17,23 @@ int main(int argc, char* argv[])
 
   SRS0 srs;
 
-  auto const enc =
+  auto const rep_enc =
       srs.enc_reply(SRS0::reply_address{"foo@example.com", "local"});
 
-  std::cout << enc << '\n';
+  std::cout << rep_enc << '\n';
 
-  auto const dec = srs.dec_reply(enc);
-  if (dec) {
-    std::cout << dec->mail_from << '\n';
-    std::cout << dec->rcpt_to_local_part << '\n';
-  }
+  auto const rep_dec = srs.dec_reply(rep_enc);
+  CHECK(rep_dec);
+
+  std::cout << rep_dec->mail_from << '\n';
+  std::cout << rep_dec->rcpt_to_local_part << '\n';
+
+  auto const bnc_enc = srs.enc_bounce(SRS0::bounce_address{"foo@example.com"});
+
+  std::cout << bnc_enc << '\n';
+
+  auto const bnc_dec = srs.dec_bounce(bnc_enc, 10);
+  CHECK(bnc_dec);
+
+  std::cout << bnc_dec->mail_from << '\n';
 }
