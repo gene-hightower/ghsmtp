@@ -4,7 +4,6 @@
 
 #include "IP4.hpp"
 #include "IP6.hpp"
-#include "SRS.hpp"
 #include "imemstream.hpp"
 #include "message.hpp"
 #include "osutil.hpp"
@@ -779,17 +778,7 @@ Send::Send(fs::path config_path, char const* service)
 
 bool Send::mail_from(Mailbox const& mailbox)
 {
-  SRS srs;
-
-  auto const fwd =
-      srs.forward(mailbox.as_string().c_str(), sender_.ascii().c_str());
-
-  if (Mailbox::validate(fwd))
-    // If the SRS2 algo works, fine
-    mail_from_ = Mailbox(fwd);
-  else
-    // Otherwise, use a generic address
-    mail_from_ = Mailbox("noreply", sender_);
+  mail_from_ = mailbox;
 
   for (auto& [mx, conn] : exchangers_) {
     conn->mail_from.clear();
