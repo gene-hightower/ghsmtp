@@ -24,8 +24,6 @@ void MessageStore::open(std::string_view fqdn,
                         std::streamsize  max_size,
                         std::string_view folder)
 {
-  max_size_ = max_size;
-
   auto maildir = locate_maildir();
 
   if (!folder.empty()) {
@@ -51,6 +49,9 @@ void MessageStore::open(std::string_view fqdn,
   // open
   ofs_.exceptions(std::ifstream::failbit | std::ifstream::badbit);
   ofs_.open(tmpfn_);
+
+  max_size_ = max_size;
+  size_     = 0;
 }
 
 std::ostream& MessageStore::write(char const* s, std::streamsize count)
@@ -82,6 +83,12 @@ std::string_view MessageStore::freeze()
 {
   try_close_();
   error_code ec;
+  if (fs::exists(tmp2fn_)) {
+    fs::remove(tmp2fn_, ec);
+    if (ec) {
+      LOG(WARNING) << "problem removing " << tmp2fn_ << ": " << ec;
+    }
+  }
   rename(tmpfn_, tmp2fn_, ec);
   if (ec) {
     LOG(ERROR) << "can't rename " << tmpfn_ << " to " << tmp2fn_ << ": " << ec;
@@ -92,7 +99,7 @@ std::string_view MessageStore::freeze()
   return std::string_view(mapping_.data(), mapping_.size());
 }
 
-fs::path MessageStore::deliver()
+void MessageStore::deliver()
 {
   if (size_error()) {
     LOG(WARNING) << "message size error: " << size() << " exceeds "
@@ -113,21 +120,9 @@ fs::path MessageStore::deliver()
   else {
     LOG(ERROR) << "failed to deliver " << newfn_;
   }
-
-  if (fs::exists(tmp2fn_)) {
-    fs::remove(tmp2fn_, ec);
-    if (ec) {
-      LOG(ERROR) << "can't remove " << tmp2fn_ << ": " << ec;
-    }
-  }
-
-  if (mapping_.is_open())
-    mapping_.close();
-
-  return newfn_;
 }
 
-void MessageStore::trash()
+void MessageStore::close()
 {
   try_close_();
 
@@ -141,5 +136,8 @@ void MessageStore::trash()
     if (ec) {
       LOG(ERROR) << "can't remove " << tmp2fn_ << ": " << ec;
     }
+  }
+  if (mapping_.is_open()) {
+    mapping_.close();
   }
 }

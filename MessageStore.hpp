@@ -26,14 +26,16 @@ public:
     return write(s.data(), s.length());
   }
 
+  void deliver();
+  void close();
+  void trash() { close(); }
+
+  std::string_view freeze();
+
   bool            size_error() const { return size_error_; }
   std::streamsize size() const { return size_; }
   std::streamsize max_size() const { return max_size_; }
   std::streamsize size_left() const { return max_size() - size(); }
-
-  std::string_view freeze();
-  fs::path         deliver();
-  void             trash();
 
 private:
   Pill s_;
