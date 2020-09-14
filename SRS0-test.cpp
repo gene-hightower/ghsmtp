@@ -1,5 +1,7 @@
 #include "SRS0.hpp"
 
+#include "osutil.hpp"
+
 #include <iostream>
 
 #include <fmt/format.h>
@@ -15,7 +17,9 @@ int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  SRS0 srs;
+  fs::path config_path = osutil::get_config_dir();
+
+  SRS0 srs(config_path);
 
   auto const rep_enc =
       srs.enc_reply(SRS0::from_to{"reply@example.com", "local-A"});

@@ -11,9 +11,20 @@
 
 class SRS0 {
 public:
+  SRS0(fs::path config_path)
+    : config_path_(config_path)
+  {
+  }
+
   struct from_to {
     std::string mail_from;          // from
     std::string rcpt_to_local_part; // @our-domain.com
+
+    bool operator==(from_to const& rhs) const
+    {
+      return (mail_from == rhs.mail_from) &&
+             (rcpt_to_local_part == rhs.rcpt_to_local_part);
+    }
   };
 
   std::string enc_reply(from_to const& reply_info) const;
@@ -25,6 +36,7 @@ public:
 
 private:
   // key info, secrets
+  fs::path config_path_;
 };
 
 #endif // SRS0_DOT_HPP
