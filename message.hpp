@@ -50,6 +50,13 @@ struct parsed {
 
   std::string_view body;
 
+  // Parsing of the RFC-5322.From header
+  std::vector<std::string> from_addrs;
+  std::string              dmarc_from_domain;
+
+  // New RFC5322.From
+  std::string new_22from;
+
   // New body
   std::string body_str;
 
@@ -63,16 +70,18 @@ struct parsed {
   std::vector<std::string> arc_hdrs;
 };
 
-void authentication(fs::path         config_path,
+bool authentication(fs::path         config_path,
                     char const*      domain,
                     message::parsed& msg);
 
 void dkim_check(fs::path config_path, char const* domain, message::parsed& msg);
 
-bool rewrite(fs::path         config_path,
-             Mailbox const&   mail_from,
+void remove_delivery_headers(message::parsed& msg);
+
+void rewrite(fs::path         config_path,
              Domain const&    sender,
-             message::parsed& msg);
+             message::parsed& msg,
+             std::string      mail_from);
 
 void print_spf_envelope_froms(char const* domain, message::parsed& msg);
 

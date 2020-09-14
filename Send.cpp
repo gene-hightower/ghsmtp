@@ -838,22 +838,11 @@ bool Send::rcpt_to(DNS::Resolver& res,
 
 bool Send::send(std::string_view msg_input)
 {
-  message::parsed msg;
-  if (!msg.parse(msg_input)) {
-    LOG(WARNING) << "failed to parse message";
-    return false;
-  }
-
-  if (!message::rewrite(config_path_, mail_from_, sender_, msg)) {
-    LOG(WARNING) << "failed to rewrite message";
-    return false;
-  }
-
   // FIXME this should be done in parallel
   for (auto& [dom, conn] : exchangers_) {
     if (!conn->rcpt_to.empty()) {
-      auto const msg_str = msg.as_string();
-      auto       is{imemstream{msg_str.data(), msg_str.length()}};
+
+      auto is{imemstream{msg_input.data(), msg_input.length()}};
       if (!do_send(*conn, is)) {
         LOG(WARNING) << "failed to send to " << conn->server_id;
         return false;

@@ -20,11 +20,7 @@ public:
     std::string mail_from;          // from
     std::string rcpt_to_local_part; // @our-domain.com
 
-    bool operator==(from_to const& rhs) const
-    {
-      return (mail_from == rhs.mail_from) &&
-             (rcpt_to_local_part == rhs.rcpt_to_local_part);
-    }
+    inline bool operator==(from_to const& rhs) const;
   };
 
   std::string enc_reply(from_to const& reply_info) const;
@@ -38,5 +34,11 @@ private:
   // key info, secrets
   fs::path config_path_;
 };
+
+inline bool SRS0::from_to::operator==(from_to const& rhs) const
+{
+  return (mail_from == rhs.mail_from) &&
+         (rcpt_to_local_part == rhs.rcpt_to_local_part);
+}
 
 #endif // SRS0_DOT_HPP

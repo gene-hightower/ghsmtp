@@ -13,6 +13,7 @@
 #include "Mailbox.hpp"
 #include "MessageStore.hpp"
 #include "SPF.hpp"
+#include "SRS0.hpp"
 #include "Send.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
@@ -99,6 +100,7 @@ private:
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
+  void new_bounce_(std::string rev, std::string loc);
   void deliver_();
 
   // clear per transaction data, preserve per connection data
@@ -128,9 +130,11 @@ private:
   DNS::Resolver res_;
   Sock          sock_;
 
-  // forwarding
-  Send                 send_;
-  std::vector<Mailbox> fwd_path_; // for each "rcpt to"
+  // forwarding and replies
+  SRS0                       srs_;
+  Send                       send_;
+  std::vector<Mailbox>       fwd_path_; // for each "rcpt to"
+  std::vector<SRS0::from_to> rep_path_; // for each reply being forwarded
 
   // per connection/session
   Domain              server_identity_; // who we identify as

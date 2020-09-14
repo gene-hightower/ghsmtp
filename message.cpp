@@ -658,7 +658,9 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   }
 }
 
-static void add_authentication_results(fs::path         config_path,
+namespace message {
+
+bool authentication(fs::path         config_path,
                                        char const*      domain,
                                        message::parsed& msg)
 {
@@ -716,27 +718,14 @@ static void add_authentication_results(fs::path         config_path,
     }
   }
 
-  /*
-    <https://tools.ietf.org/html/rfc7489#section-6.6>
-    6.6.1.  Extract Author Domain
-
-    The case of a syntactically valid multi-valued RFC5322.From field
-    presents a particular challenge.  The process in this case is to
-    apply the DMARC check using each of those domains found in the
-    RFC5322.From field as the Author Domain and apply the most strict
-    policy selected among the checks that fail.
-
-  */
-
   // Should be only one From:
-  std::vector<std::string> addr_specs;
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
       hdr != end(msg.headers)) {
     auto const from_str = make_string(hdr->value);
 
     memory_input<> from_in(from_str, "from");
     if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
-            from_in, addr_specs)) {
+            from_in, msg.from_addrs)) {
       LOG(WARNING) << "failed to parse From:" << from_str;
     }
 
@@ -749,33 +738,44 @@ static void add_authentication_results(fs::path         config_path,
     }
   }
 
-  // FIXME see of all the domains are the same in addr_specs, for
-  // right now just take the first domain.
-
-  std::string const dmarc_from_domain = [&addr_specs]() {
-    if (addr_specs.empty()) {
-      LOG(WARNING) << "RFC5322.From is missing or empty";
-      return ""s;
-    }
-    boost::trim(addr_specs[0]);
-    if (Mailbox::validate(addr_specs[0])) {
-      Mailbox from_mbx(addr_specs[0]);
-      return std::string(from_mbx.domain().ascii());
-    }
-    else {
-      LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
-                   << addr_specs[0] << "\"";
-    }
-    return ""s;
-  }();
-
-  if (dmarc_from_domain.empty()) {
-    LOG(WARNING) << "no from address";
+  if (msg.from_addrs.empty()) {
+    LOG(WARNING) << "No address in RFC5322.From header";
+    return false;
   }
-  else {
-    LOG(INFO) << "dmp.store_from_domain(\"" << dmarc_from_domain << "\")";
-    dmp.store_from_domain(dmarc_from_domain.c_str());
+
+  /*
+    <https://tools.ietf.org/html/rfc7489#section-6.6>
+    6.6.1.  Extract Author Domain
+
+    The case of a syntactically valid multi-valued RFC5322.From field
+    presents a particular challenge.  The process in this case is to
+    apply the DMARC check using each of those domains found in the
+    RFC5322.From field as the Author Domain and apply the most strict
+    policy selected among the checks that fail.
+
+  */
+
+  // FIXME
+  if (msg.from_addrs.size() > 1) {
+    LOG(WARNING) << "More than one address in RFC5322.From header";
   }
+
+  auto from_addr = msg.from_addrs[0];
+
+  boost::trim(from_addr);
+
+  if (!Mailbox::validate(from_addr)) {
+    LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: \""
+                 << from_addr << "\"";
+    // Maybe we can pick out a valid domain?
+    return false;
+  }
+
+  Mailbox from_mbx(from_addr);
+  msg.dmarc_from_domain = from_mbx.domain().ascii();
+
+  LOG(INFO) << "dmarc_from_domain == " << msg.dmarc_from_domain;
+  dmp.store_from_domain(msg.dmarc_from_domain.c_str());
 
   // Check each DKIM sig, inform DMARC processor, put in AR
 
@@ -800,13 +800,13 @@ static void add_authentication_results(fs::path         config_path,
 
   // Set DMARC status in AR
 
-  auto const dmarc_passed = dmp.query_dmarc(dmarc_from_domain.c_str());
+  auto const dmarc_passed = dmp.query_dmarc(msg.dmarc_from_domain.c_str());
 
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
 
   fmt::format_to(bfr, ";\r\n       dmarc={} header.from={}", dmarc_result,
-                 dmarc_from_domain);
+                 msg.dmarc_from_domain);
 
   // ARC
 
@@ -868,7 +868,7 @@ static void add_authentication_results(fs::path         config_path,
   auto const key_file = (config_path / selector).replace_extension("private");
   if (!fs::exists(key_file)) {
     LOG(WARNING) << "can't find key file " << key_file;
-    return;
+    return dmarc_passed;
   }
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
@@ -894,9 +894,9 @@ static void add_authentication_results(fs::path         config_path,
 
   LOG(INFO) << "check ARC status  == " << arv2.chain_status_str();
   LOG(INFO) << "check ARC custody == " << arv2.chain_custody_str();
-}
 
-namespace message {
+  return dmarc_passed;
+}
 
 void print_spf_envelope_froms(char const* file, message::parsed& msg)
 {
@@ -915,13 +915,8 @@ void print_spf_envelope_froms(char const* file, message::parsed& msg)
   }
 }
 
-bool rewrite(fs::path         config_path,
-             Mailbox const&   mail_from,
-             Domain const&    sender,
-             message::parsed& msg)
+void remove_delivery_headers(message::parsed& msg)
 {
-  LOG(INFO) << "rewrite";
-
   // Remove headers that are added by the "delivery agent"
   // aka (Session::added_headers_)
   msg.headers.erase(
@@ -932,87 +927,6 @@ bool rewrite(fs::path         config_path,
   msg.headers.erase(
       std::remove(msg.headers.begin(), msg.headers.end(), Delivered_To),
       msg.headers.end());
-
-  // munge RFC-5322.From address
-
-  std::string              new_from;
-  std::vector<std::string> addr_specs;
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
-      hdr != end(msg.headers)) {
-    auto const from_str = make_string(hdr->value);
-
-    memory_input<> from_in(from_str, "from");
-    if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
-            from_in, addr_specs)) {
-      LOG(WARNING) << "failed to parse From:" << from_str;
-    }
-
-    // Okay if parse fails after 1st valid addr_spec in From:
-    if (addr_specs.size() == 1) {
-      // msg.headers.erase(hdr);
-      new_from = fmt::format("From: was {} <no-reply@{}>", addr_specs[0],
-                             sender.ascii());
-      LOG(INFO) << "munged: " << new_from;
-      // FIXME parse new_from
-    }
-  }
-
-  // modify plain text body
-
-  if (iequal(msg.get_header(MIME_Version), "1.0") &&
-      istarts_with(msg.get_header(Content_Type), "text/plain;")) {
-    LOG(INFO) << "Adding footer to message body.";
-    msg.body_str = msg.body;
-    msg.body_str.append("\r\n\r\n\t-- Added Footer --\r\n");
-    msg.body = msg.body_str;
-  }
-  else {
-    LOG(INFO) << "Not adding footer to message body.";
-    LOG(INFO) << "MIME-Version == " << msg.get_header(MIME_Version);
-    LOG(INFO) << "Content-Type == " << msg.get_header(Content_Type);
-  }
-  LOG(INFO) << "body == " << msg.body;
-
-  auto const key_file = (config_path / selector).replace_extension("private");
-  if (!fs::exists(key_file)) {
-    LOG(WARNING) << "can't find key file " << key_file;
-    return false;
-  }
-
-  // DKIM sign
-
-  boost::iostreams::mapped_file_source priv;
-  priv.open(key_file);
-
-  auto const key_str = std::string(priv.data(), priv.size());
-
-  // Run our message through DKIM::sign
-  OpenDKIM::sign dks(key_str.c_str(), // textual data
-                     selector, sender.ascii().c_str(),
-                     OpenDKIM::sign::body_type::text);
-  for (auto const& header : msg.headers) {
-    dks.header(header.as_view());
-  }
-  dks.eoh();
-  dks.body(msg.body);
-  dks.eom();
-
-  fmt::memory_buffer bfr;
-  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
-  CHECK(msg.parse_hdr(msg.sig_str));
-
-  return true;
-}
-
-void authentication(fs::path         config_path,
-                    char const*      domain,
-                    message::parsed& msg)
-{
-  LOG(INFO) << "authentication";
-
-  if (!msg.body.empty()) {
-    add_authentication_results(config_path, domain, msg);
-  }
 }
 
 void dkim_check(fs::path config_path, char const* domain, message::parsed& msg)
@@ -1103,4 +1017,67 @@ std::string_view parsed::get_header(std::string_view name) const
   }
   return "";
 }
+
+void rewrite(fs::path         config_path,
+             Domain const&    sender,
+             message::parsed& msg,
+             std::string      mail_from)
+{
+  LOG(INFO) << "rewrite";
+
+  remove_delivery_headers(msg);
+
+  if (!mail_from.empty()) {
+    // munge RFC-5322.From address
+
+    msg.headers.erase(std::remove(msg.headers.begin(), msg.headers.end(), From),
+                      msg.headers.end());
+
+    msg.new_22from = mail_from;
+
+    CHECK(msg.parse_hdr(msg.new_22from));
+  }
+
+  // modify plain text body
+
+  if (iequal(msg.get_header(MIME_Version), "1.0") &&
+      istarts_with(msg.get_header(Content_Type), "text/plain;")) {
+    LOG(INFO) << "Adding footer to message body.";
+    msg.body_str = msg.body;
+    msg.body_str.append("\r\n\r\n\t-- Added Footer --\r\n");
+    msg.body = msg.body_str;
+  }
+  else {
+    LOG(INFO) << "Not adding footer to message body.";
+    LOG(INFO) << "MIME-Version == " << msg.get_header(MIME_Version);
+    LOG(INFO) << "Content-Type == " << msg.get_header(Content_Type);
+  }
+  LOG(INFO) << "body == " << msg.body;
+
+  auto const key_file = (config_path / selector).replace_extension("private");
+  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+
+  // DKIM sign
+
+  boost::iostreams::mapped_file_source priv;
+  priv.open(key_file);
+
+  auto const key_str = std::string(priv.data(), priv.size());
+
+  // Run our message through DKIM::sign
+  OpenDKIM::sign dks(key_str.c_str(), // textual data
+                     selector, sender.ascii().c_str(),
+                     OpenDKIM::sign::body_type::text);
+  for (auto const& header : msg.headers) {
+    dks.header(header.as_view());
+  }
+  dks.eoh();
+  dks.body(msg.body);
+  dks.eom();
+
+  fmt::memory_buffer bfr;
+  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
+  CHECK(msg.parse_hdr(msg.sig_str));
+}
+
 } // namespace message

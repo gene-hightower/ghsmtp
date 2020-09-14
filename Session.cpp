@@ -155,6 +155,7 @@ Session::Session(fs::path                  config_path,
   : config_path_(config_path)
   , res_(config_path)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
+  , srs_(config_path)
   , send_(config_path, "smtp")
 {
   auto accept_db_name  = config_path_ / "accept_domains";
@@ -459,7 +460,12 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   state_ = xact_step::rcpt;
 
-  send_.mail_from(reverse_path_);
+  // Don't leak receiver identities in bounce addresses.
+  SRS0::from_to bounce;
+  bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
+  auto const mail_from =
+      fmt::format("{}@{}", srs_.enc_bounce(bounce), server_identity_);
+  send_.mail_from(Mailbox(mail_from));
 }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
@@ -503,11 +509,20 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   // no check for dups, postfix doesn't
   forward_path_.emplace_back(std::move(forward_path));
 
-  auto const forward = forward_.find(forward_path_.back().as_string().c_str());
+  auto const rcpt_to_loc_str = forward_path_.back().local_part();
+  auto const rcpt_to_dom_str = forward_path_.back().domain().ascii();
+
+  auto const rcpt_to_str =
+      forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
+
+  auto const forward = forward_.find(rcpt_to_str.c_str());
   if (forward) {
-    Mailbox const fwd{forward->c_str()};
+    Mailbox const fwd(*forward);
     if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd) ==
         std::end(fwd_path_)) {
+
+      new_bounce_(*forward, rcpt_to_loc_str);
+
       std::string error_msg;
       if (!send_.rcpt_to(res_, fwd, error_msg)) {
         out_()
@@ -517,16 +532,58 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
         return;
       }
       fwd_path_.emplace_back(fwd);
-      LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">"
+      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">"
                 << " forwarding to == <" << fwd_path_.back() << ">";
     }
     else {
-      LOG(INFO) << "RCPT TO:<" << forward_path_.back()
-                << "> already forwarding";
+      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> already forwarding";
     }
   }
+  else if (auto reply = srs_.dec_reply(rcpt_to_str); reply) {
+
+    LOG(INFO) << "Reply! RCPT TO:<" << rcpt_to_str << ">";
+    LOG(INFO) << "reply->mail_from          == " << reply->mail_from;
+    LOG(INFO) << "reply->rcpt_to_local_part == " << reply->rcpt_to_local_part;
+
+#if 0
+    if (std::find(std::begin(rep_path_), std::end(rep_path_), *reply) ==
+        std::end(rep_path_)) {
+
+      auto const new_from =
+        fmt::format("{}@{}", reply->rcpt_to_local_str, server_identity_);
+      if (!send_.mail_from(new_from)) {
+        out_()
+            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+            << std::flush;
+        LOG(WARNING) << "failed to reply to <" << reply->mail_from << "> " << error_msg;
+        return;
+      }
+
+
+
+      std::string error_msg;
+      if (!send_.rcpt_to(res_, reply->mail_from, error_msg)) {
+        out_()
+            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+            << std::flush;
+        LOG(WARNING) << "failed to reply to <" << rep->mail_from << "> " << error_msg;
+        return;
+      }
+      fwd_path_.emplace_back(fwd);
+      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">"
+                << " forwarding to == <" << fwd_path_.back() << ">";
+    }
+    else {
+      LOG(INFO) << "RCPT TO:<" << rcpt_to_str
+                << "> already forwarding";
+    }
+
+
+    rep_path_.emplace_back(rep);
+#endif
+  }
   else {
-    LOG(INFO) << "RCPT TO:<" << forward_path_.back() << ">";
+    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
   }
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
@@ -827,10 +884,21 @@ bool Session::data_start()
   return true;
 }
 
+void Session::new_bounce_(std::string rev, std::string loc)
+{
+  // New bounce address
+  SRS0::from_to bounce;
+  bounce.mail_from          = rev;
+  bounce.rcpt_to_local_part = loc;
+
+  auto const mail_from =
+      fmt::format("{}@{}", srs_.enc_bounce(bounce), server_identity_);
+
+  send_.mail_from(Mailbox(mail_from));
+}
+
 void Session::deliver_()
 {
-  auto constexpr Return_Path = "Return-Path";
-
   CHECK(msg_);
 
   try {
@@ -840,28 +908,14 @@ void Session::deliver_()
     message::parsed msg;
     msg.parse(msg_data);
 
-    auto const return_path =
-        fmt::format("{}: <{}>", Return_Path, reverse_path_);
-
-    for (auto const& header : msg.headers) {
-      if (header == Return_Path) {
-        auto hs = header.as_string();
-        if (hs != return_path) {
-          LOG(INFO) << "old \"" << esc(hs) << "\"";
-          LOG(INFO) << "new \"" << esc(return_path) << "\"";
-        }
-      }
-    }
-
     // remove any Return-Path
-    msg.headers.erase(
-        std::remove(msg.headers.begin(), msg.headers.end(), Return_Path),
-        msg.headers.end());
+    message::remove_delivery_headers(msg);
 
-    message::authentication(config_path_, server, msg);
+    auto const authentic = message::authentication(config_path_, server, msg);
 
-    msg_->write(return_path);
-    msg_->write("\r\n");
+    // write a new Return-Path
+    msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
+
     for (auto const h : msg.headers) {
       msg_->write(h.as_string());
       msg_->write("\r\n");
@@ -871,18 +925,57 @@ void Session::deliver_()
       msg_->write(msg.body);
     }
 
-    auto const pth = msg_->deliver();
+    msg_->deliver();
 
-    if (!fwd_path_.empty()) {
-      boost::iostreams::mapped_file_source mfs;
-      mfs.open(pth);
-      if (send_.send(std::string_view(mfs.data(), mfs.size()))) {
-        LOG(INFO) << "successfully sent";
-      }
-      else {
-        LOG(WARNING) << "failed to send";
+    if (authentic && !fwd_path_.empty()) {
+      for (auto const& fwd_path : fwd_path_) {
+        auto msg_fwd = msg;
+
+        new_bounce_(reverse_path_.as_string(Mailbox::domain_encoding::ascii),
+                    fwd_path.local_part());
+
+        std::string errmsg;
+        if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
+          out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                    "stopped\r\n"
+                 << std::flush;
+          LOG(ERROR) << "failed to send for " << fwd_path;
+          msg_->trash();
+          reset_();
+          return;
+        }
+
+        // New RFC-5322.From address
+        SRS0::from_to reply;
+        reply.mail_from          = msg_fwd.dmarc_from_domain;
+        reply.rcpt_to_local_part = fwd_path.local_part();
+
+        // FIXME do something nice with the "friendly" (name) part
+
+        auto const rfc22_from =
+            fmt::format("{}@{}", srs_.enc_reply(reply), server_identity_);
+
+        // Munge the message
+        message::rewrite(config_path_, server_identity_, msg_fwd, rfc22_from);
+
+        // Forward it on
+        if (send_.send(msg_fwd.as_string())) {
+          LOG(INFO) << "successfully sent for " << fwd_path;
+        }
+        else {
+          out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                    "stopped\r\n"
+                 << std::flush;
+
+          LOG(ERROR) << "failed to send for " << fwd_path;
+          msg_->trash();
+          reset_();
+          return;
+        }
       }
     }
+
+    msg_->close();
   }
   catch (std::system_error const& e) {
     switch (errno) {
