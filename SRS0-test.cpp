@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
   SRS0 srs;
 
   auto const rep_enc =
-      srs.enc_reply(SRS0::reply_address{"foo@example.com", "local"});
+      srs.enc_reply(SRS0::from_to{"reply@example.com", "local-A"});
 
   std::cout << rep_enc << '\n';
 
@@ -28,7 +28,8 @@ int main(int argc, char* argv[])
   std::cout << rep_dec->mail_from << '\n';
   std::cout << rep_dec->rcpt_to_local_part << '\n';
 
-  auto const bnc_enc = srs.enc_bounce(SRS0::bounce_address{"foo@example.com"});
+  auto const bnc_enc =
+      srs.enc_bounce(SRS0::from_to{"noreply@example.com", "local-B"});
 
   std::cout << bnc_enc << '\n';
 

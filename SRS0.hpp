@@ -11,21 +11,17 @@
 
 class SRS0 {
 public:
-  struct reply_address {
+  struct from_to {
     std::string mail_from;          // from
     std::string rcpt_to_local_part; // @our-domain.com
   };
 
-  struct bounce_address {
-    std::string mail_from; // from
-  };
+  std::string enc_reply(from_to const& reply_info) const;
+  std::string enc_bounce(from_to const& bounce_info) const;
 
-  std::string enc_reply(reply_address const& reply_info) const;
-  std::string enc_bounce(bounce_address const& bounce_info) const;
-
-  std::optional<reply_address>  dec_reply(std::string_view addr) const;
-  std::optional<bounce_address> dec_bounce(std::string_view addr,
-                                           uint16_t         days_valid) const;
+  std::optional<from_to> dec_reply(std::string_view addr) const;
+  std::optional<from_to> dec_bounce(std::string_view addr,
+                                    uint16_t         days_valid) const;
 
 private:
   // key info, secrets

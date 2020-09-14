@@ -25,7 +25,7 @@ constexpr int hash_bytes_reply  = 6;
 constexpr std::string_view SRS_PREFIX = "SRS0=";
 constexpr std::string_view REP_PREFIX = "REP=";
 
-static std::string hash_rep(SRS0::reply_address const& rep)
+static std::string hash_rep(SRS0::from_to const& rep)
 {
   auto const hb =
       fmt::format("{}{}{}", srs_secret, rep.mail_from, rep.rcpt_to_local_part);
@@ -36,7 +36,7 @@ static std::string hash_rep(SRS0::reply_address const& rep)
   return std::string(reinterpret_cast<char const*>(hash), hash_bytes_reply);
 }
 
-std::string SRS0::enc_reply(SRS0::reply_address const& rep) const
+std::string SRS0::enc_reply(SRS0::from_to const& rep) const
 {
   auto const hash = hash_rep(rep);
 
@@ -53,7 +53,7 @@ static bool starts_with(std::string_view str, std::string_view prefix)
          (str.compare(0, prefix.size(), prefix) == 0);
 }
 
-std::optional<SRS0::reply_address> SRS0::dec_reply(std::string_view addr) const
+std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
 {
   if (!starts_with(addr, REP_PREFIX)) {
     LOG(WARNING) << addr << " not a valid reply address";
@@ -68,7 +68,7 @@ std::optional<SRS0::reply_address> SRS0::dec_reply(std::string_view addr) const
   auto const hash = pkt.substr(0, hash_bytes_reply);
   pkt.erase(0, hash_bytes_reply);
 
-  reply_address rep;
+  from_to rep;
   rep.mail_from = pkt.c_str();
   pkt.erase(0, rep.mail_from.length() + 1);
   rep.rcpt_to_local_part = pkt;
@@ -97,11 +97,11 @@ static uint16_t dec_posix_day(std::string_view posix_day)
          static_cast<uint8_t>(posix_day[1]);
 }
 
-static std::string hash_bounce(SRS0::bounce_address const& bounce_info,
-                               std::string_view            timestamp)
+static std::string hash_bounce(SRS0::from_to const& bounce,
+                               std::string_view     timestamp)
 {
-  auto const hb =
-      fmt::format("{}{}{}", srs_secret, timestamp, bounce_info.mail_from);
+  auto const hb = fmt::format("{}{}{}{}", srs_secret, timestamp,
+                              bounce.mail_from, bounce.rcpt_to_local_part);
 
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
@@ -109,22 +109,22 @@ static std::string hash_bounce(SRS0::bounce_address const& bounce_info,
   return std::string(reinterpret_cast<char const*>(hash), hash_bytes_bounce);
 }
 
-std::string SRS0::enc_bounce(SRS0::bounce_address const& bounce_info) const
+std::string SRS0::enc_bounce(SRS0::from_to const& bounce) const
 {
   auto const timestamp = enc_posix_day();
 
-  auto const hash = hash_bounce(bounce_info, timestamp);
+  auto const hash = hash_bounce(bounce, timestamp);
 
-  auto const pkt =
-      fmt::format("{}{}{}", hash, timestamp, bounce_info.mail_from);
+  auto const pkt = fmt::format("{}{}{}{}{}", hash, timestamp, bounce.mail_from,
+                               '\0', bounce.rcpt_to_local_part);
 
   auto const b32 = cppcodec::base32_crockford::encode(pkt);
 
   return fmt::format("{}{}", SRS_PREFIX, b32);
 }
 
-std::optional<SRS0::bounce_address> SRS0::dec_bounce(std::string_view addr,
-                                                     uint16_t days_valid) const
+std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
+                                              uint16_t         days_valid) const
 {
   if (!starts_with(addr, SRS_PREFIX)) {
     LOG(WARNING) << addr << " not a valid SRS0 address";
@@ -142,9 +142,12 @@ std::optional<SRS0::bounce_address> SRS0::dec_bounce(std::string_view addr,
   auto const timestamp = pkt.substr(0, sizeof(uint16_t));
   pkt.erase(0, sizeof(uint16_t));
 
-  bounce_address bounce_info = {pkt.c_str()};
+  from_to bounce;
+  bounce.mail_from = pkt.c_str();
+  pkt.erase(0, bounce.mail_from.length() + 1);
+  bounce.rcpt_to_local_part = pkt;
 
-  auto const hash_computed = hash_bounce(bounce_info, timestamp);
+  auto const hash_computed = hash_bounce(bounce, timestamp);
 
   if (hash_computed != hash) {
     LOG(WARNING) << "hash check failed";
@@ -158,5 +161,5 @@ std::optional<SRS0::bounce_address> SRS0::dec_bounce(std::string_view addr,
     return {};
   }
 
-  return bounce_info;
+  return bounce;
 }
