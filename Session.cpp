@@ -906,71 +906,76 @@ void Session::deliver_()
     auto const msg_data = msg_->freeze();
 
     message::parsed msg;
-    msg.parse(msg_data);
 
-    // remove any Return-Path
-    message::remove_delivery_headers(msg);
+    // Only deal in RFC-5322 Mail Objects.
+    bool const message_parsed = msg.parse(msg_data);
+    if (message_parsed) {
 
-    auto const authentic = message::authentication(config_path_, server, msg);
+      // remove any Return-Path
+      message::remove_delivery_headers(msg);
 
-    // write a new Return-Path
-    msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
+      auto const authentic =
+          message_parsed && message::authentication(config_path_, server, msg);
 
-    for (auto const h : msg.headers) {
-      msg_->write(h.as_string());
-      msg_->write("\r\n");
-    }
-    if (!msg.body.empty()) {
-      msg_->write("\r\n");
-      msg_->write(msg.body);
-    }
+      // write a new Return-Path
+      msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
 
-    msg_->deliver();
+      for (auto const h : msg.headers) {
+        msg_->write(h.as_string());
+        msg_->write("\r\n");
+      }
+      if (!msg.body.empty()) {
+        msg_->write("\r\n");
+        msg_->write(msg.body);
+      }
 
-    if (authentic && !fwd_path_.empty()) {
-      for (auto const& fwd_path : fwd_path_) {
-        auto msg_fwd = msg;
+      msg_->deliver();
 
-        new_bounce_(reverse_path_.as_string(Mailbox::domain_encoding::ascii),
-                    fwd_path.local_part());
+      if (authentic && !fwd_path_.empty()) {
+        for (auto const& fwd_path : fwd_path_) {
+          auto msg_fwd = msg;
 
-        std::string errmsg;
-        if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
-          out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-                    "stopped\r\n"
-                 << std::flush;
-          LOG(ERROR) << "failed to send for " << fwd_path;
-          msg_->trash();
-          reset_();
-          return;
-        }
+          new_bounce_(reverse_path_.as_string(Mailbox::domain_encoding::ascii),
+                      fwd_path.local_part());
 
-        // New RFC-5322.From address
-        SRS0::from_to reply;
-        reply.mail_from          = msg_fwd.dmarc_from_domain;
-        reply.rcpt_to_local_part = fwd_path.local_part();
+          std::string errmsg;
+          if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
+            out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                      "stopped\r\n"
+                   << std::flush;
+            LOG(ERROR) << "failed to send for " << fwd_path;
+            msg_->trash();
+            reset_();
+            return;
+          }
 
-        // FIXME do something nice with the "friendly" (name) part
+          // New RFC-5322.From address
+          SRS0::from_to reply;
+          reply.mail_from          = msg_fwd.dmarc_from_domain;
+          reply.rcpt_to_local_part = fwd_path.local_part();
 
-        auto const rfc22_from =
-            fmt::format("{}@{}", srs_.enc_reply(reply), server_identity_);
+          // FIXME do something nice with the "friendly" (name) part
 
-        // Munge the message
-        message::rewrite(config_path_, server_identity_, msg_fwd, rfc22_from);
+          auto const rfc22_from =
+              fmt::format("{}@{}", srs_.enc_reply(reply), server_identity_);
 
-        // Forward it on
-        if (send_.send(msg_fwd.as_string())) {
-          LOG(INFO) << "successfully sent for " << fwd_path;
-        }
-        else {
-          out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-                    "stopped\r\n"
-                 << std::flush;
+          // Munge the message
+          message::rewrite(config_path_, server_identity_, msg_fwd, rfc22_from);
 
-          LOG(ERROR) << "failed to send for " << fwd_path;
-          msg_->trash();
-          reset_();
-          return;
+          // Forward it on
+          if (send_.send(msg_fwd.as_string())) {
+            LOG(INFO) << "successfully sent for " << fwd_path;
+          }
+          else {
+            out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                      "stopped\r\n"
+                   << std::flush;
+
+            LOG(ERROR) << "failed to send for " << fwd_path;
+            msg_->trash();
+            reset_();
+            return;
+          }
         }
       }
     }
