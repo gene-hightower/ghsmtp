@@ -961,8 +961,13 @@ void Session::deliver_()
               fmt::format("From: Friendly Part <{}@{}>", srs_.enc_reply(reply),
                           server_identity_);
 
-          // Munge the message
-          message::rewrite(config_path_, server_identity_, msg_fwd, rfc22_from);
+          auto const reply_to =
+              fmt::format("Reply-To: Friendly Part <{}@{}>",
+                          srs_.enc_reply(reply), server_identity_);
+
+          // No munge the message
+          message::rewrite(config_path_, server_identity_, msg_fwd, "",
+                           reply_to);
 
           // Forward it on
           if (send_.send(msg_fwd.as_string())) {
