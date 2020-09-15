@@ -69,7 +69,8 @@ std::ostream& MessageStore::write(char const* s, std::streamsize count)
 void MessageStore::try_close_()
 {
   try {
-    ofs_.close();
+    if (ofs_.is_open())
+      ofs_.close();
   }
   catch (std::system_error const& e) {
     LOG(ERROR) << e.what() << "code: " << e.code();
