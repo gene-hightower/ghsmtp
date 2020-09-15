@@ -1569,8 +1569,8 @@ bool snd(fs::path                    config_path,
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
   if (FLAGS_use_dkim) {
-    auto const dom = Mailbox(from).domain().ascii().c_str();
-    sign_eml(eml, dom, bodies);
+    auto const dom = Mailbox(from).domain().ascii();
+    sign_eml(eml, dom.c_str(), bodies);
   }
 
   // Get the header as one big string
