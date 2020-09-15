@@ -661,8 +661,8 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 namespace message {
 
 bool authentication(fs::path         config_path,
-                                       char const*      domain,
-                                       message::parsed& msg)
+                    char const*      server,
+                    message::parsed& msg)
 {
   LOG(INFO) << "add_authentication_results";
   CHECK(!msg.headers.empty());
@@ -836,7 +836,7 @@ bool authentication(fs::path         config_path,
   }();
 
   msg.ar_str =
-      fmt::format("{}: {};{}", Authentication_Results, domain, ar_results);
+      fmt::format("{}: {};{}", Authentication_Results, server, ar_results);
 
   LOG(INFO) << "new AR header " << msg.ar_str;
   CHECK(msg.parse_hdr(msg.ar_str));
@@ -873,7 +873,7 @@ bool authentication(fs::path         config_path,
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
-  if (ars.seal(domain, selector, domain, priv.data(), priv.size(),
+  if (ars.seal(server, selector, server, priv.data(), priv.size(),
                ar_results.c_str())) {
     msg.arc_hdrs = ars.whole_seal();
     for (auto const& hdr : msg.arc_hdrs) {
