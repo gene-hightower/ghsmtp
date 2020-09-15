@@ -584,9 +584,6 @@ open_session(DNS::Resolver& res,
 
 bool do_mail_from(SMTP::Connection& conn, Mailbox from)
 {
-  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
-                                      "mail_from"}};
-
   std::ostringstream param_stream;
   // param_stream << " SIZE=" << total_size;
 
@@ -606,6 +603,8 @@ bool do_mail_from(SMTP::Connection& conn, Mailbox from)
   LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
   conn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n"
                   << std::flush;
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
+                                      "mail_from"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
     LOG(ERROR) << "MAIL FROM: reply unparseable";
     return false;
@@ -631,11 +630,10 @@ bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
     return true;
   }
 
-  auto in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
-
   LOG(INFO) << "C: RCPT TO:<" << to << '>';
   conn.sock.out() << "RCPT TO:<" << to << ">\r\n" << std::flush;
+  auto in{
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
     LOG(ERROR) << "RCPT TO: reply unparseable";
     return false;
@@ -651,10 +649,9 @@ bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
 
 bool do_data(SMTP::Connection& conn, std::istream& is)
 {
-  auto in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "session"}};
   LOG(INFO) << "C: DATA";
   conn.sock.out() << "DATA\r\n" << std::flush;
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "data"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
     LOG(ERROR) << "DATA command reply unparseable";
     return false;
@@ -703,12 +700,12 @@ bool do_data(SMTP::Connection& conn, std::istream& is)
 
 bool do_bdat(SMTP::Connection& conn, std::istream& is)
 {
-  auto in =
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
   auto                  bdat_error = false;
   std::streamsize const bfr_size   = 1024 * 1024;
   iobuffer<char>        bfr(bfr_size);
 
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "bdat"};
   while (!is.eof()) {
     is.read(bfr.data(), bfr_size);
     auto const size_read = is.gcount();
@@ -752,19 +749,19 @@ bool do_send(SMTP::Connection& conn, std::istream& is)
 
 bool do_rset(SMTP::Connection& conn)
 {
-  auto in =
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rset"};
   LOG(INFO) << "C: RSET";
   conn.sock.out() << "RSET\r\n" << std::flush;
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rset"};
   return parse<SMTP::reply_lines, SMTP::action>(in, conn);
 }
 
 bool do_quit(SMTP::Connection& conn)
 {
-  auto in =
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "quit"};
   LOG(INFO) << "C: QUIT";
   conn.sock.out() << "QUIT\r\n" << std::flush;
+  auto in =
+      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "quit"};
   return parse<SMTP::reply_lines, SMTP::action>(in, conn);
 }
 
@@ -800,6 +797,8 @@ bool Send::rcpt_to(DNS::Resolver& res,
   if (auto rec = receivers_.find(to.domain()); rec != receivers_.end()) {
     if (auto ex = exchangers_.find(rec->second); ex != exchangers_.end()) {
       auto& conn = ex->second;
+      LOG(INFO) << "### found existing receiver";
+      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
       return do_rcpt_to(*conn, mail_from_, to);
     }
     LOG(ERROR) << "found a receiver but not an exchanger "
@@ -813,21 +812,23 @@ bool Send::rcpt_to(DNS::Resolver& res,
   for (auto& mx : mxs) {
     // Check for existing connection.
     if (auto ex = exchangers_.find(mx); ex != exchangers_.end()) {
-      LOG(INFO) << "found existing connection to " << mx;
+      LOG(INFO) << "### found existing connection to " << mx;
       receivers_.emplace(to.domain(), mx);
       auto& conn = ex->second;
+      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
       return do_rcpt_to(*conn, mail_from_, to);
     }
     // Open new connection.
     if (auto new_conn = open_session(res, config_path_, mail_from_.domain(), mx,
                                      service_.c_str());
         new_conn) {
-      LOG(INFO) << "opened new connection to " << mx;
+      LOG(INFO) << "### opened new connection to " << mx;
       exchangers_.emplace(mx, std::move(*new_conn));
       auto ex = exchangers_.find(mx);
       CHECK(ex != exchangers_.end());
       receivers_.emplace(to.domain(), mx);
       auto& conn = ex->second;
+      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
       return do_rcpt_to(*conn, mail_from_, to);
     }
   }
