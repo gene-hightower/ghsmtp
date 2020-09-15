@@ -1033,8 +1033,8 @@ void rewrite(fs::path         config_path,
     msg.headers.erase(std::remove(msg.headers.begin(), msg.headers.end(), From),
                       msg.headers.end());
 
-    msg.new_22from = mail_from;
-    CHECK(msg.parse_hdr(msg.new_22from));
+    msg.from_str = mail_from;
+    CHECK(msg.parse_hdr(msg.from_str));
   }
 
   if (!reply_to.empty()) {
@@ -1042,8 +1042,8 @@ void rewrite(fs::path         config_path,
         std::remove(msg.headers.begin(), msg.headers.end(), Reply_To),
         msg.headers.end());
 
-    msg.reply_to = reply_to;
-    CHECK(msg.parse_hdr(msg.reply_to));
+    msg.reply_to_str = reply_to;
+    CHECK(msg.parse_hdr(msg.reply_to_str));
   }
 
   // modify plain text body

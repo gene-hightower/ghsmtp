@@ -56,10 +56,10 @@ struct parsed {
   std::string              dmarc_from_domain;
 
   // RFC5322.Reply
-  std::string reply_to;
+  std::string reply_to_str;
 
   // New RFC5322.From
-  std::string new_22from;
+  std::string from_str;
 
   // New body
   std::string body_str;
