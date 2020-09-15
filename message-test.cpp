@@ -96,7 +96,10 @@ int main(int argc, char* argv[])
     auto const rfc22_from =
         fmt::format("From: {}@{}", srs.enc_reply(reply), server_identity);
 
-    message::rewrite(config_path, Domain(server_identity), msg, rfc22_from);
+    auto const reply_to =
+        fmt::format("Reply-To: {}@{}", srs.enc_reply(reply), server_identity);
+
+    message::rewrite(config_path, Domain(server_identity), msg, "", reply_to);
 
     std::cout << msg.as_string();
   }
@@ -151,7 +154,8 @@ int main(int argc, char* argv[])
     file.open(argv[a]);
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
-    rewrite(config_path, Domain(sender), msg, "noreply@digilicious.com");
+    rewrite(config_path, Domain(sender), msg, "bounce@digilicious.com",
+            "noreply@digilicious.com");
     std::cout << msg.as_string();
   }
 }
