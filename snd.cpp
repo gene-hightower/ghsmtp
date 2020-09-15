@@ -1180,8 +1180,8 @@ auto parse_mailboxes()
   FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_to);
 
   auto smtp_from_mbx{Mailbox{}};
-  auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "SMTP.from"}};
   if (!FLAGS_smtp_from.empty()) {
+    auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "SMTP.from"}};
     if (!parse<RFC5321::path_only, RFC5321::action>(smtp_from_in,
                                                     smtp_from_mbx)) {
       LOG(FATAL) << "bad MAIL FROM: address syntax <" << FLAGS_smtp_from << ">";
@@ -1193,8 +1193,8 @@ auto parse_mailboxes()
   }
 
   auto smtp_to_mbx{Mailbox{}};
-  auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "SMTP.to"}};
   if (!FLAGS_smtp_to.empty()) {
+    auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "SMTP.to"}};
     if (!parse<RFC5321::path_only, RFC5321::action>(smtp_to_in, smtp_to_mbx)) {
       LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to << ">";
     }
@@ -1561,10 +1561,10 @@ bool snd(fs::path                    config_path,
   auto enc = FLAGS_force_smtputf8 ? Mailbox::domain_encoding::utf8
                                   : Mailbox::domain_encoding::ascii;
 
-  std::string from = smtp_from_mbx.empty() ? from_mbx.as_string(enc)
-                                           : smtp_from_mbx.as_string(enc);
+  std::string from =
+      from_mbx.empty() ? smtp_from_mbx.as_string(enc) : from_mbx.as_string(enc);
   std::string to =
-      smtp_to_mbx.empty() ? to_mbx.as_string(enc) : smtp_to_mbx.as_string(enc);
+      to_mbx.empty() ? smtp_to_mbx.as_string(enc) : to_mbx.as_string(enc);
 
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
