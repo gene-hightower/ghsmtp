@@ -1317,7 +1317,7 @@ struct action<received_spf> {
         ctx.mb_loc.clear();
         ctx.mb_dom.clear();
       }
-      ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, nullptr);
+      ctx.dmp.store_spf(dom.c_str(), pol_spf, origin, "are you human?");
     }
 
     ctx.mb_list.clear();
@@ -1560,7 +1560,7 @@ struct action<message> {
       int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                           : DMARC_POLICY_DKIM_OUTCOME_FAIL;
 
-      ctx.dmp.store_dkim(domain, result, nullptr);
+      ctx.dmp.store_dkim(domain, result, "I am human");
     });
 
     ctx.dmp.query_dmarc(from_domain.ascii().c_str());
