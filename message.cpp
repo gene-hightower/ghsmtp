@@ -771,6 +771,7 @@ bool authentication(fs::path         config_path,
   }
 
   Mailbox from_mbx(from_addr);
+  msg.dmarc_from        = from_mbx.as_string(Mailbox::domain_encoding::ascii);
   msg.dmarc_from_domain = from_mbx.domain().ascii();
 
   LOG(INFO) << "dmarc_from_domain == " << msg.dmarc_from_domain;
@@ -1051,7 +1052,7 @@ void rewrite(fs::path         config_path,
     LOG(INFO) << "MIME-Version == " << msg.get_header(MIME_Version);
     LOG(INFO) << "Content-Type == " << msg.get_header(Content_Type);
   }
-  LOG(INFO) << "body == " << msg.body;
+  // LOG(INFO) << "body == " << msg.body;
 
   auto const key_file = (config_path / selector).replace_extension("private");
   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;

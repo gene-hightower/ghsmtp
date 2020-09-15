@@ -52,6 +52,7 @@ struct parsed {
 
   // Parsing of the RFC-5322.From header
   std::vector<std::string> from_addrs;
+  std::string              dmarc_from;
   std::string              dmarc_from_domain;
 
   // New RFC5322.From
