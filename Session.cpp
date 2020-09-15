@@ -510,10 +510,10 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   forward_path_.emplace_back(std::move(forward_path));
 
   auto const rcpt_to_loc_str = forward_path_.back().local_part();
-  auto const rcpt_to_dom_str = forward_path_.back().domain().ascii();
-
   auto const rcpt_to_str =
       forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
+
+  LOG(INFO) << "rcpt_to_str == " << rcpt_to_str;
 
   auto const forward = forward_.find(rcpt_to_str.c_str());
   if (forward) {
@@ -521,7 +521,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd) ==
         std::end(fwd_path_)) {
 
-      new_bounce_(*forward, rcpt_to_loc_str);
+      new_bounce_(rcpt_to_loc_str);
 
       std::string error_msg;
       if (!send_.rcpt_to(res_, fwd, error_msg)) {
@@ -546,6 +546,10 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     LOG(INFO) << "reply->rcpt_to_local_part == " << reply->rcpt_to_local_part;
 
 #if 0
+
+    /* Reply code on hold for right now.
+     */
+
     if (std::find(std::begin(rep_path_), std::end(rep_path_), *reply) ==
         std::end(rep_path_)) {
 
@@ -558,8 +562,6 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
         LOG(WARNING) << "failed to reply to <" << reply->mail_from << "> " << error_msg;
         return;
       }
-
-
 
       std::string error_msg;
       if (!send_.rcpt_to(res_, reply->mail_from, error_msg)) {
@@ -884,11 +886,11 @@ bool Session::data_start()
   return true;
 }
 
-void Session::new_bounce_(std::string rev, std::string loc)
+void Session::new_bounce_(std::string loc)
 {
   // New bounce address
   SRS0::from_to bounce;
-  bounce.mail_from          = rev;
+  bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
   bounce.rcpt_to_local_part = loc;
 
   auto const mail_from =
@@ -935,8 +937,7 @@ void Session::deliver_()
         for (auto const& fwd_path : fwd_path_) {
           auto msg_fwd = msg;
 
-          new_bounce_(reverse_path_.as_string(Mailbox::domain_encoding::ascii),
-                      fwd_path.local_part());
+          new_bounce_(fwd_path.local_part());
 
           std::string errmsg;
           if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
@@ -951,13 +952,14 @@ void Session::deliver_()
 
           // New RFC-5322.From address
           SRS0::from_to reply;
-          reply.mail_from          = msg_fwd.dmarc_from_domain;
+          reply.mail_from          = msg_fwd.dmarc_from;
           reply.rcpt_to_local_part = fwd_path.local_part();
 
           // FIXME do something nice with the "friendly" (name) part
 
           auto const rfc22_from =
-              fmt::format("{}@{}", srs_.enc_reply(reply), server_identity_);
+              fmt::format("From: Friendly Part <{}@{}>", srs_.enc_reply(reply),
+                          server_identity_);
 
           // Munge the message
           message::rewrite(config_path_, server_identity_, msg_fwd, rfc22_from);

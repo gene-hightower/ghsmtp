@@ -100,7 +100,7 @@ private:
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
-  void new_bounce_(std::string rev, std::string loc);
+  void new_bounce_(std::string loc);
   void deliver_();
 
   // clear per transaction data, preserve per connection data

@@ -172,7 +172,7 @@ SRS0-test_STEMS := SRS0 osutil
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc message osutil
 
 osutil-test_STEMS := osutil
-message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC osutil
+message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill SRS0 osutil
 
 Session-test_STEMS := \
 	CDB \
