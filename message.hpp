@@ -82,7 +82,8 @@ void remove_delivery_headers(message::parsed& msg);
 void rewrite(fs::path         config_path,
              Domain const&    sender,
              message::parsed& msg,
-             std::string      mail_from);
+             std::string      mail_from,
+             std::string      reply_to);
 
 void print_spf_envelope_froms(char const* domain, message::parsed& msg);
 

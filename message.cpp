@@ -43,11 +43,12 @@ auto constexpr DKIM_Signature         = "DKIM-Signature";
 auto constexpr Delivered_To           = "Delivered-To";
 auto constexpr From                   = "From";
 auto constexpr Received_SPF           = "Received-SPF";
+auto constexpr Reply_To               = "Reply-To";
 auto constexpr Return_Path            = "Return-Path";
 
 // MIME headers
-auto constexpr MIME_Version = "MIME-Version";
 auto constexpr Content_Type = "Content-Type";
+auto constexpr MIME_Version = "MIME-Version";
 
 // SPF Results
 auto constexpr Pass      = "Pass";
@@ -1021,21 +1022,28 @@ std::string_view parsed::get_header(std::string_view name) const
 void rewrite(fs::path         config_path,
              Domain const&    sender,
              message::parsed& msg,
-             std::string      mail_from)
+             std::string      mail_from,
+             std::string      reply_to)
 {
   LOG(INFO) << "rewrite";
 
   remove_delivery_headers(msg);
 
   if (!mail_from.empty()) {
-    // munge RFC-5322.From address
-
     msg.headers.erase(std::remove(msg.headers.begin(), msg.headers.end(), From),
                       msg.headers.end());
 
     msg.new_22from = mail_from;
-
     CHECK(msg.parse_hdr(msg.new_22from));
+  }
+
+  if (!reply_to.empty()) {
+    msg.headers.erase(
+        std::remove(msg.headers.begin(), msg.headers.end(), Reply_To),
+        msg.headers.end());
+
+    msg.reply_to = reply_to;
+    CHECK(msg.parse_hdr(msg.reply_to));
   }
 
   // modify plain text body
