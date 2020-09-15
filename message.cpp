@@ -667,10 +667,9 @@ bool authentication(fs::path         config_path,
   LOG(INFO) << "add_authentication_results";
   CHECK(!msg.headers.empty());
 
+  // Run our message through OpenDKIM verify
+
   OpenDKIM::verify dkv;
-
-  // Run our message through ARC::verify and OpenDKIM verify
-
   for (auto header : msg.headers) {
     auto const hv = header.as_view();
     // LOG(INFO) << "header «" << esc(hv, esc_line_option::multi) << "»";
