@@ -1257,7 +1257,7 @@ auto create_eml(Domain const&               sender,
 }
 
 void sign_eml(Eml&                        eml,
-              Mailbox const&              from_mbx,
+              std::string const&          from_mbx,
               std::vector<content> const& bodies)
 {
   auto const body_type = (bodies[0].type() == data_type::binary)
@@ -1270,10 +1270,10 @@ void sign_eml(Eml&                        eml,
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string    key(std::istreambuf_iterator<char>{keyfs}, {});
-  OpenDKIM::sign dks(key.c_str(), FLAGS_selector.c_str(),
-                     from_mbx.domain().ascii().c_str(), body_type);
+  OpenDKIM::sign dks(key.c_str(), FLAGS_selector.c_str(), from_mbx.c_str(),
+                     body_type);
   eml.foreach_hdr([&dks](std::string const& name, std::string const& value) {
-    auto header = name + ": "s + value;
+    auto const header = name + ": "s + value;
     dks.header(header.c_str());
   });
   dks.eoh();
@@ -1569,7 +1569,7 @@ bool snd(fs::path                    config_path,
   auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
 
   if (FLAGS_use_dkim) {
-    sign_eml(eml, from_mbx, bodies);
+    sign_eml(eml, from, bodies);
   }
 
   // Get the header as one big string
