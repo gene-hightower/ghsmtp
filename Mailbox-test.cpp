@@ -6,7 +6,6 @@
 
 int main(int argc, char* argv[])
 {
-  Mailbox empty("");
   Mailbox postmaster("postmaster@[127.0.0.1]");
 
   Mailbox mb;
@@ -97,6 +96,17 @@ int main(int argc, char* argv[])
   CHECK(Mailbox::validate("gene@[127.0.0.1]"));
   CHECK(!Mailbox::validate("gene@[127.999.0.1]"));
   CHECK(!Mailbox::validate("allen@bad_d0main.com"));
+
+  {
+    auto const res = Mailbox::parse("gene@[127.0.0.1]");
+    CHECK(res && res->local_type == Mailbox::local_types::dot_string);
+    CHECK(res && res->domain_type == Mailbox::domain_types::address_literal);
+  }
+  {
+    auto const res = Mailbox::parse("\"some string\"@example.com");
+    CHECK(res && res->local_type == Mailbox::local_types::quoted_string);
+    CHECK(res && res->domain_type == Mailbox::domain_types::domain);
+  }
 
   CHECK(!Mailbox::validate("2962"));
   CHECK(Mailbox::validate("실례@실례.테스트"));
