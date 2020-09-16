@@ -62,7 +62,7 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
   }
 
   // If the local part of the mail_from contains a '=' fall back.
-  if (result.local.find(sep_char) != std::string_view::npos) {
+  if (result->local.find(sep_char) != std::string_view::npos) {
     return enc_reply_blob(rep);
   }
 
