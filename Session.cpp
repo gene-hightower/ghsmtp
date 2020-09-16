@@ -464,7 +464,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
   auto const mail_from =
-      srs_.enc_bounce(bounce, server_identity_.domain().ascii().c_str());
+      srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
   send_.mail_from(Mailbox(mail_from));
 }
 
@@ -894,7 +894,7 @@ void Session::new_bounce_(std::string loc)
   bounce.rcpt_to_local_part = loc;
 
   auto const mail_from =
-      fmt::format("{}@{}", srs_.enc_bounce(bounce), server_identity_);
+      srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
 
   send_.mail_from(Mailbox(mail_from));
 }
