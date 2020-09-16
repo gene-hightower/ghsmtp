@@ -14,7 +14,7 @@ SRS::SRS()
 
 SRS::~SRS() { srs_free(srs_); }
 
-std::string SRS::forward(char const* sender, char const* alias)
+std::string SRS::forward(char const* sender, char const* alias) const
 {
   if (!*sender)
     return sender;
@@ -23,12 +23,13 @@ std::string SRS::forward(char const* sender, char const* alias)
   return std::string(buf);
 }
 
-std::string SRS::reverse(char const* sender)
+std::string SRS::reverse(char const* sender) const
 {
   if (!*sender)
     return sender;
   char buf[1024]; // no longer than sender
-  CHECK_EQ(srs_reverse(srs_, buf, sizeof(buf), sender), SRS_SUCCESS);
+  CHECK_EQ(srs_reverse(srs_, buf, sizeof(buf), sender), SRS_SUCCESS)
+      << "sender == " << sender;
   return std::string(buf);
 }
 
