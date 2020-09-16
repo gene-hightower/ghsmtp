@@ -464,7 +464,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
   auto const mail_from =
-      srs_.enc_bounce(bounce, server_identity_.domain().ascii());
+      srs_.enc_bounce(bounce, server_identity_.domain().ascii().c_str());
   send_.mail_from(Mailbox(mail_from));
 }
 
