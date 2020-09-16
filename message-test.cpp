@@ -3,6 +3,7 @@
 #include "Now.hpp"
 #include "Pill.hpp"
 #include "SRS0.hpp"
+#include "esc.hpp"
 #include "osutil.hpp"
 
 #include <fmt/format.h>
@@ -81,15 +82,17 @@ int main(int argc, char* argv[])
   }();
 
   message::parsed msg;
-
-  bool const message_parsed = msg.parse(msg_str);
+  bool const      message_parsed = msg.parse(msg_str);
 
   if (message_parsed) {
     LOG(INFO) << "message parsed";
 
+    auto authentic = authentication(config_path, sender.c_str(), msg);
+
     SRS0 srs(config_path);
 
     SRS0::from_to reply;
+
     reply.mail_from          = msg.dmarc_from;
     reply.rcpt_to_local_part = "local-alias";
 
