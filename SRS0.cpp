@@ -27,6 +27,8 @@ constexpr int hash_bytes_reply  = 6;
 constexpr std::string_view SRS_PREFIX = "SRS0=";
 constexpr std::string_view REP_PREFIX = "REP=";
 
+constexpr char sep_char = '=';
+
 static std::string hash_rep(SRS0::from_to const& rep)
 {
   auto const hb =
@@ -51,16 +53,24 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
   if (!result) {
     throw std::invalid_argument("invalid mailbox syntax in enc_reply");
   }
+
+  // If it's "local part"@example.com or local-part@[127.0.0.1] we
+  // must fall back to the blob style.
   if ((result->local_type == Mailbox::local_types::quoted_string) ||
       (result->domain_type == Mailbox::domain_types::address_literal)) {
+    return enc_reply_blob(rep);
+  }
+
+  // If the local part of the mail_from contains a '=' fall back.
+  if (result.local.find(sep_char) != std::string_view::npos) {
     return enc_reply_blob(rep);
   }
 
   auto const mail_from = Mailbox(rep.mail_from);
 
   auto const payload =
-      fmt::format("{}={}={}", rep.rcpt_to_local_part, mail_from.local_part(),
-                  mail_from.domain().ascii());
+      fmt::format("{}{}{}{}{}", rep.rcpt_to_local_part, sep_char,
+                  mail_from.local_part(), sep_char, mail_from.domain().ascii());
 
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
@@ -68,7 +78,7 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
       std::string(reinterpret_cast<char*>(hash), hash_bytes_reply);
   auto const hash_enc = cppcodec::base32_crockford::encode(hash_str);
 
-  return fmt::format("{}{}={}", REP_PREFIX, hash_enc, payload);
+  return fmt::format("{}{}{}{}", REP_PREFIX, hash_enc, sep_char, payload);
 }
 
 static bool starts_with(std::string_view str, std::string_view prefix)
@@ -122,9 +132,9 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   //       ^1st                 ^2nd              ^last
   // and mail_from.local can contain '=' chars
 
-  auto const first_sep  = addr.find_first_of('=');
-  auto const last_sep   = addr.find_last_of('=');
-  auto const second_sep = addr.find_first_of('=', first_sep + 1);
+  auto const first_sep  = addr.find_first_of(sep_char);
+  auto const last_sep   = addr.find_last_of(sep_char);
+  auto const second_sep = addr.find_first_of(sep_char, first_sep + 1);
 
   if (first_sep == last_sep || second_sep == last_sep) {
     LOG(WARNING) << "unrecognized reply format " << addr;
@@ -144,8 +154,8 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
   auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
 
-  auto const payload =
-      fmt::format("{}={}={}", rcpt_to_loc, mail_from_loc, mail_from_dom);
+  auto const payload = fmt::format("{}{}{}{}{}", rcpt_to_loc, sep_char,
+                                   mail_from_loc, sep_char, mail_from_dom);
 
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
