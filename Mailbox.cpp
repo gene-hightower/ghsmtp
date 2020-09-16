@@ -132,66 +132,133 @@ struct mailbox_only : seq<mailbox, eof> {};
 // clang-format on
 // Actions
 
+template <typename Input>
+static std::string_view make_view(Input const& in)
+{
+  return std::string_view(in.begin(), std::distance(in.begin(), in.end()));
+}
+
 template <typename Rule>
 struct action : nothing<Rule> {
 };
 
 template <>
+struct action<dot_string> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  {
+    results.local_type = Mailbox::local_types::dot_string;
+  }
+};
+
+template <>
+struct action<quoted_string> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  {
+    results.local_type = Mailbox::local_types::quoted_string;
+  }
+};
+
+template <>
+struct action<domain> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  {
+    results.domain_type = Mailbox::domain_types::domain;
+  }
+};
+
+template <>
+struct action<address_literal> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  {
+    results.domain_type = Mailbox::domain_types::address_literal;
+  }
+};
+
+template <>
 struct action<local_part> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox& addr)
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
   {
-    addr.set_local(in.string());
+    results.local = make_view(in);
   }
 };
 
 template <>
 struct action<non_local_part> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox& addr)
+  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
   {
-    addr.set_domain(in.string());
+    results.domain = make_view(in);
   }
 };
 } // namespace RFC5321
 
+std::optional<Mailbox::mbx_parse_results>
+Mailbox::parse(std::string_view mailbox)
+{
+  mbx_parse_results results;
+  if (mailbox.empty())
+    return {};
+  memory_input<> mbx_in(mailbox, "mailbox");
+  if (tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
+                                                                results)) {
+    return results;
+  }
+  return {};
+}
+
 bool Mailbox::validate(std::string_view mailbox)
 {
-  Mailbox        mbx;
-  memory_input<> address_in(mailbox, "address");
+  mbx_parse_results results;
+  memory_input<>    mbx_in(mailbox, "mailbox");
   return !mailbox.empty() &&
-         parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx);
+         tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
+                                                                   results);
 }
 
 bool Mailbox::validate_strict_lengths(std::string_view mailbox)
 {
-  Mailbox        mbx;
-  memory_input<> address_in(mailbox, "address");
+  mbx_parse_results results;
+  memory_input<>    mbx_in(mailbox, "mailbox");
   return !mailbox.empty() &&
-         parse<RFC5321::mailbox_only, RFC5321::action>(address_in, mbx) &&
-         (mbx.local_part().length() <= 64) &&
-         (mbx.domain().ascii().length() <= 255);
+         tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
+                                                                   results) &&
+         (results.local.length() <= 64) && (results.domain.length() <= 255);
 }
 
 Mailbox::Mailbox(std::string_view mailbox)
 {
-  if (!mailbox.empty()) {
-    memory_input<> address_in(mailbox, "address");
-    if (!parse<RFC5321::mailbox_only, RFC5321::action>(address_in, *this)) {
-      LOG(ERROR) << "invalid mailbox syntax «" << mailbox << "»";
-      throw std::invalid_argument("invalid mailbox syntax");
-    }
+  if (mailbox.empty()) {
+    throw std::invalid_argument("empty mailbox string");
   }
+
+  mbx_parse_results results;
+  memory_input<>    mbx_in(mailbox, "mailbox");
+  if (!tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
+                                                                 results)) {
+    LOG(ERROR) << "invalid mailbox syntax «" << mailbox << "»";
+    throw std::invalid_argument("invalid mailbox syntax");
+  }
+
+  CHECK(results.local_type != local_types::unknown);
+  CHECK(results.domain_type != domain_types::unknown);
 
   // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
 
-  if (local_part().length() > 64) { // Section 4.5.3.1.1.  Local-part
+  if (results.local.length() > 64) { // Section 4.5.3.1.1.  Local-part
     LOG(WARNING) << "local part > 64 octets «" << mailbox << "»";
   }
-  if (domain().ascii().length() > 255) { // Section 4.5.3.1.2.
+  if (results.domain.length() > 255) { // Section 4.5.3.1.2.
     // Also RFC 2181 section 11. Name syntax
     LOG(WARNING) << "domain > 255 octets «" << mailbox << "»";
   }
+
+  set_local(results.local);
+  set_domain(results.domain);
 
   // FIXME
   // Check that each label is limited to between 1 and 63 octets.
