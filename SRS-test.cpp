@@ -23,9 +23,10 @@ int main(int argc, char* argv[])
   SRS srs;
 
   char const* sender = "gene@digilicious.com";
-  char const* alias  = "♥.digilicious.com";
-  // char const* alias  = "xn--g6h.digilicious.com";
-  char const* alias2 = "xn--g6h.digilicious.com";
+  // libsrs seems to choke on Unicode in the domain
+  // char const* alias  = "♥.digilicious.com";
+  char const* alias  = "xn--g6h.digilicious.com";
+  char const* alias2 = "xn--g6h.example.com";
 
   LOG(INFO) << "sender == " << sender;
   LOG(INFO) << "alias  == " << alias;
