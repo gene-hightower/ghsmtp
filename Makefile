@@ -3,7 +3,6 @@ USES := ldns libglog libidn2 opendkim openssl
 CXXFLAGS += -IPEGTL/include -Ijson/include -Icppcodec
 
 LDLIBS += \
-	-lopenarc \
 	-lboost_filesystem \
 	-lboost_iostreams \
 	-lboost_system \
@@ -11,9 +10,11 @@ LDLIBS += \
 	-lfmt \
 	-lgflags \
 	-lmagic \
+	-lopenarc \
 	-lopendmarc \
 	-lpsl \
 	-lspf2 \
+	-lsrs2 \
 	-lunistring
 
 PROGRAMS := dns_tool smtp msg sasl snd socks5
@@ -168,11 +169,11 @@ OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
-SRS0-test_STEMS := SRS0 osutil
+SRS0-test_STEMS := SRS0 osutil Domain IP IP4 IP6 Mailbox
 Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc message osutil
 
 osutil-test_STEMS := osutil
-message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill SRS0 osutil
+message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill SRS0 osutil esc
 
 Session-test_STEMS := \
 	CDB \
