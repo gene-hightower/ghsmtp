@@ -22,18 +22,21 @@ int main(int argc, char* argv[])
 
   SRS srs;
 
-  char const* sender = "\"gene\"@digilicious.com";
+  char const* sender = "gene@digilicious.com";
   char const* alias  = "♥.digilicious.com";
+  // char const* alias  = "xn--g6h.digilicious.com";
   char const* alias2 = "xn--g6h.digilicious.com";
-
-  auto const fwd  = srs.forward(sender, alias);
-  auto const fwd2 = srs.forward(fwd.c_str(), alias2);
-  auto const rev  = srs.reverse(fwd.c_str());
 
   LOG(INFO) << "sender == " << sender;
   LOG(INFO) << "alias  == " << alias;
+
+  auto const fwd = srs.forward(sender, alias);
   LOG(INFO) << "  fwd  == " << fwd;
+
+  auto const fwd2 = srs.forward(fwd.c_str(), alias2);
   LOG(INFO) << "  fwd2 == " << fwd2;
+
+  auto const rev = srs.reverse(fwd.c_str());
   LOG(INFO) << "   rev == " << rev;
 
   check_mbx(sender);
