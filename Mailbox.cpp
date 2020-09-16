@@ -145,7 +145,7 @@ struct action : nothing<Rule> {
 template <>
 struct action<dot_string> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.local_type = Mailbox::local_types::dot_string;
   }
@@ -154,7 +154,7 @@ struct action<dot_string> {
 template <>
 struct action<quoted_string> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.local_type = Mailbox::local_types::quoted_string;
   }
@@ -163,7 +163,7 @@ struct action<quoted_string> {
 template <>
 struct action<domain> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.domain_type = Mailbox::domain_types::domain;
   }
@@ -172,7 +172,7 @@ struct action<domain> {
 template <>
 struct action<address_literal> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.domain_type = Mailbox::domain_types::address_literal;
   }
@@ -181,7 +181,7 @@ struct action<address_literal> {
 template <>
 struct action<local_part> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.local = make_view(in);
   }
@@ -190,17 +190,16 @@ struct action<local_part> {
 template <>
 struct action<non_local_part> {
   template <typename Input>
-  static void apply(Input const& in, Mailbox::mbx_parse_results& results)
+  static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.domain = make_view(in);
   }
 };
 } // namespace RFC5321
 
-std::optional<Mailbox::mbx_parse_results>
-Mailbox::parse(std::string_view mailbox)
+std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
 {
-  mbx_parse_results results;
+  parse_results results;
   if (mailbox.empty())
     return {};
   memory_input<> mbx_in(mailbox, "mailbox");
@@ -213,8 +212,8 @@ Mailbox::parse(std::string_view mailbox)
 
 bool Mailbox::validate(std::string_view mailbox)
 {
-  mbx_parse_results results;
-  memory_input<>    mbx_in(mailbox, "mailbox");
+  parse_results  results;
+  memory_input<> mbx_in(mailbox, "mailbox");
   return !mailbox.empty() &&
          tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
                                                                    results);
@@ -222,8 +221,8 @@ bool Mailbox::validate(std::string_view mailbox)
 
 bool Mailbox::validate_strict_lengths(std::string_view mailbox)
 {
-  mbx_parse_results results;
-  memory_input<>    mbx_in(mailbox, "mailbox");
+  parse_results  results;
+  memory_input<> mbx_in(mailbox, "mailbox");
   return !mailbox.empty() &&
          tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
                                                                    results) &&
@@ -236,8 +235,8 @@ Mailbox::Mailbox(std::string_view mailbox)
     throw std::invalid_argument("empty mailbox string");
   }
 
-  mbx_parse_results results;
-  memory_input<>    mbx_in(mailbox, "mailbox");
+  parse_results  results;
+  memory_input<> mbx_in(mailbox, "mailbox");
   if (!tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
                                                                  results)) {
     LOG(ERROR) << "invalid mailbox syntax «" << mailbox << "»";

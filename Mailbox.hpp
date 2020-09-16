@@ -61,14 +61,14 @@ public:
     address_literal,
   };
 
-  struct mbx_parse_results {
+  struct parse_results {
     std::string_view local;
     std::string_view domain;
     local_types      local_type  = local_types::unknown;
     domain_types     domain_type = domain_types::unknown;
   };
 
-  static std::optional<mbx_parse_results> parse(std::string_view mailbox);
+  static std::optional<parse_results> parse(std::string_view mailbox);
 
   static bool validate(std::string_view mailbox);
   static bool validate_strict_lengths(std::string_view mailbox);
