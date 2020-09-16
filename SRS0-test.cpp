@@ -32,8 +32,8 @@ int main(int argc, char* argv[])
   std::cout << rep_dec->mail_from << '\n';
   std::cout << rep_dec->rcpt_to_local_part << '\n';
 
-  auto const bnc_enc =
-      srs.enc_bounce(SRS0::from_to{"noreply@example.com", "local-B"});
+  auto const bnc_enc = srs.enc_bounce(
+      SRS0::from_to{"noreply@example.com", "local-B"}, "sender.com");
 
   std::cout << bnc_enc << '\n';
 

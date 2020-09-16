@@ -1,6 +1,8 @@
 #ifndef SRS0_DOT_HPP
 #define SRS0_DOT_HPP
 
+#include "SRS.hpp"
+
 #include <optional>
 #include <string>
 #include <string_view>
@@ -24,7 +26,7 @@ public:
   };
 
   std::string enc_reply(from_to const& reply_info) const;
-  std::string enc_bounce(from_to const& bounce_info) const;
+  std::string enc_bounce(from_to const& bounce_info, char const* sender) const;
 
   std::optional<from_to> dec_reply(std::string_view addr) const;
   std::optional<from_to> dec_bounce(std::string_view addr,
@@ -33,6 +35,7 @@ public:
 private:
   // key info, secrets
   fs::path config_path_;
+  SRS      srs_;
 };
 
 inline bool SRS0::from_to::operator==(from_to const& rhs) const

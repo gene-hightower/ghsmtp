@@ -111,6 +111,15 @@ static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr)
   return rep;
 }
 
+static bool is_pure_base32(std::string_view s)
+{
+  auto constexpr alpha =
+      std::string_view(cppcodec::detail::base32_crockford_alphabet,
+                       sizeof(cppcodec::detail::base32_crockford_alphabet));
+  // If we can't find anything not in the base32 alphabet, it's pure
+  return s.find_first_not_of(alpha) == std::string_view::npos;
+}
+
 std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
 {
   if (!starts_with(addr, REP_PREFIX)) {
@@ -119,10 +128,7 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   }
   addr.remove_prefix(REP_PREFIX.length());
 
-  auto constexpr alpha =
-      std::string_view(cppcodec::detail::base32_crockford_alphabet,
-                       sizeof(cppcodec::detail::base32_crockford_alphabet));
-  if (addr.find_first_not_of(alpha) == std::string_view::npos) {
+  if (is_pure_base32(addr)) {
     // if everything after REP= is base32 we have a blob
     return dec_reply_blob(addr);
   }
@@ -201,25 +207,44 @@ static std::string hash_bounce(SRS0::from_to const& bounce,
   return std::string(reinterpret_cast<char const*>(hash), hash_bytes_bounce);
 }
 
-std::string SRS0::enc_bounce(SRS0::from_to const& bounce) const
+static std::string enc_bounce_blob(SRS0::from_to const& bounce,
+                                   char const*          sender)
 {
   auto const tstamp = enc_posix_day();
   auto const hash   = hash_bounce(bounce, tstamp);
   auto const pkt    = fmt::format("{}{}{}{}{}", hash, tstamp, bounce.mail_from,
                                '\0', bounce.rcpt_to_local_part);
   auto const b32    = cppcodec::base32_crockford::encode(pkt);
-  return fmt::format("{}{}", SRS_PREFIX, b32);
+  return fmt::format("{}{}@{}", SRS_PREFIX, b32, sender);
 }
 
-std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
-                                              uint16_t         days_valid) const
+std::string SRS0::enc_bounce(SRS0::from_to const& bounce,
+                             char const*          sender) const
 {
-  if (!starts_with(addr, SRS_PREFIX)) {
-    LOG(WARNING) << addr << " not a valid SRS0 address";
-    return {};
+  auto const result = Mailbox::parse(bounce.mail_from);
+  if (!result) {
+    throw std::invalid_argument("invalid mailbox syntax in enc_bounce");
   }
-  addr.remove_prefix(SRS_PREFIX.length());
 
+  // If it's "local part"@example.com or local-part@[127.0.0.1] we
+  // must fall back to the blob style.
+  if ((result->local_type == Mailbox::local_types::quoted_string) ||
+      (result->domain_type == Mailbox::domain_types::address_literal)) {
+    return enc_bounce_blob(bounce, sender);
+  }
+
+  /*
+  auto const for_srs = fmt::format("{}{}{}", bounce.rcpt_to_local_part,
+                                   sep_char, bounce.mail_from);
+  */
+  auto const for_srs = fmt::format("{}", bounce.mail_from);
+
+  return srs_.forward(for_srs.c_str(), sender);
+}
+
+static std::optional<SRS0::from_to> dec_bounce_blob(std::string_view addr,
+                                                    uint16_t         days_valid)
+{
   auto const pktv = cppcodec::base32_crockford::decode(addr);
   auto       pkt =
       std::string(reinterpret_cast<char const*>(pktv.data()), pktv.size());
@@ -229,7 +254,7 @@ std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
   auto const tstamp = pkt.substr(0, sizeof(uint16_t));
   pkt.erase(0, sizeof(uint16_t));
 
-  from_to bounce;
+  SRS0::from_to bounce;
   bounce.mail_from = pkt.c_str();
   pkt.erase(0, bounce.mail_from.length() + 1);
   bounce.rcpt_to_local_part = pkt;
@@ -249,4 +274,36 @@ std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
   }
 
   return bounce;
+}
+
+std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
+                                              uint16_t         days_valid) const
+{
+  if (!starts_with(addr, SRS_PREFIX)) {
+    LOG(WARNING) << addr << " not a valid SRS0 address";
+    return {};
+  }
+
+  if (is_pure_base32(
+          addr.substr(SRS_PREFIX.length(), std::string_view::npos))) {
+    // if everything after REP= is base32 we have a blob
+    return dec_bounce_blob(addr, days_valid);
+  }
+
+  auto const addr_str = std::string(addr.data(), addr.length());
+
+  auto const rev_str = srs_.reverse(addr_str.c_str());
+
+  /*
+  auto const first_sep = rev_str.find_first_of(sep_char);
+
+  SRS0::from_to dec;
+  dec.rcpt_to_local_part = rev_str.substr(0, first_sep);
+  dec.mail_from = rev_str.substr(first_sep + 1, std::string_view::npos);
+  */
+
+  SRS0::from_to dec;
+  dec.mail_from = rev_str;
+
+  return dec;
 }
