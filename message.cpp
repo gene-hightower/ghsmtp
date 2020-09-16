@@ -1048,6 +1048,7 @@ void rewrite(fs::path         config_path,
 
   // modify plain text body
 
+  /*
   if (iequal(msg.get_header(MIME_Version), "1.0") &&
       istarts_with(msg.get_header(Content_Type), "text/plain;")) {
     LOG(INFO) << "Adding footer to message body.";
@@ -1061,6 +1062,7 @@ void rewrite(fs::path         config_path,
     LOG(INFO) << "Content-Type == " << msg.get_header(Content_Type);
   }
   // LOG(INFO) << "body == " << msg.body;
+  */
 
   auto const key_file = (config_path / selector).replace_extension("private");
   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
