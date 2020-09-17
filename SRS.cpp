@@ -9,6 +9,7 @@
 SRS::SRS()
   : srs_(srs_new())
 {
+  CHECK_NOTNULL(srs_);
   add_secret(srs_secret);
 }
 
