@@ -1,5 +1,6 @@
 #include "SRS0.hpp"
 
+#include "Mailbox.hpp"
 #include "osutil.hpp"
 
 #include <iostream>
@@ -34,6 +35,7 @@ int main(int argc, char* argv[])
 
   for (auto const& test_case : test_cases) {
     auto const enc_rep = srs.enc_reply(test_case);
+    CHECK(Mailbox::validate(fmt::format("{}@x.y", enc_rep))) << enc_rep;
     auto const dec_rep = srs.dec_reply(enc_rep);
     if (!dec_rep || *dec_rep != test_case) {
       LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
@@ -47,6 +49,7 @@ int main(int argc, char* argv[])
 
   for (auto const& test_case : test_cases) {
     auto const enc_bnc = srs.enc_bounce(test_case, "sender.com");
+    CHECK(Mailbox::validate(enc_bnc)) << enc_bnc;
     auto const dec_bnc = srs.dec_bounce(enc_bnc, 3);
     if (!dec_bnc || dec_bnc->mail_from != test_case.mail_from) {
       LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
