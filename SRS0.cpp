@@ -56,13 +56,14 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
 
   // If it's "local part"@example.com or local-part@[127.0.0.1] we
   // must fall back to the blob style.
-  if ((result->local_type == Mailbox::local_types::quoted_string) ||
-      (result->domain_type == Mailbox::domain_types::address_literal)) {
+  if (result->local_type == Mailbox::local_types::quoted_string ||
+      result->domain_type == Mailbox::domain_types::address_literal) {
     return enc_reply_blob(rep);
   }
 
-  // If the local part of the mail_from contains a '=' fall back.
-  if (result->local.find(sep_char) != std::string_view::npos) {
+  // If any of the local parts contain a '=' fall back.
+  if (rep.rcpt_to_local_part.find(sep_char) != std::string_view::npos ||
+      rep.rcpt_to_local_part.find(sep_char) != std::string_view::npos) {
     return enc_reply_blob(rep);
   }
 
@@ -284,23 +285,24 @@ std::optional<SRS0::from_to> SRS0::dec_bounce(std::string_view addr,
     return {};
   }
 
-  if (is_pure_base32(
-          addr.substr(SRS_PREFIX.length(), std::string_view::npos))) {
-    // if everything after REP= is base32 we have a blob
-    return dec_bounce_blob(addr, days_valid);
+  auto const minus_prefix =
+      addr.substr(SRS_PREFIX.length(), std::string_view::npos);
+
+  auto const at_sign = minus_prefix.find_last_of('@');
+  if (at_sign == std::string_view::npos) {
+    LOG(WARNING) << addr << " not a valid SRS0 address";
+    return {};
+  }
+
+  auto const local_part = minus_prefix.substr(0, at_sign);
+
+  if (is_pure_base32(local_part)) {
+    return dec_bounce_blob(local_part, days_valid);
   }
 
   auto const addr_str = std::string(addr.data(), addr.length());
 
   auto const rev_str = srs_.reverse(addr_str.c_str());
-
-  /*
-  auto const first_sep = rev_str.find_first_of(sep_char);
-
-  SRS0::from_to dec;
-  dec.rcpt_to_local_part = rev_str.substr(0, first_sep);
-  dec.mail_from = rev_str.substr(first_sep + 1, std::string_view::npos);
-  */
 
   SRS0::from_to dec;
   dec.mail_from = rev_str;
