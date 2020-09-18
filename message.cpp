@@ -507,15 +507,27 @@ bool received_spf_parsed::parse(std::string_view input)
 // Parse a grammar and extract each addr_spec
 
 template <typename Rule>
-struct addr_specs_action : nothing<Rule> {
+struct mailbox_list_action : nothing<Rule> {
 };
 
 template <>
-struct addr_specs_action<addr_spec> {
+struct mailbox_list_action<display_name> {
   template <typename Input>
-  static void apply(Input const& in, std::vector<std::string>& addr_specs)
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
   {
-    addr_specs.push_back(in.string());
+    from_parsed.name = in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<addr_spec> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    from_parsed.name_addr_list.push_back({from_parsed.name, in.string()});
+    from_parsed.name.clear();
   }
 };
 
@@ -724,8 +736,8 @@ bool authentication(fs::path         config_path,
     auto const from_str = make_string(hdr->value);
 
     memory_input<> from_in(from_str, "from");
-    if (!parse<RFC5322::mailbox_list_only, RFC5322::addr_specs_action>(
-            from_in, msg.from_addrs)) {
+    if (!parse<RFC5322::mailbox_list_only, RFC5322::mailbox_list_action>(
+            from_in, msg.from_parsed)) {
       LOG(WARNING) << "failed to parse From:" << from_str;
     }
 
@@ -738,7 +750,7 @@ bool authentication(fs::path         config_path,
     }
   }
 
-  if (msg.from_addrs.empty()) {
+  if (msg.from_parsed.name_addr_list.empty()) {
     LOG(WARNING) << "No address in RFC5322.From header";
     return false;
   }
@@ -756,11 +768,11 @@ bool authentication(fs::path         config_path,
   */
 
   // FIXME
-  if (msg.from_addrs.size() > 1) {
+  if (msg.from_parsed.name_addr_list.size() > 1) {
     LOG(WARNING) << "More than one address in RFC5322.From header";
   }
 
-  auto from_addr = msg.from_addrs[0];
+  auto from_addr = msg.from_parsed.name_addr_list[0].addr;
 
   boost::trim(from_addr);
 

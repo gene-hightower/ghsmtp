@@ -33,6 +33,16 @@ struct header {
   std::string_view value;
 }; // namespace header
 
+struct name_addr {
+  std::string name;
+  std::string addr;
+};
+
+struct mailbox_name_addr_list {
+  std::string            name;
+  std::vector<name_addr> name_addr_list;
+};
+
 struct parsed {
   bool parse(std::string_view input);
   bool parse_hdr(std::string_view input);
@@ -51,9 +61,9 @@ struct parsed {
   std::string_view body;
 
   // Parsing of the RFC-5322.From header
-  std::vector<std::string> from_addrs;
-  std::string              dmarc_from;
-  std::string              dmarc_from_domain;
+  mailbox_name_addr_list from_parsed;
+  std::string            dmarc_from;
+  std::string            dmarc_from_domain;
 
   // RFC5322.Reply
   std::string reply_to_str;
