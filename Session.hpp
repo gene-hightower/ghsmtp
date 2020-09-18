@@ -17,6 +17,7 @@
 #include "Send.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
+#include "message.hpp"
 
 namespace Config {
 constexpr size_t kibibyte             = 1024;
@@ -101,7 +102,8 @@ private:
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
   void new_bounce_(std::string loc);
-  void deliver_();
+  void do_forward_(message::parsed& msg);
+  void do_deliver_();
 
   // clear per transaction data, preserve per connection data
   void reset_();
@@ -134,7 +136,9 @@ private:
   SRS0                       srs_;
   Send                       send_;
   std::vector<Mailbox>       fwd_path_; // for each "rcpt to"
-  std::vector<SRS0::from_to> rep_path_; // for each reply being forwarded
+
+  // std::vector<SRS0::from_to> rep_path_; // for each reply being forwarded
+  SRS0::from_to rep_path_; // should be only one reply
 
   // per connection/session
   Domain              server_identity_; // who we identify as

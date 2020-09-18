@@ -14,7 +14,6 @@
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
-#include "message.hpp"
 #include "osutil.hpp"
 
 #include <fmt/format.h>
@@ -540,49 +539,31 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     }
   }
   else if (auto reply = srs_.dec_reply(rcpt_to_str); reply) {
+    // Should be only one rep_path_
+    CHECK(rep_path_.mail_from.empty());
+    CHECK(rep_path_.rcpt_to_local_part.empty());
 
-    LOG(INFO) << "Reply! RCPT TO:<" << rcpt_to_str << ">";
-    LOG(INFO) << "reply->mail_from          == " << reply->mail_from;
-    LOG(INFO) << "reply->rcpt_to_local_part == " << reply->rcpt_to_local_part;
+    rep_path_ = *reply;
 
-#if 0
+    Mailbox const rep(rep_path_.mail_from);
 
-    /* Reply code on hold for right now.
-     */
+    auto const sender =
+        fmt::format("{}@{}", rep_path_.rcpt_to_local_part, server_identity_);
 
-    if (std::find(std::begin(rep_path_), std::end(rep_path_), *reply) ==
-        std::end(rep_path_)) {
+    new_bounce_(rep_path_.rcpt_to_local_part);
 
-      auto const new_from =
-        fmt::format("{}@{}", reply->rcpt_to_local_str, server_identity_);
-      if (!send_.mail_from(new_from)) {
-        out_()
-            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-            << std::flush;
-        LOG(WARNING) << "failed to reply to <" << reply->mail_from << "> " << error_msg;
-        return;
-      }
-
-      std::string error_msg;
-      if (!send_.rcpt_to(res_, reply->mail_from, error_msg)) {
-        out_()
-            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-            << std::flush;
-        LOG(WARNING) << "failed to reply to <" << rep->mail_from << "> " << error_msg;
-        return;
-      }
-      fwd_path_.emplace_back(fwd);
-      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">"
-                << " forwarding to == <" << fwd_path_.back() << ">";
-    }
-    else {
-      LOG(INFO) << "RCPT TO:<" << rcpt_to_str
-                << "> already forwarding";
+    std::string error_msg;
+    if (!send_.rcpt_to(res_, rep, error_msg)) {
+      out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+             << std::flush;
+      LOG(WARNING) << "failed to reply <" << rep_path_.mail_from << "> "
+                   << error_msg;
+      return;
     }
 
-
-    rep_path_.emplace_back(rep);
-#endif
+    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> is a reply to "
+              << rep_path_.mail_from << " from "
+              << rep_path_.rcpt_to_local_part;
   }
   else {
     LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
@@ -899,7 +880,71 @@ void Session::new_bounce_(std::string loc)
   send_.mail_from(Mailbox(mail_from));
 }
 
-void Session::deliver_()
+void Session::do_forward_(message::parsed& msg)
+{
+  for (auto const& fwd_path : fwd_path_) {
+    auto msg_fwd = msg;
+
+    new_bounce_(fwd_path.local_part());
+
+    std::string errmsg;
+    if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
+      out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                "stopped\r\n"
+             << std::flush;
+      LOG(ERROR) << "failed to send for " << fwd_path;
+      msg_->trash();
+      reset_();
+      return;
+    }
+
+    // Generate a reply address
+    SRS0::from_to reply;
+    reply.mail_from          = msg_fwd.dmarc_from;
+    reply.rcpt_to_local_part = fwd_path.local_part();
+
+    auto const reply_local = srs_.enc_reply(reply);
+
+    auto const reply_to = fmt::format("{}@{}", reply_local, server_identity_);
+
+    auto const munged_from_hdr =
+        fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_to);
+
+    // Otherwise, generate a Reply-To: address
+    auto const reply_to_hdr = fmt::format("Reply-To: {}", reply_to);
+
+    // Check DMARC policy, if p=reject on receiving domain, munge the
+    // from:
+
+    auto const munging = false;
+
+    if (munging) {
+      message::rewrite(config_path_, server_identity_, msg_fwd, munged_from_hdr,
+                       "");
+    }
+    else {
+      message::rewrite(config_path_, server_identity_, msg_fwd, "",
+                       reply_to_hdr);
+    }
+
+    // Forward it on
+    if (send_.send(msg_fwd.as_string())) {
+      LOG(INFO) << "successfully sent for " << fwd_path;
+    }
+    else {
+      out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+                "stopped\r\n"
+             << std::flush;
+
+      LOG(ERROR) << "failed to send for " << fwd_path;
+      msg_->trash();
+      reset_();
+      return;
+    }
+  }
+}
+
+void Session::do_deliver_()
 {
   CHECK(msg_);
 
@@ -934,56 +979,7 @@ void Session::deliver_()
       msg_->deliver();
 
       if (authentic && !fwd_path_.empty()) {
-        for (auto const& fwd_path : fwd_path_) {
-          auto msg_fwd = msg;
-
-          new_bounce_(fwd_path.local_part());
-
-          std::string errmsg;
-          if (!send_.rcpt_to(res_, fwd_path, errmsg)) {
-            out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-                      "stopped\r\n"
-                   << std::flush;
-            LOG(ERROR) << "failed to send for " << fwd_path;
-            msg_->trash();
-            reset_();
-            return;
-          }
-
-          // New RFC-5322.From address
-          SRS0::from_to reply;
-          reply.mail_from          = msg_fwd.dmarc_from;
-          reply.rcpt_to_local_part = fwd_path.local_part();
-
-          // FIXME do something nice with the "friendly" (name) part
-
-          auto const rfc22_from =
-              fmt::format("From: Friendly Part <{}@{}>", srs_.enc_reply(reply),
-                          server_identity_);
-
-          auto const reply_to =
-              fmt::format("Reply-To: Friendly Part <{}@{}>",
-                          srs_.enc_reply(reply), server_identity_);
-
-          // No munge the message
-          message::rewrite(config_path_, server_identity_, msg_fwd, "",
-                           reply_to);
-
-          // Forward it on
-          if (send_.send(msg_fwd.as_string())) {
-            LOG(INFO) << "successfully sent for " << fwd_path;
-          }
-          else {
-            out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-                      "stopped\r\n"
-                   << std::flush;
-
-            LOG(ERROR) << "failed to send for " << fwd_path;
-            msg_->trash();
-            reset_();
-            return;
-          }
-        }
+        do_forward_(msg);
       }
     }
 
@@ -1019,7 +1015,7 @@ void Session::data_done()
     return;
   }
 
-  deliver_();
+  do_deliver_();
 
   if (prdr_) {
     out_() << "353\r\n";
@@ -1132,7 +1128,7 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
-  deliver_();
+  do_deliver_();
 
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
 
@@ -1421,6 +1417,13 @@ bool Session::verify_ip_address_(std::string& error_msg)
     ip_whitelisted_ = true;
     client_fcrdns_.emplace_back("localhost");
     client_ = fmt::format("localhost {}", sock_.them_address_literal());
+    return true;
+  }
+
+  if (IP::is_private(sock_.them_address_literal())) {
+    LOG(INFO) << "local address whitelisted";
+    ip_whitelisted_ = true;
+    client_         = sock_.them_address_literal();
     return true;
   }
 
