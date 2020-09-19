@@ -240,7 +240,7 @@ void Session::reset_()
 
   binarymime_ = false;
   smtputf8_   = false;
-  prdr_       = false;
+  // prdr_     = false;
 
   if (msg_) {
     msg_.reset();
@@ -366,7 +366,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-RRVS\r\n"; // RFC 7293
     }
 
-    out_() << "250-PRDR\r\n"; // draft-hall-prdr-00.txt
+    // out_() << "250-PRDR\r\n"; // draft-hall-prdr-00.txt
 
     if (sock_.tls()) {
       // Check sasl sources for auth types.
@@ -459,12 +459,67 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   state_ = xact_step::rcpt;
 
-  // Don't leak receiver identities in bounce addresses.
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
   auto const mail_from =
       srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
   send_.mail_from(Mailbox(mail_from));
+}
+
+bool Session::forward_to_(std::string const& forward,
+                          std::string_view   rcpt_to_str)
+{
+  Mailbox const fwd(forward);
+  if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd) ==
+      std::end(fwd_path_)) {
+
+    new_bounce_(forward_path_.back().local_part());
+
+    std::string error_msg;
+    if (!send_.rcpt_to(res_, fwd, error_msg)) {
+      out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+             << std::flush;
+      LOG(WARNING) << "failed to forward <" << fwd << "> " << error_msg;
+      return false;
+    }
+    fwd_path_.emplace_back(fwd);
+    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">"
+              << " forwarding to == <" << fwd_path_.back() << ">";
+  }
+  else {
+    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> already forwarding";
+  }
+  return true;
+}
+
+bool Session::reply_to_(SRS0::from_to const& reply_info,
+                        std::string_view     rcpt_to_str)
+{
+  // Should be only one rep_path_
+  CHECK(rep_info_.mail_from.empty());
+  CHECK(rep_info_.rcpt_to_local_part.empty());
+
+  rep_info_ = reply_info;
+
+  Mailbox const rep(rep_info_.mail_from);
+
+  auto const sender =
+      fmt::format("{}@{}", rep_info_.rcpt_to_local_part, server_identity_);
+
+  new_bounce_(rep_info_.rcpt_to_local_part);
+
+  std::string error_msg;
+  if (!send_.rcpt_to(res_, rep, error_msg)) {
+    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+           << std::flush;
+    LOG(WARNING) << "failed to reply <" << rep_info_.mail_from << "> "
+                 << error_msg;
+    return false;
+  }
+
+  LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> is a reply to "
+            << rep_info_.mail_from << " from " << rep_info_.rcpt_to_local_part;
+  return true;
 }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
@@ -508,66 +563,21 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   // no check for dups, postfix doesn't
   forward_path_.emplace_back(std::move(forward_path));
 
-  auto const rcpt_to_loc_str = forward_path_.back().local_part();
   auto const rcpt_to_str =
       forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
 
-  LOG(INFO) << "rcpt_to_str == " << rcpt_to_str;
-
-  auto const forward = forward_.find(rcpt_to_str.c_str());
-  if (forward) {
-    Mailbox const fwd(*forward);
-    if (std::find(std::begin(fwd_path_), std::end(fwd_path_), fwd) ==
-        std::end(fwd_path_)) {
-
-      new_bounce_(rcpt_to_loc_str);
-
-      std::string error_msg;
-      if (!send_.rcpt_to(res_, fwd, error_msg)) {
-        out_()
-            << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-            << std::flush;
-        LOG(WARNING) << "failed to forward <" << fwd << "> " << error_msg;
-        return;
-      }
-      fwd_path_.emplace_back(fwd);
-      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">"
-                << " forwarding to == <" << fwd_path_.back() << ">";
-    }
-    else {
-      LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> already forwarding";
-    }
+  if (auto const forward = forward_.find(rcpt_to_str.c_str());
+      forward && !forward_to_(*forward, rcpt_to_str)) {
+    return;
   }
-  else if (auto reply = srs_.dec_reply(rcpt_to_str); reply) {
-    // Should be only one rep_path_
-    CHECK(rep_path_.mail_from.empty());
-    CHECK(rep_path_.rcpt_to_local_part.empty());
-
-    rep_path_ = *reply;
-
-    Mailbox const rep(rep_path_.mail_from);
-
-    auto const sender =
-        fmt::format("{}@{}", rep_path_.rcpt_to_local_part, server_identity_);
-
-    new_bounce_(rep_path_.rcpt_to_local_part);
-
-    std::string error_msg;
-    if (!send_.rcpt_to(res_, rep, error_msg)) {
-      out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-             << std::flush;
-      LOG(WARNING) << "failed to reply <" << rep_path_.mail_from << "> "
-                   << error_msg;
-      return;
-    }
-
-    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> is a reply to "
-              << rep_path_.mail_from << " from "
-              << rep_path_.rcpt_to_local_part;
+  else if (auto reply = srs_.dec_reply(rcpt_to_str);
+           reply && !reply_to_(*reply, rcpt_to_str)) {
+    return;
   }
   else {
     LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
   }
+
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
 
@@ -880,7 +890,7 @@ void Session::new_bounce_(std::string loc)
   send_.mail_from(Mailbox(mail_from));
 }
 
-void Session::do_forward_(message::parsed& msg)
+bool Session::do_forward_(message::parsed& msg)
 {
   for (auto const& fwd_path : fwd_path_) {
     auto msg_fwd = msg;
@@ -892,10 +902,8 @@ void Session::do_forward_(message::parsed& msg)
       out_() << "432 4.3.0 Recipient's incoming mail queue has been "
                 "stopped\r\n"
              << std::flush;
-      LOG(ERROR) << "failed to send for " << fwd_path;
-      msg_->trash();
-      reset_();
-      return;
+      LOG(ERROR) << "failed to send for " << fwd_path << " " << errmsg;
+      return false;
     }
 
     // Generate a reply address
@@ -919,12 +927,11 @@ void Session::do_forward_(message::parsed& msg)
     auto const munging = false;
 
     if (munging) {
-      message::rewrite(config_path_, server_identity_, msg_fwd, munged_from_hdr,
+      message::rewrite(config_path_, server_id_(), msg_fwd, munged_from_hdr,
                        "");
     }
     else {
-      message::rewrite(config_path_, server_identity_, msg_fwd, "",
-                       reply_to_hdr);
+      message::rewrite(config_path_, server_id_(), msg_fwd, "", reply_to_hdr);
     }
 
     // Forward it on
@@ -937,19 +944,91 @@ void Session::do_forward_(message::parsed& msg)
              << std::flush;
 
       LOG(ERROR) << "failed to send for " << fwd_path;
-      msg_->trash();
-      reset_();
-      return;
+      return false;
     }
   }
+
+  return true;
 }
 
-void Session::do_deliver_()
+bool Session::do_reply_(message::parsed& msg)
+{
+  CHECK(!rep_info_.empty());
+
+  Mailbox to_mbx(rep_info_.mail_from);
+  Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_id_());
+
+  send_.mail_from(from_mbx);
+
+  std::string errmsg;
+  if (!send_.rcpt_to(res_, to_mbx, errmsg)) {
+    out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+              "stopped\r\n"
+           << std::flush;
+    LOG(ERROR) << "failed to reply to " << rep_info_.mail_from << " " << errmsg;
+    return false;
+  }
+
+  auto reply = std::make_unique<MessageStore>();
+  reply->open(server_id_(), FLAGS_max_write, ".Drafts");
+
+  auto const date{Now{}};
+  auto const pill{Pill{}};
+  auto const mid_str =
+      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
+
+  fmt::memory_buffer bfr;
+
+  fmt::format_to(bfr, "From: <{}>\r\n", from_mbx);
+  fmt::format_to(bfr, "To: <{}>\r\n", to_mbx);
+
+  fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
+
+  fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
+
+  if (!msg.get_header(message::Subject).empty()) {
+    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::Subject));
+  }
+  else {
+    fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
+                   "Reply to your message");
+  }
+
+  if (!msg.get_header(message::In_Reply_To).empty()) {
+    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::In_Reply_To));
+  }
+
+  if (!msg.get_header(message::MIME_Version).empty() &&
+      msg.get_header(message::Content_Type).empty()) {
+    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::MIME_Version));
+    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::Content_Type));
+  }
+
+  reply.write(fmt::to_string(bfr));
+
+  if (!msg.body.empty()) {
+    reply.write("\r\n");
+    reply.write(msg.body);
+  }
+
+  auto const      msg_data = reply.freeze();
+  message::parsed msg_reply;
+  CHECK(msg_reply.parse(msg_data));
+
+  message::dkim_sign(msg_reply);
+
+  send_.send(msg_reply.as_string());
+  send_.quit();
+
+  return true;
+}
+
+bool Session::do_deliver_()
 {
   CHECK(msg_);
 
   try {
-    auto const server   = server_identity_.ascii().c_str();
+    auto const server   = server_id_().c_str();
     auto const msg_data = msg_->freeze();
 
     message::parsed msg;
@@ -979,7 +1058,12 @@ void Session::do_deliver_()
       msg_->deliver();
 
       if (authentic && !fwd_path_.empty()) {
-        do_forward_(msg);
+        if (!do_forward_(msg))
+          return false;
+      }
+      if (authentic && !rep_info_.empty()) {
+        if (!do_reply_(msg))
+          return false;
       }
     }
 
@@ -992,7 +1076,7 @@ void Session::do_deliver_()
       LOG(ERROR) << "no space";
       msg_->trash();
       reset_();
-      return;
+      return false;
 
     default:
       out_() << "550 5.0.0 mail system error\r\n" << std::flush;
@@ -1001,9 +1085,11 @@ void Session::do_deliver_()
       LOG(ERROR) << e.what();
       msg_->trash();
       reset_();
-      return;
+      return false;
     }
   }
+
+  return true;
 }
 
 void Session::data_done()
@@ -1017,12 +1103,12 @@ void Session::data_done()
 
   do_deliver_();
 
-  if (prdr_) {
-    out_() << "353\r\n";
-    for (auto fp : forward_path_) {
-      out_() << "250 2.1.5 RCPT TO OK\r\n";
-    }
-  }
+  // if (prdr_) {
+  //   out_() << "353\r\n";
+  //   for (auto fp : forward_path_) {
+  //     out_() << "250 2.1.5 RCPT TO OK\r\n";
+  //   }
+  // }
 
   {
     using namespace boost::xpressive;
@@ -1568,9 +1654,9 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername() && ((client_identity == server_identity_) ||
-                               (client_identity == "localhost") ||
-                               (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername() &&
+      ((client_identity == server_id_()) || (client_identity == "localhost") ||
+       (client_identity == "localhost.localdomain"))) {
 
     if ((sock_.them_address_literal() == IP4::loopback_literal) ||
         (sock_.them_address_literal() == IP6::loopback_literal)) {
@@ -1654,7 +1740,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     if ((accept_domains_.is_open() &&
          (accept_domains_.contains(sender.domain().ascii()) ||
           accept_domains_.contains(sender.domain().utf8()))) ||
-        (sender.domain() == server_identity_)) {
+        (sender.domain() == server_id_())) {
 
       // Ease up in test mode.
       if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
@@ -1840,10 +1926,12 @@ bool Session::verify_from_params_(parameters_t const& parameters)
       }
       smtputf8_ = true;
     }
-    else if (iequal(name, "PRDR")) {
-      LOG(INFO) << "using PRDR";
-      prdr_ = true;
-    }
+
+    // else if (iequal(name, "PRDR")) {
+    //   LOG(INFO) << "using PRDR";
+    //   prdr_ = true;
+    // }
+
     else if (iequal(name, "SIZE")) {
       if (value.empty()) {
         LOG(WARNING) << "SIZE parameter has no value.";
@@ -1926,7 +2014,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
     else {
       // If we have no list of domains to accept, at least take our own.
-      if (recipient.domain() == server_identity_) {
+      if (recipient.domain() == server_id_()) {
         return true;
       }
     }

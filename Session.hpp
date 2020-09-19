@@ -102,8 +102,11 @@ private:
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
   void new_bounce_(std::string loc);
-  void do_forward_(message::parsed& msg);
-  void do_deliver_();
+  bool forward_to_(std::string const& forward, std::string_view rcpt_to_str);
+  bool reply_to_(SRS0::from_to const& reply_info, std::string_view rcpt_to_str);
+  bool do_forward_(message::parsed& msg);
+  bool do_reply_(message::parsed& msg);
+  bool do_deliver_();
 
   // clear per transaction data, preserve per connection data
   void reset_();
@@ -137,8 +140,8 @@ private:
   Send                       send_;
   std::vector<Mailbox>       fwd_path_; // for each "rcpt to"
 
-  // std::vector<SRS0::from_to> rep_path_; // for each reply being forwarded
-  SRS0::from_to rep_path_; // should be only one reply
+  // std::vector<SRS0::from_to> rep_info_; // for each reply being forwarded
+  SRS0::from_to rep_info_; // should be only one reply
 
   // per connection/session
   Domain              server_identity_; // who we identify as
@@ -188,7 +191,7 @@ private:
   bool binarymime_{false};
   bool extensions_{false};
   bool smtputf8_{false};
-  bool prdr_{false};
+  // bool prdr_{false};
 
   // per connection
   bool fcrdns_whitelisted_{false};
