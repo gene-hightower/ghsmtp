@@ -23,6 +23,7 @@ public:
     std::string rcpt_to_local_part; // @our-domain.com
 
     inline bool operator==(from_to const& rhs) const;
+    inline bool empty() const;
   };
 
   std::string enc_reply(from_to const& reply_info) const;
@@ -42,6 +43,11 @@ inline bool SRS0::from_to::operator==(from_to const& rhs) const
 {
   return (mail_from == rhs.mail_from) &&
          (rcpt_to_local_part == rhs.rcpt_to_local_part);
+}
+
+inline bool SRS0::from_to::empty() const
+{
+  return mail_from.empty() && rcpt_to_local_part.empty();
 }
 
 #endif // SRS0_DOT_HPP
