@@ -46,8 +46,10 @@ int main(int argc, char* argv[])
 
   fmt::memory_buffer bfr;
   fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
-  fmt::format_to(bfr, "From: \"Gene Hightower\" <{}>\r\n", from.as_string());
-  fmt::format_to(bfr, "To: \"Gene Hightower\" <{}>\r\n", to.as_string());
+  fmt::format_to(bfr, "From: \"Gene Hightower\" <{}>\r\n",
+                 from.as_string(Mailbox::domain_encoding::utf8));
+  fmt::format_to(bfr, "To: \"Gene Hightower\" <{}>\r\n",
+                 to.as_string(Mailbox::domain_encoding::utf8));
   fmt::format_to(bfr, "Subject: Testing, one, two, three.\r\n");
   fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
   fmt::format_to(bfr, "Authentication-Results: {}; none\r\n", server_identity);
