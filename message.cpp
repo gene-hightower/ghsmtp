@@ -4,6 +4,11 @@
 // RFC5321.MailFrom   mailbox
 // RFC5322.From       mailbox-list
 
+// Reply-To:
+
+// MAIL FROM:<reverse-path>
+// RCPT TO:<forward-path>
+
 #include "message.hpp"
 
 #include "Mailbox.hpp"
@@ -32,23 +37,6 @@ using std::end;
 
 // DKIM key "selector"
 auto constexpr selector = "ghsmtp";
-
-// RFC-5322 header names
-auto constexpr ARC_Authentication_Results = "ARC-Authentication-Results";
-auto constexpr ARC_Message_Signature      = "ARC-Message-Signature";
-auto constexpr ARC_Seal                   = "ARC-Seal";
-
-auto constexpr Authentication_Results = "Authentication-Results";
-auto constexpr DKIM_Signature         = "DKIM-Signature";
-auto constexpr Delivered_To           = "Delivered-To";
-auto constexpr From                   = "From";
-auto constexpr Received_SPF           = "Received-SPF";
-auto constexpr Reply_To               = "Reply-To";
-auto constexpr Return_Path            = "Return-Path";
-
-// MIME headers
-auto constexpr Content_Type = "Content-Type";
-auto constexpr MIME_Version = "MIME-Version";
 
 // SPF Results
 auto constexpr Pass      = "Pass";
@@ -793,7 +781,7 @@ bool authentication(fs::path         config_path,
   // Check each DKIM sig, inform DMARC processor, put in AR
 
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
-                               char const* identity, char const* selector,
+                               char const* identity, char const* sel,
                                char const* b) {
     int const result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                               : DMARC_POLICY_DKIM_OUTCOME_FAIL;
@@ -807,7 +795,7 @@ bool authentication(fs::path         config_path,
 
     fmt::format_to(bfr, ";\r\n       dkim={}", human_result);
     fmt::format_to(bfr, " header.i={}", identity);
-    fmt::format_to(bfr, " header.s={}", selector);
+    fmt::format_to(bfr, " header.s={}", sel);
     fmt::format_to(bfr, " header.b=\"{}\"", bs);
   });
 
@@ -963,14 +951,14 @@ void dkim_check(fs::path config_path, char const* domain, message::parsed& msg)
   // Check each DKIM sig, inform DMARC processor, put in AR
 
   dkv.foreach_sig([](char const* domain, bool passed, char const* identity,
-                     char const* selector, char const* b) {
+                     char const* sel, char const* b) {
     auto const human_result = (passed ? "pass" : "fail");
 
     auto bs = std::string_view(b, strlen(b)).substr(0, 8);
 
     LOG(INFO) << "DKIM check bfor " << domain << " " << human_result;
     LOG(INFO) << " header.i=" << identity;
-    LOG(INFO) << " header.s=" << selector;
+    LOG(INFO) << " header.s=" << sel;
     LOG(INFO) << " header.b=\"" << bs << "\"";
   });
 }
@@ -1031,6 +1019,31 @@ std::string_view parsed::get_header(std::string_view name) const
   return "";
 }
 
+void dkim_sign(message::parsed& msg, char const* sender, fs::path key_file)
+{
+  CHECK(msg.sig_str.empty());
+
+  boost::iostreams::mapped_file_source priv;
+  priv.open(key_file);
+
+  auto const key_str = std::string(priv.data(), priv.size());
+
+  // Run our message through DKIM::sign
+  OpenDKIM::sign dks(key_str.c_str(), // textual data
+                     selector, sender, OpenDKIM::sign::body_type::text);
+  for (auto const& header : msg.headers) {
+    dks.header(header.as_view());
+  }
+  dks.eoh();
+  dks.body(msg.body);
+  dks.eom();
+
+  auto const sig = dks.getsighdr();
+
+  msg.sig_str = fmt::format("DKIM-Signature: {}", sig);
+  CHECK(msg.parse_hdr(msg.sig_str));
+}
+
 void rewrite(fs::path         config_path,
              Domain const&    sender,
              message::parsed& msg,
@@ -1079,27 +1092,7 @@ void rewrite(fs::path         config_path,
   auto const key_file = (config_path / selector).replace_extension("private");
   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
 
-  // DKIM sign
-
-  boost::iostreams::mapped_file_source priv;
-  priv.open(key_file);
-
-  auto const key_str = std::string(priv.data(), priv.size());
-
-  // Run our message through DKIM::sign
-  OpenDKIM::sign dks(key_str.c_str(), // textual data
-                     selector, sender.ascii().c_str(),
-                     OpenDKIM::sign::body_type::text);
-  for (auto const& header : msg.headers) {
-    dks.header(header.as_view());
-  }
-  dks.eoh();
-  dks.body(msg.body);
-  dks.eom();
-
-  fmt::memory_buffer bfr;
-  msg.sig_str = fmt::format("DKIM-Signature: {}", dks.getsighdr());
-  CHECK(msg.parse_hdr(msg.sig_str));
+  dkim_sign(msg, sender.ascii().c_str(), key_file);
 }
 
 } // namespace message

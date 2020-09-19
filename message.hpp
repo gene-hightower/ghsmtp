@@ -12,6 +12,26 @@
 #include "iequal.hpp"
 
 namespace message {
+
+// RFC-5322 header names
+auto constexpr ARC_Authentication_Results = "ARC-Authentication-Results";
+auto constexpr ARC_Message_Signature      = "ARC-Message-Signature";
+auto constexpr ARC_Seal                   = "ARC-Seal";
+
+auto constexpr Authentication_Results = "Authentication-Results";
+auto constexpr DKIM_Signature         = "DKIM-Signature";
+auto constexpr Delivered_To           = "Delivered-To";
+auto constexpr From                   = "From";
+auto constexpr In_Reply_To            = "In-Reply-To";
+auto constexpr Received_SPF           = "Received-SPF";
+auto constexpr Reply_To               = "Reply-To";
+auto constexpr Return_Path            = "Return-Path";
+auto constexpr Subject                = "Subject";
+
+// MIME headers
+auto constexpr Content_Type = "Content-Type";
+auto constexpr MIME_Version = "MIME-Version";
+
 struct header {
   header(std::string_view n, std::string_view v)
     : name(n)
@@ -91,6 +111,8 @@ bool authentication(fs::path         config_path,
 void dkim_check(fs::path config_path, char const* domain, message::parsed& msg);
 
 void remove_delivery_headers(message::parsed& msg);
+
+void dkim_sign(message::parsed& msg, char const* sender, fs::path key_file);
 
 void rewrite(fs::path         config_path,
              Domain const&    sender,
