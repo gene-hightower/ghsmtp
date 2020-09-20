@@ -26,6 +26,8 @@
 
 #include <syslog.h>
 
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
+
 using namespace std::string_literals;
 
 namespace Config {
@@ -915,7 +917,7 @@ bool Session::do_forward_(message::parsed& msg)
 
     auto const reply_to = fmt::format("{}@{}", reply_local, server_identity_);
 
-    auto const munged_from_hdr =
+    auto const from_hdr =
         fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_to);
 
     // Otherwise, generate a Reply-To: address
@@ -926,12 +928,17 @@ bool Session::do_forward_(message::parsed& msg)
 
     auto const munging = false;
 
+    auto const sender   = server_identity_.ascii().c_str();
+    auto const selector = FLAGS_selector.c_str();
+    auto const key_file =
+        (config_path_ / FLAGS_selector).replace_extension("private");
+    CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+
     if (munging) {
-      message::rewrite(config_path_, server_id_(), msg_fwd, munged_from_hdr,
-                       "");
+      message::rewrite(msg_fwd, from_hdr, "", sender, selector, key_file);
     }
     else {
-      message::rewrite(config_path_, server_id_(), msg_fwd, "", reply_to_hdr);
+      message::rewrite(msg_fwd, "", reply_to_hdr, sender, selector, key_file);
     }
 
     // Forward it on
@@ -956,7 +963,7 @@ bool Session::do_reply_(message::parsed& msg)
   CHECK(!rep_info_.empty());
 
   Mailbox to_mbx(rep_info_.mail_from);
-  Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_id_());
+  Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
 
   send_.mail_from(from_mbx);
 
@@ -975,7 +982,7 @@ bool Session::do_reply_(message::parsed& msg)
   auto const date{Now{}};
   auto const pill{Pill{}};
   auto const mid_str =
-      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
+      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity_);
 
   fmt::memory_buffer bfr;
 
@@ -1004,18 +1011,24 @@ bool Session::do_reply_(message::parsed& msg)
     fmt::format_to(bfr, "{}\r\n", msg.get_header(message::Content_Type));
   }
 
-  reply.write(fmt::to_string(bfr));
+  reply->write(fmt::to_string(bfr));
 
   if (!msg.body.empty()) {
-    reply.write("\r\n");
-    reply.write(msg.body);
+    reply->write("\r\n");
+    reply->write(msg.body);
   }
 
-  auto const      msg_data = reply.freeze();
+  auto const      msg_data = reply->freeze();
   message::parsed msg_reply;
   CHECK(msg_reply.parse(msg_data));
 
-  message::dkim_sign(msg_reply);
+  auto const sender   = server_identity_.ascii().c_str();
+  auto const selector = FLAGS_selector.c_str();
+  auto const key_file =
+      (config_path_ / FLAGS_selector).replace_extension("private");
+  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+
+  message::dkim_sign(msg_reply, sender, selector, key_file);
 
   send_.send(msg_reply.as_string());
   send_.quit();
@@ -1027,8 +1040,13 @@ bool Session::do_deliver_()
 {
   CHECK(msg_);
 
+  auto const sender   = server_identity_.ascii().c_str();
+  auto const selector = FLAGS_selector.c_str();
+  auto const key_file =
+      (config_path_ / FLAGS_selector).replace_extension("private");
+  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+
   try {
-    auto const server   = server_id_().c_str();
     auto const msg_data = msg_->freeze();
 
     message::parsed msg;
@@ -1041,7 +1059,8 @@ bool Session::do_deliver_()
       message::remove_delivery_headers(msg);
 
       auto const authentic =
-          message_parsed && message::authentication(config_path_, server, msg);
+          message_parsed &&
+          message::authentication(msg, sender, selector, key_file);
 
       // write a new Return-Path
       msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
@@ -1654,9 +1673,9 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername() &&
-      ((client_identity == server_id_()) || (client_identity == "localhost") ||
-       (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername() && ((client_identity == server_identity_) ||
+                               (client_identity == "localhost") ||
+                               (client_identity == "localhost.localdomain"))) {
 
     if ((sock_.them_address_literal() == IP4::loopback_literal) ||
         (sock_.them_address_literal() == IP6::loopback_literal)) {
@@ -1740,7 +1759,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     if ((accept_domains_.is_open() &&
          (accept_domains_.contains(sender.domain().ascii()) ||
           accept_domains_.contains(sender.domain().utf8()))) ||
-        (sender.domain() == server_id_())) {
+        (sender.domain() == server_identity_)) {
 
       // Ease up in test mode.
       if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
