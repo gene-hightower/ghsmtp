@@ -236,9 +236,10 @@ void Session::reset_()
   // client_identity_.clear(); <-- not cleared!
 
   reverse_path_.clear();
-  fwd_path_.clear();
   forward_path_.clear();
   spf_received_.clear();
+  fwd_path_.clear();
+  rep_info_.clear();
 
   binarymime_ = false;
   smtputf8_   = false;
@@ -934,8 +935,6 @@ bool Session::do_forward_(message::parsed& msg)
 
 bool Session::do_reply_(message::parsed& msg)
 {
-  CHECK(!rep_info_.empty());
-
   Mailbox to_mbx(rep_info_.mail_from);
   Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
 

@@ -24,6 +24,7 @@ public:
 
     inline bool operator==(from_to const& rhs) const;
     inline bool empty() const;
+    inline void clear();
   };
 
   std::string enc_reply(from_to const& reply_info) const;
@@ -48,6 +49,12 @@ inline bool SRS0::from_to::operator==(from_to const& rhs) const
 inline bool SRS0::from_to::empty() const
 {
   return mail_from.empty() && rcpt_to_local_part.empty();
+}
+
+inline void SRS0::from_to::clear()
+{
+  mail_from.clear();
+  rcpt_to_local_part.clear();
 }
 
 #endif // SRS0_DOT_HPP
