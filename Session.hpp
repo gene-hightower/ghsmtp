@@ -101,7 +101,6 @@ private:
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
-  void new_bounce_(std::string loc);
   bool forward_to_(std::string const& forward, std::string_view rcpt_to_str);
   bool reply_to_(SRS0::from_to const& reply_info, std::string_view rcpt_to_str);
   bool do_forward_(message::parsed& msg);
@@ -136,12 +135,10 @@ private:
   Sock          sock_;
 
   // forwarding and replies
-  SRS0                       srs_;
-  Send                       send_;
-  std::vector<Mailbox>       fwd_path_; // for each "rcpt to"
-
-  // std::vector<SRS0::from_to> rep_info_; // for each reply being forwarded
-  SRS0::from_to rep_info_; // should be only one reply
+  Send          send_;
+  SRS0          srs_;
+  Mailbox       fwd_path_;
+  SRS0::from_to rep_info_;
 
   // per connection/session
   Domain              server_identity_; // who we identify as
