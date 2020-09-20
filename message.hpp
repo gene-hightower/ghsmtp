@@ -104,21 +104,26 @@ struct parsed {
   std::vector<std::string> arc_hdrs;
 };
 
-bool authentication(fs::path         config_path,
-                    char const*      domain,
-                    message::parsed& msg);
+bool authentication(message::parsed& msg,
+                    char const*      sender,
+                    char const*      selector,
+                    fs::path         key_file);
 
-void dkim_check(fs::path config_path, char const* domain, message::parsed& msg);
+void dkim_check(message::parsed& msg, char const* domain);
 
 void remove_delivery_headers(message::parsed& msg);
 
-void dkim_sign(message::parsed& msg, char const* sender, fs::path key_file);
+void dkim_sign(message::parsed& msg,
+               char const*      sender,
+               char const*      selector,
+               fs::path         key_file);
 
-void rewrite(fs::path         config_path,
-             Domain const&    sender,
-             message::parsed& msg,
+void rewrite(message::parsed& msg,
              std::string      mail_from,
-             std::string      reply_to);
+             std::string      reply_to,
+             char const*      sender,
+             char const*      selector,
+             fs::path         key_file);
 
 void print_spf_envelope_froms(char const* domain, message::parsed& msg);
 

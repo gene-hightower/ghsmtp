@@ -23,6 +23,8 @@ DEFINE_bool(arc, false, "check ARC set");
 DEFINE_bool(dkim, false, "check DKIM sigs");
 DEFINE_bool(print_from, false, "print envelope froms");
 
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
+
 int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -44,6 +46,11 @@ int main(int argc, char* argv[])
   auto const dom_to{Domain(server_identity)};
 
   auto const config_path = osutil::get_config_dir();
+
+  auto const selector = FLAGS_selector.c_str();
+
+  auto const key_file = (config_path / selector).replace_extension("private");
+  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
 
   Mailbox from("gene", dom_from);
   Mailbox to("anything", dom_to);
@@ -89,7 +96,7 @@ int main(int argc, char* argv[])
   if (message_parsed) {
     LOG(INFO) << "message parsed";
 
-    auto authentic = authentication(config_path, sender.c_str(), msg);
+    auto authentic = authentication(msg, sender.c_str(), selector, key_file);
 
     if (authentic)
       LOG(INFO) << "authentic";
@@ -107,7 +114,7 @@ int main(int argc, char* argv[])
     auto const reply_to =
         fmt::format("Reply-To: {}@{}", srs.enc_reply(reply), server_identity);
 
-    message::rewrite(config_path, Domain(server_identity), msg, "", reply_to);
+    message::rewrite(msg, "", reply_to, sender.c_str(), selector, key_file);
 
     std::cout << msg.as_string();
   }
@@ -123,7 +130,7 @@ int main(int argc, char* argv[])
       file.open(argv[a]);
       message::parsed msg;
       CHECK(msg.parse(std::string_view(file.data(), file.size())));
-      message::authentication(config_path, sender.c_str(), msg);
+      message::authentication(msg, sender.c_str(), selector, key_file);
       std::cout << msg.as_string();
     }
     return 0;
@@ -137,7 +144,7 @@ int main(int argc, char* argv[])
       file.open(argv[a]);
       message::parsed msg;
       CHECK(msg.parse(std::string_view(file.data(), file.size())));
-      message::dkim_check(config_path, sender.c_str(), msg);
+      message::dkim_check(msg, sender.c_str());
     }
     return 0;
   }
@@ -162,8 +169,8 @@ int main(int argc, char* argv[])
     file.open(argv[a]);
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
-    rewrite(config_path, Domain(sender), msg, "bounce@digilicious.com",
-            "noreply@digilicious.com");
+    rewrite(msg, "bounce@digilicious.com", "noreply@digilicious.com",
+            sender.c_str(), selector, key_file);
     std::cout << msg.as_string();
   }
 }

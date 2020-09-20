@@ -35,9 +35,6 @@
 using std::begin;
 using std::end;
 
-// DKIM key "selector"
-auto constexpr selector = "ghsmtp";
-
 // SPF Results
 auto constexpr Pass      = "Pass";
 auto constexpr Fail      = "Fail";
@@ -661,9 +658,10 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 
 namespace message {
 
-bool authentication(fs::path         config_path,
-                    char const*      server,
-                    message::parsed& msg)
+bool authentication(message::parsed& msg,
+                    char const*      sender,
+                    char const*      selector,
+                    fs::path         key_file)
 {
   LOG(INFO) << "add_authentication_results";
   CHECK(!msg.headers.empty());
@@ -837,7 +835,7 @@ bool authentication(fs::path         config_path,
   }();
 
   msg.ar_str =
-      fmt::format("{}: {};{}", Authentication_Results, server, ar_results);
+      fmt::format("{}: {};{}", Authentication_Results, sender, ar_results);
 
   LOG(INFO) << "new AR header " << msg.ar_str;
   CHECK(msg.parse_hdr(msg.ar_str));
@@ -866,15 +864,10 @@ bool authentication(fs::path         config_path,
   ars.body(msg.body);
   ars.eom();
 
-  auto const key_file = (config_path / selector).replace_extension("private");
-  if (!fs::exists(key_file)) {
-    LOG(WARNING) << "can't find key file " << key_file;
-    return dmarc_passed;
-  }
   boost::iostreams::mapped_file_source priv;
   priv.open(key_file);
 
-  if (ars.seal(server, selector, server, priv.data(), priv.size(),
+  if (ars.seal(sender, selector, sender, priv.data(), priv.size(),
                ar_results.c_str())) {
     msg.arc_hdrs = ars.whole_seal();
     for (auto const& hdr : msg.arc_hdrs) {
@@ -930,7 +923,7 @@ void remove_delivery_headers(message::parsed& msg)
       msg.headers.end());
 }
 
-void dkim_check(fs::path config_path, char const* domain, message::parsed& msg)
+void dkim_check(message::parsed& msg, char const* domain)
 {
   LOG(INFO) << "dkim";
 
@@ -1019,7 +1012,10 @@ std::string_view parsed::get_header(std::string_view name) const
   return "";
 }
 
-void dkim_sign(message::parsed& msg, char const* sender, fs::path key_file)
+void dkim_sign(message::parsed& msg,
+               char const*      sender,
+               char const*      selector,
+               fs::path         key_file)
 {
   CHECK(msg.sig_str.empty());
 
@@ -1044,11 +1040,12 @@ void dkim_sign(message::parsed& msg, char const* sender, fs::path key_file)
   CHECK(msg.parse_hdr(msg.sig_str));
 }
 
-void rewrite(fs::path         config_path,
-             Domain const&    sender,
-             message::parsed& msg,
+void rewrite(message::parsed& msg,
              std::string      mail_from,
-             std::string      reply_to)
+             std::string      reply_to,
+             char const*      sender,
+             char const*      selector,
+             fs::path         key_file)
 {
   LOG(INFO) << "rewrite";
 
@@ -1089,10 +1086,7 @@ void rewrite(fs::path         config_path,
   // LOG(INFO) << "body == " << msg.body;
   */
 
-  auto const key_file = (config_path / selector).replace_extension("private");
-  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
-
-  dkim_sign(msg, sender.ascii().c_str(), key_file);
+  dkim_sign(msg, sender, selector, key_file);
 }
 
 } // namespace message
