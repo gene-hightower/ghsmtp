@@ -461,11 +461,16 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   state_ = xact_step::rcpt;
 
-  SRS0::from_to bounce;
-  bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
-  auto const mail_from =
-      srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
-  send_.mail_from(Mailbox(mail_from));
+  if (reverse_path_.empty()) {
+    send_.mail_from(reverse_path_);
+  }
+  else {
+    SRS0::from_to bounce;
+    bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
+    auto const mail_from =
+        srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
+    send_.mail_from(Mailbox(mail_from));
+  }
 }
 
 bool Session::forward_to_(std::string const& forward,
@@ -885,7 +890,6 @@ void Session::new_bounce_(std::string loc)
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
   bounce.rcpt_to_local_part = loc;
-
   auto const mail_from =
       srs_.enc_bounce(bounce, server_identity_.ascii().c_str());
 
