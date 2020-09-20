@@ -488,8 +488,7 @@ bool Session::forward_to_(std::string const& forward,
 
   std::string error_msg;
   if (!send_.rcpt_to(res_, fwd_path_, error_msg)) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-           << std::flush;
+    out_() << error_msg << std::flush;
     LOG(WARNING) << "failed to forward <" << fwd_path_ << "> " << error_msg;
     return false;
   }
@@ -522,8 +521,7 @@ bool Session::reply_to_(SRS0::from_to const& reply_info,
 
   std::string error_msg;
   if (!send_.rcpt_to(res_, rep, error_msg)) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-           << std::flush;
+    out_() << error_msg << std::flush;
     LOG(WARNING) << "failed to reply <" << rep_info_.mail_from << "> "
                  << error_msg;
     return false;

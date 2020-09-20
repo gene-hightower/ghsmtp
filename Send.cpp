@@ -8,6 +8,8 @@
 #include "message.hpp"
 #include "osutil.hpp"
 
+#include <fmt/format.h>
+
 #include <gflags/gflags.h>
 
 // This needs to be at least the length of each string it's trying to match.
@@ -618,7 +620,10 @@ bool do_mail_from(SMTP::Connection& conn, Mailbox from)
   return true;
 }
 
-bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
+bool do_rcpt_to(SMTP::Connection& conn,
+                Mailbox           from,
+                Mailbox           to,
+                std::string&      error_msg)
 {
   if (conn.mail_from != from) {
     do_mail_from(conn, from);
@@ -636,10 +641,23 @@ bool do_rcpt_to(SMTP::Connection& conn, Mailbox from, Mailbox to)
       istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
     LOG(ERROR) << "RCPT TO: reply unparseable";
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
     return false;
   }
   if (conn.reply_code.at(0) != '2') {
+    if (conn.reply_code.at(0) == '5') {
+      LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
+      error_msg = fmt::format("{} 5.0.0 Downstream error\r\n", conn.reply_code);
+      return false;
+    }
+    if (conn.reply_code.at(0) == '4') {
+      LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
+      error_msg = fmt::format("{} 4.3.0 Downstream error\r\n", conn.reply_code);
+      return false;
+    }
     LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
+    error_msg = "500 5.0.0 Downstream error\r\n"s;
     return false;
   }
 
@@ -790,6 +808,8 @@ bool Send::rcpt_to(DNS::Resolver& res,
 {
   if (mail_from_.empty()) {
     LOG(WARNING) << "sequence error, must have MAIL FROM: before RCPT TO:";
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
     return false;
   }
 
@@ -799,10 +819,12 @@ bool Send::rcpt_to(DNS::Resolver& res,
       auto& conn = ex->second;
       LOG(INFO) << "### found existing receiver";
       LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to);
+      return do_rcpt_to(*conn, mail_from_, to, error_msg);
     }
     LOG(ERROR) << "found a receiver but not an exchanger "
                << "from == " << mail_from_ << "  to == " << to;
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
     return false;
   }
 
@@ -816,7 +838,7 @@ bool Send::rcpt_to(DNS::Resolver& res,
       receivers_.emplace(to.domain(), mx);
       auto& conn = ex->second;
       LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to);
+      return do_rcpt_to(*conn, mail_from_, to, error_msg);
     }
     // Open new connection.
     if (auto new_conn = open_session(res, config_path_, mail_from_.domain(), mx,
@@ -829,11 +851,12 @@ bool Send::rcpt_to(DNS::Resolver& res,
       receivers_.emplace(to.domain(), mx);
       auto& conn = ex->second;
       LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to);
+      return do_rcpt_to(*conn, mail_from_, to, error_msg);
     }
   }
 
   LOG(WARNING) << "ran out of mail exchangers for " << to;
+  error_msg = "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
   return false;
 }
 
