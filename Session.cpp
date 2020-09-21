@@ -514,15 +514,10 @@ bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to)
 
   Mailbox const to(rep_info_.mail_from);
 
-  auto const sender =
-      fmt::format("{}@{}", fwd_from_.local_part(), server_identity_);
-
-  auto const mail_from = Mailbox(sender);
-
   std::string error_msg;
-  if (!send_.mail_from_rcpt_to(res_, mail_from, to, error_msg)) {
+  if (!send_.mail_from_rcpt_to(res_, fwd_from_, to, error_msg)) {
     out_() << error_msg << std::flush;
-    LOG(WARNING) << "failed to reply from <" << mail_from << "> to <" << to
+    LOG(WARNING) << "failed to reply from <" << fwd_from_ << "> to <" << to
                  << "> " << error_msg;
     return false;
   }
