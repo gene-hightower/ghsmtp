@@ -576,7 +576,9 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   auto const rcpt_to_str =
       forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
 
-  if (auto reply = srs_.dec_reply(rcpt_to_str); reply) {
+  Mailbox rcpt_to_mbx(rcpt_to_str);
+
+  if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
     if (!reply_to_(*reply, rcpt_to_str))
       return;
   }
