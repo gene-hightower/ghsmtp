@@ -63,9 +63,8 @@ int main(int argc, char* argv[])
 
   auto res{DNS::Resolver{config_path}};
 
-  CHECK(snd.mail_from(from));
   std::string err;
-  CHECK(snd.rcpt_to(res, to, err));
+  CHECK(snd.mail_from_rcpt_to(res, from, to, err));
   CHECK(snd.send(msg_str));
   snd.quit();
 }

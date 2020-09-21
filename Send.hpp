@@ -21,9 +21,6 @@ struct Connection {
 
   std::string server_id;
 
-  Mailbox              mail_from;
-  std::vector<Mailbox> rcpt_to;
-
   std::string                                               ehlo_keyword;
   std::vector<std::string>                                  ehlo_param;
   std::unordered_map<std::string, std::vector<std::string>> ehlo_params;
@@ -47,8 +44,10 @@ public:
 
   void set_sender(Domain sender) { sender_ = sender; }
 
-  bool mail_from(Mailbox const& from);
-  bool rcpt_to(DNS::Resolver& res, Mailbox const& to, std::string& error_msg);
+  bool mail_from_rcpt_to(DNS::Resolver& res,
+                         Mailbox const& from,
+                         Mailbox const& to,
+                         std::string&   error_msg);
 
   bool send(std::string_view msg);
 
@@ -61,14 +60,7 @@ private:
 
   Domain sender_;
 
-  Mailbox              mail_from_;
-  std::vector<Mailbox> rcpt_to_;
-
-  // MX hostname or address => connection
-  std::unordered_map<Domain, std::unique_ptr<SMTP::Connection>> exchangers_;
-
-  // @domain => MX hostname or address
-  std::unordered_map<Domain, Domain> receivers_;
+  std::unique_ptr<SMTP::Connection> conn_;
 };
 
 #endif // SEND_DOT_HPP

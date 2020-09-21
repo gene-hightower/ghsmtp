@@ -484,10 +484,10 @@ bool Session::forward_to_(std::string const& forward,
 
   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
 
-  send_.mail_from(Mailbox(new_bounce));
+  auto const mail_from = Mailbox(new_bounce);
 
   std::string error_msg;
-  if (!send_.rcpt_to(res_, fwd_path_, error_msg)) {
+  if (!send_.mail_from_rcpt_to(res_, mail_from, fwd_path_, error_msg)) {
     out_() << error_msg << std::flush;
     LOG(WARNING) << "failed to forward <" << fwd_path_ << "> " << error_msg;
     return false;
@@ -512,18 +512,18 @@ bool Session::reply_to_(SRS0::from_to const& reply_info,
 
   rep_info_ = reply_info;
 
-  Mailbox const rep(rep_info_.mail_from);
+  Mailbox const to(rep_info_.mail_from);
 
   auto const sender =
       fmt::format("{}@{}", rep_info_.rcpt_to_local_part, server_identity_);
 
-  send_.mail_from(Mailbox(sender));
+  auto const mail_from = Mailbox(sender);
 
   std::string error_msg;
-  if (!send_.rcpt_to(res_, rep, error_msg)) {
+  if (!send_.mail_from_rcpt_to(res_, mail_from, to, error_msg)) {
     out_() << error_msg << std::flush;
-    LOG(WARNING) << "failed to reply <" << rep_info_.mail_from << "> "
-                 << error_msg;
+    LOG(WARNING) << "failed to reply from <" << mail_from << "> to <" << to
+                 << "> " << error_msg;
     return false;
   }
 
@@ -935,8 +935,6 @@ bool Session::do_reply_(message::parsed& msg)
 {
   Mailbox to_mbx(rep_info_.mail_from);
   Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
-
-  send_.mail_from(from_mbx);
 
   auto reply = std::make_unique<MessageStore>();
   reply->open(server_id_(), FLAGS_max_write, ".Drafts");

@@ -555,7 +555,7 @@ open_session(DNS::Resolver& res,
     LOG(INFO) << "C: HELO " << sender.ascii();
     conn->sock.out() << "HELO " << sender.ascii() << "\r\n" << std::flush;
     if (!parse<SMTP::helo_ok_rsp, SMTP::action>(in, *conn)) {
-      LOG(WARNING) << "HELO response was unrecognizable";
+      LOG(ERROR) << "HELO response was unrecognizable";
       close(fd);
       return {};
     }
@@ -567,7 +567,7 @@ open_session(DNS::Resolver& res,
     LOG(INFO) << "C: STARTTLS";
     conn->sock.out() << "STARTTLS\r\n" << std::flush;
     if (!parse<SMTP::reply_lines, SMTP::action>(in, *conn)) {
-      LOG(WARNING) << "STARTTLS response was unrecognizable";
+      LOG(ERROR) << "STARTTLS response was unrecognizable";
       close(fd);
       return {};
     }
@@ -584,7 +584,9 @@ open_session(DNS::Resolver& res,
   return std::optional<std::unique_ptr<SMTP::Connection>>(std::move(conn));
 }
 
-bool do_mail_from(SMTP::Connection& conn, Mailbox from)
+bool do_mail_from(SMTP::Connection& conn,
+                  Mailbox           mail_from,
+                  std::string&      error_msg)
 {
   std::ostringstream param_stream;
   // param_stream << " SIZE=" << total_size;
@@ -602,41 +604,44 @@ bool do_mail_from(SMTP::Connection& conn, Mailbox from)
 
   auto const param_str = param_stream.str();
 
-  LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
-  conn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n"
+  LOG(INFO) << "C: MAIL FROM:<" << mail_from << '>' << param_str;
+  conn.sock.out() << "MAIL FROM:<" << mail_from << '>' << param_str << "\r\n"
                   << std::flush;
   auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
                                       "mail_from"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
     LOG(ERROR) << "MAIL FROM: reply unparseable";
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
+    return false;
+  }
+  if (conn.reply_code.at(0) == '5') {
+    LOG(WARNING) << "MAIL FROM: negative reply " << conn.reply_code;
+    error_msg = "554 5.5.4 Permanent error\r\n";
     return false;
   }
   if (conn.reply_code.at(0) != '2') {
     LOG(WARNING) << "MAIL FROM: negative reply " << conn.reply_code;
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
     return false;
   }
 
-  conn.mail_from = from;
   return true;
 }
 
-bool do_rcpt_to(SMTP::Connection& conn,
-                Mailbox           from,
-                Mailbox           to,
-                std::string&      error_msg)
+bool do_mail_from_rcpt_to(SMTP::Connection& conn,
+                          Mailbox           mail_from,
+                          Mailbox           rcpt_to,
+                          std::string&      error_msg)
 {
-  if (conn.mail_from != from) {
-    do_mail_from(conn, from);
+  if (!do_mail_from(conn, mail_from, error_msg)) {
+    LOG(ERROR) << "MAIL FROM: failed";
+    return false;
   }
 
-  if (std::find(begin(conn.rcpt_to), end(conn.rcpt_to), to) !=
-      end(conn.rcpt_to)) {
-    LOG(INFO) << to << " already in recpt_to list of " << conn.server_id;
-    return true;
-  }
-
-  LOG(INFO) << "C: RCPT TO:<" << to << '>';
-  conn.sock.out() << "RCPT TO:<" << to << ">\r\n" << std::flush;
+  LOG(INFO) << "C: RCPT TO:<" << rcpt_to << '>';
+  conn.sock.out() << "RCPT TO:<" << rcpt_to << ">\r\n" << std::flush;
   auto in{
       istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
   if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
@@ -661,7 +666,6 @@ bool do_rcpt_to(SMTP::Connection& conn,
     return false;
   }
 
-  conn.rcpt_to.emplace_back(to);
   return true;
 }
 
@@ -791,114 +795,66 @@ Send::Send(fs::path config_path, char const* service)
 {
 }
 
-bool Send::mail_from(Mailbox const& mailbox)
+bool Send::mail_from_rcpt_to(DNS::Resolver& res,
+                             Mailbox const& mail_from,
+                             Mailbox const& rcpt_to,
+                             std::string&   error_msg)
 {
-  mail_from_ = mailbox;
-
-  for (auto& [mx, conn] : exchangers_) {
-    conn->mail_from.clear();
-    conn->rcpt_to.clear();
+  if (conn_) {
+    conn_->sock.close_fds();
+    conn_.reset(nullptr);
   }
-  return true;
-}
-
-bool Send::rcpt_to(DNS::Resolver& res,
-                   Mailbox const& to,
-                   std::string&   error_msg)
-{
-  if (mail_from_.empty()) {
-    LOG(WARNING) << "sequence error, must have MAIL FROM: before RCPT TO:";
-    error_msg =
-        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
-    return false;
-  }
-
-  // Check for existing receivers entry.
-  if (auto rec = receivers_.find(to.domain()); rec != receivers_.end()) {
-    if (auto ex = exchangers_.find(rec->second); ex != exchangers_.end()) {
-      auto& conn = ex->second;
-      LOG(INFO) << "### found existing receiver";
-      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to, error_msg);
-    }
-    LOG(ERROR) << "found a receiver but not an exchanger "
-               << "from == " << mail_from_ << "  to == " << to;
-    error_msg =
-        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
-    return false;
-  }
-
   // Get a connection to an MX for this domain
-  std::vector<Domain> mxs = get_mxs(res, to.domain());
+  std::vector<Domain> mxs = get_mxs(res, rcpt_to.domain());
   CHECK(!mxs.empty());
   for (auto& mx : mxs) {
-    // Check for existing connection.
-    if (auto ex = exchangers_.find(mx); ex != exchangers_.end()) {
-      LOG(INFO) << "### found existing connection to " << mx;
-      receivers_.emplace(to.domain(), mx);
-      auto& conn = ex->second;
-      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to, error_msg);
-    }
+    LOG(INFO) << "### trying " << mx;
     // Open new connection.
-    if (auto new_conn = open_session(res, config_path_, mail_from_.domain(), mx,
+    if (auto new_conn = open_session(res, config_path_, mail_from.domain(), mx,
                                      service_.c_str());
         new_conn) {
       LOG(INFO) << "### opened new connection to " << mx;
-      exchangers_.emplace(mx, std::move(*new_conn));
-      auto ex = exchangers_.find(mx);
-      CHECK(ex != exchangers_.end());
-      receivers_.emplace(to.domain(), mx);
-      auto& conn = ex->second;
-      LOG(INFO) << "### do_rcpt_to(" << mail_from_ << ", " << to << ");";
-      return do_rcpt_to(*conn, mail_from_, to, error_msg);
+      conn_ = std::move(*new_conn);
+      return do_mail_from_rcpt_to(*conn_, mail_from, rcpt_to, error_msg);
     }
   }
 
-  LOG(WARNING) << "ran out of mail exchangers for " << to;
+  LOG(WARNING) << "ran out of mail exchangers for " << rcpt_to;
   error_msg = "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
   return false;
 }
 
 bool Send::send(std::string_view msg_input)
 {
+  if (!conn_) {
+    return false;
+  }
   // FIXME this should be done in parallel
-  for (auto& [dom, conn] : exchangers_) {
-    if (!conn->rcpt_to.empty()) {
-
-      auto is{imemstream{msg_input.data(), msg_input.length()}};
-      if (!do_send(*conn, is)) {
-        LOG(WARNING) << "failed to send to " << conn->server_id;
-        return false;
-      }
-    }
-    else {
-      LOG(INFO) << "no receivers, skipping MX " << dom;
-    }
-    conn->mail_from.clear();
-    conn->rcpt_to.clear();
+  auto is{imemstream{msg_input.data(), msg_input.length()}};
+  if (!do_send(*conn_, is)) {
+    LOG(WARNING) << "failed to send to " << conn_->server_id;
+    return false;
   }
   return true;
 }
 
 void Send::rset()
 {
-  for (auto& [dom, conn] : exchangers_) {
-    if (!conn->rcpt_to.empty()) {
-      if (!do_rset(*conn)) {
-        LOG(WARNING) << "failed to rset " << conn->server_id;
-      }
-    }
-    conn->mail_from.clear();
-    conn->rcpt_to.clear();
+  if (!conn_) {
+    return;
+  }
+  if (!do_rset(*conn_)) {
+    LOG(WARNING) << "failed to rset " << conn_->server_id;
   }
 }
 
 void Send::quit()
 {
-  for (auto& [dom, conn] : exchangers_) {
-    do_quit(*conn);
-    conn->sock.close_fds();
+  if (!conn_) {
+    return;
   }
-  exchangers_.clear();
+  if (!do_quit(*conn_)) {
+    LOG(WARNING) << "failed to quit " << conn_->server_id;
+  }
+  conn_->sock.close_fds();
 }
