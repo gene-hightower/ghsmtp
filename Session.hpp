@@ -101,8 +101,8 @@ private:
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
-  bool forward_to_(std::string const& forward, std::string_view rcpt_to_str);
-  bool reply_to_(SRS0::from_to const& reply_info, std::string_view rcpt_to_str);
+  bool forward_to_(std::string const& forward, Mailbox const& rcpt_to);
+  bool reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to);
   bool do_forward_(message::parsed& msg);
   bool do_reply_(message::parsed& msg);
   bool do_deliver_();

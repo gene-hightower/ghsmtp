@@ -463,15 +463,14 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   state_ = xact_step::rcpt;
 }
 
-bool Session::forward_to_(std::string const& forward,
-                          std::string_view   rcpt_to_str)
+bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
 {
   // If we're already forwarding or replying, reject
   if (!fwd_path_.empty() || !rep_info_.empty()) {
     out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
            << std::flush;
     LOG(WARNING) << "failed to forward to <" << forward
-                 << "> already forwarding or replying for: " << rcpt_to_str;
+                 << "> already forwarding or replying for: " << rcpt_to;
     return false;
   }
 
@@ -480,7 +479,7 @@ bool Session::forward_to_(std::string const& forward,
   // New bounce address
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
-  bounce.rcpt_to_local_part = fwd_path_.local_part();
+  bounce.rcpt_to_local_part = rcpt_to.local_part();
 
   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
 
@@ -493,20 +492,19 @@ bool Session::forward_to_(std::string const& forward,
     return false;
   }
 
-  LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> forwarding to == <" << fwd_path_
+  LOG(INFO) << "RCPT TO:<" << rcpt_to << "> forwarding to == <" << fwd_path_
             << ">";
   return true;
 }
 
-bool Session::reply_to_(SRS0::from_to const& reply_info,
-                        std::string_view     rcpt_to_str)
+bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to)
 {
   // If we're already forwarding or replying, reject
   if (!fwd_path_.empty() || !rep_info_.empty()) {
     out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
            << std::flush;
     LOG(WARNING) << "failed to reply to <" << reply_info.mail_from
-                 << "> already forwarding or replying for: " << rcpt_to_str;
+                 << "> already forwarding or replying for: " << rcpt_to;
     return false;
   }
 
@@ -527,7 +525,7 @@ bool Session::reply_to_(SRS0::from_to const& reply_info,
     return false;
   }
 
-  LOG(INFO) << "RCPT TO:<" << rcpt_to_str << "> is a reply to "
+  LOG(INFO) << "RCPT TO:<" << rcpt_to << "> is a reply to "
             << rep_info_.mail_from << " from " << rep_info_.rcpt_to_local_part;
   return true;
 }
@@ -576,14 +574,14 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   auto const rcpt_to_str =
       forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
 
-  Mailbox rcpt_to_mbx(rcpt_to_str);
+  Mailbox const& rcpt_to_mbx = forward_path_.back();
 
   if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
-    if (!reply_to_(*reply, rcpt_to_str))
+    if (!reply_to_(*reply, rcpt_to_mbx))
       return;
   }
   else if (auto const forward = forward_.find(rcpt_to_str.c_str()); forward) {
-    if (!forward_to_(*forward, rcpt_to_str))
+    if (!forward_to_(*forward, rcpt_to_mbx))
       return;
   }
   else {
