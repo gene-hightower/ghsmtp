@@ -891,7 +891,7 @@ bool Session::do_forward_(message::parsed& msg)
   // Generate a reply address
   SRS0::from_to reply;
   reply.mail_from          = msg_fwd.dmarc_from;
-  reply.rcpt_to_local_part = fwd_path_.local_part();
+  reply.rcpt_to_local_part = fwd_from_.local_part();
 
   auto const reply_addr =
       fmt::format("{}@{}", srs_.enc_reply(reply), server_id_());
