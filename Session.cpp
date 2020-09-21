@@ -239,6 +239,7 @@ void Session::reset_()
   forward_path_.clear();
   spf_received_.clear();
   fwd_path_.clear();
+  fwd_from_.clear();
   rep_info_.clear();
 
   binarymime_ = false;
@@ -447,6 +448,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   reverse_path_ = std::move(reverse_path);
   fwd_path_.clear();
+  fwd_from_.clear();
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
@@ -475,11 +477,11 @@ bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
   }
 
   fwd_path_ = Mailbox(forward);
+  fwd_from_ = rcpt_to;
 
   // New bounce address
   SRS0::from_to bounce;
   bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
-  bounce.rcpt_to_local_part = rcpt_to.local_part();
 
   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
 
@@ -513,7 +515,7 @@ bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to)
   Mailbox const to(rep_info_.mail_from);
 
   auto const sender =
-      fmt::format("{}@{}", rep_info_.rcpt_to_local_part, server_identity_);
+      fmt::format("{}@{}", fwd_from_.local_part(), server_identity_);
 
   auto const mail_from = Mailbox(sender);
 
@@ -571,10 +573,10 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   // no check for dups, postfix doesn't
   forward_path_.emplace_back(std::move(forward_path));
 
-  auto const rcpt_to_str =
-      forward_path_.back().as_string(Mailbox::domain_encoding::ascii);
-
   Mailbox const& rcpt_to_mbx = forward_path_.back();
+
+  auto const rcpt_to_str =
+      rcpt_to_mbx.as_string(Mailbox::domain_encoding::ascii);
 
   if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
     if (!reply_to_(*reply, rcpt_to_mbx))

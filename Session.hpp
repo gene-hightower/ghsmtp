@@ -138,6 +138,7 @@ private:
   Send          send_;
   SRS0          srs_;
   Mailbox       fwd_path_;
+  Mailbox       fwd_from_;
   SRS0::from_to rep_info_;
 
   // per connection/session
