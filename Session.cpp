@@ -956,7 +956,8 @@ bool Session::do_reply_(message::parsed& msg)
   fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
 
   if (!msg.get_header(message::Subject).empty()) {
-    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::Subject));
+    fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
+                   msg.get_header(message::Subject));
   }
   else {
     fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
@@ -964,13 +965,16 @@ bool Session::do_reply_(message::parsed& msg)
   }
 
   if (!msg.get_header(message::In_Reply_To).empty()) {
-    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::In_Reply_To));
+    fmt::format_to(bfr, "{}: {}\r\n", message::In_Reply_To,
+                   msg.get_header(message::In_Reply_To));
   }
 
   if (!msg.get_header(message::MIME_Version).empty() &&
       msg.get_header(message::Content_Type).empty()) {
-    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::MIME_Version));
-    fmt::format_to(bfr, "{}\r\n", msg.get_header(message::Content_Type));
+    fmt::format_to(bfr, "{}: {}\r\n", message::MIME_Version,
+                   msg.get_header(message::MIME_Version));
+    fmt::format_to(bfr, "{}: {}\r\n", message::Content_Type,
+                   msg.get_header(message::Content_Type));
   }
 
   reply->write(fmt::to_string(bfr));
