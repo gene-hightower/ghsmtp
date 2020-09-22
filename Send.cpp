@@ -592,9 +592,7 @@ open_session(DNS::Resolver& res,
   return std::optional<std::unique_ptr<SMTP::Connection>>(std::move(conn));
 }
 
-bool do_mail_from(SMTP::Connection& conn,
-                  Mailbox           mail_from,
-                  std::string&      error_msg)
+std::string from_params(SMTP::Connection& conn)
 {
   std::ostringstream param_stream;
   // param_stream << " SIZE=" << total_size;
@@ -610,7 +608,14 @@ bool do_mail_from(SMTP::Connection& conn,
     param_stream << " SMTPUTF8";
   }
 
-  auto const param_str = param_stream.str();
+  return param_stream.str();
+}
+
+bool do_mail_from(SMTP::Connection& conn,
+                  Mailbox           mail_from,
+                  std::string&      error_msg)
+{
+  auto const param_str = from_params(conn);
 
   LOG(INFO) << "C: MAIL FROM:<" << mail_from << '>' << param_str;
   conn.sock.out() << "MAIL FROM:<" << mail_from << '>' << param_str << "\r\n"
@@ -638,16 +643,8 @@ bool do_mail_from(SMTP::Connection& conn,
   return true;
 }
 
-bool do_mail_from_rcpt_to(SMTP::Connection& conn,
-                          Mailbox           mail_from,
-                          Mailbox           rcpt_to,
-                          std::string&      error_msg)
+bool do_rcpt_to(SMTP::Connection& conn, Mailbox rcpt_to, std::string& error_msg)
 {
-  if (!do_mail_from(conn, mail_from, error_msg)) {
-    LOG(ERROR) << "MAIL FROM: failed";
-    return false;
-  }
-
   LOG(INFO) << "C: RCPT TO:<" << rcpt_to << '>';
   conn.sock.out() << "RCPT TO:<" << rcpt_to << ">\r\n" << std::flush;
   auto in{
@@ -671,6 +668,24 @@ bool do_mail_from_rcpt_to(SMTP::Connection& conn,
     }
     LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
     error_msg = "500 5.0.0 Downstream error\r\n"s;
+    return false;
+  }
+
+  return true;
+}
+
+bool do_mail_from_rcpt_to(SMTP::Connection& conn,
+                          Mailbox           mail_from,
+                          Mailbox           rcpt_to,
+                          std::string&      error_msg)
+{
+  if (!do_mail_from(conn, mail_from, error_msg)) {
+    LOG(ERROR) << "MAIL FROM: failed";
+    return false;
+  }
+
+  if (!do_rcpt_to(conn, rcpt_to, error_msg)) {
+    LOG(ERROR) << "RCPT TO: failed";
     return false;
   }
 
