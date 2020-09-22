@@ -579,6 +579,14 @@ open_session(DNS::Resolver& res,
       close(fd);
       return {};
     }
+
+    LOG(INFO) << "C: EHLO " << sender.ascii();
+    conn->sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+    if (!parse<SMTP::ehlo_rsp, SMTP::action>(in, *conn) || !conn->ehlo_ok) {
+      LOG(WARNING) << "EHLO response was unrecognizable, trying HELO";
+      close(fd);
+      return {};
+    }
   }
 
   return std::optional<std::unique_ptr<SMTP::Connection>>(std::move(conn));
