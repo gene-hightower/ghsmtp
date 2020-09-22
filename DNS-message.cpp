@@ -69,9 +69,11 @@ public:
   uint16_t nscount() const { return as_u16(nscount_hi_, nscount_lo_); }
   uint16_t arcount() const { return as_u16(arcount_hi_, arcount_lo_); }
 
-  bool checking_disabled() const { return (flags_1_ & 0x10) != 0; }
-  bool authentic_data() const { return (flags_1_ & 0x20) != 0; }
+  // clang-format off
+  bool checking_disabled()   const { return (flags_1_ & 0x10) != 0; }
+  bool authentic_data()      const { return (flags_1_ & 0x20) != 0; }
   bool recursion_available() const { return (flags_1_ & 0x80) != 0; }
+  // clang-format on
 
   uint16_t rcode() const { return flags_1_ & 0xf; }
 };
@@ -95,8 +97,7 @@ public:
 
   DNS::RR_type qtype() const
   {
-    auto const typ = as_u16(qtype_hi_, qtype_lo_);
-    return static_cast<DNS::RR_type>(typ);
+    return static_cast<DNS::RR_type>(as_u16(qtype_hi_, qtype_lo_));
   }
   uint16_t qclass() const { return as_u16(qclass_hi_, qclass_lo_); }
 };
@@ -208,8 +209,8 @@ public:
   uint16_t rr_class() const { return as_u16(class_hi_, class_lo_); }
   uint32_t rr_ttl() const
   {
-    return (uint32_t(ttl_0_) << 24) + (uint32_t(ttl_1_) << 16)
-           + (uint32_t(ttl_2_) << 8) + (uint32_t(ttl_3_));
+    return (uint32_t(ttl_0_) << 24) + (uint32_t(ttl_1_) << 16) +
+           (uint32_t(ttl_2_) << 8) + (uint32_t(ttl_3_));
   }
 
   uint16_t rdlength() const { return as_u16(rdlength_hi_, rdlength_lo_); }
@@ -349,7 +350,7 @@ bool expand_name(octet const*        encoded,
   if (!indir)
     enc_len = uztosl(p + 1 - encoded);
 
-  if (name.length() && ('.' == name.back())) {
+  if (name.length() && (name.back() == '.')) {
     name.pop_back();
   }
 
@@ -428,8 +429,10 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   // size to allocate may be larger than needed if backslash escapes
   // are used in domain name
 
-  auto const sz_alloc = strlen(name) + 2 + sizeof(header) + sizeof(question)
-                        + sizeof(edns0_opt_meta_rr);
+  auto const sz_alloc = strlen(name) + 2 + // clang-format off
+                        sizeof(header)   +
+                        sizeof(question) +
+                        sizeof(edns0_opt_meta_rr); // clang-format on
 
   DNS::message::container_t bfr(sz_alloc);
 
@@ -568,8 +571,8 @@ void check_answer(bool& nx_domain,
   for (auto i = 0; i < (hdr_p->ancount() + hdr_p->nscount()); ++i) {
     std::string x;
     auto        enc_len = 0;
-    if (!expand_name(p, a, x, enc_len)
-        || ((p + enc_len + sizeof(rr)) > end(a))) {
+    if (!expand_name(p, a, x, enc_len) ||
+        ((p + enc_len + sizeof(rr)) > end(a))) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message in answer or nameserver section for " << name
                    << '/' << type;
@@ -584,8 +587,8 @@ void check_answer(bool& nx_domain,
   for (auto i = 0; i < hdr_p->arcount(); ++i) {
     std::string x;
     auto        enc_len = 0;
-    if (!expand_name(p, a, x, enc_len)
-        || ((p + enc_len + sizeof(rr)) > end(a))) {
+    if (!expand_name(p, a, x, enc_len) ||
+        ((p + enc_len + sizeof(rr)) > end(a))) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message in additional section for " << name << '/'
                    << type;
@@ -745,14 +748,14 @@ std::optional<RR> get_rr(rr const* rr_p, DNS::message const& pkt, bool& err)
   auto const typ = static_cast<DNS::RR_type>(rr_p->rr_type());
 
   switch (typ) { // clang-format off
-  case DNS::RR_type::A:     return get_A(rr_p, pkt, err);
+  case DNS::RR_type::A:     return get_A    (rr_p, pkt, err);
   case DNS::RR_type::CNAME: return get_CNAME(rr_p, pkt, err);
-  case DNS::RR_type::PTR:   return get_PTR(rr_p, pkt, err);
-  case DNS::RR_type::MX:    return get_MX(rr_p, pkt, err);
-  case DNS::RR_type::TXT:   return get_TXT(rr_p, pkt, err);
-  case DNS::RR_type::AAAA:  return get_AAAA(rr_p, pkt, err);
+  case DNS::RR_type::PTR:   return get_PTR  (rr_p, pkt, err);
+  case DNS::RR_type::MX:    return get_MX   (rr_p, pkt, err);
+  case DNS::RR_type::TXT:   return get_TXT  (rr_p, pkt, err);
+  case DNS::RR_type::AAAA:  return get_AAAA (rr_p, pkt, err);
   case DNS::RR_type::RRSIG: return get_RRSIG(rr_p, pkt, err);
-  case DNS::RR_type::TLSA:  return get_TLSA(rr_p, pkt, err);
+  case DNS::RR_type::TLSA:  return get_TLSA (rr_p, pkt, err);
   default: break;
   } // clang-format on
 

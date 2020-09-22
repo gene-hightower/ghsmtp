@@ -38,8 +38,10 @@ public:
 
   uint16_t size() const { return bfr_.size(); }
 
+  // clang-format off
   auto begin() const { return bfr_.data(); }
-  auto end() const { return bfr_.data() + bfr_.size(); }
+  auto end()   const { return bfr_.data() + bfr_.size(); }
+  // clang-format on
 
   uint16_t id() const;
 
@@ -47,9 +49,11 @@ private:
   container_t bfr_;
 };
 
+// clang-format off
 inline auto begin(message const& pkt) { return pkt.begin(); }
-inline auto end(message const& pkt) { return pkt.end(); }
-inline auto size(message const& pkt) { return pkt.size(); }
+inline auto end  (message const& pkt) { return pkt.end(); }
+inline auto size (message const& pkt) { return pkt.size(); }
+// clang-format on
 
 size_t min_udp_sz();
 
