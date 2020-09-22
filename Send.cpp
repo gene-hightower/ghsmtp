@@ -611,6 +611,33 @@ std::string from_params(SMTP::Connection& conn)
   return param_stream.str();
 }
 
+bool do_reply_lines(SMTP::Connection& conn,
+                    std::string_view  info,
+                    std::string&      error_msg)
+{
+  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
+                                      "mail_from"}};
+  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
+    LOG(ERROR) << info << ": reply unparseable";
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
+    return false;
+  }
+  if (conn.reply_code.at(0) == '5') {
+    LOG(WARNING) << info << ": negative reply " << conn.reply_code;
+    error_msg = "554 5.5.4 Permanent error\r\n";
+    return false;
+  }
+  if (conn.reply_code.at(0) != '2') {
+    LOG(WARNING) << info << ": negative reply " << conn.reply_code;
+    error_msg =
+        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
+    return false;
+  }
+
+  return true;
+}
+
 bool do_mail_from(SMTP::Connection& conn,
                   Mailbox           mail_from,
                   std::string&      error_msg)
@@ -618,60 +645,40 @@ bool do_mail_from(SMTP::Connection& conn,
   auto const param_str = from_params(conn);
 
   LOG(INFO) << "C: MAIL FROM:<" << mail_from << '>' << param_str;
-  conn.sock.out() << "MAIL FROM:<" << mail_from << '>' << param_str << "\r\n"
-                  << std::flush;
-  auto in{istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size,
-                                      "mail_from"}};
-  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
-    LOG(ERROR) << "MAIL FROM: reply unparseable";
-    error_msg =
-        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
-    return false;
-  }
-  if (conn.reply_code.at(0) == '5') {
-    LOG(WARNING) << "MAIL FROM: negative reply " << conn.reply_code;
-    error_msg = "554 5.5.4 Permanent error\r\n";
-    return false;
-  }
-  if (conn.reply_code.at(0) != '2') {
-    LOG(WARNING) << "MAIL FROM: negative reply " << conn.reply_code;
-    error_msg =
-        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
-    return false;
-  }
+  conn.sock.out() << "MAIL FROM:<" << mail_from << '>' << param_str << "\r\n";
 
-  return true;
+  conn.sock.out() << std::flush;
+
+  return do_reply_lines(conn, "MAIL FROM", error_msg);
 }
 
 bool do_rcpt_to(SMTP::Connection& conn, Mailbox rcpt_to, std::string& error_msg)
 {
   LOG(INFO) << "C: RCPT TO:<" << rcpt_to << '>';
-  conn.sock.out() << "RCPT TO:<" << rcpt_to << ">\r\n" << std::flush;
-  auto in{
-      istream_input<eol::crlf, 1>{conn.sock.in(), FLAGS_pbfr_size, "rcpt_to"}};
-  if (!parse<SMTP::reply_lines, SMTP::action>(in, conn)) {
-    LOG(ERROR) << "RCPT TO: reply unparseable";
-    error_msg =
-        "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n";
-    return false;
-  }
-  if (conn.reply_code.at(0) != '2') {
-    if (conn.reply_code.at(0) == '5') {
-      LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
-      error_msg = fmt::format("{} 5.0.0 Downstream error\r\n", conn.reply_code);
-      return false;
-    }
-    if (conn.reply_code.at(0) == '4') {
-      LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
-      error_msg = fmt::format("{} 4.3.0 Downstream error\r\n", conn.reply_code);
-      return false;
-    }
-    LOG(WARNING) << "RCPT TO: negative reply " << conn.reply_code;
-    error_msg = "500 5.0.0 Downstream error\r\n"s;
-    return false;
-  }
+  conn.sock.out() << "RCPT TO:<" << rcpt_to << ">\r\n";
 
-  return true;
+  conn.sock.out() << std::flush;
+
+  return do_reply_lines(conn, "RCPT TO", error_msg);
+}
+
+bool mail_from_rcpt_to_pipelined(SMTP::Connection& conn,
+                                 Mailbox           mail_from,
+                                 Mailbox           rcpt_to,
+                                 std::string&      error_msg)
+{
+  auto const param_str = from_params(conn);
+
+  LOG(INFO) << "C: MAIL FROM:<" << mail_from << '>' << param_str;
+  conn.sock.out() << "MAIL FROM:<" << mail_from << '>' << param_str << "\r\n";
+
+  LOG(INFO) << "C: RCPT TO:<" << rcpt_to << '>';
+  conn.sock.out() << "RCPT TO:<" << rcpt_to << ">\r\n";
+
+  conn.sock.out() << std::flush;
+
+  return do_reply_lines(conn, "MAIL FROM", error_msg) &&
+         do_reply_lines(conn, "RCPT TO", error_msg);
 }
 
 bool do_mail_from_rcpt_to(SMTP::Connection& conn,
@@ -679,11 +686,13 @@ bool do_mail_from_rcpt_to(SMTP::Connection& conn,
                           Mailbox           rcpt_to,
                           std::string&      error_msg)
 {
+  if (conn.has_extension("PIPELINING"))
+    return mail_from_rcpt_to_pipelined(conn, mail_from, rcpt_to, error_msg);
+
   if (!do_mail_from(conn, mail_from, error_msg)) {
     LOG(ERROR) << "MAIL FROM: failed";
     return false;
   }
-
   if (!do_rcpt_to(conn, rcpt_to, error_msg)) {
     LOG(ERROR) << "RCPT TO: failed";
     return false;
