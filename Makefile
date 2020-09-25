@@ -222,7 +222,15 @@ databases := \
 all:: $(databases) public_suffix_list.dat
 
 TMPDIR ?= /tmp
-TEST_MAILDIR=$(TMPDIR)/Maildir
+
+export TEST_MAILDIR=$(TMPDIR)/Maildir
+export MAILDIR=$(TEST_MAILDIR)
+
+export ASAN_OPTIONS=detect_odr_violation=0
+
+export GHSMTP_SERVER_ID=digilicious.com
+
+export LLVM_PROFILE_FILE=smtp.profraw
 
 $(TEST_MAILDIR):
 	mkdir -p $@
@@ -272,7 +280,7 @@ regression:: $(programs) $(TEST_MAILDIR)
 	@for f in testcase_dir/* ; do \
 	  echo -n test `basename $$f` ""; \
 	  tmp_out=`mktemp`; \
-	  MAILDIR=$(TEST_MAILDIR) valgrind ./smtp < $$f > $$tmp_out; \
+	  valgrind ./smtp < $$f > $$tmp_out; \
 	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
 	  rm $$tmp_out; \
 	done
@@ -281,7 +289,7 @@ check::
 	@for f in testcase_dir/* ; do \
 	  echo -n test `basename $$f` ""; \
 	  tmp_out=`mktemp`; \
-	  GHSMTP_SERVER_ID=digilicious.com MAILDIR=$(TEST_MAILDIR) LLVM_PROFILE_FILE=smtp.profraw ASAN_OPTIONS=detect_odr_violation=0 ./smtp < $$f > $$tmp_out; \
+	   ./smtp < $$f > $$tmp_out; \
 	  diff testout_dir/`basename $$f` $$tmp_out && echo ...pass; \
 	  if [ -e smtp.profraw ] ; then mv smtp.profraw /tmp/smtp-profile/`basename $$f`; fi; \
 	  rm $$tmp_out; \
