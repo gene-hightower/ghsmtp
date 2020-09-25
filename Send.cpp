@@ -861,7 +861,6 @@ bool Send::send(std::string_view msg_input)
   if (!conn_) {
     return false;
   }
-  // FIXME this should be done in parallel
   auto is{imemstream{msg_input.data(), msg_input.length()}};
   if (!do_send(*conn_, is)) {
     LOG(WARNING) << "failed to send to " << conn_->server_id;

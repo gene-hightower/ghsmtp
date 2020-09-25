@@ -158,9 +158,11 @@ private:
 
   std::random_device random_device_;
 
-  // White and black lists for domains.
-  CDB white_;
-  CDB black_;
+  // Allow and block lists for domains.
+  CDB allow_;
+  CDB block_;
+
+  // Forwards
   CDB forward_;
 
   // Domains we receive mail for.
@@ -192,8 +194,8 @@ private:
   // bool prdr_{false};
 
   // per connection
-  bool fcrdns_whitelisted_{false};
-  bool ip_whitelisted_{false};
+  bool fcrdns_allowed_{false};
+  bool ip_allowed_{false};
 };
 
 #endif // SESSION_DOT_HPP

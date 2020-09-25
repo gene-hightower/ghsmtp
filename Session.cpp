@@ -84,7 +84,7 @@ char const* bls[]{
     "zen.spamhaus.org",
 };
 
-/*** Last octet from A record returned by blacklists ***
+/*** Last octet from A record returned by blocklists ***
 
 From <http://uribl.com/about.shtml#implementation>
 
@@ -160,13 +160,13 @@ Session::Session(fs::path                  config_path,
   , srs_(config_path)
 {
   auto accept_db_name  = config_path_ / "accept_domains";
-  auto black_db_name   = config_path_ / "black";
-  auto white_db_name   = config_path_ / "white";
+  auto allow_db_name   = config_path_ / "allow";
+  auto block_db_name   = config_path_ / "block";
   auto forward_db_name = config_path_ / "forward";
 
   accept_domains_.open(accept_db_name);
-  black_.open(black_db_name);
-  white_.open(white_db_name);
+  allow_.open(allow_db_name);
+  block_.open(block_db_name);
   forward_.open(forward_db_name);
 
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
@@ -300,7 +300,7 @@ void Session::greeting()
     *******************************************************************/
 
     // Wait a bit of time for pre-greeting traffic.
-    if (!(ip_whitelisted_ || fcrdns_whitelisted_)) {
+    if (!(ip_allowed_ || fcrdns_allowed_)) {
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         // no glog message at this point
@@ -650,7 +650,7 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  if (spf_result_ == SPF::Result::FAIL && !ip_whitelisted_)
+  if (spf_result_ == SPF::Result::FAIL && !ip_allowed_)
     return {SpamStatus::spam, "SPF failed"};
 
   // These should have already been rejected by verify_client_().
@@ -665,22 +665,22 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     why_ham.emplace_back("they used TLS");
 
   if (spf_result_ == SPF::Result::PASS) {
-    if (lookup_domain(white_, spf_sender_domain_)) {
-      why_ham.emplace_back(fmt::format("SPF sender domain ({}) is whitelisted",
+    if (lookup_domain(allow_, spf_sender_domain_)) {
+      why_ham.emplace_back(fmt::format("SPF sender domain ({}) is allowed",
                                        spf_sender_domain_.utf8()));
     }
     else {
       auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
-      if (tld_dom && white_.contains(tld_dom)) {
+      if (tld_dom && allow_.contains(tld_dom)) {
         why_ham.emplace_back(fmt::format(
-            "SPF sender registered domain ({}) is whitelisted", tld_dom));
+            "SPF sender registered domain ({}) is allowed", tld_dom));
       }
     }
   }
 
-  if (fcrdns_whitelisted_)
+  if (fcrdns_allowed_)
     why_ham.emplace_back(
-        fmt::format("FCrDNS (or it's registered domain) is whitelisted"));
+        fmt::format("FCrDNS (or it's registered domain) is allowed"));
 
   if (!why_ham.empty())
     return {SpamStatus::ham,
@@ -1367,7 +1367,7 @@ void Session::exit_()
 }
 
 namespace {
-bool ip4_whitelisted(char const* addr)
+bool ip4_allowed(char const* addr)
 {
   struct nw {
     char const* net;
@@ -1458,7 +1458,7 @@ bool ip4_whitelisted(char const* addr)
         << "bogus config net=" << network.net << ", mask=" << network.mask;
 
     if (net32 == (addr32 & mask32)) {
-      LOG(INFO) << addr << " whitelisted " << network.comment;
+      LOG(INFO) << addr << " allowed " << network.comment;
       return true;
     }
   }
@@ -1474,11 +1474,11 @@ bool ip4_whitelisted(char const* addr)
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
-  auto ip_black_db_name = config_path_ / "ip-black";
-  CDB  ip_black{ip_black_db_name};
-  if (ip_black.contains(sock_.them_c_str())) {
+  auto ip_block_db_name = config_path_ / "ip-block";
+  CDB  ip_block{ip_block_db_name};
+  if (ip_block.contains(sock_.them_c_str())) {
     error_msg =
-        fmt::format("IP address {} on static blacklist", sock_.them_c_str());
+        fmt::format("IP address {} on static blocklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
@@ -1487,17 +1487,17 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if ((sock_.them_address_literal() == IP4::loopback_literal) ||
       (sock_.them_address_literal() == IP6::loopback_literal)) {
-    LOG(INFO) << "loopback address whitelisted";
-    ip_whitelisted_ = true;
+    LOG(INFO) << "loopback address allowed";
+    ip_allowed_ = true;
     client_fcrdns_.emplace_back("localhost");
     client_ = fmt::format("localhost {}", sock_.them_address_literal());
     return true;
   }
 
   if (IP::is_private(sock_.them_address_literal())) {
-    LOG(INFO) << "local address whitelisted";
-    ip_whitelisted_ = true;
-    client_         = sock_.them_address_literal();
+    LOG(INFO) << "local address allowed";
+    ip_allowed_ = true;
+    client_     = sock_.them_address_literal();
     return true;
   }
 
@@ -1509,37 +1509,37 @@ bool Session::verify_ip_address_(std::string& error_msg)
   if (!client_fcrdns_.empty()) {
     client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
                           sock_.them_address_literal());
-    // check whitelist
+    // check allow list
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (white_.contains(client_fcrdns.ascii())) {
-        // LOG(INFO) << "FCrDNS " << client_fcrdns << " whitelisted";
-        fcrdns_whitelisted_ = true;
+      if (allow_.contains(client_fcrdns.ascii())) {
+        // LOG(INFO) << "FCrDNS " << client_fcrdns << " allowed";
+        fcrdns_allowed_ = true;
         return true;
       }
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
-        if (white_.contains(tld)) {
-          // LOG(INFO) << "FCrDNS registered domain " << tld << " whitelisted";
-          fcrdns_whitelisted_ = true;
+        if (allow_.contains(tld)) {
+          // LOG(INFO) << "FCrDNS registered domain " << tld << " allowed";
+          fcrdns_allowed_ = true;
           return true;
         }
       }
     }
-    // check blacklist
+    // check blocklist
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (black_.contains(client_fcrdns.ascii())) {
+      if (block_.contains(client_fcrdns.ascii())) {
         error_msg =
-            fmt::format("FCrDNS {} on static blacklist", client_fcrdns.ascii());
-        out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+            fmt::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
+        out_() << "554 5.7.1 blocklisted\r\n" << std::flush;
         return false;
       }
 
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
-        if (black_.contains(tld)) {
+        if (block_.contains(tld)) {
           error_msg = fmt::format(
-              "FCrDNS registered domain {} on static blacklist", tld);
-          out_() << "554 5.7.1 blacklisted\r\n" << std::flush;
+              "FCrDNS registered domain {} on static blocklist", tld);
+          out_() << "554 5.7.1 blocklisted\r\n" << std::flush;
           return false;
         }
       }
@@ -1551,15 +1551,15 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if (IP4::is_address(sock_.them_c_str())) {
 
-    if (ip4_whitelisted(sock_.them_c_str())) {
-      LOG(INFO) << "on internal white list";
-      ip_whitelisted_ = true;
+    if (ip4_allowed(sock_.them_c_str())) {
+      LOG(INFO) << "on internal allow list";
+      ip_allowed_ = true;
       return true;
     }
 
     auto const reversed{IP4::reverse(sock_.them_c_str())};
 
-    // Check with white list.
+    // Check with allow list.
     std::shuffle(std::begin(Config::wls), std::end(Config::wls),
                  random_device_);
 
@@ -1569,7 +1569,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         using namespace boost::xpressive;
 
         auto const as = q.get_strings()[0];
-        LOG(INFO) << "on white list " << wl << " as " << as;
+        LOG(INFO) << "on allow list " << wl << " as " << as;
 
         mark_tag     x_(1);
         mark_tag     y_(2);
@@ -1583,17 +1583,17 @@ bool Session::verify_ip_address_(std::string& error_msg)
           int value = 0;
           std::from_chars(y.data(), y.data() + y.size(), value);
           if (value > 0) {
-            ip_whitelisted_ = true;
-            LOG(INFO) << "white-listing";
+            ip_allowed_ = true;
+            LOG(INFO) << "allowed";
           }
         }
 
-        // Any A record skips check on black list
+        // Any A record skips check on block list
         return true;
       }
     }
 
-    // Check with black hole lists. <https://en.wikipedia.org/wiki/DNSBL>
+    // Check with block lists. <https://en.wikipedia.org/wiki/DNSBL>
     std::shuffle(std::begin(Config::bls), std::end(Config::bls),
                  random_device_);
 
@@ -1652,8 +1652,8 @@ bool Session::verify_client_(Domain const& client_identity,
     }
 
     // Give 'em a pass.
-    if (ip_whitelisted_) {
-      LOG(INFO) << "white-listed IP address can claim to be "
+    if (ip_allowed_) {
+      LOG(INFO) << "allow-listed IP address can claim to be "
                 << client_identity;
       return true;
     }
@@ -1683,10 +1683,10 @@ bool Session::verify_client_(Domain const& client_identity,
     // return true;
   }
 
-  if (lookup_domain(black_, client_identity)) {
+  if (lookup_domain(block_, client_identity)) {
     error_msg =
-        fmt::format("claimed blacklisted identity {}", client_identity.ascii());
-    out_() << "550 4.7.1 blacklisted identity\r\n" << std::flush;
+        fmt::format("claimed blocked identity {}", client_identity.ascii());
+    out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
 
@@ -1697,10 +1697,10 @@ bool Session::verify_client_(Domain const& client_identity,
     // LOG(WARNING) << "claimed identity has no registered domain";
     // return true;
   }
-  else if (black_.contains(tld)) {
-    error_msg = fmt::format(
-        "claimed identity has blacklisted registered domain {}", tld);
-    out_() << "550 4.7.1 blacklisted registered domain\r\n" << std::flush;
+  else if (block_.contains(tld)) {
+    error_msg =
+        fmt::format("claimed identity has blocked registered domain {}", tld);
+    out_() << "550 4.7.1 blocked registered domain\r\n" << std::flush;
     return false;
   }
 
@@ -1770,8 +1770,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return true;
   }
 
-  if (white_.contains(sender.ascii())) {
-    LOG(INFO) << "sender " << sender.ascii() << " whitelisted";
+  if (allow_.contains(sender.ascii())) {
+    LOG(INFO) << "sender " << sender.ascii() << " allowed";
     return true;
   }
 
@@ -1793,8 +1793,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
     out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
-  if (white_.contains(reg_dom)) {
-    LOG(INFO) << "sender registered domain \"" << reg_dom << "\" whitelisted";
+  if (allow_.contains(reg_dom)) {
+    LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
     return true;
   }
 
@@ -1802,7 +1802,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
   return verify_sender_domain_uribl_(reg_dom, error_msg);
 }
 
-// check sender domain on dynamic URI black lists
+// check sender domain on dynamic URI block lists
 bool Session::verify_sender_domain_uribl_(std::string_view sender,
                                           std::string&     error_msg)
 {
@@ -1832,7 +1832,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   if (!sock_.has_peername()) {
     auto const ip_addr = "127.0.0.1"; // use localhost for local socket
     spf_received_ =
-        fmt::format("Received-SPF: pass ({}: whitelisted) client-ip={}; "
+        fmt::format("Received-SPF: pass ({}: allow-listed) client-ip={}; "
                     "envelope-from={}; helo={};",
                     server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
@@ -1865,9 +1865,9 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_sender_domain_ = spf_request.get_sender_dom();
 
   if (spf_result_ == SPF::Result::PASS) {
-    if (lookup_domain(black_, spf_sender_domain_)) {
+    if (lookup_domain(block_, spf_sender_domain_)) {
       LOG(INFO) << "SPF sender domain (" << spf_sender_domain_
-                << ") is blacklisted";
+                << ") is blocked";
       return false;
     }
   }

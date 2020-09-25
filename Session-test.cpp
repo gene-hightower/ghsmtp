@@ -39,13 +39,13 @@ struct Session_test {
     CHECK(!sess.verify_sender_domain_(
         Domain("invalid-domain-has-only-one-lable"), error_msg));
 
-    // white listed
+    // allow listed
     CHECK(sess.verify_sender_domain_(Domain("lots.of.lables.digilicious.com"),
                                      error_msg));
-    CHECK(sess.verify_sender_domain_(Domain("whitelisted.digilicious.com"),
+    CHECK(sess.verify_sender_domain_(Domain("allowlisted.digilicious.com"),
                                      error_msg));
     CHECK(sess.verify_sender_domain_(
-        Domain("reg-domain-is-whitelisted.digilicious.com"), error_msg));
+        Domain("reg-domain-is-allowlisted.digilicious.com"), error_msg));
 
     // bounce address
     CHECK(sess.verify_sender_domain_(Domain(""), error_msg));
@@ -59,7 +59,7 @@ struct Session_test {
 
     // IP address
     // auto error_msg{std::string{}};
-    // CHECK(!sess.verify_ip_address_("blacklisted.digilicious.com"s));
+    // CHECK(!sess.verify_ip_address_("blocklisted.digilicious.com"s));
   }
 };
 

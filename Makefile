@@ -211,13 +211,13 @@ esc-test_STEMS := esc
 
 databases := \
 	accept_domains.cdb \
+	allow.cdb \
 	bad_recipients.cdb \
 	bad_senders.cdb \
-	black.cdb \
+	block.cdb \
 	forward.cdb \
-	ip-black.cdb \
-	temp_fail.cdb \
-	white.cdb
+	ip-block.cdb \
+	temp_fail.cdb
 
 all:: $(databases) public_suffix_list.dat
 
@@ -240,17 +240,17 @@ clean-test::
 
 clean::
 	rm -f accept_domains.cdb
-	rm -f black.cdb
+	rm -f block.cdb
 	rm -f cdb-gen
 	rm -f forward.cdb
-	rm -f ip-black.cdb
-	rm -f white.cdb
+	rm -f ip-block.cdb
+	rm -f allow.cdb
 
 accept_domains.cdb: accept_domains cdb-gen
-black.cdb: black cdb-gen
-ip-black.cdb: ip-black cdb-gen
+allow.cdb: allow cdb-gen
+block.cdb: block cdb-gen
+ip-block.cdb: ip-block cdb-gen
 three-level-tlds.cdb: three-level-tlds cdb-gen
-white.cdb: white cdb-gen
 
 forward.cdb: forward
 	cat $< | cdb -c $@
@@ -306,5 +306,5 @@ show::
 	llvm-cov show ./smtp -instr-profile=smtp.profdata
 
 init::
-	touch accept_domains bad_recipients bad_senders black ip-black temp_fail
+	touch accept_domains bad_recipients bad_senders block ip-block temp_fail
 	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel
