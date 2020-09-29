@@ -595,7 +595,7 @@ template <>
 struct spf_action<spf_kv_list> {
   static void apply0(received_spf_parsed& spf)
   {
-    for (auto kvp : spf.kv_list) {
+    for (auto const& kvp : spf.kv_list) {
       if (spf.kv_map.contains(kvp.first)) {
         LOG(WARNING) << "dup key: " << kvp.first << "=" << kvp.second;
         LOG(WARNING) << "    and: " << kvp.first << "="
@@ -800,10 +800,12 @@ bool authentication(message::parsed& msg,
   LOG(INFO) << "add_authentication_results";
   CHECK(!msg.headers.empty());
 
+  // Remove any redundant Authentication-Results headers
+
   // Run our message through OpenDKIM verify
 
   OpenDKIM::verify dkv;
-  for (auto header : msg.headers) {
+  for (auto const& header : msg.headers) {
     auto const hv = header.as_view();
     // LOG(INFO) << "header «" << esc(hv, esc_line_option::multi) << "»";
     dkv.header(hv);
@@ -944,7 +946,7 @@ bool authentication(message::parsed& msg,
   // ARC
 
   OpenARC::verify arv;
-  for (auto header : msg.headers) {
+  for (auto const& header : msg.headers) {
     arv.header(header.as_view());
   }
   arv.eoh();
@@ -1067,7 +1069,7 @@ void dkim_check(message::parsed& msg, char const* domain)
 
   // Run our message through OpenDKIM verify
 
-  for (auto header : msg.headers) {
+  for (auto const& header : msg.headers) {
     auto const hv = header.as_view();
     dkv.header(hv);
   }
