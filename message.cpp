@@ -352,12 +352,137 @@ struct mailbox_list_only: seq<mailbox_list, eof> {};
 
 //.............................................................................
 
-// struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
-//                                  authres_payload> {};
+// <https://www.rfc-editor.org/rfc/rfc2045.html>
+
+//  tspecials :=  "(" / ")" / "<" / ">" / "@" /
+//                "," / ";" / ":" / "\" / <">
+//                "/" / "[" / "]" / "?" / "="
+
+//  token := 1*<any (US-ASCII) CHAR except SPACE, CTLs,
+//              or tspecials>
+
+// CTL   0..31 127
+// SPACE 32
+
+// tspecials
+// 34     "
+// 40..41 ()
+// 44     ,
+// 47     /
+// 58..64 ;:<=>?@
+// 91..93 [\]
+// 127    DEL
+
+struct tchar45          : ranges<        // NUL..' '
+                                 33, 33, // !
+                              // 34, 34, // "
+                                 35, 39, // #$%&'
+                              // 40, 41, // ()
+                                 42, 43, // *+
+                              // 44, 44, // ,
+                                 45, 46, // -.
+                              // 47, 47, // /
+                                 48, 57, // 0123456789
+                              // 58, 64, // ;:<=>?@
+                                 65, 90, // A..Z
+                              // 91, 93, // [\]
+                                 94, 126 // ^_` a..z {|}~
+                              // 127,127 // DEL
+                                > {};
+
+struct token45          : plus<tchar45> {};
+
+//.............................................................................
+
+// <https://tools.ietf.org/html/rfc8601#section-2.2>
+
+struct value            : sor<token45, quoted_string> {};
+
+struct authserv_id      :  value {};
+
+struct authres_version  : seq<plus<DIGIT>, opt<CFWS>> {};
+
+struct no_result        : seq<opt<CFWS>, one<';'>, opt<CFWS>, TAO_PEGTL_ISTRING("none")> {};
+
+struct let_dig          : sor<ALPHA, DIGIT> {};
+
+struct ldh_tail         : star<sor<seq<plus<one<'-'>>, let_dig>, let_dig>> {};
+
+struct ldh_str          : seq<let_dig, ldh_tail> {};
+
+struct keyword          : ldh_str {};
+
+struct method_version   : seq<plus<DIGIT>, opt<CFWS>> {};
+
+//     method = Keyword [ [CFWS] "/" [CFWS] method-version ]
+
+struct method           : seq<keyword, opt<opt<CFWS>, one<'/'>, opt<CFWS>, method_version>> {};
+
+//     methodspec = [CFWS] method [CFWS] "=" [CFWS] result
+//                ; indicates which authentication method was evaluated
+//                ; and what its output was
+
+struct methodspec       : seq<opt<CFWS>, method, opt<CFWS>, one<'='>, opt<CFWS>, result> {};
+
+//     reasonspec = "reason" [CFWS] "=" [CFWS] value
+//                ; a free-form comment on the reason the given result
+//                ; was returned
+
+struct reasonspec       : seq<TAO_PEGTL_ISTRING("reason"), opt<CFWS>, one<'='>, opt<CFWS>, value> {};
+
+//     pvalue = [CFWS] ( value / [ [ local-part ] "@" ] domain-name )
+//              [CFWS]
+
+struct pvalue           : seq<opt<CFWS>, sor<value,
+                                             seq<opt<seq<opt<local_part>, one<'@'>>, domain>>>,
+                              opt<CFWS>> {};
+
+struct ptype            : keyword {};
+
+struct special_smtp_verb: sor<TAO_PEGTL_ISTRING("mailfrom"),
+                              TAO_PEGTL_ISTRING("rcptto")> {};
+
+struct property         : sor<special_smtp_verb, keyword> {};
+
+//     propspec = ptype [CFWS] "." [CFWS] property [CFWS] "=" pvalue
+//              ; an indication of which properties of the message
+//              ; were evaluated by the authentication scheme being
+//              ; applied to yield the reported result
+
+struct propspec         : seq<ptype, opt<CFWS>, one<'.'>, opt<CFWS>, property, opt<CFWS>, one<'='>, pvalue> {};
+
+struct resinfo          : seq<opt<CFWS>, one<';'>, methodspec, opt<seq<CFWS, reasonspec>>,
+                              opt<seq<CFWS, plus<propspec>>>
+                             > {};
+
+struct authres_payload  : seq<opt<CFWS>, authserv_id,
+                              opt<seq<CFWS, authres_version>>,
+                              sor<no_result, plus<resinfo>>,
+                              opt<CFWS>, CRLF> {};
+
+struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
+                                 authres_payload> {};
+
+struct authres_header_field_only: seq<authres_header_field, eof> {};
 
 //.............................................................................
 
 // clang-format on
+
+template <typename Rule>
+struct ar_action : nothing<Rule> {
+};
+
+template <>
+struct ar_action<authserv_id> {
+  template <typename Input>
+  static void apply(Input const& in, std::string& authservid)
+  {
+    authservid = in.string();
+  }
+};
+
+//.............................................................................
 
 template <typename Rule>
 struct msg_action : nothing<Rule> {
@@ -657,6 +782,15 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 }
 
 namespace message {
+
+bool authentication_reaults_parse(std::string_view input,
+                                  std::string&     authservid)
+{
+  auto in{memory_input<>(input.data(), input.size(),
+                         "authentication_reaults_header")};
+  return tao::pegtl::parse<RFC5322::authres_header_field_only,
+                           RFC5322::ar_action>(in, authservid);
+}
 
 bool authentication(message::parsed& msg,
                     char const*      sender,

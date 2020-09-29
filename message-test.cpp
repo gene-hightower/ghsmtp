@@ -42,6 +42,19 @@ int main(int argc, char* argv[])
     return "(none)"s;
   }();
 
+  auto constexpr authentication_results_str =
+      "Authentication-Results: digilicious.com;\r\n"
+      "       spf=pass smtp.helo=mta122b.pmx1.epsl1.com;\r\n"
+      "       dkim=pass header.i=@mail.paypal.com header.s=pp-epsilon1 "
+      "header.b=\"A4JA0zWd\";\r\n"
+      "       dmarc=fail header.from=mail.paypal.com;\r\n"
+      "       arc=none\r\n";
+
+  std::string authservid;
+  CHECK(message::authentication_reaults_parse(authentication_results_str,
+                                              authservid));
+  CHECK_EQ(authservid, "digilicious.com");
+
   auto const dom_from{Domain(server_identity)};
   auto const dom_to{Domain(server_identity)};
 
