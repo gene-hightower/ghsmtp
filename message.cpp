@@ -1174,14 +1174,14 @@ void dkim_sign(message::parsed& msg,
   CHECK(msg.parse_hdr(msg.sig_str));
 }
 
-void rewrite(message::parsed& msg,
-             std::string      mail_from,
-             std::string      reply_to,
-             char const*      sender,
-             char const*      selector,
-             fs::path         key_file)
+void rewrite_from_to(message::parsed& msg,
+                     std::string      mail_from,
+                     std::string      reply_to,
+                     char const*      sender,
+                     char const*      selector,
+                     fs::path         key_file)
 {
-  LOG(INFO) << "rewrite";
+  LOG(INFO) << "rewrite_from_to";
 
   remove_delivery_headers(msg);
 

@@ -908,11 +908,12 @@ bool Session::do_forward_(message::parsed& msg)
   if (munging) {
     auto const from_hdr =
         fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_addr);
-    message::rewrite(msg_fwd, from_hdr, "", sender, selector, key_file);
+    message::rewrite_from_to(msg_fwd, from_hdr, "", sender, selector, key_file);
   }
   else {
     auto const reply_to_hdr = fmt::format("Reply-To: {}", reply_addr);
-    message::rewrite(msg_fwd, "", reply_to_hdr, sender, selector, key_file);
+    message::rewrite_from_to(msg_fwd, "", reply_to_hdr, sender, selector,
+                             key_file);
   }
 
   // Forward it on

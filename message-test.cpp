@@ -127,7 +127,8 @@ int main(int argc, char* argv[])
     auto const reply_to =
         fmt::format("Reply-To: {}@{}", srs.enc_reply(reply), server_identity);
 
-    message::rewrite(msg, "", reply_to, sender.c_str(), selector, key_file);
+    message::rewrite_from_to(msg, "", reply_to, sender.c_str(), selector,
+                             key_file);
 
     std::cout << msg.as_string();
   }
@@ -182,8 +183,8 @@ int main(int argc, char* argv[])
     file.open(argv[a]);
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
-    rewrite(msg, "bounce@digilicious.com", "noreply@digilicious.com",
-            sender.c_str(), selector, key_file);
+    rewrite_from_to(msg, "bounce@digilicious.com", "noreply@digilicious.com",
+                    sender.c_str(), selector, key_file);
     std::cout << msg.as_string();
   }
 }
