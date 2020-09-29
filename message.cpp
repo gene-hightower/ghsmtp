@@ -783,11 +783,11 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 
 namespace message {
 
-bool authentication_reaults_parse(std::string_view input,
+bool authentication_results_parse(std::string_view input,
                                   std::string&     authservid)
 {
   auto in{memory_input<>(input.data(), input.size(),
-                         "authentication_reaults_header")};
+                         "authentication_results_header")};
   return tao::pegtl::parse<RFC5322::authres_header_field_only,
                            RFC5322::ar_action>(in, authservid);
 }

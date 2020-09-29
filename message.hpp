@@ -108,7 +108,7 @@ struct parsed {
   std::vector<std::string> arc_hdrs;
 };
 
-bool authentication_reaults_parse(std::string_view input,
+bool authentication_results_parse(std::string_view input,
                                   std::string&     authservid);
 
 bool authentication(message::parsed& msg,
