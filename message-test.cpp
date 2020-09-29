@@ -48,10 +48,10 @@ int main(int argc, char* argv[])
       "       dkim=pass header.i=@mail.paypal.com header.s=pp-epsilon1 "
       "header.b=\"A4JA0zWd\";\r\n"
       "       dmarc=fail header.from=mail.paypal.com;\r\n"
-      "       arc=none\r\n";
+      "       arc=none";
 
   std::string authservid;
-  CHECK(message::authentication_reaults_parse(authentication_results_str,
+  CHECK(message::authentication_results_parse(authentication_results_str,
                                               authservid));
   CHECK_EQ(authservid, "digilicious.com");
 
@@ -109,7 +109,8 @@ int main(int argc, char* argv[])
   if (message_parsed) {
     LOG(INFO) << "message parsed";
 
-    auto authentic = authentication(msg, sender.c_str(), selector, key_file);
+    auto const authentic =
+        authentication(msg, sender.c_str(), selector, key_file);
 
     if (authentic)
       LOG(INFO) << "authentic";
@@ -131,6 +132,15 @@ int main(int argc, char* argv[])
                              key_file);
 
     std::cout << msg.as_string();
+
+    // auth again
+    // authentication(msg, sender.c_str(), selector, key_file);
+
+    auto const count = std::count_if(
+        begin(msg.headers), end(msg.headers),
+        [](auto const& hdr) { return hdr == message::Authentication_Results; });
+    // should have only one header, no matter what
+    CHECK_EQ(count, 1);
   }
   else {
     LOG(INFO) << "message failed to parse";

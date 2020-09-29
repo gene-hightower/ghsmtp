@@ -458,7 +458,7 @@ struct resinfo          : seq<opt<CFWS>, one<';'>, methodspec, opt<seq<CFWS, rea
 struct authres_payload  : seq<opt<CFWS>, authserv_id,
                               opt<seq<CFWS, authres_version>>,
                               sor<no_result, plus<resinfo>>,
-                              opt<CFWS>, CRLF> {};
+                              opt<CFWS>> {};
 
 struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
                                  authres_payload> {};
@@ -801,6 +801,20 @@ bool authentication(message::parsed& msg,
   CHECK(!msg.headers.empty());
 
   // Remove any redundant Authentication-Results headers
+  msg.headers.erase(
+      std::remove_if(msg.headers.begin(), msg.headers.end(),
+                     [sender](auto const& hdr) {
+                       if (hdr == Authentication_Results) {
+                         std::string authservid;
+                         if (message::authentication_results_parse(
+                                 hdr.as_view(), authservid)) {
+                           return Domain::match(authservid, sender);
+                         }
+                         LOG(WARNING) << "failed to parse " << hdr.as_string();
+                       }
+                       return false;
+                     }),
+      msg.headers.end());
 
   // Run our message through OpenDKIM verify
 
