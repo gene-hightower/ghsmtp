@@ -11,6 +11,8 @@
 #include "fs.hpp"
 #include "iequal.hpp"
 
+#include <glog/logging.h>
+
 namespace message {
 
 // RFC-5322 header names
@@ -43,6 +45,8 @@ struct header {
 
   std::string_view as_view() const
   {
+    // Verify that name and value views point to the same text.
+    CHECK_EQ(name.begin() + name.length() + 1, value.begin());
     return {name.begin(),
             static_cast<size_t>(std::distance(name.begin(), value.end()))};
   }
