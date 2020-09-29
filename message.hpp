@@ -51,7 +51,7 @@ struct header {
 
   std::string_view name;
   std::string_view value;
-}; // namespace header
+};
 
 struct name_addr {
   std::string name;
