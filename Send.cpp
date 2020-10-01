@@ -455,6 +455,13 @@ std::vector<Domain> get_mxs(DNS::Resolver& res, Domain const& domain)
     }
   }
 
+  for (auto const& mx : mxs) {
+    if (mx.is_address_literal()) {
+      LOG(WARNING) << "MX record for " << dom
+                   << " contains address literal: " << mx;
+    }
+  }
+
   return mxs;
 }
 
