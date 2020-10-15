@@ -71,8 +71,8 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
   auto const mail_from = Mailbox(rep.mail_from);
 
   auto const payload =
-      fmt::format("{}{}{}{}{}", rep.rcpt_to_local_part, sep_char,
-                  mail_from.local_part(), sep_char, mail_from.domain().ascii());
+      fmt::format("{}{}{}{}", srs_secret, rep.rcpt_to_local_part,
+                  mail_from.local_part(), mail_from.domain().ascii());
 
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
@@ -80,7 +80,9 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
       std::string(reinterpret_cast<char*>(hash), hash_bytes_reply);
   auto const hash_enc = cppcodec::base32_crockford::encode(hash_str);
 
-  return fmt::format("{}{}{}{}", REP_PREFIX, hash_enc, sep_char, payload);
+  return fmt::format("{}{}{}{}{}{}{}{}", REP_PREFIX, hash_enc, sep_char,
+                     rep.rcpt_to_local_part, sep_char, mail_from.local_part(),
+                     sep_char, mail_from.domain().ascii());
 }
 
 static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr)
@@ -156,8 +158,8 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
   auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
 
-  auto const payload = fmt::format("{}{}{}{}{}", rcpt_to_loc, sep_char,
-                                   mail_from_loc, sep_char, mail_from_dom);
+  auto const payload = fmt::format("{}{}{}{}", srs_secret, rcpt_to_loc,
+                                   mail_from_loc, mail_from_dom);
 
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
