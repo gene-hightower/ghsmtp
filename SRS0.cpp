@@ -32,8 +32,10 @@ constexpr char sep_char = '=';
 
 static std::string hash_rep(SRS0::from_to const& rep)
 {
+  auto const mail_from = Mailbox(rep.mail_from);
   auto const hb =
-      fmt::format("{}{}{}", srs_secret, rep.mail_from, rep.rcpt_to_local_part);
+      fmt::format("{}{}{}{}", srs_secret, rep.rcpt_to_local_part,
+                  mail_from.local_part(), mail_from.domain().ascii());
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
   return std::string(reinterpret_cast<char const*>(hash), hash_bytes_reply);
@@ -70,15 +72,7 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
 
   auto const mail_from = Mailbox(rep.mail_from);
 
-  auto const payload =
-      fmt::format("{}{}{}{}", srs_secret, rep.rcpt_to_local_part,
-                  mail_from.local_part(), mail_from.domain().ascii());
-
-  unsigned char hash[picosha2::k_digest_size];
-  picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
-  auto const hash_str =
-      std::string(reinterpret_cast<char*>(hash), hash_bytes_reply);
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash_str);
+  auto const hash_enc = cppcodec::base32_crockford::encode(hash_rep(rep));
 
   return fmt::format("{}{}{}{}{}{}{}{}", REP_PREFIX, hash_enc, sep_char,
                      rep.rcpt_to_local_part, sep_char, mail_from.local_part(),
@@ -158,24 +152,17 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
   auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
 
-  auto const payload = fmt::format("{}{}{}{}", srs_secret, rcpt_to_loc,
-                                   mail_from_loc, mail_from_dom);
+  SRS0::from_to rep;
+  rep.rcpt_to_local_part = rcpt_to_loc;
+  rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
 
-  unsigned char hash[picosha2::k_digest_size];
-  picosha2::hash256(begin(payload), end(payload), begin(hash), end(hash));
-  auto const hash_str =
-      std::string(reinterpret_cast<char*>(hash), hash_bytes_reply);
-
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash_str);
+  auto const hash_enc = cppcodec::base32_crockford::encode(hash_rep(rep));
 
   if (reply_hash != hash_enc) {
     LOG(WARNING) << "hash mismatch in reply " << addr;
     return {};
   }
 
-  SRS0::from_to rep;
-  rep.rcpt_to_local_part = rcpt_to_loc;
-  rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
   return rep;
 }
 
