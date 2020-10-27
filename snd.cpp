@@ -58,11 +58,13 @@ DEFINE_string(to_name, "", "RFC5322 To: name");
 DEFINE_string(smtp_from, "", "RFC5321 MAIL FROM address");
 DEFINE_string(smtp_to, "", "RFC5321 RCPT TO address");
 
+DEFINE_string(content_type, "", "RFC5322 Content-Type");
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
 DEFINE_string(keywords, "", "RFC5322 Keywords: header");
 DEFINE_string(references, "", "RFC5322 References: header");
 DEFINE_string(in_reply_to, "", "RFC5322 In-Reply-To: header");
 DEFINE_string(reply_to, "", "RFC5322 Reply-To: header");
+DEFINE_string(reply_2, "", "Second RFC5322 Reply-To: header");
 
 DEFINE_bool(4, false, "use only IP version 4");
 DEFINE_bool(6, false, "use only IP version 6");
@@ -674,7 +676,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
         continue;
       }
 
-      LOG(INFO) << fd << " connected to [" << addr << "]:" << port;
+      LOG(INFO) << fd << "    connected to [" << addr << "]:" << port;
       return fd;
     }
 
@@ -720,7 +722,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
         continue;
       }
 
-      LOG(INFO) << fd << " connected to " << addr << ":" << port;
+      LOG(INFO) << "    connected to " << addr << ":" << port;
       return fd;
     }
 
@@ -1246,12 +1248,20 @@ auto create_eml(Domain const&               sender,
   if (!FLAGS_reply_to.empty())
     eml.add_hdr("Reply-To", FLAGS_reply_to);
 
+  if (!FLAGS_reply_2.empty())
+    eml.add_hdr("Reply-To", FLAGS_reply_2);
+
   eml.add_hdr("MIME-Version", "1.0");
   eml.add_hdr("Content-Language", "en-US");
 
   auto magic{Magic{}}; // to ID buffer contents
 
-  eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
+  if (!FLAGS_content_type.empty()) {
+    eml.add_hdr("Content-Type", FLAGS_content_type);
+  }
+  else {
+    eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
+  }
 
   return eml;
 }
@@ -1765,7 +1775,7 @@ bool snd(fs::path                    config_path,
             cnn.sock.out() << '.';
           }
           cnn.sock.out() << line;
-          if (line.back() != '\r')
+          if (line.length() && line.back() != '\r')
             cnn.sock.out() << '\r';
           cnn.sock.out() << '\n';
         }
