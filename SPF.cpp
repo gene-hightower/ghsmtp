@@ -98,7 +98,7 @@ void Request::set_ip_str(char const* ip)
     set_ipv6_str(ip);
   }
   else {
-    LOG(FATAL) << "non IP address passwd to set_ip_str: " << ip;
+    LOG(FATAL) << "non IP address passed to set_ip_str: " << ip;
   }
 }
 void Request::set_ipv4_str(char const* ipv4)
