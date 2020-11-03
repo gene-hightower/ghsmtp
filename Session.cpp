@@ -1772,11 +1772,6 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return true;
   }
 
-  if (allow_.contains(sender.ascii())) {
-    LOG(INFO) << "sender " << sender.ascii() << " allowed";
-    return true;
-  }
-
   // Break sender domain into labels:
 
   std::vector<std::string> labels;
@@ -1789,19 +1784,23 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return false;
   }
 
-  auto const reg_dom{tld_db_.get_registered_domain(sender.ascii())};
-  if (!reg_dom) {
-    error_msg = fmt::format("{} has no registered domain", sender.ascii());
-    out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
-    return false;
-  }
-  if (allow_.contains(reg_dom)) {
-    LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
+  if (allow_.contains(sender.ascii())) {
+    LOG(INFO) << "sender " << sender.ascii() << " allowed";
     return true;
   }
+  auto const reg_dom{tld_db_.get_registered_domain(sender.ascii())};
+  if (reg_dom) {
+    if (allow_.contains(reg_dom)) {
+      LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
+      return true;
+    }
 
-  // LOG(INFO) << "looking up " << reg_dom;
-  return verify_sender_domain_uribl_(reg_dom, error_msg);
+    // LOG(INFO) << "looking up " << reg_dom;
+    return verify_sender_domain_uribl_(reg_dom, error_msg);
+  }
+
+  LOG(INFO) << "sender \"" << sender << "\" not disallowed";
+  return true;
 }
 
 // check sender domain on dynamic URI block lists
@@ -1825,7 +1824,7 @@ bool Session::verify_sender_domain_uribl_(std::string_view sender,
     }
   }
 
-  // LOG(INFO) << sender << " cleared by URIBLs";
+  LOG(INFO) << "sender \"" << sender << "\" not blocked by URIBLs";
   return true;
 }
 

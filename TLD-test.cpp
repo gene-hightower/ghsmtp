@@ -10,6 +10,8 @@ int main(int argc, char const* argv[])
   CHECK_NOTNULL(tld.get_registered_domain("yahoo.com"));
   CHECK_NOTNULL(tld.get_registered_domain("google.com"));
 
+  CHECK_NOTNULL(tld.get_registered_domain("foo.blogspot.com.ar"));
+
   CHECK(!strcmp(tld.get_registered_domain("pi.digilicious.com"),
                 "digilicious.com"));
 

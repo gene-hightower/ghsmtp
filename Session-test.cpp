@@ -31,9 +31,9 @@ struct Session_test {
     auto       read_hook   = []() { std::cout << "Session-test read_hook\n"; };
     Session    sess(config_path, read_hook, STDIN_FILENO, fd_null);
 
-    auto sender{Domain{"example.er"}};
+    auto sender{Domain{"example.er"}}; // Not a public suffix
     auto error_msg{std::string{}};
-    CHECK(!sess.verify_sender_domain_(sender, error_msg));
+    CHECK(sess.verify_sender_domain_(sender, error_msg));
 
     // bogus
     CHECK(!sess.verify_sender_domain_(
@@ -51,7 +51,6 @@ struct Session_test {
     CHECK(sess.verify_sender_domain_(Domain(""), error_msg));
 
     CHECK(!sess.verify_sender_domain_(Domain("com"), error_msg));
-    CHECK(!sess.verify_sender_domain_(Domain("blogspot.com.ar"), error_msg));
 
     // SPF
     auto mb{Mailbox{"foo", "digilicious.com"}};
