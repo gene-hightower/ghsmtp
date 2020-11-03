@@ -1,3 +1,4 @@
 220 digilicious.com ESMTP - ghsmtp
 250 digilicious.com
-550 5.7.1 example.er has no registered domain
+250 2.1.0 MAIL FROM OK
+221 2.0.0 closing connection
