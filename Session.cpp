@@ -237,7 +237,8 @@ void Session::reset_()
 
   reverse_path_.clear();
   forward_path_.clear();
-  spf_received_.clear();
+  spf_received_helo_.clear();
+  spf_received_mailfrom_.clear();
   fwd_path_.clear();
   fwd_from_.clear();
   rep_info_.clear();
@@ -626,8 +627,11 @@ std::string Session::added_headers_(MessageStore const& msg)
   fmt::format_to(headers, ";\r\n\t{}\r\n", msg.when());
 
   // Received-SPF:
-  if (!spf_received_.empty()) {
-    fmt::format_to(headers, "{}\r\n", spf_received_);
+  if (!spf_received_helo_.empty()) {
+    fmt::format_to(headers, "{}\r\n", spf_received_helo_);
+  }
+  if (!spf_received_mailfrom_.empty()) {
+    fmt::format_to(headers, "{}\r\n", spf_received_mailfrom_);
   }
 
   return fmt::to_string(headers);
@@ -650,7 +654,8 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  if (spf_result_ == SPF::Result::FAIL && !ip_allowed_)
+  if (spf_result_mailfrom_ == SPF::Result::FAIL &&
+      spf_result_helo_ == SPF::Result::FAIL && !ip_allowed_)
     return {SpamStatus::spam, "SPF failed"};
 
   // These should have already been rejected by verify_client_().
@@ -664,13 +669,29 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   if (sock_.tls())
     why_ham.emplace_back("they used TLS");
 
-  if (spf_result_ == SPF::Result::PASS) {
-    if (lookup_domain(allow_, spf_sender_domain_)) {
+  if (spf_result_helo_ == SPF::Result::PASS) {
+    if (lookup_domain(allow_, spf_sender_domain_helo_)) {
       why_ham.emplace_back(fmt::format("SPF sender domain ({}) is allowed",
-                                       spf_sender_domain_.utf8()));
+                                       spf_sender_domain_helo_.utf8()));
     }
     else {
-      auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
+      auto tld_dom{
+          tld_db_.get_registered_domain(spf_sender_domain_helo_.ascii())};
+      if (tld_dom && allow_.contains(tld_dom)) {
+        why_ham.emplace_back(fmt::format(
+            "SPF sender registered domain ({}) is allowed", tld_dom));
+      }
+    }
+  }
+
+  if (spf_result_mailfrom_ == SPF::Result::PASS) {
+    if (lookup_domain(allow_, spf_sender_domain_mailfrom_)) {
+      why_ham.emplace_back(fmt::format("SPF sender domain ({}) is allowed",
+                                       spf_sender_domain_mailfrom_.utf8()));
+    }
+    else {
+      auto tld_dom{
+          tld_db_.get_registered_domain(spf_sender_domain_mailfrom_.ascii())};
       if (tld_dom && allow_.contains(tld_dom)) {
         why_ham.emplace_back(fmt::format(
             "SPF sender registered domain ({}) is allowed", tld_dom));
@@ -1832,60 +1853,76 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
     auto const ip_addr = "127.0.0.1"; // use localhost for local socket
-    spf_received_ =
+    spf_received_helo_ =
         fmt::format("Received-SPF: pass ({}: allow-listed) client-ip={}; "
                     "envelope-from={}; helo={};",
                     server_id_(), ip_addr, sender, client_identity_);
-    spf_sender_domain_ = "localhost";
+    spf_sender_domain_helo_ = "localhost";
     return true;
   }
 
-  auto const spf_srv     = SPF::Server{server_id_().c_str()};
-  auto       spf_request = SPF::Request{spf_srv};
+  auto const spf_srv              = SPF::Server{server_id_().c_str()};
+  auto       spf_request_helo     = SPF::Request{spf_srv};
+  auto       spf_request_mailfrom = SPF::Request{spf_srv};
 
   if (IP4::is_address(sock_.them_c_str())) {
-    spf_request.set_ipv4_str(sock_.them_c_str());
+    spf_request_helo.set_ipv4_str(sock_.them_c_str());
+    spf_request_mailfrom.set_ipv4_str(sock_.them_c_str());
   }
   else if (IP6::is_address(sock_.them_c_str())) {
-    spf_request.set_ipv6_str(sock_.them_c_str());
+    spf_request_helo.set_ipv6_str(sock_.them_c_str());
+    spf_request_mailfrom.set_ipv6_str(sock_.them_c_str());
   }
   else {
     LOG(FATAL) << "bogus address " << sock_.them_address_literal() << ", "
                << sock_.them_c_str();
   }
 
-  spf_request.set_helo_dom(client_identity_.ascii().c_str());
-
   auto const from{static_cast<std::string>(sender)};
 
-  spf_request.set_env_from(from.c_str());
+  // Helo id
+  spf_request_helo.set_helo_dom(client_identity_.ascii().c_str());
 
-  auto const spf_res{SPF::Response{spf_request}};
-  spf_result_        = spf_res.result();
-  spf_received_      = spf_res.received_spf();
-  spf_sender_domain_ = spf_request.get_sender_dom();
+  auto const spf_res_helo{SPF::Response{spf_request_helo}};
+  spf_result_helo_        = spf_res_helo.result();
+  spf_received_helo_      = spf_res_helo.received_spf();
+  spf_sender_domain_helo_ = spf_request_helo.get_sender_dom();
 
-  if (spf_result_ == SPF::Result::PASS) {
-    if (lookup_domain(block_, spf_sender_domain_)) {
-      LOG(INFO) << "SPF sender domain (" << spf_sender_domain_
+  if (spf_result_helo_ == SPF::Result::FAIL) {
+    LOG(WARNING) << spf_res_helo.header_comment();
+  }
+  else {
+    LOG(INFO) << spf_res_helo.header_comment();
+  }
+
+  // MailFrom
+  spf_request_mailfrom.set_env_from(from.c_str());
+
+  auto const spf_res_mailfrom{SPF::Response{spf_request_mailfrom}};
+  spf_result_mailfrom_        = spf_res_mailfrom.result();
+  spf_received_mailfrom_      = spf_res_mailfrom.received_spf();
+  spf_sender_domain_mailfrom_ = spf_request_mailfrom.get_sender_dom();
+
+  if (spf_result_mailfrom_ == SPF::Result::FAIL) {
+    LOG(WARNING) << spf_res_mailfrom.header_comment();
+  }
+  else {
+    LOG(INFO) << spf_res_mailfrom.header_comment();
+  }
+
+  if (spf_result_helo_ == SPF::Result::PASS) {
+    if (lookup_domain(block_, spf_sender_domain_helo_)) {
+      LOG(INFO) << "SPF sender domain (ehlo/helo " << spf_sender_domain_helo_
                 << ") is blocked";
       return false;
     }
   }
-
-  if (spf_result_ == SPF::Result::FAIL) {
-    LOG(WARNING) << spf_res.header_comment();
-    /*
-      If we want to refuse mail that fails SPF.
-      Error code from RFC 7372, section 3.2.  Also:
-      <https://www.iana.org/assignments/smtp-enhanced-status-codes/smtp-enhanced-status-codes.xhtml>
-
-      out_() << "550 5.7.23 " << spf_res.smtp_comment() << "\r\n" << std::flush;
+  if (spf_result_mailfrom_ == SPF::Result::PASS) {
+    if (lookup_domain(block_, spf_sender_domain_mailfrom_)) {
+      LOG(INFO) << "SPF sender domain (MailFrom " << spf_sender_domain_mailfrom_
+                << ") is blocked";
       return false;
-    */
-  }
-  else {
-    LOG(INFO) << spf_res.header_comment();
+    }
   }
 
   return true;

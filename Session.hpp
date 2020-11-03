@@ -151,7 +151,8 @@ private:
   Domain                        client_identity_; // from ehlo/helo
   Mailbox                       reverse_path_;    // "mail from"
   std::vector<Mailbox>          forward_path_;    // for each "rcpt to"
-  std::string                   spf_received_;
+  std::string                   spf_received_helo_;
+  std::string                   spf_received_mailfrom_;
   std::unique_ptr<MessageStore> msg_;
 
   TLD tld_db_;
@@ -172,8 +173,10 @@ private:
 
   int n_unrecognized_cmds_{0};
 
-  SPF::Result spf_result_;
-  Domain      spf_sender_domain_;
+  SPF::Result spf_result_helo_;
+  Domain      spf_sender_domain_helo_;
+  SPF::Result spf_result_mailfrom_;
+  Domain      spf_sender_domain_mailfrom_;
 
   // RFC 5321 section 3.3. Mail Transactions
   enum class xact_step : int8_t {
