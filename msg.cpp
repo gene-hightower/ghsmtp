@@ -599,11 +599,11 @@ struct spf_key : sor<TAO_PEGTL_ISTRING("client-ip"),
                      TAO_PEGTL_ISTRING("identity"),
                      TAO_PEGTL_ISTRING("mechanism")> {};
 
-// This value syntax (allowing addr_spec) is not in accordance with RFC
-// 7208 (or 4408) but is what is effectivly used by libspf2 1.2.10 and
-// before.
+// This value syntax (allowing addr_spec and angle_addr) is not in
+// accordance with RFC 7208 (or 4408) but is what is effectivly used
+// by libspf2 1.2.10 and before.
 
-struct spf_value : sor<ip, addr_spec, dot_atom, quoted_string> {};
+struct spf_value : sor<ip, addr_spec, dot_atom, quoted_string, angle_addr> {};
 
 struct spf_key_value_pair : seq<spf_key, opt<CFWS>, one<'='>, spf_value> {};
 
@@ -1609,7 +1609,7 @@ struct action<angle_addr> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "angle_addr: " << in.string();
+    //    LOG(INFO) << "angle_addr: " << in.string();
   }
 };
 template <>
@@ -1617,7 +1617,7 @@ struct action<display_name> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "display_name: " << in.string();
+    //    LOG(INFO) << "display_name: " << in.string();
   }
 };
 template <>
@@ -1625,7 +1625,7 @@ struct action<name_addr> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "name_addr: " << in.string();
+    //    LOG(INFO) << "name_addr: " << in.string();
   }
 };
 template <>
@@ -1633,7 +1633,7 @@ struct action<name_addr_only> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
   {
-    LOG(INFO) << "name_addr_only: " << in.string();
+    //    LOG(INFO) << "name_addr_only: " << in.string();
   }
 };
 } // namespace RFC5322
