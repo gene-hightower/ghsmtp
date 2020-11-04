@@ -41,13 +41,13 @@ constexpr nameserver nameservers[]{
         "localhost",
         "127.0.0.1",
         "domain",
-        sock_type::dgram,
+        sock_type::stream,
     },
     {
         "localhost",
         "::1",
         "domain",
-        sock_type::dgram,
+        sock_type::stream,
     },
     /*
     {
