@@ -75,6 +75,7 @@ private:
 
   bool authentic_data_{false};
   bool bogus_or_indeterminate_{false};
+  bool truncation_{false};
   bool nx_domain_{false};
   bool has_record_{false};
 };

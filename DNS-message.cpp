@@ -70,6 +70,8 @@ public:
   uint16_t arcount() const { return as_u16(arcount_hi_, arcount_lo_); }
 
   // clang-format off
+  bool truncation()          const { return (flags_0_ & 0x02) != 0; }
+
   bool checking_disabled()   const { return (flags_1_ & 0x10) != 0; }
   bool authentic_data()      const { return (flags_1_ & 0x20) != 0; }
   bool recursion_available() const { return (flags_1_ & 0x80) != 0; }
@@ -421,7 +423,7 @@ uint16_t message::id() const
   return hdr_p->id();
 }
 
-size_t min_udp_sz() { return sizeof(header); }
+size_t min_message_sz() { return sizeof(header); }
 
 DNS::message
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
@@ -467,6 +469,7 @@ void check_answer(bool& nx_domain,
                   uint16_t& rcode,
                   uint16_t& extended_rcode,
 
+                  bool& truncation,
                   bool& authentic_data,
                   bool& has_record,
 
@@ -508,8 +511,15 @@ void check_answer(bool& nx_domain,
     break;
   }
 
+  truncation     = hdr_p->truncation();
   authentic_data = hdr_p->authentic_data();
   has_record     = hdr_p->ancount() != 0;
+
+  if (truncation) {
+    bogus_or_indeterminate = true;
+    LOG(WARNING) << "DNS answer truncated for " << name << '/' << type;
+    return;
+  }
 
   // check the question part of the replay
 

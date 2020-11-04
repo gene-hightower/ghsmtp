@@ -301,7 +301,7 @@ bool Query::xchg_(Resolver& res, uint16_t id)
       return false;
     }
 
-    if (size(a_) < min_udp_sz()) {
+    if (size(a_) < min_message_sz()) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "packet too small";
       return false;
@@ -330,24 +330,29 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   static_assert(std::numeric_limits<uint16_t>::min() == 0);
   static_assert(std::numeric_limits<uint16_t>::max() == 65535);
 
-  uint16_t id
-      = std::experimental::randint(std::numeric_limits<uint16_t>::min(),
-                                   std::numeric_limits<uint16_t>::max());
+  uint16_t id =
+      std::experimental::randint(std::numeric_limits<uint16_t>::min(),
+                                 std::numeric_limits<uint16_t>::max());
 
   uint16_t cls = ns_c_in;
+
   q_ = create_question(name, type, cls, id);
 
   if (!xchg_(res, id))
     return;
 
-  if (size(a_) < min_udp_sz()) {
+  if (size(a_) < min_message_sz()) {
     bogus_or_indeterminate_ = true;
     LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
     return;
   }
 
   check_answer(nx_domain_, bogus_or_indeterminate_, rcode_, extended_rcode_,
-               authentic_data_, has_record_, q_, a_, type, name);
+               truncation_, authentic_data_, has_record_, q_, a_, type, name);
+
+  if (truncation_) {
+    // if UDP, retry with TCP
+  }
 }
 
 RR_collection Query::get_records()

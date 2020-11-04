@@ -55,7 +55,7 @@ inline auto end  (message const& pkt) { return pkt.end(); }
 inline auto size (message const& pkt) { return pkt.size(); }
 // clang-format on
 
-size_t min_udp_sz();
+size_t min_message_sz();
 
 DNS::message
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id);
@@ -64,6 +64,7 @@ void check_answer(bool&          nx_domain,
                   bool&          bogus_or_indeterminate,
                   uint16_t&      rcode,
                   uint16_t&      extended_rcode,
+                  bool&          truncation,
                   bool&          authentic_data,
                   bool&          has_record,
                   message const& question,
