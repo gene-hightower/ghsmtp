@@ -90,19 +90,6 @@ int main(int argc, char* argv[])
   fmt::format_to(bfr, "This is the body of the email.\r\n");
   auto const msg_str = fmt::to_string(bfr);
 
-  auto const sender = [] {
-    auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
-    if (id_from_env)
-      return std::string{id_from_env};
-
-    auto const hostname{osutil::get_hostname()};
-    if (hostname.find('.') != std::string::npos)
-      return hostname;
-
-    LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
-    return "(none)"s;
-  }();
-
   message::parsed msg;
   bool const      message_parsed = msg.parse(msg_str);
 
@@ -110,7 +97,7 @@ int main(int argc, char* argv[])
     LOG(INFO) << "message parsed";
 
     auto const authentic =
-        authentication(msg, sender.c_str(), selector, key_file);
+        authentication(msg, server_identity.c_str(), selector, key_file);
 
     if (authentic)
       LOG(INFO) << "authentic";
@@ -128,13 +115,13 @@ int main(int argc, char* argv[])
     auto const reply_to =
         fmt::format("Reply-To: {}@{}", srs.enc_reply(reply), server_identity);
 
-    message::rewrite_from_to(msg, "", reply_to, sender.c_str(), selector,
-                             key_file);
+    message::rewrite_from_to(msg, "", reply_to, server_identity.c_str(),
+                             selector, key_file);
 
     std::cout << msg.as_string();
 
     // auth again
-    // authentication(msg, sender.c_str(), selector, key_file);
+    // authentication(msg, server_identity.c_str(), selector, key_file);
 
     auto const count = std::count_if(
         begin(msg.headers), end(msg.headers),
@@ -154,7 +141,7 @@ int main(int argc, char* argv[])
       file.open(argv[a]);
       message::parsed msg;
       CHECK(msg.parse(std::string_view(file.data(), file.size())));
-      message::authentication(msg, sender.c_str(), selector, key_file);
+      message::authentication(msg, server_identity.c_str(), selector, key_file);
       std::cout << msg.as_string();
     }
     return 0;
@@ -168,7 +155,7 @@ int main(int argc, char* argv[])
       file.open(argv[a]);
       message::parsed msg;
       CHECK(msg.parse(std::string_view(file.data(), file.size())));
-      message::dkim_check(msg, sender.c_str());
+      message::dkim_check(msg, server_identity.c_str());
     }
     return 0;
   }
@@ -194,7 +181,7 @@ int main(int argc, char* argv[])
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
     rewrite_from_to(msg, "bounce@digilicious.com", "noreply@digilicious.com",
-                    sender.c_str(), selector, key_file);
+                    server_identity.c_str(), selector, key_file);
     std::cout << msg.as_string();
   }
 }
