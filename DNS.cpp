@@ -18,6 +18,8 @@
 
 #include "osutil.hpp"
 
+DEFINE_bool(log_dns_data, false, "log all DNS TCP protocol data");
+
 namespace Config {
 // The default timeout in glibc is 5 seconds.  My setup with unbound
 // in front of stubby with DNSSEC checking and all that seems to work
@@ -150,8 +152,8 @@ Resolver::Resolver(fs::path config_path)
 
     auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
                                                              : SOCK_DGRAM;
-    uint16_t port = osutil::get_port(nameserver.port,
-                                     (typ == SOCK_STREAM) ? "tcp" : "udp");
+    uint16_t port =
+        osutil::get_port(nameserver.port, (typ == SOCK_STREAM) ? "tcp" : "udp");
     ns_fd_ = -1;
 
     if (IP4::is_address(nameserver.addr)) {
@@ -160,7 +162,7 @@ Resolver::Resolver(fs::path config_path)
 
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
-      in4.sin_port = htons(port);
+      in4.sin_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET, nameserver.addr,
                          reinterpret_cast<void*>(&in4.sin_addr)),
                1);
@@ -179,7 +181,7 @@ Resolver::Resolver(fs::path config_path)
 
       auto in6{sockaddr_in6{}};
       in6.sin6_family = AF_INET6;
-      in6.sin6_port = htons(port);
+      in6.sin6_port   = htons(port);
       CHECK_EQ(inet_pton(AF_INET6, nameserver.addr,
                          reinterpret_cast<void*>(&in6.sin6_addr)),
                1);
@@ -197,6 +199,12 @@ Resolver::Resolver(fs::path config_path)
 
     if (nameserver.typ == Config::sock_type::stream) {
       ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
+      if (FLAGS_log_dns_data) {
+        ns_sock_->log_data_on();
+      }
+      else {
+        ns_sock_->log_data_off();
+      }
 
       if (port != 53) {
         DNS::RR_collection tlsa_rrs; // empty FIXME!

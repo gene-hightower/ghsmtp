@@ -81,6 +81,9 @@ public:
     octets_written_ = 0;
   }
 
+  void log_data_on() { log_data_ = true; }
+  void log_data_off() { log_data_ = false; }
+
   void log_stats() const;
   void log_totals() const;
 

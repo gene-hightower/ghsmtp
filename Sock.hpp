@@ -62,8 +62,11 @@ public:
 
   void set_max_read(std::streamsize max) { iostream_->set_max_read(max); }
 
-  void log_stats() { return iostream_->log_stats(); }
-  void log_totals() { return iostream_->log_totals(); }
+  void log_data_on() { iostream_->log_data_on(); }
+  void log_data_off() { iostream_->log_data_off(); }
+
+  void log_stats() { iostream_->log_stats(); }
+  void log_totals() { iostream_->log_totals(); }
 
   void close_fds() { iostream_->close_fds(); }
 
