@@ -655,8 +655,6 @@ struct mailbox_list_action<addr_spec> {
 
 // Map SPF result string to DMARC policy code.
 
-// FIXME: This mapping needs to be examined and confirmed, no time now.
-
 static int result_to_pol(std::string_view result)
 {
   // clang-format off
