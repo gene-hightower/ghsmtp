@@ -1650,25 +1650,37 @@ void display(RFC5322::Ctx const& ctx)
 
 void selftest()
 {
-  const char* name_addr_list[]{
+  const char* name_addr_list_bad[]{
+      "Gene Hightower . <gene@digilicious.com>",
+      "via.Relay. <noreply@relay.firefox.com>",
+      "[via Relay] <noreply@relay.firefox.com>",
+  };
+
+  for (auto i : name_addr_list_bad) {
+    memory_input<> in(i, i);
+    RFC5322::Ctx   ctx;
+    if (parse<RFC5322::name_addr_only,
+              RFC5322::action /*, tao::pegtl::tracer*/>(in, ctx)) {
+      LOG(FATAL) << "Should not parse as name_addr_only \"" << i << "\"";
+    }
+  }
+
+  const char* name_addr_list_good[]{
       "Gene Hightower <gene@digilicious.com>",
       "via Relay <noreply@relay.firefox.com>",
-      "[via Relay] <noreply@relay.firefox.com>",
       "\"Gene Hightower <gene@digilicious.com> [via Relay]\""
       "<noreply@relay.firefox.com>",
       "\"Customer Care <care@bigcompany.com> via foo.com\" <noreply@foo.com>",
   };
 
-  for (auto i : name_addr_list) {
+  for (auto i : name_addr_list_good) {
     memory_input<> in(i, i);
     RFC5322::Ctx   ctx;
     if (!parse<RFC5322::name_addr_only,
                RFC5322::action /*, tao::pegtl::tracer*/>(in, ctx)) {
-      LOG(ERROR) << "Error parsing as name_addr_only \"" << i << "\"";
+      LOG(FATAL) << "Error parsing as name_addr_only \"" << i << "\"";
     }
   }
-
-  exit(0);
 
   CHECK(RFC5322::is_defined_field("Subject"));
   CHECK(!RFC5322::is_defined_field("X-Subject"));
