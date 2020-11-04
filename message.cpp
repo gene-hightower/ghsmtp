@@ -541,6 +541,7 @@ struct received_spf_parsed {
   bool parse(std::string_view input);
 
   std::string_view result;
+  std::string_view comment;
 
   std::string_view key;
   std::string_view value;
@@ -559,6 +560,15 @@ struct spf_action<result> {
   static void apply(const Input& in, received_spf_parsed& spf)
   {
     spf.result = make_view(in);
+  }
+};
+
+template <>
+struct spf_action<comment> {
+  template <typename Input>
+  static void apply(const Input& in, received_spf_parsed& spf)
+  {
+    spf.comment = make_view(in);
   }
 };
 
@@ -662,6 +672,17 @@ static int result_to_pol(std::string_view result)
   // clang-format on
 }
 
+static bool is_postmaster(std::string_view from)
+{
+  return from == "<>" || istarts_with(from, "<Postmaster@");
+}
+
+static bool sender_comment(std::string_view comment, std::string_view sender)
+{
+  auto const prefix = fmt::format("({}:", sender);
+  return istarts_with(comment, prefix);
+}
+
 static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
                                 RFC5322::received_spf_parsed& spf)
 {
@@ -733,7 +754,7 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   if (spf.kv_map.contains(envelope_from)) {
     auto const efrom = spf.kv_map[envelope_from];
 
-    if (efrom == "<>") {
+    if (is_postmaster(efrom)) {
       if (spf.kv_map.contains(helo)) {
         if (Domain::validate(spf.kv_map[helo])) {
           Domain dom(spf.kv_map[helo]);
@@ -749,8 +770,9 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
           return;
         }
         else {
-          LOG(WARNING) << "RFC-5321.FROM is <> but helo is invalid domain: "
-                       << spf.kv_map[helo];
+          LOG(WARNING)
+              << "RFC-5321.FROM is postmaster or <> but helo is invalid domain:"
+              << spf.kv_map[helo];
         }
       }
       else {
@@ -774,6 +796,20 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
     }
   }
   else if (spf.kv_map.contains(helo)) {
+    if (Domain::validate(spf.kv_map[helo])) {
+      Domain dom(spf.kv_map[helo]);
+      spf_dom    = dom.ascii();
+      spf_origin = DMARC_POLICY_SPF_ORIGIN_HELO;
+
+      auto const human_result =
+          fmt::format("{}, hello domain {}", spf.result, dom);
+      LOG(INFO) << "SPF result " << human_result;
+      dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin, human_result.c_str());
+      return;
+    }
+    else {
+      LOG(WARNING) << "helo is invalid domain:" << spf.kv_map[helo];
+    }
   }
   else {
     LOG(WARNING)
@@ -836,15 +872,24 @@ bool authentication(message::parsed& msg,
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
 
-  // Grab 1st SPF record
-  RFC5322::received_spf_parsed spf_parsed;
-  if (auto hdr = std::find(begin(msg.headers), end(msg.headers), Received_SPF);
-      hdr != end(msg.headers)) {
-    if (spf_parsed.parse(hdr->value)) {
+  // Grab SPF records
+  for (auto hdr : msg.headers) {
+    if (hdr == Received_SPF) {
+      RFC5322::received_spf_parsed spf_parsed;
+      if (!spf_parsed.parse(hdr.value)) {
+        LOG(WARNING) << "failed to parse SPF record: " << hdr.value;
+        continue;
+      }
+
+      if (sender_comment(spf_parsed.comment, sender)) {
+        LOG(INFO) << "comment == " << spf_parsed.comment << " not by "
+                  << sender;
+        continue;
+      }
+
       fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
 
-      // FIXME get comment in here
-      // fmt::format_to(bfr, " ({}) ", );
+      fmt::format_to(bfr, " {}", spf_parsed.comment);
 
       if (spf_parsed.kv_map[envelope_from] != spf_parsed.kv_map[helo]) {
         fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
@@ -860,9 +905,6 @@ bool authentication(message::parsed& msg,
       }
 
       spf_result_to_dmarc(dmp, spf_parsed);
-    }
-    else {
-      LOG(WARNING) << "failed to parse " << hdr->value;
     }
   }
 
