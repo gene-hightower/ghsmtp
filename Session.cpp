@@ -608,6 +608,15 @@ std::string Session::added_headers_(MessageStore const& msg)
 
   fmt::memory_buffer headers;
 
+  // Received-SPF:
+  if (!spf_received_helo_.empty()) {
+    fmt::format_to(headers, "{}\r\n", spf_received_helo_);
+  }
+  if (!spf_received_mailfrom_.empty()) {
+    fmt::format_to(headers, "{}\r\n", spf_received_mailfrom_);
+  }
+
+  // Received:
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
   fmt::format_to(headers, "Received: from {}", client_identity_.utf8());
   if (sock_.has_peername()) {
@@ -625,14 +634,6 @@ std::string Session::added_headers_(MessageStore const& msg)
     fmt::format_to(headers, "\r\n\t({})", tls_info);
   }
   fmt::format_to(headers, ";\r\n\t{}\r\n", msg.when());
-
-  // Received-SPF:
-  if (!spf_received_helo_.empty()) {
-    fmt::format_to(headers, "{}\r\n", spf_received_helo_);
-  }
-  if (!spf_received_mailfrom_.empty()) {
-    fmt::format_to(headers, "{}\r\n", spf_received_mailfrom_);
-  }
 
   return fmt::to_string(headers);
 }
