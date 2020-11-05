@@ -264,8 +264,8 @@ bool TLS::starttls_client(fs::path                  config_path,
         else if (gen->type == GEN_IPADD) {
           unsigned char* p = gen->d.ip->data;
           if (gen->d.ip->length == 4) {
-            auto const ip = fmt::format(fmt("{:d}.{:d}.{:d}.{:d}"), p[0], p[1],
-                                        p[2], p[3]);
+            auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
+                                        p[1], p[2], p[3]);
             LOG(INFO) << "alt name IP4 address " << ip;
           }
           else if (gen->d.ip->length == 16) {
@@ -380,8 +380,8 @@ bool TLS::starttls_client(fs::path                  config_path,
   // LOG(INFO) << "SSL_set_tlsext_host_name == " << server_name;
 
   if (session_context_index < 0) {
-    session_context_index
-        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    session_context_index =
+        SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
   session_context context;
   SSL_set_ex_data(ssl_, session_context_index, &context);
@@ -479,10 +479,10 @@ bool TLS::starttls_server(fs::path                  config_path,
 
   auto const method = CHECK_NOTNULL(SSLv23_server_method());
 
-  auto const bio
-      = CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
-  auto const dh
-      = CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
+  auto const bio =
+      CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
+  auto const dh =
+      CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
   auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
@@ -616,8 +616,8 @@ bool TLS::starttls_server(fs::path                  config_path,
       else if (gen->type == GEN_IPADD) {
         unsigned char* p = gen->d.ip->data;
         if (gen->d.ip->length == 4) {
-          auto const ip
-              = fmt::format(fmt("{:d}.{:d}.{:d}.{:d}"), p[0], p[1], p[2], p[3]);
+          auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
+                                      p[1], p[2], p[3]);
           LOG(INFO) << "alt name IP4 address " << ip;
           names.emplace_back(ip);
         }
@@ -650,8 +650,8 @@ bool TLS::starttls_server(fs::path                  config_path,
   SSL_set_wfd(ssl_, fd_out);
 
   if (session_context_index < 0) {
-    session_context_index
-        = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    session_context_index =
+        SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
   session_context context;
   SSL_set_ex_data(ssl_, session_context_index, &context);
@@ -667,8 +667,8 @@ bool TLS::starttls_server(fs::path                  config_path,
 
     CHECK(now < (start + timeout)) << "starttls timed out";
 
-    auto const time_left
-        = std::chrono::duration_cast<std::chrono::milliseconds>(
+    auto const time_left =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
             (start + timeout) - now);
 
     int n_get_err;
