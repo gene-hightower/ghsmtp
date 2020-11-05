@@ -82,6 +82,7 @@ public:
 
   bool authentic_data() const { return authentic_data_; }
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
+  bool truncation() const { return truncation_; }
   bool nx_domain() const { return nx_domain_; }
 
   DNS::RR_collection       get_records() const;
@@ -92,6 +93,7 @@ private:
 
   bool authentic_data_{false};
   bool bogus_or_indeterminate_{false};
+  bool truncation_{false};
   bool nx_domain_{false};
 };
 

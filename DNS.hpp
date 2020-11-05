@@ -52,6 +52,7 @@ public:
 
   bool authentic_data() const { return authentic_data_; }
   bool bogus_or_indeterminate() const { return bogus_or_indeterminate_; }
+  bool truncation() const { return truncation_; }
   bool nx_domain() const { return nx_domain_; }
 
   bool                     has_record() const { return has_record_; }

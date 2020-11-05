@@ -360,6 +360,8 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   if (truncation_) {
     // if UDP, retry with TCP
+    bogus_or_indeterminate_ = true;
+    LOG(INFO) << "truncated answer for " << name << '/' << type;
   }
 }
 

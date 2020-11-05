@@ -130,8 +130,14 @@ Query::Query(Resolver const& res, DNS::RR_type type, char const* domain)
   if (p_) {
     authentic_data_ = ldns_pkt_ad(p_);
 
-    auto const rcode = ldns_pkt_get_rcode(p_);
+    truncation_ = ldns_pkt_tc(p_);
+    if (truncation_) {
+      // if UDP, retry with TCP?
+      bogus_or_indeterminate_ = true;
+      LOG(WARNING) << "truncated answer (" << dom.str() << "/" << type << ")";
+    }
 
+    auto const rcode = ldns_pkt_get_rcode(p_);
     switch (rcode) {
     case LDNS_RCODE_NOERROR: break;
 
