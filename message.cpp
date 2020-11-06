@@ -22,6 +22,7 @@
 
 #include <cstring>
 #include <map>
+#include <unordered_set>
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -684,6 +685,8 @@ static bool sender_comment(std::string_view comment, std::string_view sender)
 static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
                                 RFC5322::received_spf_parsed& spf)
 {
+  LOG(INFO) << "spf_result_to_dmarc";
+
   if (spf.kv_map.contains(problem)) {
     LOG(WARNING) << "SPF problem: " << spf.kv_map[problem];
   }
@@ -855,7 +858,6 @@ bool authentication(message::parsed& msg,
   OpenDKIM::verify dkv;
   for (auto const& header : msg.headers) {
     auto const hv = header.as_view();
-    // LOG(INFO) << "header «" << esc(hv, esc_line_option::multi) << "»";
     dkv.header(hv);
   }
   dkv.eoh();
@@ -870,6 +872,8 @@ bool authentication(message::parsed& msg,
   // Build up Authentication-Results header
   fmt::memory_buffer bfr;
 
+  std::unordered_set<Domain> validated_doms;
+
   // Grab SPF records
   for (auto hdr : msg.headers) {
     if (hdr == Received_SPF) {
@@ -879,33 +883,60 @@ bool authentication(message::parsed& msg,
         continue;
       }
 
-      if (sender_comment(spf_parsed.comment, sender)) {
-        LOG(INFO) << "comment == " << spf_parsed.comment << " not by "
+      LOG(INFO) << "SPF record parsed";
+      if (!sender_comment(spf_parsed.comment, sender)) {
+        LOG(INFO) << "comment == \"" << spf_parsed.comment << "\" not by "
                   << sender;
         continue;
       }
 
-      fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
+      if (!Mailbox::validate(spf_parsed.kv_map[envelope_from])) {
+        LOG(WARNING) << "invalid mailbox: " << spf_parsed.kv_map[envelope_from];
+        continue;
+      }
 
-      fmt::format_to(bfr, " {}", spf_parsed.comment);
+      if (!Domain::validate(spf_parsed.kv_map[helo])) {
+        LOG(WARNING) << "invalid helo domain: " << spf_parsed.kv_map[helo];
+        continue;
+      }
 
-      if (spf_parsed.kv_map[envelope_from] != spf_parsed.kv_map[helo]) {
-        fmt::format_to(bfr, " smtp.helo={}", spf_parsed.kv_map[helo]);
+      Mailbox env_from(spf_parsed.kv_map[envelope_from]);
+      Domain  helo_dom(spf_parsed.kv_map[helo]);
+
+      if (iequal(env_from.local_part(), "Postmaster") &&
+          env_from.domain() == helo_dom) {
+        if (validated_doms.count(helo_dom) == 0) {
+          fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
+          fmt::format_to(bfr, " {}", spf_parsed.comment);
+          fmt::format_to(bfr, " smtp.helo={}", helo_dom.ascii());
+          validated_doms.emplace(helo_dom);
+
+          if (spf_parsed.kv_map.contains(client_ip)) {
+            std::string ip = make_string(spf_parsed.kv_map[client_ip]);
+            dmp.connect(ip.c_str());
+          }
+          spf_result_to_dmarc(dmp, spf_parsed);
+        }
       }
       else {
-        fmt::format_to(bfr, " smtp.mailfrom={}",
-                       spf_parsed.kv_map[envelope_from]);
-      }
+        if (validated_doms.count(env_from.domain()) == 0) {
+          fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
+          fmt::format_to(bfr, " {}", spf_parsed.comment);
+          fmt::format_to(bfr, " smtp.mailfrom={}",
+                         env_from.as_string(Mailbox::domain_encoding::ascii));
+          validated_doms.emplace(env_from.domain());
 
-      if (spf_parsed.kv_map.contains(client_ip)) {
-        std::string ip = make_string(spf_parsed.kv_map[client_ip]);
-        dmp.connect(ip.c_str());
+          if (spf_parsed.kv_map.contains(client_ip)) {
+            std::string ip = make_string(spf_parsed.kv_map[client_ip]);
+            dmp.connect(ip.c_str());
+          }
+          spf_result_to_dmarc(dmp, spf_parsed);
+        }
       }
-
-      spf_result_to_dmarc(dmp, spf_parsed);
     }
   }
 
+  LOG(INFO) << "fetching From: header";
   // Should be only one From:
   if (auto hdr = std::find(begin(msg.headers), end(msg.headers), From);
       hdr != end(msg.headers)) {
@@ -1027,7 +1058,9 @@ bool authentication(message::parsed& msg,
   msg.ar_str =
       fmt::format("{}: {};{}", Authentication_Results, sender, ar_results);
 
-  LOG(INFO) << "new AR header " << msg.ar_str;
+  LOG(INFO) << "new AR header «" << esc(msg.ar_str, esc_line_option::multi)
+            << "»";
+
   CHECK(msg.parse_hdr(msg.ar_str));
 
   // Run our message through ARC::sign
