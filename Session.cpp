@@ -1899,7 +1899,6 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   // Helo id
   if (sender.domain() != client_identity_) {
     spf_request_helo.set_helo_dom(client_identity_.ascii().c_str());
-    spf_request_helo.set_env_from(from.c_str());
 
     auto const spf_res_helo{SPF::Response{spf_request_helo}};
     spf_result_helo_        = spf_res_helo.result();
