@@ -1881,21 +1881,6 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   auto const from{static_cast<std::string>(sender)};
 
-  // Helo id
-  spf_request_helo.set_helo_dom(client_identity_.ascii().c_str());
-
-  auto const spf_res_helo{SPF::Response{spf_request_helo}};
-  spf_result_helo_        = spf_res_helo.result();
-  spf_received_helo_      = spf_res_helo.received_spf();
-  spf_sender_domain_helo_ = spf_request_helo.get_sender_dom();
-
-  if (spf_result_helo_ == SPF::Result::FAIL) {
-    LOG(WARNING) << spf_res_helo.header_comment();
-  }
-  else {
-    LOG(INFO) << spf_res_helo.header_comment();
-  }
-
   // MailFrom
   spf_request_mailfrom.set_env_from(from.c_str());
 
@@ -1911,13 +1896,32 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
     LOG(INFO) << spf_res_mailfrom.header_comment();
   }
 
-  if (spf_result_helo_ == SPF::Result::PASS) {
-    if (lookup_domain(block_, spf_sender_domain_helo_)) {
-      LOG(INFO) << "SPF sender domain (ehlo/helo " << spf_sender_domain_helo_
-                << ") is blocked";
-      return false;
+  // Helo id
+  if (sender.domain() != client_identity_) {
+    spf_request_helo.set_helo_dom(client_identity_.ascii().c_str());
+    spf_request_helo.set_env_from(from.c_str());
+
+    auto const spf_res_helo{SPF::Response{spf_request_helo}};
+    spf_result_helo_        = spf_res_helo.result();
+    spf_received_helo_      = spf_res_helo.received_spf();
+    spf_sender_domain_helo_ = spf_request_helo.get_sender_dom();
+
+    if (spf_result_helo_ == SPF::Result::FAIL) {
+      LOG(WARNING) << spf_res_helo.header_comment();
+    }
+    else {
+      LOG(INFO) << spf_res_helo.header_comment();
+    }
+
+    if (spf_result_helo_ == SPF::Result::PASS) {
+      if (lookup_domain(block_, spf_sender_domain_helo_)) {
+        LOG(INFO) << "SPF sender domain (ehlo/helo " << spf_sender_domain_helo_
+                  << ") is blocked";
+        return false;
+      }
     }
   }
+
   if (spf_result_mailfrom_ == SPF::Result::PASS) {
     if (lookup_domain(block_, spf_sender_domain_mailfrom_)) {
       LOG(INFO) << "SPF sender domain (MailFrom " << spf_sender_domain_mailfrom_
