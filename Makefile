@@ -226,7 +226,7 @@ TMPDIR ?= /tmp
 export TEST_MAILDIR=$(TMPDIR)/Maildir
 export MAILDIR=$(TEST_MAILDIR)
 
-export ASAN_OPTIONS=detect_odr_violation=0
+export ASAN_OPTIONS=detect_leaks=0
 
 export GHSMTP_SERVER_ID=digilicious.com
 
