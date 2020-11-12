@@ -51,8 +51,9 @@ int main(int argc, char* argv[])
       "       arc=none";
 
   std::string authservid;
+  std::string ar_result;
   CHECK(message::authentication_results_parse(authentication_results_str,
-                                              authservid));
+                                              authservid, ar_result));
   CHECK_EQ(authservid, "digilicious.com");
 
   auto const dom_from{Domain(server_identity)};

@@ -434,8 +434,8 @@ struct reasonspec       : seq<TAO_PEGTL_ISTRING("reason"), opt<CFWS>, one<'='>, 
 //     pvalue = [CFWS] ( value / [ [ local-part ] "@" ] domain-name )
 //              [CFWS]
 
-struct pvalue           : seq<opt<CFWS>, sor<value,
-                                             seq<opt<seq<opt<local_part>, one<'@'>>, domain>>>,
+struct pvalue           : seq<opt<CFWS>, sor<seq<opt<seq<opt<local_part>, one<'@'>>, domain>>,
+                                             value>,
                               opt<CFWS>> {};
 
 struct ptype            : keyword {};
@@ -456,9 +456,11 @@ struct resinfo          : seq<opt<CFWS>, one<';'>, methodspec, opt<seq<CFWS, rea
                               opt<seq<CFWS, plus<propspec>>>
                              > {};
 
+struct ar_results       : sor<no_result, plus<resinfo>> {};
+
 struct authres_payload  : seq<opt<CFWS>, authserv_id,
                               opt<seq<CFWS, authres_version>>,
-                              sor<no_result, plus<resinfo>>,
+                              ar_results,
                               opt<CFWS>> {};
 
 struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
@@ -475,9 +477,20 @@ struct ar_action : nothing<Rule> {
 };
 
 template <>
+struct ar_action<ar_results> {
+  template <typename Input>
+  static void
+  apply(Input const& in, std::string& authservid, std::string& ar_results)
+  {
+    ar_results = in.string();
+  }
+};
+
+template <>
 struct ar_action<authserv_id> {
   template <typename Input>
-  static void apply(Input const& in, std::string& authservid)
+  static void
+  apply(Input const& in, std::string& authservid, std::string& ar_results)
   {
     authservid = in.string();
   }
@@ -541,6 +554,8 @@ struct msg_action<body> {
 struct received_spf_parsed {
   bool parse(std::string_view input);
 
+  std::string_view whole_thing;
+
   std::string_view result;
   std::string_view comment;
 
@@ -549,6 +564,8 @@ struct received_spf_parsed {
 
   std::vector<std::pair<std::string_view, std::string_view>> kv_list;
   std::map<std::string_view, std::string_view, ci_less>      kv_map;
+
+  std::string as_string() const { return fmt::format("{}", whole_thing); }
 };
 
 template <typename Rule>
@@ -619,6 +636,7 @@ struct spf_action<spf_kv_list> {
 
 bool received_spf_parsed::parse(std::string_view input)
 {
+  whole_thing = input;
   auto in{memory_input<>(input.data(), input.size(), "spf_header")};
   return tao::pegtl::parse<spf_header_only, spf_action>(in, *this);
 }
@@ -692,6 +710,11 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
   }
 
   auto const spf_pol = result_to_pol(spf.result);
+
+  if (spf_pol == DMARC_POLICY_SPF_OUTCOME_NONE) {
+    LOG(WARNING) << "Ignoring for DMARC purposes: " << spf.as_string();
+    return;
+  }
 
   std::string spf_dom;
 
@@ -821,12 +844,13 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 namespace message {
 
 bool authentication_results_parse(std::string_view input,
-                                  std::string&     authservid)
+                                  std::string&     authservid,
+                                  std::string&     ar_results)
 {
   auto in{memory_input<>(input.data(), input.size(),
                          "authentication_results_header")};
   return tao::pegtl::parse<RFC5322::authres_header_field_only,
-                           RFC5322::ar_action>(in, authservid);
+                           RFC5322::ar_action>(in, authservid, ar_results);
 }
 
 bool authentication(message::parsed& msg,
@@ -843,8 +867,9 @@ bool authentication(message::parsed& msg,
                      [sender](auto const& hdr) {
                        if (hdr == Authentication_Results) {
                          std::string authservid;
+                         std::string ar_results;
                          if (message::authentication_results_parse(
-                                 hdr.as_view(), authservid)) {
+                                 hdr.as_view(), authservid, ar_results)) {
                            return Domain::match(authservid, sender);
                          }
                          LOG(WARNING) << "failed to parse " << hdr.as_string();
@@ -906,7 +931,7 @@ bool authentication(message::parsed& msg,
       if (iequal(env_from.local_part(), "Postmaster") &&
           env_from.domain() == helo_dom) {
         if (validated_doms.count(helo_dom) == 0) {
-          fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
+          fmt::format_to(bfr, ";\r\n\tspf={}", spf_parsed.result);
           fmt::format_to(bfr, " {}", spf_parsed.comment);
           fmt::format_to(bfr, " smtp.helo={}", helo_dom.ascii());
           validated_doms.emplace(helo_dom);
@@ -920,7 +945,7 @@ bool authentication(message::parsed& msg,
       }
       else {
         if (validated_doms.count(env_from.domain()) == 0) {
-          fmt::format_to(bfr, ";\r\n       spf={}", spf_parsed.result);
+          fmt::format_to(bfr, ";\r\n\tspf={}", spf_parsed.result);
           fmt::format_to(bfr, " {}", spf_parsed.comment);
           fmt::format_to(bfr, " smtp.mailfrom={}",
                          env_from.as_string(Mailbox::domain_encoding::ascii));
@@ -1002,8 +1027,8 @@ bool authentication(message::parsed& msg,
   dkv.foreach_sig([&dmp, &bfr](char const* domain, bool passed,
                                char const* identity, char const* sel,
                                char const* b) {
-    int const result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
-                              : DMARC_POLICY_DKIM_OUTCOME_FAIL;
+    int const  result       = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
+                                     : DMARC_POLICY_DKIM_OUTCOME_FAIL;
     auto const human_result = (passed ? "pass" : "fail");
 
     LOG(INFO) << "DKIM check for " << domain << " " << human_result;
@@ -1012,7 +1037,7 @@ bool authentication(message::parsed& msg,
 
     auto bs = std::string_view(b, strlen(b)).substr(0, 8);
 
-    fmt::format_to(bfr, ";\r\n       dkim={}", human_result);
+    fmt::format_to(bfr, ";\r\n\tdkim={}", human_result);
     fmt::format_to(bfr, " header.i={}", identity);
     fmt::format_to(bfr, " header.s={}", sel);
     fmt::format_to(bfr, " header.b=\"{}\"", bs);
@@ -1025,7 +1050,7 @@ bool authentication(message::parsed& msg,
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
 
-  fmt::format_to(bfr, ";\r\n       dmarc={} header.from={}", dmarc_result,
+  fmt::format_to(bfr, ";\r\n\tdmarc={} header.from={}", dmarc_result,
                  msg.dmarc_from_domain);
 
   // ARC
@@ -1043,7 +1068,7 @@ bool authentication(message::parsed& msg,
 
   auto const arc_status = arv.chain_status_str();
 
-  fmt::format_to(bfr, ";\r\n       arc={}", arc_status);
+  fmt::format_to(bfr, ";\r\n\tarc={}", arc_status);
 
   // New AR header on the top
 

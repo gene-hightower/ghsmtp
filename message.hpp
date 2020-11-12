@@ -109,7 +109,8 @@ struct parsed {
 };
 
 bool authentication_results_parse(std::string_view input,
-                                  std::string&     authservid);
+                                  std::string&     authservid,
+                                  std::string&     ar_results);
 
 bool authentication(message::parsed& msg,
                     char const*      sender,

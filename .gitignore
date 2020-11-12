@@ -6,6 +6,8 @@
 SRS.ipp
 TAGS
 accept_domains
+arcsign
+arcverify
 bad_recipients
 cdb-gen
 dns_tool

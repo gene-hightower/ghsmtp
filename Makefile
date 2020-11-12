@@ -17,7 +17,13 @@ LDLIBS += \
 	-lsrs2 \
 	-lunistring
 
-PROGRAMS := dns_tool smtp msg sasl snd socks5
+PROGRAMS := arcsign arcverify dns_tool smtp msg sasl snd socks5
+
+arcsign_STEMS := arcsign \
+	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill SRS SRS0 osutil esc
+
+arcverify_STEMS := arcverify \
+	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill SRS SRS0 osutil esc
 
 DNS := DNS DNS-rrs DNS-fcrdns DNS-message
 
