@@ -609,7 +609,7 @@ std::string Session::added_headers_(MessageStore const& msg)
   fmt::memory_buffer headers;
 
   // Received-SPF:
-  if (!spf_received_helo_.empty()) {
+  if (!spf_received_helo_.empty() && spf_result_helo_ != SPF::Result::NONE) {
     fmt::format_to(headers, "{}\r\n", spf_received_helo_);
   }
   if (!spf_received_mailfrom_.empty()) {
