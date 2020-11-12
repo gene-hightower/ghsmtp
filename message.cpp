@@ -434,7 +434,7 @@ struct reasonspec       : seq<TAO_PEGTL_ISTRING("reason"), opt<CFWS>, one<'='>, 
 //     pvalue = [CFWS] ( value / [ [ local-part ] "@" ] domain-name )
 //              [CFWS]
 
-struct pvalue           : seq<opt<CFWS>, sor<seq<opt<seq<opt<local_part>, one<'@'>>, domain>>,
+struct pvalue           : seq<opt<CFWS>, sor<seq<opt<seq<opt<local_part>, one<'@'>>>, domain>,
                                              value>,
                               opt<CFWS>> {};
 
