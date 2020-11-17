@@ -1874,7 +1874,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
 
   if (spf_result_ == SPF::Result::PASS) {
     if (lookup_domain(block_, spf_sender_domain_)) {
-      LOG(INFO) << "SPF sender domain (MailFrom " << spf_sender_domain_
+      LOG(INFO) << "SPF sender domain (" << spf_sender_domain_
                 << ") is blocked";
       return false;
     }

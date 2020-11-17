@@ -786,7 +786,7 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
           spf_origin = DMARC_POLICY_SPF_ORIGIN_HELO;
 
           auto const human_result = fmt::format(
-              "{}, RFC-5321.FROM is <>, implicit origin hello, domain {}",
+              "{}, RFC5321.MailFrom is <>, implicit origin hello, domain {}",
               spf.result, dom);
           LOG(INFO) << "SPF result " << human_result;
           dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin,
@@ -794,9 +794,9 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
           return;
         }
         else {
-          LOG(WARNING)
-              << "RFC-5321.FROM is postmaster or <> but helo is invalid domain:"
-              << spf.kv_map[helo];
+          LOG(WARNING) << "RFC5321.MailFrom is postmaster or <> but helo is "
+                          "invalid domain:"
+                       << spf.kv_map[helo];
         }
       }
       else {
@@ -809,8 +809,8 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
       spf_dom    = mbx.domain().ascii();
       spf_origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
-      auto const human_result = fmt::format(
-          "{}, implicit origin mail from, mailbox {}", spf.result, mbx);
+      auto const human_result =
+          fmt::format("{}, implicit RFC5321.MailFrom <{}>", spf.result, mbx);
       LOG(INFO) << "SPF result " << human_result;
       dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin, human_result.c_str());
       return;
