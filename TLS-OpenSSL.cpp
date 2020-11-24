@@ -313,9 +313,6 @@ bool TLS::starttls_client(fs::path                  config_path,
 
   ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
 
-  char const* const preferred_ciphers = "HIGH:!aNULL:!kRSA:!PSK:!SRP:!MD5:!RC4";
-  CHECK_EQ(1, SSL_set_cipher_list(ssl_, preferred_ciphers));
-
   SSL_set_rfd(ssl_, fd_in);
   SSL_set_wfd(ssl_, fd_out);
 
@@ -451,8 +448,8 @@ bool TLS::starttls_client(fs::path                  config_path,
                 << " " << unsigned(mtype) << " [" << bin2hexstring(certdata, 6)
                 << "...] "
                 << ((mspki != nullptr) ? "TA public key verified certificate"
-                                       : depth ? "matched TA certificate"
-                                               : "matched EE certificate")
+                    : depth            ? "matched TA certificate"
+                                       : "matched EE certificate")
                 << " at depth " << depth;
     }
     else if (usable_TLSA_records && enforce_dane) {
