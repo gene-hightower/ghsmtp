@@ -129,7 +129,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     check_uribls(res, dom.ascii().c_str());
   }
 
-  if (q.authentic_data()) {
+  if (q.has_record() && q.authentic_data()) {
     std::cout << "MX records authentic for domain " << dom << '\n';
   }
 
