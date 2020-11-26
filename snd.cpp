@@ -59,6 +59,10 @@ DEFINE_string(smtp_from, "", "RFC5321 MAIL FROM address");
 DEFINE_string(smtp_to, "", "RFC5321 RCPT TO address");
 
 DEFINE_string(content_type, "", "RFC5322 Content-Type");
+DEFINE_string(content_transfer_encoding,
+              "",
+              "RFC5322 Content-Transfer-Encoding");
+
 DEFINE_string(subject, "testing one, two, three...", "RFC5322 Subject");
 DEFINE_string(keywords, "", "RFC5322 Keywords: header");
 DEFINE_string(references, "", "RFC5322 References: header");
@@ -1263,6 +1267,10 @@ auto create_eml(Domain const&               sender,
     eml.add_hdr("Content-Type", magic.buffer(bodies[0]));
   }
 
+  if (!FLAGS_content_transfer_encoding.empty()) {
+    eml.add_hdr("Content-Transfer-Encoding", FLAGS_content_transfer_encoding);
+  }
+
   return eml;
 }
 
@@ -1553,11 +1561,12 @@ bool snd(fs::path                    config_path,
     }
   }
 
-  auto deliver_by{0u};
+  auto deliver_by_min{0u};
   if (ext_deliverby) {
     if (!cnn.ehlo_params["DELIVERBY"].empty()) {
-      char* ep     = nullptr;
-      max_msg_size = strtoul(cnn.ehlo_params["DELIVERBY"][0].c_str(), &ep, 10);
+      char* ep = nullptr;
+      deliver_by_min =
+          strtoul(cnn.ehlo_params["DELIVERBY"][0].c_str(), &ep, 10);
       if (ep && (*ep != '\0')) {
         LOG(WARNING) << "garbage in DELIVERBY argument: "
                      << cnn.ehlo_params["DELIVERBY"][0];
