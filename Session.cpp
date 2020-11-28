@@ -870,7 +870,8 @@ bool Session::data_start()
   }
 
   if (binarymime_) {
-    out_() << "503 5.5.1 DATA does not support BINARYMIME\r\n" << std::flush;
+    out_() << "503 5.5.1 sequence error, DATA does not support BINARYMIME\r\n"
+           << std::flush;
     LOG(WARNING) << "DATA does not support BINARYMIME";
     state_ = xact_step::rset; // RFC 3030 section 3 page 5
     return false;
@@ -1864,6 +1865,8 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   spf_result_        = spf_res.result();
   spf_received_      = spf_res.received_spf();
   spf_sender_domain_ = spf_request.get_sender_dom();
+
+  LOG(INFO) << "spf_received_ == " << spf_received_;
 
   if (spf_result_ == SPF::Result::FAIL) {
     LOG(WARNING) << spf_res.header_comment();
