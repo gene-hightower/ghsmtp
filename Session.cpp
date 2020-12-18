@@ -496,7 +496,7 @@ bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
 
   // New bounce address
   SRS0::from_to bounce;
-  bounce.mail_from = reverse_path_.as_string(Mailbox::domain_encoding::ascii);
+  bounce.mail_from = reverse_path_.as_string();
 
   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
 
@@ -593,8 +593,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   Mailbox const& rcpt_to_mbx = forward_path_.back();
 
-  auto const rcpt_to_str =
-      rcpt_to_mbx.as_string(Mailbox::domain_encoding::ascii);
+  auto const rcpt_to_str = rcpt_to_mbx.as_string();
 
   if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
     if (!reply_to_(*reply, rcpt_to_mbx))
