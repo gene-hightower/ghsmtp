@@ -79,6 +79,7 @@ public:
 
   void flush();
   void last_in_group_(std::string_view verb);
+  void check_for_pipeline_error_(std::string_view verb);
 
   size_t max_msg_size() const { return max_msg_size_; }
   void   max_msg_size(size_t max);

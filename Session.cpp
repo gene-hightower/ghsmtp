@@ -333,6 +333,13 @@ void Session::last_in_group_(std::string_view verb)
   }
 }
 
+void Session::check_for_pipeline_error_(std::string_view verb)
+{
+  if (!extensions_ && sock_.input_ready(std::chrono::seconds(0))) {
+    LOG(WARNING) << "pipelining error; input ready processing " << verb;
+  }
+}
+
 void Session::lo_(char const* verb, std::string_view client_identity)
 {
   last_in_group_(verb);
@@ -343,12 +350,12 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 
     std::string error_msg;
     if (!verify_client_(client_identity_, error_msg)) {
-      // no glog message at this point
       bad_host_(error_msg.c_str());
     }
   }
 
   if (*verb == 'H') {
+    extensions_ = false;
     out_() << "250 " << server_id_() << "\r\n";
   }
 
@@ -411,6 +418,8 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 
 void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
+  check_for_pipeline_error_("MAIL FROM");
+
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
@@ -530,6 +539,8 @@ bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to)
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
+  check_for_pipeline_error_("RCPT TO");
+
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
@@ -1151,6 +1162,8 @@ void Session::data_error()
 
 bool Session::bdat_start(size_t n)
 {
+  last_in_group_("BDAT");
+
   switch (state_) {
   case xact_step::helo:
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
@@ -1631,7 +1644,9 @@ bool Session::verify_client_(Domain const& client_identity,
     if (auto id = std::find(begin(client_fcrdns_), end(client_fcrdns_),
                             client_identity);
         id != end(client_fcrdns_)) {
+      // If the HELO ident is one of the FCrDNS names...
       if (id != begin(client_fcrdns_)) {
+        // ...then rotate that one to the front of the list
         std::rotate(begin(client_fcrdns_), id, id + 1);
       }
       client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
@@ -2049,6 +2064,15 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       std::from_chars(str.data(), str.data() + str.size(), value);
       sleep(value);
       LOG(INFO) << "done waiting";
+    }
+  }
+
+  if (!extensions_) {
+    if (recipient.local_part().length() > 8) {
+      out_() << "550 5.1.1 unknown recipient " << recipient << "\r\n"
+             << std::flush;
+      LOG(WARNING) << "unknown recipient for HELO " << recipient;
+      return false;
     }
   }
 
