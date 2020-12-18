@@ -2,6 +2,7 @@
 
 #include "Mailbox.hpp"
 #include "iequal.hpp"
+#include "is_ascii.hpp"
 
 #include <iterator>
 
@@ -55,6 +56,11 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
   auto const result = Mailbox::parse(rep.mail_from);
   if (!result) {
     throw std::invalid_argument("invalid mailbox syntax in enc_reply");
+  }
+
+  // If it's UTF-8 we must fall back to the blob style.
+  if (!is_ascii(result->local)) {
+    return enc_reply_blob(rep);
   }
 
   // If it's "local part"@example.com or local-part@[127.0.0.1] we

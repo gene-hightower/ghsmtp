@@ -14,6 +14,7 @@
 #include "Session.hpp"
 #include "esc.hpp"
 #include "iequal.hpp"
+#include "is_ascii.hpp"
 #include "osutil.hpp"
 
 #include <fmt/format.h>
@@ -449,6 +450,11 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     return;
   }
 
+  if (!smtputf8_ && !is_ascii(reverse_path.local_part())) {
+    LOG(WARNING) << "non ascii reverse_path \"" << reverse_path
+                 << "\" without SMTPUTF8 paramater";
+  }
+
   std::string error_msg;
   if (!verify_sender_(reverse_path, error_msg)) {
     LOG(WARNING) << "verify sender failed: " << error_msg;
@@ -571,6 +577,11 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   if (!verify_recipient_(forward_path))
     return;
+
+  if (!smtputf8_ && !is_ascii(forward_path.local_part())) {
+    LOG(WARNING) << "non ascii forward_path \"" << forward_path
+                 << "\" without SMTPUTF8 paramater";
+  }
 
   if (forward_path_.size() >= Config::max_recipients_per_message) {
     out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
