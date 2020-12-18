@@ -159,6 +159,7 @@ TESTS := \
 	default_init_allocator-test \
 	esc-test \
 	iobuffer-test \
+	is_ascii-test \
 	message-test \
 	osutil-test
 
