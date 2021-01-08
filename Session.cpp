@@ -81,8 +81,9 @@ this situation.
 
 char const* bls[]{
     "b.barracudacentral.org",
+    "cbl.abuseat.org",
     "psbl.surriel.com",
-    "zen.spamhaus.org",
+    "sbl.spamhaus.org",
 };
 
 /*** Last octet from A record returned by blocklists ***
@@ -124,9 +125,10 @@ that last octet for membership in the different lists are:
 */
 
 char const* uribls[]{
-    "multi.uribl.com",
     "dbl.spamhaus.org",
     "multi.surbl.org",
+    "multi.uribl.com",
+    "sbl.spamhaus.org",
 };
 
 constexpr auto greeting_wait              = std::chrono::seconds{2};
