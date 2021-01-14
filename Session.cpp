@@ -1174,7 +1174,8 @@ void Session::data_error()
 
 bool Session::bdat_start(size_t n)
 {
-  last_in_group_("BDAT");
+  // In practice, this one gets pipelined.
+  // last_in_group_("BDAT");
 
   switch (state_) {
   case xact_step::helo:
