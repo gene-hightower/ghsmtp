@@ -10,6 +10,24 @@ Written using Standard C++ — plus PEGTL, (at one time Ragel, before
 that Bison), OpenSSL, boost-iostreams, ldns, spf2, regdom, TinyCDB,
 glog etc.  Compiles with recent GCC and Clang.
 
+sudo dnf install \
+  boost-devel \
+  file-devel \
+  fmt-devel \
+  glog-devel \
+  ldns-devel \
+  libasan \
+  libidn2-devel \
+  libopenarc-devel \
+  libopendkim-devel \
+  libopendmarc-devel \
+  libpsl-devel \
+  libspf2-devel \
+  libubsan \
+  libunistring-devel \
+  openssl-devel \
+  tinycdb-devel
+
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
 
