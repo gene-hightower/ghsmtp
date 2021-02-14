@@ -12,8 +12,6 @@
 
 #include <glog/logging.h>
 
-using namespace std::string_literals;
-
 int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
