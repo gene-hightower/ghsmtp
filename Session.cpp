@@ -159,8 +159,8 @@ Session::Session(fs::path                  config_path,
   : config_path_(config_path)
   , res_(config_path)
   , sock_(fd_in, fd_out, read_hook, Config::read_timeout, Config::write_timeout)
-  , send_(config_path, "smtp")
-  , srs_(config_path)
+//, send_(config_path, "smtp")
+//, srs_(config_path)
 {
   auto accept_db_name  = config_path_ / "accept_domains";
   auto allow_db_name   = config_path_ / "allow";
@@ -202,7 +202,7 @@ Session::Session(fs::path                  config_path,
     return ""s;
   }();
 
-  send_.set_sender(server_identity_);
+  // send_.set_sender(server_identity_);
 
   max_msg_size(Config::max_msg_size_initial);
 }
@@ -241,9 +241,9 @@ void Session::reset_()
   reverse_path_.clear();
   forward_path_.clear();
   spf_received_.clear();
-  fwd_path_.clear();
-  fwd_from_.clear();
-  rep_info_.clear();
+  // fwd_path_.clear();
+  // fwd_from_.clear();
+  // rep_info_.clear();
 
   binarymime_ = false;
   smtputf8_   = false;
@@ -256,7 +256,7 @@ void Session::reset_()
   max_msg_size(max_msg_size());
 
   state_ = xact_step::mail;
-  send_.rset();
+  // send_.rset();
 }
 
 // Return codes from connection establishment are 220 or 554, according
@@ -464,8 +464,8 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   }
 
   reverse_path_ = std::move(reverse_path);
-  fwd_path_.clear();
-  fwd_from_.clear();
+  // fwd_path_.clear();
+  // fwd_from_.clear();
   forward_path_.clear();
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
@@ -482,68 +482,73 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   state_ = xact_step::rcpt;
 }
 
-bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
-{
-  // If we're already forwarding or replying, reject
-  if (!fwd_path_.empty() || !rep_info_.empty()) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-           << std::flush;
-    LOG(WARNING) << "failed to forward to <" << forward
-                 << "> already forwarding or replying for: " << rcpt_to;
-    return false;
-  }
+// bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
+// {
+//   // If we're already forwarding or replying, reject
+//   if (!fwd_path_.empty() || !rep_info_.empty()) {
+//     out_() << "432 4.3.0 Recipient's incoming mail queue has been
+//     stopped\r\n"
+//            << std::flush;
+//     LOG(WARNING) << "failed to forward to <" << forward
+//                  << "> already forwarding or replying for: " << rcpt_to;
+//     return false;
+//   }
 
-  fwd_path_ = Mailbox(forward);
-  fwd_from_ = rcpt_to;
+//   fwd_path_ = Mailbox(forward);
+//   fwd_from_ = rcpt_to;
 
-  // New bounce address
-  SRS0::from_to bounce;
-  bounce.mail_from = reverse_path_.as_string();
+//   // New bounce address
+//   SRS0::from_to bounce;
+//   bounce.mail_from = reverse_path_.as_string();
 
-  auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
+//   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
 
-  auto const mail_from = Mailbox(new_bounce);
+//   auto const mail_from = Mailbox(new_bounce);
 
-  std::string error_msg;
-  if (!send_.mail_from_rcpt_to(res_, mail_from, fwd_path_, error_msg)) {
-    out_() << error_msg << std::flush;
-    LOG(WARNING) << "failed to forward <" << fwd_path_ << "> " << error_msg;
-    return false;
-  }
+//   std::string error_msg;
+//   if (!send_.mail_from_rcpt_to(res_, mail_from, fwd_path_, error_msg)) {
+//     out_() << error_msg << std::flush;
+//     LOG(WARNING) << "failed to forward <" << fwd_path_ << "> " << error_msg;
+//     return false;
+//   }
 
-  LOG(INFO) << "RCPT TO:<" << rcpt_to << "> forwarding to == <" << fwd_path_
-            << ">";
-  return true;
-}
+//   LOG(INFO) << "RCPT TO:<" << rcpt_to << "> forwarding to == <" << fwd_path_
+//             << ">";
+//   return true;
+// }
 
-bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to)
-{
-  // If we're already forwarding or replying, reject
-  if (!fwd_path_.empty() || !rep_info_.empty()) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
-           << std::flush;
-    LOG(WARNING) << "failed to reply to <" << reply_info.mail_from
-                 << "> already forwarding or replying for: " << rcpt_to;
-    return false;
-  }
+// bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const&
+// rcpt_to)
+// {
+//   // If we're already forwarding or replying, reject
+//   if (!fwd_path_.empty() || !rep_info_.empty()) {
+//     out_() << "432 4.3.0 Recipient's incoming mail queue has been
+//     stopped\r\n"
+//            << std::flush;
+//     LOG(WARNING) << "failed to reply to <" << reply_info.mail_from
+//                  << "> already forwarding or replying for: " << rcpt_to;
+//     return false;
+//   }
 
-  rep_info_ = reply_info;
+//   rep_info_ = reply_info;
 
-  Mailbox const from(rep_info_.rcpt_to_local_part, server_identity_);
-  Mailbox const to(rep_info_.mail_from);
+//   Mailbox const from(rep_info_.rcpt_to_local_part, server_identity_);
+//   Mailbox const to(rep_info_.mail_from);
 
-  std::string error_msg;
-  if (!send_.mail_from_rcpt_to(res_, from, to, error_msg)) {
-    out_() << error_msg << std::flush;
-    LOG(WARNING) << "failed to reply from <" << from << "> to <" << to << "> "
-                 << error_msg;
-    return false;
-  }
+//   std::string error_msg;
+//   if (!send_.mail_from_rcpt_to(res_, from, to, error_msg)) {
+//     out_() << error_msg << std::flush;
+//     LOG(WARNING) << "failed to reply from <" << from << "> to <" << to << ">
+//     "
+//                  << error_msg;
+//     return false;
+//   }
 
-  LOG(INFO) << "RCPT TO:<" << rcpt_to << "> is a reply to "
-            << rep_info_.mail_from << " from " << rep_info_.rcpt_to_local_part;
-  return true;
-}
+//   LOG(INFO) << "RCPT TO:<" << rcpt_to << "> is a reply to "
+//             << rep_info_.mail_from << " from " <<
+//             rep_info_.rcpt_to_local_part;
+//   return true;
+// }
 
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
@@ -595,19 +600,22 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   Mailbox const& rcpt_to_mbx = forward_path_.back();
 
-  auto const rcpt_to_str = rcpt_to_mbx.as_string();
+  LOG(INFO) << "RCPT TO:<" << rcpt_to_mbx << ">";
 
-  if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
-    if (!reply_to_(*reply, rcpt_to_mbx))
-      return;
-  }
-  else if (auto const forward = forward_.find(rcpt_to_str.c_str()); forward) {
-    if (!forward_to_(*forward, rcpt_to_mbx))
-      return;
-  }
-  else {
-    LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
-  }
+  // auto const rcpt_to_str = rcpt_to_mbx.as_string();
+
+  // if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
+  //   if (!reply_to_(*reply, rcpt_to_mbx))
+  //     return;
+  // }
+  // else if (auto const forward = forward_.find(rcpt_to_str.c_str()); forward)
+  // {
+  //   if (!forward_to_(*forward, rcpt_to_mbx))
+  //     return;
+  // }
+  // else {
+  //   LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
+  // }
 
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
@@ -910,176 +918,177 @@ bool Session::data_start()
   return true;
 }
 
-bool Session::do_forward_(message::parsed& msg)
-{
-  auto msg_fwd = msg;
+// bool Session::do_forward_(message::parsed& msg)
+// {
+//   auto msg_fwd = msg;
 
-  // Generate a reply address
-  SRS0::from_to reply;
-  reply.mail_from          = msg_fwd.dmarc_from;
-  reply.rcpt_to_local_part = fwd_from_.local_part();
+//   // Generate a reply address
+//   SRS0::from_to reply;
+//   reply.mail_from          = msg_fwd.dmarc_from;
+//   reply.rcpt_to_local_part = fwd_from_.local_part();
 
-  auto const reply_addr =
-      fmt::format("{}@{}", srs_.enc_reply(reply), server_id_());
+//   auto const reply_addr =
+//       fmt::format("{}@{}", srs_.enc_reply(reply), server_id_());
 
-  auto const munging = false;
+//   auto const munging = false;
 
-  auto const sender   = server_identity_.ascii().c_str();
-  auto const selector = FLAGS_selector.c_str();
-  auto const key_file =
-      (config_path_ / FLAGS_selector).replace_extension("private");
-  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+//   auto const sender   = server_identity_.ascii().c_str();
+//   auto const selector = FLAGS_selector.c_str();
+//   auto const key_file =
+//       (config_path_ / FLAGS_selector).replace_extension("private");
+//   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
 
-  if (munging) {
-    auto const from_hdr =
-        fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_addr);
-    message::rewrite_from_to(msg_fwd, from_hdr, "", sender, selector, key_file);
-  }
-  else {
-    auto const reply_to_hdr = fmt::format("Reply-To: {}", reply_addr);
-    message::rewrite_from_to(msg_fwd, "", reply_to_hdr, sender, selector,
-                             key_file);
-  }
+//   if (munging) {
+//     auto const from_hdr =
+//         fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_addr);
+//     message::rewrite_from_to(msg_fwd, from_hdr, "", sender, selector,
+//     key_file);
+//   }
+//   else {
+//     auto const reply_to_hdr = fmt::format("Reply-To: {}", reply_addr);
+//     message::rewrite_from_to(msg_fwd, "", reply_to_hdr, sender, selector,
+//                              key_file);
+//   }
 
-  // Forward it on
-  if (!send_.send(msg_fwd.as_string())) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-              "stopped\r\n"
-           << std::flush;
+//   // Forward it on
+//   if (!send_.send(msg_fwd.as_string())) {
+//     out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+//               "stopped\r\n"
+//            << std::flush;
 
-    LOG(ERROR) << "failed to send for " << fwd_path_;
-    return false;
-  }
+//     LOG(ERROR) << "failed to send for " << fwd_path_;
+//     return false;
+//   }
 
-  LOG(INFO) << "successfully sent for " << fwd_path_;
-  return true;
-}
+//   LOG(INFO) << "successfully sent for " << fwd_path_;
+//   return true;
+// }
 
-bool Session::do_reply_(message::parsed& msg)
-{
-  Mailbox to_mbx(rep_info_.mail_from);
-  Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
+// bool Session::do_reply_(message::parsed& msg)
+// {
+//   Mailbox to_mbx(rep_info_.mail_from);
+//   Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
 
-  auto reply = std::make_unique<MessageStore>();
-  reply->open(server_id_(), FLAGS_max_write, ".Drafts");
+//   auto reply = std::make_unique<MessageStore>();
+//   reply->open(server_id_(), FLAGS_max_write, ".Drafts");
 
-  auto const date{Now{}};
-  auto const pill{Pill{}};
-  auto const mid_str =
-      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity_);
+//   auto const date{Now{}};
+//   auto const pill{Pill{}};
+//   auto const mid_str =
+//       fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity_);
 
-  fmt::memory_buffer bfr;
+//   fmt::memory_buffer bfr;
 
-  fmt::format_to(bfr, "From: <{}>\r\n", from_mbx);
-  fmt::format_to(bfr, "To: <{}>\r\n", to_mbx);
+//   fmt::format_to(bfr, "From: <{}>\r\n", from_mbx);
+//   fmt::format_to(bfr, "To: <{}>\r\n", to_mbx);
 
-  fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
+//   fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
 
-  fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
+//   fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
 
-  if (!msg.get_header(message::Subject).empty()) {
-    fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
-                   msg.get_header(message::Subject));
-  }
-  else {
-    fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
-                   "Reply to your message");
-  }
+//   if (!msg.get_header(message::Subject).empty()) {
+//     fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
+//                    msg.get_header(message::Subject));
+//   }
+//   else {
+//     fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
+//                    "Reply to your message");
+//   }
 
-  if (!msg.get_header(message::In_Reply_To).empty()) {
-    fmt::format_to(bfr, "{}: {}\r\n", message::In_Reply_To,
-                   msg.get_header(message::In_Reply_To));
-  }
+//   if (!msg.get_header(message::In_Reply_To).empty()) {
+//     fmt::format_to(bfr, "{}: {}\r\n", message::In_Reply_To,
+//                    msg.get_header(message::In_Reply_To));
+//   }
 
-  if (!msg.get_header(message::MIME_Version).empty() &&
-      msg.get_header(message::Content_Type).empty()) {
-    fmt::format_to(bfr, "{}: {}\r\n", message::MIME_Version,
-                   msg.get_header(message::MIME_Version));
-    fmt::format_to(bfr, "{}: {}\r\n", message::Content_Type,
-                   msg.get_header(message::Content_Type));
-  }
+//   if (!msg.get_header(message::MIME_Version).empty() &&
+//       msg.get_header(message::Content_Type).empty()) {
+//     fmt::format_to(bfr, "{}: {}\r\n", message::MIME_Version,
+//                    msg.get_header(message::MIME_Version));
+//     fmt::format_to(bfr, "{}: {}\r\n", message::Content_Type,
+//                    msg.get_header(message::Content_Type));
+//   }
 
-  reply->write(fmt::to_string(bfr));
+//   reply->write(fmt::to_string(bfr));
 
-  if (!msg.body.empty()) {
-    reply->write("\r\n");
-    reply->write(msg.body);
-  }
+//   if (!msg.body.empty()) {
+//     reply->write("\r\n");
+//     reply->write(msg.body);
+//   }
 
-  auto const      msg_data = reply->freeze();
-  message::parsed msg_reply;
-  CHECK(msg_reply.parse(msg_data));
+//   auto const      msg_data = reply->freeze();
+//   message::parsed msg_reply;
+//   CHECK(msg_reply.parse(msg_data));
 
-  auto const sender   = server_identity_.ascii().c_str();
-  auto const selector = FLAGS_selector.c_str();
-  auto const key_file =
-      (config_path_ / FLAGS_selector).replace_extension("private");
-  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+//   auto const sender   = server_identity_.ascii().c_str();
+//   auto const selector = FLAGS_selector.c_str();
+//   auto const key_file =
+//       (config_path_ / FLAGS_selector).replace_extension("private");
+//   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
 
-  message::dkim_sign(msg_reply, sender, selector, key_file);
+//   message::dkim_sign(msg_reply, sender, selector, key_file);
 
-  if (!send_.send(msg_reply.as_string())) {
-    out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-              "stopped\r\n"
-           << std::flush;
+//   if (!send_.send(msg_reply.as_string())) {
+//     out_() << "432 4.3.0 Recipient's incoming mail queue has been "
+//               "stopped\r\n"
+//            << std::flush;
 
-    LOG(ERROR) << "send failed for reply to " << to_mbx << " from " << from_mbx;
-    return false;
-  }
+//     LOG(ERROR) << "send failed for reply to " << to_mbx << " from " <<
+//     from_mbx; return false;
+//   }
 
-  LOG(INFO) << "successful reply to " << to_mbx << " from " << from_mbx;
-  return true;
-}
+//   LOG(INFO) << "successful reply to " << to_mbx << " from " << from_mbx;
+//   return true;
+// }
 
 bool Session::do_deliver_()
 {
   CHECK(msg_);
 
-  auto const sender   = server_identity_.ascii().c_str();
-  auto const selector = FLAGS_selector.c_str();
-  auto const key_file =
-      (config_path_ / FLAGS_selector).replace_extension("private");
-  CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
+  // auto const sender   = server_identity_.ascii().c_str();
+  // auto const selector = FLAGS_selector.c_str();
+  // auto const key_file =
+  //     (config_path_ / FLAGS_selector).replace_extension("private");
+  // CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
 
   try {
-    auto const msg_data = msg_->freeze();
+    // auto const msg_data = msg_->freeze();
 
-    message::parsed msg;
+    // message::parsed msg;
 
-    // Only deal in RFC-5322 Mail Objects.
-    bool const message_parsed = msg.parse(msg_data);
-    if (message_parsed) {
+    // // Only deal in RFC-5322 Mail Objects.
+    // bool const message_parsed = msg.parse(msg_data);
+    // if (message_parsed) {
 
-      // remove any Return-Path
-      message::remove_delivery_headers(msg);
+    //   // remove any Return-Path
+    //   message::remove_delivery_headers(msg);
 
-      auto const authentic =
-          message_parsed &&
-          message::authentication(msg, sender, selector, key_file);
+    //   auto const authentic =
+    //       message_parsed &&
+    //       message::authentication(msg, sender, selector, key_file);
 
-      // write a new Return-Path
-      msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
+    //   // write a new Return-Path
+    //   msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
 
-      for (auto const h : msg.headers) {
-        msg_->write(h.as_string());
-        msg_->write("\r\n");
-      }
-      if (!msg.body.empty()) {
-        msg_->write("\r\n");
-        msg_->write(msg.body);
-      }
+    //   for (auto const h : msg.headers) {
+    //     msg_->write(h.as_string());
+    //     msg_->write("\r\n");
+    //   }
+    //   if (!msg.body.empty()) {
+    //     msg_->write("\r\n");
+    //     msg_->write(msg.body);
+    //   }
 
-      msg_->deliver();
+    msg_->deliver();
 
-      if (authentic && !fwd_path_.empty()) {
-        if (!do_forward_(msg))
-          return false;
-      }
-      if (authentic && !rep_info_.empty()) {
-        if (!do_reply_(msg))
-          return false;
-      }
-    }
+    // if (authentic && !fwd_path_.empty()) {
+    //   if (!do_forward_(msg))
+    //     return false;
+    // }
+    // if (authentic && !rep_info_.empty()) {
+    //   if (!do_reply_(msg))
+    //     return false;
+    // }
+    // }
 
     msg_->close();
   }
@@ -1304,7 +1313,7 @@ void Session::help(std::string_view str)
 
 void Session::quit()
 {
-  send_.quit();
+  // send_.quit();
   // last_in_group_("QUIT");
   out_() << "221 2.0.0 closing connection\r\n" << std::flush;
   LOG(INFO) << "QUIT";
