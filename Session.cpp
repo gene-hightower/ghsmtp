@@ -81,8 +81,6 @@ this situation.
 
 char const* bls[]{
     "b.barracudacentral.org",
-    "cbl.abuseat.org",
-    "psbl.surriel.com",
     "sbl.spamhaus.org",
 };
 
@@ -126,9 +124,7 @@ that last octet for membership in the different lists are:
 
 char const* uribls[]{
     "dbl.spamhaus.org",
-    "multi.surbl.org",
     "multi.uribl.com",
-    "sbl.spamhaus.org",
 };
 
 constexpr auto greeting_wait              = std::chrono::seconds{2};
@@ -393,13 +389,9 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     }
     out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
               "250-PIPELINING\r\n"          // RFC 2920
-              //-----------------------------------------------
-              // Disable this right now, nobody uses it anyhow,
-              //  but this might break DKIM signing for relay.
-              //            "250-BINARYMIME\r\n"          // RFC 3030
-              //-----------------------------------------------
-              "250-CHUNKING\r\n"  // RFC 3030
-              "250 SMTPUTF8\r\n"; // RFC 6531
+              "250-BINARYMIME\r\n"          // RFC 3030
+              "250-CHUNKING\r\n"            // RFC 3030
+              "250 SMTPUTF8\r\n";           // RFC 6531
   }
 
   out_() << std::flush;
