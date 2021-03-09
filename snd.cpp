@@ -11,6 +11,7 @@ DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
 DEFINE_bool(selftest, false, "run a self test");
 
+DEFINE_bool(pipeline_quit, false, "pipeline the QUIT command");
 DEFINE_bool(badpipline, false, "send two NOOPs back-to-back");
 DEFINE_bool(bare_lf, false, "send a bare LF");
 DEFINE_bool(huge_size, false, "attempt with huge size");
@@ -24,7 +25,7 @@ DEFINE_bool(rawdog,
             "send the body exactly as is, don't fix CRLF issues "
             "or escape leading dots");
 DEFINE_bool(require_tls, true, "use STARTTLS or die");
-
+DEFINE_bool(save, false, "save mail in .Sent");
 DEFINE_bool(slow_strangle, false, "super slow mo");
 DEFINE_bool(to_the_neck, false, "shove data forever");
 
@@ -129,8 +130,8 @@ using namespace tao::pegtl::abnf;
 using namespace std::string_literals;
 
 namespace Config {
-constexpr auto read_timeout  = std::chrono::seconds(30);
-constexpr auto write_timeout = std::chrono::minutes(3);
+constexpr auto read_timeout  = std::chrono::minutes(24 * 60);
+constexpr auto write_timeout = std::chrono::minutes(24 * 60);
 } // namespace Config
 
 // clang-format off
@@ -1229,7 +1230,7 @@ auto create_eml(Domain const&               sender,
   eml.add_hdr("Date", date.c_str());
 
   if (!FLAGS_from_name.empty())
-    eml.add_hdr("From", fmt::format("{} <{}>", FLAGS_from_name, from));
+    eml.add_hdr("From", fmt::format("{}\r\n <{}>", FLAGS_from_name, from));
   else
     eml.add_hdr("From", from);
 
@@ -1282,9 +1283,9 @@ void sign_eml(Eml&                        eml,
                              ? OpenDKIM::sign::body_type::binary
                              : OpenDKIM::sign::body_type::text;
 
-  auto const key_file = FLAGS_dkim_key_file.empty()
-                            ? (FLAGS_selector + ".private")
-                            : FLAGS_dkim_key_file;
+  auto const    key_file = FLAGS_dkim_key_file.empty()
+                               ? (FLAGS_selector + ".private")
+                               : FLAGS_dkim_key_file;
   std::ifstream keyfs(key_file.c_str());
   CHECK(keyfs.good()) << "can't access " << key_file;
   std::string    key(std::istreambuf_iterator<char>{keyfs}, {});
@@ -1683,10 +1684,12 @@ bool snd(fs::path                    config_path,
 
   // if service is smtp (i.e. sending real mail, not smtp-test)
   try {
-    msg->open(sender.ascii(), total_size * 2, ".Sent");
-    msg->write(hdr_str.data(), hdr_str.size());
-    for (auto const& body : bodies) {
-      msg->write(body.data(), body.size());
+    if (FLAGS_save) {
+      msg->open(sender.ascii(), total_size * 2, ".Sent");
+      msg->write(hdr_str.data(), hdr_str.size());
+      for (auto const& body : bodies) {
+        msg->write(body.data(), body.size());
+      }
     }
   }
   catch (std::system_error const& e) {
@@ -1721,6 +1724,11 @@ bool snd(fs::path                    config_path,
     for (auto const& body : bodies) {
       cnn.sock.out().write(body.data(), body.size());
       CHECK(cnn.sock.out().good());
+    }
+
+    if (FLAGS_pipeline_quit) {
+      LOG(INFO) << "C: QUIT";
+      cnn.sock.out() << "QUIT\r\n" << std::flush;
     }
 
     cnn.sock.out() << std::flush;
@@ -1793,17 +1801,30 @@ bool snd(fs::path                    config_path,
     CHECK(cnn.sock.out().good());
 
     // Done!
-    cnn.sock.out() << ".\r\n" << std::flush;
+    if (FLAGS_pipeline_quit) {
+      LOG(INFO) << "C: QUIT";
+      cnn.sock.out() << ".\r\nQUIT\r\n" << std::flush;
+    }
+    else {
+      cnn.sock.out() << ".\r\n" << std::flush;
+    }
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
   }
   if (cnn.reply_code.at(0) == '2') {
-    msg->deliver();
+    if (FLAGS_save) {
+      msg->deliver();
+    }
+    else {
+      msg->trash();
+    }
     LOG(INFO) << "mail was sent successfully";
   }
   in.discard();
 
-  LOG(INFO) << "C: QUIT";
-  cnn.sock.out() << "QUIT\r\n" << std::flush;
+  if (!FLAGS_pipeline_quit) {
+    LOG(INFO) << "C: QUIT";
+    cnn.sock.out() << "QUIT\r\n" << std::flush;
+  }
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
   return true;
