@@ -4,7 +4,10 @@
 #include "iequal.hpp"
 #include "is_ascii.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <iterator>
+#include <string>
 
 #include "picosha2.h"
 
@@ -31,15 +34,23 @@ constexpr std::string_view REP_PREFIX = "rep=";
 
 constexpr char sep_char = '=';
 
+std::string to_lower(std::string data)
+{
+  std::transform(data.begin(), data.end(), data.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return data;
+}
+
 static std::string hash_rep(SRS0::from_to const& rep)
 {
   auto const mail_from = Mailbox(rep.mail_from);
   auto const hb =
-      fmt::format("{}{}{}{}", srs_secret, rep.rcpt_to_local_part,
-                  mail_from.local_part(), mail_from.domain().ascii());
+      fmt::format("{}{}{}{}", srs_secret, to_lower(rep.rcpt_to_local_part),
+                  to_lower(mail_from.local_part()), mail_from.domain().ascii());
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
-  return std::string(reinterpret_cast<char const*>(hash), hash_bytes_reply);
+  auto const hash_enc = cppcodec::base32_crockford::encode(hash);
+  return hash_enc.substr(0, hash_bytes_reply);
 }
 
 std::string enc_reply_blob(SRS0::from_to const& rep)
@@ -77,7 +88,7 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
 
   auto const mail_from = Mailbox(rep.mail_from);
 
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash_rep(rep));
+  auto const hash_enc = hash_rep(rep);
 
   return fmt::format("{}{}{}{}{}{}{}{}", REP_PREFIX, hash_enc, sep_char,
                      rep.rcpt_to_local_part, sep_char, mail_from.local_part(),
@@ -100,7 +111,7 @@ static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr)
 
   auto const hash_computed = hash_rep(rep);
 
-  if (hash_computed != hash) {
+  if (!iequal(hash_computed, hash)) {
     LOG(WARNING) << "hash check failed";
     return {};
   }
@@ -161,9 +172,9 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   rep.rcpt_to_local_part = rcpt_to_loc;
   rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
 
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash_rep(rep));
+  auto const hash_enc = hash_rep(rep);
 
-  if (reply_hash != hash_enc) {
+  if (!iequal(reply_hash, hash_enc)) {
     LOG(WARNING) << "hash mismatch in reply " << addr;
     return {};
   }
@@ -188,13 +199,13 @@ static uint16_t dec_posix_day(std::string_view posix_day)
 static std::string hash_bounce(SRS0::from_to const& bounce,
                                std::string_view     tstamp)
 {
-  auto const hb = fmt::format("{}{}{}{}", srs_secret, tstamp, bounce.mail_from,
-                              bounce.rcpt_to_local_part);
-
+  auto const hb =
+      fmt::format("{}{}{}{}", srs_secret, tstamp, to_lower(bounce.mail_from),
+                  to_lower(bounce.rcpt_to_local_part));
   unsigned char hash[picosha2::k_digest_size];
   picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
-
-  return std::string(reinterpret_cast<char const*>(hash), hash_bytes_bounce);
+  auto const hash_enc = cppcodec::base32_crockford::encode(hash);
+  return hash_enc.substr(0, hash_bytes_bounce);
 }
 
 static std::string enc_bounce_blob(SRS0::from_to const& bounce,
