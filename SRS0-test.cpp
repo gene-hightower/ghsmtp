@@ -24,8 +24,8 @@ int main(int argc, char* argv[])
       {"reply@example.com", "local-address"},
       {"one.reply@example.com", "local"},
       {"reply@example.com", "local"},
-      // These should force blob mode:
       {"reply=something@example.com", "local"},
+      // These should force blob mode:
       {"reply@example.com", "local=address"},
       {"\"quoted string\"@example.com", "local"},
       {"reply@[127.0.0.1]", "local"},
