@@ -138,6 +138,7 @@ TESTS := \
 	CDB-test \
 	DNS-test \
 	Domain-test \
+	Hash-test \
 	IP4-test \
 	IP6-test \
 	Magic-test \
