@@ -26,6 +26,13 @@ int main(int argc, char* argv[])
 
   SRS0 srs(config_path);
 
+  CHECK_EQ(srs.enc_reply({"x@y.z", "a"}), "rep=RHGA7M=a=x=y.z");
+  CHECK_EQ(srs.enc_reply({"x=x@y.z", "a"}), "rep=A0DT6K=a=x=x=y.z");
+  CHECK_EQ(srs.enc_reply({"x@y.z", "a=a"}), "rep=6NBM8PA4AR062FB101W40Y9EF8");
+  CHECK_EQ(srs.enc_reply({"\"x\"@y.z", "a"}), "rep=AWTK8DJQAW062012F0H40Y9EF8");
+  CHECK_EQ(srs.enc_reply({"x@[IPv6:::1]", "a"}),
+           "rep=8GWKGGAD8C06203R81DMJM3P6RX3MEHHBM");
+
   SRS0::from_to test_cases[] = {
       {"reply@example.com", "local"},
       {"reply@example.com", "local-address"},
@@ -44,6 +51,7 @@ int main(int argc, char* argv[])
 
   for (auto const& test_case : test_cases) {
     auto const enc_rep = srs.enc_reply(test_case);
+    // std::cout << enc_rep << '\n';
     CHECK(Mailbox::validate(fmt::format("{}@x.y", enc_rep))) << enc_rep;
     auto const dec_rep = srs.dec_reply(enc_rep);
     if (!dec_rep || *dec_rep != test_case) {
