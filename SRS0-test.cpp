@@ -12,6 +12,12 @@
 
 #include <glog/logging.h>
 
+#include <cppcodec/base32_crockford.hpp>
+#include <openssl/sha.h>
+
+using std::begin;
+using std::end;
+
 int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -21,14 +27,19 @@ int main(int argc, char* argv[])
   SRS0 srs(config_path);
 
   SRS0::from_to test_cases[] = {
+      {"reply@example.com", "local"},
       {"reply@example.com", "local-address"},
       {"one.reply@example.com", "local"},
-      {"reply@example.com", "local"},
       {"reply=something@example.com", "local"},
+
+      // Should work with UTF-8 in all the places.
+      {"♥@♥.example.com", "♥"},
+
       // These should force blob mode:
-      {"reply@example.com", "local=address"},
+      {"reply@example.com", "separator=in=address"},
       {"\"quoted string\"@example.com", "local"},
       {"reply@[127.0.0.1]", "local"},
+      {"reply@[IPv6:::1]", "local"},
   };
 
   for (auto const& test_case : test_cases) {

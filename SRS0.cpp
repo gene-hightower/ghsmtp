@@ -1,5 +1,6 @@
 #include "SRS0.hpp"
 
+#include "Hash.hpp"
 #include "Mailbox.hpp"
 #include "iequal.hpp"
 #include "is_ascii.hpp"
@@ -8,8 +9,6 @@
 #include <cctype>
 #include <iterator>
 #include <string>
-
-#include "picosha2.h"
 
 #include "SRS.ipp"
 
@@ -32,7 +31,7 @@ constexpr int hash_bytes_reply  = 6;
 constexpr std::string_view SRS_PREFIX = "SRS0=";
 constexpr std::string_view REP_PREFIX = "rep=";
 
-constexpr char sep_char = '=';
+constexpr char sep_char = '='; // must match above *_PREFIX values
 
 std::string to_lower(std::string data)
 {
@@ -41,25 +40,26 @@ std::string to_lower(std::string data)
   return data;
 }
 
-static std::string hash_rep(SRS0::from_to const& rep)
+static std::string hash_rep(SRS0::from_to const& rep, std::string_view secret)
 {
-  auto const mail_from = Mailbox(rep.mail_from);
-  auto const hb =
-      fmt::format("{}{}{}{}", srs_secret, to_lower(rep.rcpt_to_local_part),
-                  to_lower(mail_from.local_part()), mail_from.domain().ascii());
-  unsigned char hash[picosha2::k_digest_size];
-  picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash);
-  return hash_enc.substr(0, hash_bytes_reply);
+  Hash h;
+  h.update(secret);
+  h.update(to_lower(rep.mail_from));
+  h.update(to_lower(rep.rcpt_to_local_part));
+  return h.final().substr(0, hash_bytes_reply);
 }
 
 std::string enc_reply_blob(SRS0::from_to const& rep)
 {
-  auto const hash = hash_rep(rep);
-  auto const pkt  = fmt::format("{}{}{}{}", hash, rep.rcpt_to_local_part, '\0',
-                               rep.mail_from);
-  auto const b32  = cppcodec::base32_crockford::encode(pkt);
-  return fmt::format("{}{}", REP_PREFIX, b32);
+  auto const hash = hash_rep(rep, srs_secret);
+
+  auto const pkt = fmt::format("{}{}{}{}{}", // clang-format off
+                               hash, '\0',
+                               rep.rcpt_to_local_part, '\0',
+                               rep.mail_from); // clang-format on
+
+  return fmt::format("{}{}", REP_PREFIX,
+                     cppcodec::base32_crockford::encode(pkt));
 }
 
 std::string SRS0::enc_reply(SRS0::from_to const& rep) const
@@ -67,11 +67,6 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
   auto const result = Mailbox::parse(rep.mail_from);
   if (!result) {
     throw std::invalid_argument("invalid mailbox syntax in enc_reply");
-  }
-
-  // If it's UTF-8 we must fall back to the blob style.
-  if (!is_ascii(result->local)) {
-    return enc_reply_blob(rep);
   }
 
   // If it's "local part"@example.com or local-part@[127.0.0.1] we
@@ -88,28 +83,46 @@ std::string SRS0::enc_reply(SRS0::from_to const& rep) const
 
   auto const mail_from = Mailbox(rep.mail_from);
 
-  auto const hash_enc = hash_rep(rep);
+  auto const hash_enc = hash_rep(rep, srs_secret);
 
-  return fmt::format("{}{}{}{}{}{}{}{}", REP_PREFIX, hash_enc, sep_char,
-                     rep.rcpt_to_local_part, sep_char, mail_from.local_part(),
-                     sep_char, mail_from.domain().ascii());
+  return fmt::format("{}{}{}{}{}{}{}{}", // clang-format off
+                     REP_PREFIX,         // includes sep_char
+                     hash_enc, sep_char,
+                     rep.rcpt_to_local_part, sep_char,
+                     mail_from.local_part(), sep_char,
+                     mail_from.domain().utf8());
+  // clang-format on
+}
+
+auto split(std::string const& str, const char delim)
+{
+  std::vector<std::string> out;
+
+  size_t start;
+  size_t end = 0;
+  while ((start = str.find_first_not_of(delim, end)) != std::string::npos) {
+    end = str.find(delim, start);
+    out.push_back(str.substr(start, end - start));
+  }
+
+  return out;
 }
 
 static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr)
 {
   auto const pktv = cppcodec::base32_crockford::decode(addr);
-  auto       pkt =
+  auto const pkt =
       std::string(reinterpret_cast<char const*>(pktv.data()), pktv.size());
 
-  auto const hash = pkt.substr(0, hash_bytes_reply);
-  pkt.erase(0, hash_bytes_reply);
+  auto const parts = split(pkt, '\0');
+
+  auto const hash = parts[0];
 
   SRS0::from_to rep;
-  rep.rcpt_to_local_part = pkt.c_str();
-  pkt.erase(0, rep.rcpt_to_local_part.length() + 1);
-  rep.mail_from = pkt;
+  rep.rcpt_to_local_part = parts[1];
+  rep.mail_from          = parts[2];
 
-  auto const hash_computed = hash_rep(rep);
+  auto const hash_computed = hash_rep(rep, srs_secret);
 
   if (!iequal(hash_computed, hash)) {
     LOG(WARNING) << "hash check failed";
@@ -155,8 +168,6 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
     return {};
   }
 
-  auto const reply_hash = addr.substr(0, first_sep);
-
   auto const rcpt_to_pos = first_sep + 1;
   auto const mf_loc_pos  = second_sep + 1;
   auto const mf_dom_pos  = last_sep + 1;
@@ -164,6 +175,7 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   auto const rcpt_to_len = second_sep - rcpt_to_pos;
   auto const mf_loc_len  = last_sep - mf_loc_pos;
 
+  auto const reply_hash    = addr.substr(0, first_sep);
   auto const rcpt_to_loc   = addr.substr(rcpt_to_pos, rcpt_to_len);
   auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
   auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
@@ -172,10 +184,15 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr) const
   rep.rcpt_to_local_part = rcpt_to_loc;
   rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
 
-  auto const hash_enc = hash_rep(rep);
+  auto const hash_enc = hash_rep(rep, srs_secret);
 
   if (!iequal(reply_hash, hash_enc)) {
     LOG(WARNING) << "hash mismatch in reply " << addr;
+    LOG(WARNING) << "   reply_hash == " << reply_hash;
+    LOG(WARNING) << "     hash_enc == " << hash_enc;
+    LOG(WARNING) << "  rcpt_to_loc == " << rcpt_to_loc;
+    LOG(WARNING) << "mail_from_loc == " << mail_from_loc;
+    LOG(WARNING) << "mail_from_dom == " << mail_from_dom;
     return {};
   }
 
@@ -197,22 +214,22 @@ static uint16_t dec_posix_day(std::string_view posix_day)
 }
 
 static std::string hash_bounce(SRS0::from_to const& bounce,
-                               std::string_view     tstamp)
+                               std::string_view     tstamp,
+                               std::string_view     secret)
 {
-  auto const hb =
-      fmt::format("{}{}{}{}", srs_secret, tstamp, to_lower(bounce.mail_from),
-                  to_lower(bounce.rcpt_to_local_part));
-  unsigned char hash[picosha2::k_digest_size];
-  picosha2::hash256(begin(hb), end(hb), begin(hash), end(hash));
-  auto const hash_enc = cppcodec::base32_crockford::encode(hash);
-  return hash_enc.substr(0, hash_bytes_bounce);
+  Hash h;
+  h.update(secret);
+  h.update(tstamp);
+  h.update(to_lower(bounce.mail_from));
+  h.update(to_lower(bounce.rcpt_to_local_part));
+  return h.final().substr(0, hash_bytes_bounce);
 }
 
 static std::string enc_bounce_blob(SRS0::from_to const& bounce,
                                    char const*          sender)
 {
   auto const tstamp = enc_posix_day();
-  auto const hash   = hash_bounce(bounce, tstamp);
+  auto const hash   = hash_bounce(bounce, tstamp, srs_secret);
   auto const pkt    = fmt::format("{}{}{}{}{}", hash, tstamp, bounce.mail_from,
                                '\0', bounce.rcpt_to_local_part);
   auto const b32    = cppcodec::base32_crockford::encode(pkt);
@@ -260,7 +277,7 @@ static std::optional<SRS0::from_to> dec_bounce_blob(std::string_view addr,
   pkt.erase(0, bounce.mail_from.length() + 1);
   bounce.rcpt_to_local_part = pkt;
 
-  auto const hash_computed = hash_bounce(bounce, tstamp);
+  auto const hash_computed = hash_bounce(bounce, tstamp, srs_secret);
 
   if (hash_computed != hash) {
     LOG(WARNING) << "hash check failed";
