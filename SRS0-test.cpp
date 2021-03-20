@@ -18,19 +18,20 @@
 using std::begin;
 using std::end;
 
+constexpr char srs_secret[] = "Not a real secret, of course.";
+
 int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  fs::path config_path = osutil::get_config_dir();
-
-  SRS0 srs(config_path);
-
-  CHECK_EQ(srs.enc_reply({"x@y.z", "a"}), "rep=RHGA7M=a=x=y.z");
-  CHECK_EQ(srs.enc_reply({"x=x@y.z", "a"}), "rep=A0DT6K=a=x=x=y.z");
-  CHECK_EQ(srs.enc_reply({"x@y.z", "a=a"}), "rep=6NBM8PA4AR062FB101W40Y9EF8");
-  CHECK_EQ(srs.enc_reply({"\"x\"@y.z", "a"}), "rep=AWTK8DJQAW062012F0H40Y9EF8");
-  CHECK_EQ(srs.enc_reply({"x@[IPv6:::1]", "a"}),
+  CHECK_EQ(SRS0::enc_reply({"x@y.z", "a"}, srs_secret), "rep=RHGA7M=a=x=y.z");
+  CHECK_EQ(SRS0::enc_reply({"x=x@y.z", "a"}, srs_secret),
+           "rep=A0DT6K=a=x=x=y.z");
+  CHECK_EQ(SRS0::enc_reply({"x@y.z", "a=a"}, srs_secret),
+           "rep=6NBM8PA4AR062FB101W40Y9EF8");
+  CHECK_EQ(SRS0::enc_reply({"\"x\"@y.z", "a"}, srs_secret),
+           "rep=AWTK8DJQAW062012F0H40Y9EF8");
+  CHECK_EQ(SRS0::enc_reply({"x@[IPv6:::1]", "a"}, srs_secret),
            "rep=8GWKGGAD8C06203R81DMJM3P6RX3MEHHBM");
 
   SRS0::from_to test_cases[] = {
@@ -50,10 +51,10 @@ int main(int argc, char* argv[])
   };
 
   for (auto const& test_case : test_cases) {
-    auto const enc_rep = srs.enc_reply(test_case);
+    auto const enc_rep = SRS0::enc_reply(test_case, srs_secret);
     // std::cout << enc_rep << '\n';
     CHECK(Mailbox::validate(fmt::format("{}@x.y", enc_rep))) << enc_rep;
-    auto const dec_rep = srs.dec_reply(enc_rep);
+    auto const dec_rep = SRS0::dec_reply(enc_rep, srs_secret);
     if (!dec_rep || *dec_rep != test_case) {
       LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
       LOG(INFO) << "in  local_part == " << test_case.rcpt_to_local_part;
@@ -61,17 +62,6 @@ int main(int argc, char* argv[])
       LOG(INFO) << "out mail_from  == " << dec_rep->mail_from;
       LOG(INFO) << "out local_part == " << dec_rep->rcpt_to_local_part;
       CHECK(test_case == *dec_rep);
-    }
-  }
-
-  for (auto const& test_case : test_cases) {
-    auto const enc_bnc = srs.enc_bounce(test_case, "sender.com");
-    CHECK(Mailbox::validate(enc_bnc)) << enc_bnc;
-    auto const dec_bnc = srs.dec_bounce(enc_bnc, 3);
-    if (!dec_bnc || dec_bnc->mail_from != test_case.mail_from) {
-      LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
-      LOG(INFO) << "    enc_bnc    == " << enc_bnc;
-      LOG(INFO) << "out mail_from  == " << dec_bnc->mail_from;
     }
   }
 }

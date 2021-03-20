@@ -17,7 +17,7 @@
 
 #include <iostream>
 
-using namespace std::string_literals;
+constexpr char srs_secret[] = "Not a real secret, of course.";
 
 DEFINE_bool(arc, false, "check ARC set");
 DEFINE_bool(dkim, false, "check DKIM sigs");
@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
       return hostname;
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
-    return "(none)"s;
+    return std::string("(none)");
   }();
 
   auto constexpr authentication_results_str =
@@ -103,18 +103,16 @@ int main(int argc, char* argv[])
     if (authentic)
       LOG(INFO) << "authentic";
 
-    SRS0 srs(config_path);
-
     SRS0::from_to reply;
 
     reply.mail_from          = msg.dmarc_from;
     reply.rcpt_to_local_part = "local-alias";
 
-    auto const rfc22_from =
-        fmt::format("From: {}@{}", srs.enc_reply(reply), server_identity);
+    auto const rfc22_from = fmt::format(
+        "From: {}@{}", SRS0::enc_reply(reply, srs_secret), server_identity);
 
-    auto const reply_to =
-        fmt::format("Reply-To: {}@{}", srs.enc_reply(reply), server_identity);
+    auto const reply_to = fmt::format(
+        "Reply-To: {}@{}", SRS0::enc_reply(reply, srs_secret), server_identity);
 
     message::rewrite_from_to(msg, "", reply_to, server_identity.c_str(),
                              selector, key_file);
