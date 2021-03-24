@@ -1,4 +1,4 @@
-#include "SRS0.hpp"
+#include "Reply.hpp"
 
 #include "Mailbox.hpp"
 #include "osutil.hpp"
@@ -18,23 +18,22 @@
 using std::begin;
 using std::end;
 
-constexpr char srs_secret[] = "Not a real secret, of course.";
+constexpr char secret[] = "Not a real secret, of course.";
 
 int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  CHECK_EQ(SRS0::enc_reply({"x@y.z", "a"}, srs_secret), "rep=RHGA7M=a=x=y.z");
-  CHECK_EQ(SRS0::enc_reply({"x=x@y.z", "a"}, srs_secret),
-           "rep=A0DT6K=a=x=x=y.z");
-  CHECK_EQ(SRS0::enc_reply({"x@y.z", "a=a"}, srs_secret),
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "rep=RHGA7M=a=x=y.z");
+  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "rep=A0DT6K=a=x=x=y.z");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret),
            "rep=6NBM8PA4AR062FB101W40Y9EF8");
-  CHECK_EQ(SRS0::enc_reply({"\"x\"@y.z", "a"}, srs_secret),
+  CHECK_EQ(Reply::enc_reply({"\"x\"@y.z", "a"}, secret),
            "rep=AWTK8DJQAW062012F0H40Y9EF8");
-  CHECK_EQ(SRS0::enc_reply({"x@[IPv6:::1]", "a"}, srs_secret),
+  CHECK_EQ(Reply::enc_reply({"x@[IPv6:::1]", "a"}, secret),
            "rep=8GWKGGAD8C06203R81DMJM3P6RX3MEHHBM");
 
-  SRS0::from_to test_cases[] = {
+  Reply::from_to test_cases[] = {
       {"reply@example.com", "local"},
       {"reply@example.com", "local-address"},
       {"one.reply@example.com", "local"},
@@ -51,10 +50,10 @@ int main(int argc, char* argv[])
   };
 
   for (auto const& test_case : test_cases) {
-    auto const enc_rep = SRS0::enc_reply(test_case, srs_secret);
+    auto const enc_rep = Reply::enc_reply(test_case, secret);
     // std::cout << enc_rep << '\n';
     CHECK(Mailbox::validate(fmt::format("{}@x.y", enc_rep))) << enc_rep;
-    auto const dec_rep = SRS0::dec_reply(enc_rep, srs_secret);
+    auto const dec_rep = Reply::dec_reply(enc_rep, secret);
     if (!dec_rep || *dec_rep != test_case) {
       LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
       LOG(INFO) << "in  local_part == " << test_case.rcpt_to_local_part;

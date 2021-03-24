@@ -13,8 +13,6 @@
 #include "Mailbox.hpp"
 #include "MessageStore.hpp"
 #include "SPF.hpp"
-//#include "SRS0.hpp"
-//#include "Send.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
 #include "message.hpp"
@@ -103,7 +101,7 @@ private:
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
   // bool forward_to_(std::string const& forward, Mailbox const& rcpt_to);
-  // bool reply_to_(SRS0::from_to const& reply_info, Mailbox const& rcpt_to);
+  // bool reply_to_(Reply::from_to const& reply_info, Mailbox const& rcpt_to);
   // bool do_forward_(message::parsed& msg);
   // bool do_reply_(message::parsed& msg);
   bool do_deliver_();
@@ -136,11 +134,11 @@ private:
   Sock          sock_;
 
   // forwarding and replies
-  // Send          send_;
-  // SRS0          srs_;
-  // Mailbox       fwd_path_;
-  // Mailbox       fwd_from_;
-  // SRS0::from_to rep_info_;
+  // Send           send_;
+  // Reply          rep_;
+  // Mailbox        fwd_path_;
+  // Mailbox        fwd_from_;
+  // Reply::from_to rep_info_;
 
   // per connection/session
   Domain              server_identity_; // who we identify as
