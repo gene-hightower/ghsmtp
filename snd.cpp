@@ -328,6 +328,7 @@ struct Connection {
 using dot = one<'.'>;
 using colon = one<':'>;
 using dash = one<'-'>;
+using underscore = one<'_'>;
 
 struct u_let_dig : sor<ALPHA, DIGIT, chars::non_ascii> {};
 
@@ -470,7 +471,7 @@ struct ehlo_greet : plus<ranges<0, 9, 11, 12, 14, 127>> {};
 // The '.' we also allow in ehlo-keyword since it has been seen in the
 // wild at least at 263.net.
 
-struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash, dot>>> {};
+struct ehlo_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash, dot, underscore>>> {};
 
 // ehlo-param     = 1*(%d33-126)
 //                  ; any CHAR excluding <SP> and all
@@ -960,6 +961,15 @@ void selftest()
   }
 
   const char* ehlo_rsp_list[]{
+      "250-www77.totaalholding.nl Hello "
+      "ec2-18-205-224-193.compute-1.amazonaws.com [18.205.224.193]\r\n"
+      "250-SIZE 52428800\r\n"
+      "250-8BITMIME\r\n"
+      "250-PIPELINING\r\n"
+      "250-X_PIPE_CONNECT\r\n"
+      "250-STARTTLS\r\n"
+      "250 HELP\r\n",
+
       "250-HELLO, SAILOR!\r\n"
       "250-NO-SOLICITING\r\n"
       "250 8BITMIME\r\n",
@@ -1516,7 +1526,7 @@ bool snd(fs::path                    config_path,
 
     LOG(INFO) << "C: EHLO " << sender.ascii();
     cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
-    CHECK((parse<RFC5321::ehlo_ok_rsp, RFC5321::action>(in, cnn)));
+    CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
   }
   else if (FLAGS_require_tls) {
     LOG(ERROR) << "No TLS extension, won't send mail in plain text without "
