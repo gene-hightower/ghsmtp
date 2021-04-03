@@ -2,7 +2,7 @@
 
 #include "Now.hpp"
 #include "Pill.hpp"
-#include "SRS0.hpp"
+#include "Reply.hpp"
 #include "esc.hpp"
 #include "osutil.hpp"
 
@@ -103,16 +103,17 @@ int main(int argc, char* argv[])
     if (authentic)
       LOG(INFO) << "authentic";
 
-    SRS0::from_to reply;
+    Reply::from_to reply;
 
     reply.mail_from          = msg.dmarc_from;
     reply.rcpt_to_local_part = "local-alias";
 
     auto const rfc22_from = fmt::format(
-        "From: {}@{}", SRS0::enc_reply(reply, srs_secret), server_identity);
+        "From: {}@{}", Reply::enc_reply(reply, srs_secret), server_identity);
 
-    auto const reply_to = fmt::format(
-        "Reply-To: {}@{}", SRS0::enc_reply(reply, srs_secret), server_identity);
+    auto const reply_to =
+        fmt::format("Reply-To: {}@{}", Reply::enc_reply(reply, srs_secret),
+                    server_identity);
 
     message::rewrite_from_to(msg, "", reply_to, server_identity.c_str(),
                              selector, key_file);

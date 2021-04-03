@@ -490,7 +490,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 //   fwd_from_ = rcpt_to;
 
 //   // New bounce address
-//   SRS0::from_to bounce;
+//   Reply::from_to bounce;
 //   bounce.mail_from = reverse_path_.as_string();
 
 //   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
@@ -509,7 +509,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 //   return true;
 // }
 
-// bool Session::reply_to_(SRS0::from_to const& reply_info, Mailbox const&
+// bool Session::reply_to_(Reply::from_to const& reply_info, Mailbox const&
 // rcpt_to)
 // {
 //   // If we're already forwarding or replying, reject
@@ -915,7 +915,7 @@ bool Session::data_start()
 //   auto msg_fwd = msg;
 
 //   // Generate a reply address
-//   SRS0::from_to reply;
+//   Reply::from_to reply;
 //   reply.mail_from          = msg_fwd.dmarc_from;
 //   reply.rcpt_to_local_part = fwd_from_.local_part();
 

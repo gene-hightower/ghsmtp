@@ -1,7 +1,5 @@
-#ifndef SRS0_DOT_HPP
-#define SRS0_DOT_HPP
-
-#include "SRS.hpp"
+#ifndef REPLY_DOT_HPP
+#define REPLY_DOT_HPP
 
 #include <optional>
 #include <string>
@@ -11,7 +9,7 @@
 
 // sender rewriting scheme complaint
 
-class SRS0 {
+class Reply {
 public:
   struct from_to {
     std::string mail_from;          // from
@@ -29,21 +27,21 @@ public:
                                           std::string_view secret);
 };
 
-inline bool SRS0::from_to::operator==(from_to const& rhs) const
+inline bool Reply::from_to::operator==(from_to const& rhs) const
 {
   return (mail_from == rhs.mail_from) &&
          (rcpt_to_local_part == rhs.rcpt_to_local_part);
 }
 
-inline bool SRS0::from_to::empty() const
+inline bool Reply::from_to::empty() const
 {
   return mail_from.empty() && rcpt_to_local_part.empty();
 }
 
-inline void SRS0::from_to::clear()
+inline void Reply::from_to::clear()
 {
   mail_from.clear();
   rcpt_to_local_part.clear();
 }
 
-#endif // SRS0_DOT_HPP
+#endif // REPLY_DOT_HPP

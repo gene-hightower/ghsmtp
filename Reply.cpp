@@ -1,4 +1,4 @@
-#include "SRS0.hpp"
+#include "Reply.hpp"
 
 #include "Hash.hpp"
 #include "Mailbox.hpp"
@@ -9,8 +9,6 @@
 #include <cctype>
 #include <iterator>
 #include <string>
-
-#include "SRS.ipp"
 
 #include <cppcodec/base32_crockford.hpp>
 
@@ -27,7 +25,6 @@ using std::end;
 
 constexpr int hash_bytes_reply = 6;
 
-constexpr std::string_view SRS_PREFIX = "SRS0=";
 constexpr std::string_view REP_PREFIX = "rep=";
 
 constexpr char sep_char = '='; // must match above *_PREFIX values
@@ -39,7 +36,7 @@ std::string to_lower(std::string data)
   return data;
 }
 
-static std::string hash_rep(SRS0::from_to const& rep, std::string_view secret)
+static std::string hash_rep(Reply::from_to const& rep, std::string_view secret)
 {
   Hash h;
   h.update(secret);
@@ -48,7 +45,7 @@ static std::string hash_rep(SRS0::from_to const& rep, std::string_view secret)
   return h.final().substr(0, hash_bytes_reply);
 }
 
-std::string enc_reply_blob(SRS0::from_to const& rep, std::string_view secret)
+std::string enc_reply_blob(Reply::from_to const& rep, std::string_view secret)
 {
   auto const hash = hash_rep(rep, secret);
 
@@ -61,7 +58,7 @@ std::string enc_reply_blob(SRS0::from_to const& rep, std::string_view secret)
                      cppcodec::base32_crockford::encode(pkt));
 }
 
-std::string SRS0::enc_reply(SRS0::from_to const& rep, std::string_view secret)
+std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
 {
   auto const result = Mailbox::parse(rep.mail_from);
   if (!result) {
@@ -107,8 +104,8 @@ auto split(std::string const& str, const char delim)
   return out;
 }
 
-static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr,
-                                                   std::string_view secret)
+static std::optional<Reply::from_to> dec_reply_blob(std::string_view addr,
+                                                    std::string_view secret)
 {
   auto const pktv = cppcodec::base32_crockford::decode(addr);
   auto const pkt =
@@ -118,7 +115,7 @@ static std::optional<SRS0::from_to> dec_reply_blob(std::string_view addr,
 
   auto const hash = parts[0];
 
-  SRS0::from_to rep;
+  Reply::from_to rep;
   rep.rcpt_to_local_part = parts[1];
   rep.mail_from          = parts[2];
 
@@ -141,8 +138,8 @@ static bool is_pure_base32(std::string_view s)
   return s.find_first_not_of(alpha) == std::string_view::npos;
 }
 
-std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr,
-                                             std::string_view secret)
+std::optional<Reply::from_to> Reply::dec_reply(std::string_view addr,
+                                               std::string_view secret)
 {
   if (!istarts_with(addr, REP_PREFIX)) {
     LOG(WARNING) << addr << " not a valid reply address";
@@ -181,7 +178,7 @@ std::optional<SRS0::from_to> SRS0::dec_reply(std::string_view addr,
   auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
   auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
 
-  SRS0::from_to rep;
+  Reply::from_to rep;
   rep.rcpt_to_local_part = rcpt_to_loc;
   rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
 
