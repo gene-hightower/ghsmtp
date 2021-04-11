@@ -1,3 +1,3 @@
 220 digilicious.com ESMTP - ghsmtp
 250 digilicious.com
-501 5.1.8 test-bad-sender@example.com bad sender
+550 5.1.8 test-bad-sender@example.com bad sender

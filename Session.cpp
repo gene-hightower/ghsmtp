@@ -764,14 +764,14 @@ bool Session::msg_new()
   catch (std::system_error const& e) {
     switch (errno) {
     case ENOSPC:
-      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      out_() << "452 4.3.1 insufficient system storage\r\n" << std::flush;
       LOG(ERROR) << "no space";
       msg_->trash();
       msg_.reset();
       return false;
 
     default:
-      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      out_() << "451 4.0.0 mail system error\r\n" << std::flush;
       LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
       LOG(ERROR) << e.what();
       msg_->trash();
@@ -780,18 +780,18 @@ bool Session::msg_new()
     }
   }
   catch (std::exception const& e) {
-    out_() << "550 5.0.0 mail error\r\n" << std::flush;
+    out_() << "451 4.0.0 mail system error\r\n" << std::flush;
     LOG(ERROR) << e.what();
     msg_->trash();
     msg_.reset();
     return false;
   }
 
-  // out_() << "550 5.0.0 mail error\r\n" << std::flush;
-  // LOG(ERROR) << "msg_new failed with no exception thrown";
-  // msg_->trash();
-  // msg_.reset();
-  // return false;
+  out_() << "451 4.0.0 mail system error\r\n" << std::flush;
+  LOG(ERROR) << "msg_new failed with no exception caught";
+  msg_->trash();
+  msg_.reset();
+  return false;
 }
 
 bool Session::msg_write(char const* s, std::streamsize count)
@@ -809,14 +809,14 @@ bool Session::msg_write(char const* s, std::streamsize count)
   catch (std::system_error const& e) {
     switch (errno) {
     case ENOSPC:
-      out_() << "452 4.3.1 mail system full\r\n" << std::flush;
+      out_() << "452 4.3.1 insufficient system storage\r\n" << std::flush;
       LOG(ERROR) << "no space";
       msg_->trash();
       msg_.reset();
       return false;
 
     default:
-      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      out_() << "451 4.0.0 mail system error\r\n" << std::flush;
       LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
       LOG(ERROR) << e.what();
       msg_->trash();
@@ -825,15 +825,15 @@ bool Session::msg_write(char const* s, std::streamsize count)
     }
   }
   catch (std::exception const& e) {
-    out_() << "550 5.0.0 mail error\r\n" << std::flush;
+    out_() << "451 4.0.0 mail system error\r\n" << std::flush;
     LOG(ERROR) << e.what();
     msg_->trash();
     msg_.reset();
     return false;
   }
 
-  out_() << "550 5.0.0 mail error\r\n" << std::flush;
-  LOG(ERROR) << "write failed with no exception thrown";
+  out_() << "451 4.0.0 mail system error\r\n" << std::flush;
+  LOG(ERROR) << "msg_write failed with no exception caught";
   msg_->trash();
   msg_.reset();
   return false;
@@ -1751,7 +1751,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   CDB  bad_senders{bad_senders_db_name}; // Addresses we don't accept mail from.
   if (bad_senders.contains(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
-    out_() << "501 5.1.8 " << error_msg << "\r\n" << std::flush;
+    out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
@@ -1782,12 +1782,12 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     return true;
   }
 
-  if (!verify_sender_domain_(sender.domain(), error_msg)) {
+  if (!verify_sender_spf_(sender)) {
+    error_msg = "failed SPF check";
     return false;
   }
 
-  if (!verify_sender_spf_(sender)) {
-    error_msg = "failed SPF check";
+  if (!verify_sender_domain_(sender.domain(), error_msg)) {
     return false;
   }
 
