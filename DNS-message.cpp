@@ -521,7 +521,7 @@ void check_answer(bool& nx_domain,
     return;
   }
 
-  // check the question part of the replay
+  // check the question part of the reply
 
   if (hdr_p->qdcount() != 1) {
     bogus_or_indeterminate = true;
