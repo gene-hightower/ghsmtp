@@ -1125,6 +1125,7 @@ void Session::data_done()
   //   }
   // }
 
+  // Check for and act on magic "wait" address.
   {
     using namespace boost::xpressive;
 
@@ -2086,6 +2087,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
   }
 
+  // This is a trap for a probe done by some senders to see if we
+  // accept just any old local-part.
   if (!extensions_) {
     if (recipient.local_part().length() > 8) {
       out_() << "550 5.1.1 unknown recipient " << recipient << "\r\n"
