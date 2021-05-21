@@ -630,6 +630,9 @@ std::string Session::added_headers_(MessageStore const& msg)
 
   fmt::memory_buffer headers;
 
+  // Return-Path:
+  fmt::format_to(headers, "Return-Path: <{}>\r\n", reverse_path_);
+
   // Received-SPF:
   if (!spf_received_.empty()) {
     fmt::format_to(headers, "{}\r\n", spf_received_);
