@@ -1058,8 +1058,8 @@ bool Session::do_deliver_()
     //       message_parsed &&
     //       message::authentication(msg, sender, selector, key_file);
 
-    // write a new Return-Path
-    msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
+    // // write a new Return-Path
+    // msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
 
     //   for (auto const h : msg.headers) {
     //     msg_->write(h.as_string());
