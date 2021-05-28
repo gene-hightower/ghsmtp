@@ -1600,6 +1600,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
     auto const reversed{IP4::reverse(sock_.them_c_str())};
 
+    /*
     // Check with allow list.
     std::shuffle(std::begin(Config::wls), std::end(Config::wls),
                  random_device_);
@@ -1633,6 +1634,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         return true;
       }
     }
+    */
 
     // Check with block lists. <https://en.wikipedia.org/wiki/DNSBL>
     std::shuffle(std::begin(Config::bls), std::end(Config::bls),
