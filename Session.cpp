@@ -620,12 +620,18 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 std::string Session::added_headers_(MessageStore const& msg)
 {
   auto const protocol{[this]() {
+    if (sock_.tls() && !extensions_) {
+      LOG(WARNING) << "TLS active without extensions";
+    }
+    // <https://www.iana.org/assignments/mail-parameters/mail-parameters.xhtml#mail-parameters-5>
     if (smtputf8_)
       return sock_.tls() ? "UTF8SMTPS" : "UTF8SMTP";
+    else if (sock_.tls())
+      return "ESMTPS";
     else if (extensions_)
-      return sock_.tls() ? "ESMTPS" : "ESMTP";
+      return "ESMTP";
     else
-      return sock_.tls() ? "SMTPS" : "SMTP";
+      return "SMTP";
   }()};
 
   fmt::memory_buffer headers;
@@ -1377,12 +1383,20 @@ void Session::starttls()
     out_() << "554 5.5.1 TLS already active\r\n" << std::flush;
     LOG(WARNING) << "STARTTLS issued with TLS already active";
   }
+  else if (!extensions_) {
+    out_() << "554 5.5.1 TLS not avaliable without using EHLO\r\n"
+           << std::flush;
+    LOG(WARNING) << "STARTTLS issued without using EHLO";
+  }
   else {
     out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
     if (sock_.starttls_server(config_path_)) {
       reset_();
       max_msg_size(Config::max_msg_size_bro);
       LOG(INFO) << "STARTTLS " << sock_.tls_info();
+    }
+    else {
+      LOG(INFO) << "failed STARTTLS";
     }
   }
 }
