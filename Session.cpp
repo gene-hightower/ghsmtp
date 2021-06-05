@@ -1601,7 +1601,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     }
   }
   else {
-    client_ = fmt::format("unknown {}", sock_.them_address_literal());
+    client_ = fmt::format("{}", sock_.them_address_literal());
   }
 
   if (IP4::is_address(sock_.them_c_str())) {
