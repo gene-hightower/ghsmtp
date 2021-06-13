@@ -46,6 +46,7 @@ public:
   void   connect(char const* ip);
   bool   store_from_domain(char const* from_domain);
   bool   store_dkim(char const* d_equal_domain,
+                    char const* d_selector,
                     int         dkim_result,
                     char const* human_result);
   bool   store_spf(char const* domain,

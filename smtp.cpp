@@ -2,8 +2,9 @@
 namespace gflags {
 }
 
-// This needs to be at least the length of each string it's trying to match.
-DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
+// These need to be at least the length of any string it's trying to match.
+DEFINE_uint64(cmd_bfr_size, 4 * 1024, "command parser buffer size");
+DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
@@ -642,8 +643,8 @@ struct action<data> {
   static void apply(Input const& in, Ctx& ctx)
   {
     if (ctx.session.data_start()) {
-      auto din = istream_input<eol::crlf, 1>(ctx.session.in(), FLAGS_bfr_size,
-                                             "data");
+      auto din = istream_input<eol::crlf, 1>(ctx.session.in(),
+                                             FLAGS_data_bfr_size, "data");
       try {
         if (!parse_nested<RFC5321::data_grammar, RFC5321::data_action>(in, din,
                                                                        ctx)) {
@@ -774,7 +775,8 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_bfr_size, "session"};
+  istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
+                                 "session"};
 
   int ret = 0;
   try {

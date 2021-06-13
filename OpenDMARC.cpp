@@ -66,6 +66,7 @@ bool policy::store_from_domain(char const* from_domain)
 }
 
 bool policy::store_dkim(char const* d_equal_domain,
+                        char const* d_selector,
                         int         dkim_result,
                         char const* human_result)
 {
@@ -73,7 +74,7 @@ bool policy::store_dkim(char const* d_equal_domain,
   CHECK_NOTNULL(human_result);
   LOG(INFO) << "d_equal_domain == " << d_equal_domain;
   auto const status = opendmarc_policy_store_dkim(
-      pctx_, uc(d_equal_domain), dkim_result, uc(human_result));
+      pctx_, uc(d_selector), uc(d_equal_domain), dkim_result, uc(human_result));
   if (status != DMARC_PARSE_OKAY) {
     LOG(WARNING) << "d_equal_domain == " << d_equal_domain;
     LOG(WARNING) << opendmarc_policy_status_to_str(status);

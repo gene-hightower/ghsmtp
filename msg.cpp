@@ -1560,7 +1560,7 @@ struct action<message> {
       int result = passed ? DMARC_POLICY_DKIM_OUTCOME_PASS
                           : DMARC_POLICY_DKIM_OUTCOME_FAIL;
 
-      ctx.dmp.store_dkim(domain, result, "I am human");
+      ctx.dmp.store_dkim(domain, selector, result, "I am human");
     });
 
     ctx.dmp.query_dmarc(from_domain.ascii().c_str());
