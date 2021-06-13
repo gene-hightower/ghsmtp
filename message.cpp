@@ -1033,7 +1033,7 @@ bool authentication(message::parsed& msg,
 
     LOG(INFO) << "DKIM check for " << domain << " " << human_result;
 
-    dmp.store_dkim(domain, result, human_result);
+    dmp.store_dkim(domain, sel, result, human_result);
 
     auto bs = std::string_view(b, strlen(b)).substr(0, 8);
 
