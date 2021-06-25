@@ -16,7 +16,8 @@ int main(int argc, char* argv[])
   auto const config_dir = osutil::get_config_dir();
 
   auto const no_database = config_dir / "unable-to-open-database";
-  CDB        no_db{no_database};
+  CDB        no_db;
+  CHECK(!no_db.open(no_database));
   CHECK(!no_db.contains("foo"));
 
   CDB        accept_dom;

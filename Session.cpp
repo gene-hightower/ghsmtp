@@ -1530,8 +1530,9 @@ bool ip4_allowed(char const* addr)
 bool Session::verify_ip_address_(std::string& error_msg)
 {
   auto ip_block_db_name = config_path_ / "ip-block";
-  CDB  ip_block{ip_block_db_name};
-  if (ip_block.contains(sock_.them_c_str())) {
+  CDB  ip_block;
+  if (ip_block.open(ip_block_db_name) &&
+      ip_block.contains(sock_.them_c_str())) {
     error_msg =
         fmt::format("IP address {} on static blocklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
@@ -1773,8 +1774,9 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   std::string const sender_str{sender};
 
   auto bad_senders_db_name = config_path_ / "bad_senders";
-  CDB  bad_senders{bad_senders_db_name}; // Addresses we don't accept mail from.
-  if (bad_senders.contains(sender_str)) {
+  CDB  bad_senders;
+  if (bad_senders.open(bad_senders_db_name) &&
+      bad_senders.contains(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
     out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
@@ -2070,8 +2072,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   // Check for local addresses we reject.
   {
     auto bad_recipients_db_name = config_path_ / "bad_recipients";
-    CDB  bad_recipients_db{bad_recipients_db_name};
-    if (bad_recipients_db.contains(recipient.local_part())) {
+    CDB  bad_recipients_db;
+    if (bad_recipients_db.open(bad_recipients_db_name) &&
+        bad_recipients_db.contains(recipient.local_part())) {
       out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
       return false;
@@ -2080,8 +2083,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   {
     auto temp_fail_db_name = config_path_ / "temp_fail";
-    CDB  temp_fail{temp_fail_db_name}; // Addresses we make wait...
-    if (temp_fail.contains(recipient.local_part())) {
+    CDB  temp_fail; // Addresses we make wait...
+    if (temp_fail.open(temp_fail_db_name) &&
+        temp_fail.contains(recipient.local_part())) {
       out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
              << std::flush;
       LOG(WARNING) << "temp fail for recipient " << recipient;

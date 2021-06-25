@@ -18,7 +18,6 @@ public:
   CDB& operator=(CDB const&) = delete;
 
   CDB() = default;
-  explicit CDB(fs::path db) { open(db); }
   ~CDB();
 
   bool                       open(fs::path db);
