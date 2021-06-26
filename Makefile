@@ -14,7 +14,6 @@ LDLIBS += \
 	-lopendmarc \
 	-lpsl \
 	-lspf2 \
-	-lsrs2 \
 	-lunistring
 
 PROGRAMS := arcsign arcverify dns_tool smtp msg sasl snd socks5
