@@ -52,10 +52,6 @@ struct Session_test {
 
     CHECK(!sess.verify_sender_domain_(Domain("com"), error_msg));
 
-    // SPF
-    auto mb{Mailbox{"foo", "digilicious.com"}};
-    CHECK(sess.verify_sender_spf_(mb));
-
     // IP address
     // auto error_msg{std::string{}};
     // CHECK(!sess.verify_ip_address_("blocklisted.digilicious.com"s));
