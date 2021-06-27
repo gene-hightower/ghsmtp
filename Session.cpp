@@ -1809,10 +1809,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     return true;
   }
 
-  if (!verify_sender_spf_(sender)) {
-    error_msg = "failed SPF check";
-    return false;
-  }
+  do_spf_check_(sender);
 
   if (!verify_sender_domain_(sender.domain(), error_msg)) {
     return false;
@@ -1843,51 +1840,34 @@ bool Session::verify_sender_domain_(Domain const& sender,
     return false;
   }
 
-  if (allow_.contains(sender.ascii())) {
-    LOG(INFO) << "sender " << sender.ascii() << " allowed";
-    return true;
+  if (lookup_domain(block_, sender)) {
+    error_msg =
+        fmt::format("SPF sender domain ({}) is blocked", spf_sender_domain_);
+    out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
+    return false;
   }
-  auto const reg_dom{tld_db_.get_registered_domain(sender.ascii())};
-  if (reg_dom) {
-    if (allow_.contains(reg_dom)) {
-      LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
+
+  if (spf_result_ == SPF::Result::PASS) {
+    if (allow_.contains(spf_sender_domain_.ascii())) {
+      LOG(INFO) << "sender " << spf_sender_domain_.ascii() << " allowed";
       return true;
     }
 
-    // LOG(INFO) << "looking up " << reg_dom;
-    return verify_sender_domain_uribl_(reg_dom, error_msg);
+    auto const reg_dom{
+        tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
+    if (reg_dom) {
+      if (allow_.contains(reg_dom)) {
+        LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
+        return true;
+      }
+    }
   }
 
   LOG(INFO) << "sender \"" << sender << "\" not disallowed";
   return true;
 }
 
-// check sender domain on dynamic URI block lists
-bool Session::verify_sender_domain_uribl_(std::string_view sender,
-                                          std::string&     error_msg)
-{
-  if (!sock_.has_peername()) // short circuit
-    return true;
-
-  std::shuffle(std::begin(Config::uribls), std::end(Config::uribls),
-               random_device_);
-  for (auto uribl : Config::uribls) {
-    auto const lookup = fmt::format("{}.{}", sender, uribl);
-    auto       as     = DNS::get_strings(res_, DNS::RR_type::A, lookup);
-    if (!as.empty()) {
-      if (as.front() == "127.0.0.1")
-        continue;
-      error_msg = fmt::format("{} blocked on advice of {}", sender, uribl);
-      out_() << "550 5.7.1 sender " << error_msg << "\r\n" << std::flush;
-      return false;
-    }
-  }
-
-  LOG(INFO) << "sender \"" << sender << "\" not blocked by URIBLs";
-  return true;
-}
-
-bool Session::verify_sender_spf_(Mailbox const& sender)
+void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
     auto const ip_addr = "127.0.0.1"; // use localhost for local socket
@@ -1896,7 +1876,7 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
                     "envelope-from={}; helo={};",
                     server_id_(), ip_addr, sender, client_identity_);
     spf_sender_domain_ = "localhost";
-    return true;
+    return;
   }
 
   auto const spf_srv     = SPF::Server{server_id_().c_str()};
@@ -1931,16 +1911,6 @@ bool Session::verify_sender_spf_(Mailbox const& sender)
   else {
     LOG(INFO) << spf_res.header_comment();
   }
-
-  if (spf_result_ == SPF::Result::PASS) {
-    if (lookup_domain(block_, spf_sender_domain_)) {
-      LOG(INFO) << "SPF sender domain (" << spf_sender_domain_
-                << ") is blocked";
-      return false;
-    }
-  }
-
-  return true;
 }
 
 bool Session::verify_from_params_(parameters_t const& parameters)
@@ -2082,11 +2052,23 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }
 
   {
+    auto fail_db_name = config_path_ / "fail_554";
+    CDB  fail_db;
+    if (fail_db.open(fail_db_name) &&
+        fail_db.contains(recipient.local_part())) {
+      out_() << "554 5.7.1 prohibited for policy reasons" << recipient << "\r\n"
+             << std::flush;
+      LOG(WARNING) << "fail_554 recipient " << recipient;
+      return false;
+    }
+  }
+
+  {
     auto temp_fail_db_name = config_path_ / "temp_fail";
     CDB  temp_fail; // Addresses we make wait...
     if (temp_fail.open(temp_fail_db_name) &&
         temp_fail.contains(recipient.local_part())) {
-      out_() << "432 4.3.0 Recipient's incoming mail queue has been stopped\r\n"
+      out_() << "432 4.3.0 recipient's incoming mail queue has been stopped\r\n"
              << std::flush;
       LOG(WARNING) << "temp fail for recipient " << recipient;
       return false;
