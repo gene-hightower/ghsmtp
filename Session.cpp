@@ -127,7 +127,7 @@ char const* uribls[]{
     "multi.uribl.com",
 };
 
-constexpr auto greeting_wait              = std::chrono::seconds{2};
+constexpr auto greeting_wait              = std::chrono::seconds{6};
 constexpr int  max_recipients_per_message = 100;
 constexpr int  max_unrecognized_cmds      = 20;
 
