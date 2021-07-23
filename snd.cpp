@@ -1240,7 +1240,7 @@ auto create_eml(Domain const&               sender,
   eml.add_hdr("Date", date.c_str());
 
   if (!FLAGS_from_name.empty())
-    eml.add_hdr("From", fmt::format("{}\r\n <{}>", FLAGS_from_name, from));
+    eml.add_hdr("From", fmt::format("{} <{}>", FLAGS_from_name, from));
   else
     eml.add_hdr("From", from);
 
