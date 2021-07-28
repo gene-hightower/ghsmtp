@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 
   auto threw = false;
   try {
-    Mailbox bad("foo bar@example.com");
+    Mailbox bad("should throw@example.com");
   }
   catch (std::exception& e) {
     threw = true;
