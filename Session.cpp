@@ -1125,8 +1125,6 @@ void Session::data_done()
     return;
   }
 
-  do_deliver_();
-
   // if (prdr_) {
   //   out_() << "353\r\n";
   //   for (auto fp : forward_path_) {
@@ -1148,16 +1146,18 @@ void Session::data_done()
         LOG(INFO) << "waiting at DATA " << str << " seconds";
         long value = 0;
         std::from_chars(str.data(), str.data() + str.size(), value);
+        google::FlushLogFiles(google::INFO);
         sleep(value);
         LOG(INFO) << "done waiting";
       }
     }
   }
 
+  do_deliver_();
+
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
             << msg_->id();
-
   reset_();
 }
 
@@ -1242,10 +1242,30 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
+  // Check for and act on magic "wait" address.
+  {
+    using namespace boost::xpressive;
+
+    mark_tag     secs_(1);
+    sregex const rex = icase("wait-bdat-") >> (secs_ = +_d);
+    smatch       what;
+
+    for (auto fp : forward_path_) {
+      if (regex_match(fp.local_part(), what, rex)) {
+        auto const str = what[secs_].str();
+        LOG(INFO) << "waiting at DATA " << str << " seconds";
+        long value = 0;
+        std::from_chars(str.data(), str.data() + str.size(), value);
+        google::FlushLogFiles(google::INFO);
+        sleep(value);
+        LOG(INFO) << "done waiting";
+      }
+    }
+  }
+
   do_deliver_();
 
   out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
-
   LOG(INFO) << "BDAT " << n << " LAST";
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
             << msg_->id();
@@ -2090,6 +2110,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       LOG(INFO) << "waiting at RCPT TO " << str << " seconds";
       long value = 0;
       std::from_chars(str.data(), str.data() + str.size(), value);
+      google::FlushLogFiles(google::INFO);
       sleep(value);
       LOG(INFO) << "done waiting";
     }
