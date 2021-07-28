@@ -27,7 +27,7 @@
 
 #include <syslog.h>
 
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
+#include <gflags/gflags.h>
 
 using namespace std::string_literals;
 
@@ -137,16 +137,22 @@ constexpr auto read_timeout  = std::chrono::minutes{5};
 constexpr auto write_timeout = std::chrono::seconds{30};
 } // namespace Config
 
-#include <gflags/gflags.h>
-
-DEFINE_bool(test_mode, false, "ease up on some checks");
-
 DEFINE_bool(immortal, false, "don't set process timout");
 
 DEFINE_uint64(max_read, 0, "max data to read");
 DEFINE_uint64(max_write, 0, "max data to write");
 
 DEFINE_bool(rrvs, false, "support RRVS à la RFC 7293");
+
+DEFINE_string(selector, "ghsmtp", "DKIM selector");
+
+DEFINE_bool(test_mode, false, "ease up on some checks");
+
+DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
+
+boost::xpressive::mark_tag     secs_(1);
+boost::xpressive::sregex const all_rex = boost::xpressive::icase("wait-all-") >>
+                                         (secs_ = +boost::xpressive::_d);
 
 Session::Session(fs::path                  config_path,
                  std::function<void(void)> read_hook,
@@ -1136,12 +1142,12 @@ void Session::data_done()
   {
     using namespace boost::xpressive;
 
-    mark_tag     secs_(1);
     sregex const rex = icase("wait-data-") >> (secs_ = +_d);
     smatch       what;
 
     for (auto fp : forward_path_) {
-      if (regex_match(fp.local_part(), what, rex)) {
+      if (regex_match(fp.local_part(), what, rex) ||
+          regex_match(fp.local_part(), what, all_rex)) {
         auto const str = what[secs_].str();
         LOG(INFO) << "waiting at DATA " << str << " seconds";
         long value = 0;
@@ -1246,12 +1252,12 @@ void Session::bdat_done(size_t n, bool last)
   {
     using namespace boost::xpressive;
 
-    mark_tag     secs_(1);
     sregex const rex = icase("wait-bdat-") >> (secs_ = +_d);
     smatch       what;
 
     for (auto fp : forward_path_) {
-      if (regex_match(fp.local_part(), what, rex)) {
+      if (regex_match(fp.local_part(), what, rex) ||
+          regex_match(fp.local_part(), what, all_rex)) {
         auto const str = what[secs_].str();
         LOG(INFO) << "waiting at DATA " << str << " seconds";
         long value = 0;
@@ -2101,11 +2107,11 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   {
     using namespace boost::xpressive;
 
-    mark_tag     secs_(1);
     sregex const rex = icase("wait-rcpt-") >> (secs_ = +_d);
     smatch       what;
 
-    if (regex_match(recipient.local_part(), what, rex)) {
+    if (regex_match(recipient.local_part(), what, rex) ||
+        regex_match(recipient.local_part(), what, all_rex)) {
       auto const str = what[secs_].str();
       LOG(INFO) << "waiting at RCPT TO " << str << " seconds";
       long value = 0;
