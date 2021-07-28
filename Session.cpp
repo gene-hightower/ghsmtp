@@ -340,7 +340,8 @@ void Session::last_in_group_(std::string_view verb)
 
 void Session::check_for_pipeline_error_(std::string_view verb)
 {
-  if (!extensions_ && sock_.input_ready(std::chrono::seconds(0))) {
+  auto pipelining = FLAGS_use_pipelining && extensions_;
+  if (pipelining && sock_.input_ready(std::chrono::seconds(0))) {
     LOG(WARNING) << "pipelining error; input ready processing " << verb;
   }
 }
@@ -393,11 +394,16 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       // If we're not already TLS, offer TLS
       out_() << "250-STARTTLS\r\n"; // RFC 3207
     }
-    out_() << "250-ENHANCEDSTATUSCODES\r\n" // RFC 2034
-              "250-PIPELINING\r\n"          // RFC 2920
-              "250-BINARYMIME\r\n"          // RFC 3030
-              "250-CHUNKING\r\n"            // RFC 3030
-              "250 SMTPUTF8\r\n";           // RFC 6531
+
+    out_() << "250-ENHANCEDSTATUSCODES\r\n"; // RFC 2034
+
+    if (FLAGS_use_pipelining) {
+      out_() << "250-PIPELINING\r\n"; // RFC 2920
+    }
+
+    out_() << "250-BINARYMIME\r\n"; // RFC 3030
+    out_() << "250-CHUNKING\r\n";   // RFC 3030
+    out_() << "250 SMTPUTF8\r\n";   // RFC 6531
   }
 
   out_() << std::flush;
