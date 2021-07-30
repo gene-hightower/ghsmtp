@@ -1159,6 +1159,7 @@ void Session::data_done()
         long value = 0;
         std::from_chars(str.data(), str.data() + str.size(), value);
         google::FlushLogFiles(google::INFO);
+        out_() << std::flush;
         sleep(value);
         LOG(INFO) << "done waiting";
       }
@@ -1265,10 +1266,11 @@ void Session::bdat_done(size_t n, bool last)
       if (regex_match(fp.local_part(), what, rex) ||
           regex_match(fp.local_part(), what, all_rex)) {
         auto const str = what[secs_].str();
-        LOG(INFO) << "waiting at DATA " << str << " seconds";
+        LOG(INFO) << "waiting at BDAT " << str << " seconds";
         long value = 0;
         std::from_chars(str.data(), str.data() + str.size(), value);
         google::FlushLogFiles(google::INFO);
+        out_() << std::flush;
         sleep(value);
         LOG(INFO) << "done waiting";
       }
@@ -1504,6 +1506,7 @@ bool ip4_allowed(char const* addr)
     {"76.178.68.57",    "255.255.255.255", "cpe-76-178-68-57.natsow.res.rr.com"},
     {"98.136.0.0",      "255.252.0.0",     "98.136.0.0/14 A-YAHOO-US9"},
     {"104.40.0.0",      "255.248.0.0",     "104.40.0.0/13 MSFT"},
+    {"104.130.96.0",    "255.255.255.240", "104.130.96.0/28 NET-104-130-96-0-1"},
     {"108.174.0.0",     "255.255.240.0",   "108.174.0.0/20 LINKEDIN"},
     {"159.45.0.0",      "255.255.0.0",     "159.45.0.0/16 AGE-COM"},
     {"159.53.0.0",      "255.255.0.0",     "159.53.0.0/16 JMC"},
@@ -2123,6 +2126,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       long value = 0;
       std::from_chars(str.data(), str.data() + str.size(), value);
       google::FlushLogFiles(google::INFO);
+      out_() << std::flush;
       sleep(value);
       LOG(INFO) << "done waiting";
     }
