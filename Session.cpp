@@ -110,6 +110,15 @@ Return Codes 	Data Source
 127.0.1.106 	abused legit botnet C&C
 127.0.1.255 	IP queries prohibited!
 
+The following special codes indicate an error condition and should not
+be taken to imply that the queried domain is "listed":
+
+Return Code 	 Description
+127.255.255.252  Typing error in DNSBL name
+127.255.255.254  Anonymous query through public resolver
+127.255.255.255  Excessive number of queries
+
+
 From <http://www.surbl.org/lists#multi>
 
 last octet indicates which lists it belongs to. The bit positions in
@@ -741,6 +750,9 @@ static std::string folder(Session::SpamStatus         status,
 {
   if (status == Session::SpamStatus::spam)
     return ".Junk";
+
+  if (iends_with(forward_path[0].local_part(), "-duck.com"))
+    return ".JunkDuck";
 
   return "";
 }
@@ -1700,8 +1712,17 @@ bool Session::verify_ip_address_(std::string& error_msg)
         if (as == "127.0.1.1") {
           LOG(INFO) << "Query blocked by " << bl;
         }
+        else if (as == "127.255.255.252") {
+          LOG(INFO) << "Typing error in DNSBL name " << bl;
+        }
+        else if (as == "127.255.255.254") {
+          LOG(INFO) << "Anonymous query through public resolver " << bl;
+        }
+        else if (as == "127.255.255.255") {
+          LOG(INFO) << "Excessive number of queries " << bl;
+        }
         else {
-          error_msg = fmt::format("blocked on advice from {}", bl);
+          error_msg = fmt::format("blocked, {} returned {}", bl, as);
           LOG(INFO) << sock_.them_c_str() << " " << error_msg;
           out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
