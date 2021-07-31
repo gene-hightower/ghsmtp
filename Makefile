@@ -156,6 +156,7 @@ TESTS := \
 	TLS-OpenSSL-test \
 	default_init_allocator-test \
 	esc-test \
+	iequal-test \
 	iobuffer-test \
 	is_ascii-test \
 	message-test \

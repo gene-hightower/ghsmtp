@@ -37,6 +37,12 @@ inline bool istarts_with(std::string_view str, std::string_view prefix)
          iequal(str.substr(0, prefix.size()), prefix);
 }
 
+inline bool iends_with(std::string_view str, std::string_view suffix)
+{
+  return (str.size() >= suffix.size()) &&
+         iequal(str.substr(str.size() - suffix.size(), str.size()), suffix);
+}
+
 struct ci_less {
   bool operator()(std::string_view a, std::string_view b) const
   {
