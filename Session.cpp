@@ -751,7 +751,7 @@ static std::string folder(Session::SpamStatus         status,
   if (status == Session::SpamStatus::spam)
     return ".Junk";
 
-  if (iends_with(forward_path[0].local_part(), "-duck.com"))
+  if (iends_with(forward_path[0].local_part(), "-at-duck"))
     return ".JunkDuck";
 
   return "";
