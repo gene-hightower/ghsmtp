@@ -349,9 +349,10 @@ void Session::last_in_group_(std::string_view verb)
 
 void Session::check_for_pipeline_error_(std::string_view verb)
 {
-  auto pipelining = FLAGS_use_pipelining && extensions_;
-  if (pipelining && sock_.input_ready(std::chrono::seconds(0))) {
-    LOG(WARNING) << "pipelining error; input ready processing " << verb;
+  if (!(FLAGS_use_pipelining && extensions_)) {
+    if (sock_.input_ready(std::chrono::seconds(0))) {
+      LOG(WARNING) << "pipelining error; input ready processing " << verb;
+    }
   }
 }
 
