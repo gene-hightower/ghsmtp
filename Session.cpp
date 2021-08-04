@@ -282,7 +282,7 @@ void Session::greeting()
 
     std::string error_msg;
     if (!verify_ip_address_(error_msg)) {
-      // no glog message at this point
+      LOG(ERROR) << "IP address blocked: " << error_msg;
       bad_host_(error_msg.c_str());
     }
 
@@ -317,14 +317,14 @@ void Session::greeting()
     if (!(ip_allowed_ || fcrdns_allowed_)) {
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
-        // no glog message at this point
+        LOG(ERROR) << "input before any greeting from " << client_;
         bad_host_("input before any greeting");
       }
       // Give a half greeting and wait again.
       out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
-        // LOG(INFO) << "half greeting got " << client_;
+        LOG(ERROR) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
       }
     }
@@ -1601,7 +1601,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
   }
 
   if (IP::is_private(sock_.them_address_literal())) {
-    LOG(INFO) << "local address allowed";
+    LOG(INFO) << "private address allowed";
     ip_allowed_ = true;
     client_     = sock_.them_address_literal();
     return true;
@@ -1618,14 +1618,14 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // check allow list
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (allow_.contains(client_fcrdns.ascii())) {
-        // LOG(INFO) << "FCrDNS " << client_fcrdns << " allowed";
+        LOG(INFO) << "FCrDNS " << client_fcrdns << " allowed";
         fcrdns_allowed_ = true;
         return true;
       }
       auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
       if (tld) {
         if (allow_.contains(tld)) {
-          // LOG(INFO) << "FCrDNS registered domain " << tld << " allowed";
+          LOG(INFO) << "FCrDNS registered domain " << tld << " allowed";
           fcrdns_allowed_ = true;
           return true;
         }
@@ -1663,6 +1663,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
       return true;
     }
 
+    LOG(INFO) << "NOT on internal allow list";
+
     auto const reversed{IP4::reverse(sock_.them_c_str())};
 
     /*
@@ -1695,7 +1697,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
           }
         }
 
-        // Any A record skips check on block list
+        LOG(INFO) << "Any A record skips check on block list";
         return true;
       }
     }
@@ -1724,7 +1726,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
         }
         else {
           error_msg = fmt::format("blocked, {} returned {}", bl, as);
-          LOG(INFO) << sock_.them_c_str() << " " << error_msg;
           out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
         }
@@ -1733,6 +1734,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     // LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
   }
 
+  LOG(INFO) << "IP address okay";
   return true;
 }
 
