@@ -96,6 +96,30 @@ X   Binary    On List
 8   00001000  red
 14  00001110  black,grey,red (for testpoints)
 
+<https://www.spamhaus.org/faq/section/DNSBL%20Usage>
+
+ Spamhaus uses this general convention for return codes:
+
+Return Code 	Description
+127.0.0.0/24 	Spamhaus IP Blocklists
+127.0.1.0/24 	Spamhaus Domain Blocklists
+127.0.2.0/24 	Spamhaus Zero Reputation Domains list
+127.255.255.0/24 	ERRORS (not implying a "listed" response)
+
+Currently used return codes for Spamhaus public IP zones:
+
+Return Code 	Zone 	Description
+127.0.0.2 	SBL 	Spamhaus SBL Data
+127.0.0.3 	SBL 	Spamhaus SBL CSS Data
+127.0.0.4 	XBL 	CBL Data
+127.0.0.9 	SBL 	Spamhaus DROP/EDROP Data
+                        (in addition to 127.0.0.2, since 01-Jun-2016)
+127.0.0.10 	PBL 	ISP Maintained
+127.0.0.11 	PBL 	Spamhaus Maintained
+
+127.0.0.5-7 are allocated to XBL for possible future use;
+127.0.0.8 is allocated to SBL for possible future use.
+
 From <https://www.spamhaus.org/faq/section/Spamhaus%20DBL#291>
 
 Return Codes 	Data Source
