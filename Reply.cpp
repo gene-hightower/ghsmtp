@@ -33,6 +33,8 @@ constexpr const char sep_chars_array[] = {
 
 constexpr std::string_view sep_chars{sep_chars_array, sizeof(sep_chars_array)};
 
+constexpr std::string_view REP_PREFIX = "rep="; // legacy reply prefix
+
 std::string to_lower(std::string data)
 {
   std::transform(data.begin(), data.end(), data.begin(),
@@ -224,9 +226,69 @@ try_decode(std::string_view addr, std::string_view secret, char sep_char)
   return rep;
 }
 
+/*
+ * Legacy format reply address with the REP= prefix. We no longer
+ * generates these addresses, but we continue to decode them in a
+ * compatable way.
+ */
+
+std::optional<Reply::from_to> old_dec_reply(std::string_view addr,
+                                            std::string_view secret)
+{
+  addr.remove_prefix(REP_PREFIX.length());
+
+  if (is_pure_base32(addr)) {
+    // if everything after REP= is base32 we have a blob
+    return dec_reply_blob(addr, secret);
+  }
+
+  // REP= has been removed, addr is now:
+  // {hash}={rcpt_to_local_part}={mail_from.local}={mail_from.domain}
+  //       ^1st                 ^2nd              ^last
+  // and mail_from.local can contain '=' chars
+
+  auto const first_sep  = addr.find_first_of('=');
+  auto const last_sep   = addr.find_last_of('=');
+  auto const second_sep = addr.find_first_of('=', first_sep + 1);
+
+  if (first_sep == last_sep || second_sep == last_sep) {
+    LOG(WARNING) << "unrecognized legacy reply format " << addr;
+    return {};
+  }
+
+  auto const rcpt_to_pos = first_sep + 1;
+  auto const mf_loc_pos  = second_sep + 1;
+  auto const mf_dom_pos  = last_sep + 1;
+
+  auto const rcpt_to_len = second_sep - rcpt_to_pos;
+  auto const mf_loc_len  = last_sep - mf_loc_pos;
+
+  auto const reply_hash    = addr.substr(0, first_sep);
+  auto const rcpt_to_loc   = addr.substr(rcpt_to_pos, rcpt_to_len);
+  auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
+  auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
+
+  Reply::from_to rep;
+  rep.rcpt_to_local_part = rcpt_to_loc;
+  rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
+
+  auto const hash_enc = hash_rep(rep, secret);
+
+  if (!iequal(reply_hash, hash_enc)) {
+    return {};
+  }
+
+  return rep;
+}
+
 std::optional<Reply::from_to> Reply::dec_reply(std::string_view addr,
                                                std::string_view secret)
 {
+  // Check for legacy format, process appropriately.
+  if (istarts_with(addr, REP_PREFIX)) {
+    return old_dec_reply(addr, secret);
+  }
+
   auto const addr_mbx = Mailbox::parse(fmt::format("{}@x.y", addr));
   if (!addr_mbx) {
     throw std::invalid_argument("invalid address syntax in dec_reply");

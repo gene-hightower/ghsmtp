@@ -24,6 +24,17 @@ int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
+  const Reply::from_to y0{"x@y.z", "a"};
+  auto const           x0 = Reply::dec_reply("rep=RHGA7M=a=x=y.z", secret);
+  if (*x0 != y0) {
+    CHECK(y0 == *x0);
+  }
+  const Reply::from_to y1{"x@y.z", "a=a"};
+  auto const x1 = Reply::dec_reply("rep=6NBM8PA4AR062FB101W40Y9EF8", secret);
+  if (*x1 != y1) {
+    CHECK(y1 == *x1);
+  }
+
   // LOG(INFO) << Reply::enc_reply({"anybody@mailhog.duck", "mydisabledalias"},
   //                               secret);
   // LOG(INFO) << Reply::enc_reply({"x@y.z", "a"}, secret);
