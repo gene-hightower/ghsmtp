@@ -36,8 +36,13 @@ int main(int argc, char* argv[])
 
   Reply::from_to test_cases[] = {
       {"reply@example.com", "local"},
+      {"reply@example.com", "local_address"},
       {"reply@example.com", "local-address"},
+      {"reply@example.com", "local=address"},
       {"one.reply@example.com", "local"},
+      {"one-reply@example.com", "local"},
+      {"one=reply@example.com", "local"},
+      {"one_reply@example.com", "local"},
       {"reply=something@example.com", "local"},
 
       // Should work with UTF-8 in all the places.
