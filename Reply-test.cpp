@@ -24,11 +24,17 @@ int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
+  // LOG(INFO) << Reply::enc_reply({"anybody@mailhog.duck", "mydisabledalias"},
+  //                               secret);
+  // LOG(INFO) << Reply::enc_reply({"x@y.z", "a"}, secret);
+
   CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "x_y.z_a_rhga7m");
   CHECK_EQ(Reply::enc_reply({"x_x@y.z", "a"}, secret), "x_x_y.z_a_4797dj");
   CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "x=x_y.z_a_a0dt6k");
+  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a_a"}, secret), "x=x=y.z=a_a=2a2qpd");
   CHECK_EQ(Reply::enc_reply({"x.x@y.z", "a"}, secret), "x.x_y.z_a_9avgdj");
   CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret), "x_y.z_a=a_5wdydv");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a_a"}, secret), "x=y.z=a_a=3d8qs3");
   CHECK_EQ(Reply::enc_reply({"\"x\"@y.z", "a"}, secret),
            "ewtk8dkqew062012f0h40y9ef8");
   CHECK_EQ(Reply::enc_reply({"x@[IPv6:::1]", "a"}, secret),
