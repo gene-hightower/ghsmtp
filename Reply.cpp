@@ -75,6 +75,15 @@ std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
     return enc_reply_blob(rep, secret);
   }
 
+  auto const rcpt_to =
+      Mailbox::parse(fmt::format("{}@x.y", rep.rcpt_to_local_part));
+  if (!rcpt_to) {
+    throw std::invalid_argument("invalid local-part syntax in enc_reply");
+  }
+  if (rcpt_to->local_type == Mailbox::local_types::quoted_string) {
+    return enc_reply_blob(rep, secret);
+  }
+
   for (auto sep_char : sep_chars) {
     if (rep.rcpt_to_local_part.find(sep_char) == std::string_view::npos) {
       // Must never be in the domain part, that's crazy
@@ -218,6 +227,11 @@ try_decode(std::string_view addr, std::string_view secret, char sep_char)
 std::optional<Reply::from_to> Reply::dec_reply(std::string_view addr,
                                                std::string_view secret)
 {
+  auto const addr_mbx = Mailbox::parse(fmt::format("{}@x.y", addr));
+  if (!addr_mbx) {
+    throw std::invalid_argument("invalid address syntax in dec_reply");
+  }
+
   // The blob for the address <"x"@y.z> is 26 bytes long.
   if (is_pure_base32(addr)) {
     // if everything is base32 we might have a blob
