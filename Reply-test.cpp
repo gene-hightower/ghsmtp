@@ -55,8 +55,8 @@ int main(int argc, char* argv[])
       {"♥@♥.example.com", "♥"},
 
       // These should force blob mode:
-      {"reply@example.com", "separator=in=address"},
-      {"reply@example.com", "both_separators=in=address"},
+      {"reply@example.com", "\"local part\""},
+      {"reply@example.com", "has=both_separators"},
       {"\"quoted string\"@example.com", "local"},
       {"reply@[127.0.0.1]", "local"},
       {"reply@[IPv6:::1]", "local"},
