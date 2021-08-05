@@ -23,11 +23,15 @@
 using std::begin;
 using std::end;
 
-constexpr int hash_bytes_reply = 6;
+constexpr int hash_length_min = 6; // 1 in a billion
+constexpr int hash_length_max = 10;
 
-constexpr std::string_view REP_PREFIX = "rep=";
+constexpr const char sep_chars_array[] = {
+    '_',
+    '=' // Must not be allowed in domain names, must not be in base32 alphabet.
+};
 
-constexpr char sep_char = '='; // must match above *_PREFIX values
+constexpr std::string_view sep_chars{sep_chars_array, sizeof(sep_chars_array)};
 
 std::string to_lower(std::string data)
 {
@@ -42,7 +46,7 @@ static std::string hash_rep(Reply::from_to const& rep, std::string_view secret)
   h.update(secret);
   h.update(to_lower(rep.mail_from));
   h.update(to_lower(rep.rcpt_to_local_part));
-  return h.final().substr(0, hash_bytes_reply);
+  return to_lower(h.final().substr(0, hash_length_min));
 }
 
 std::string enc_reply_blob(Reply::from_to const& rep, std::string_view secret)
@@ -54,8 +58,7 @@ std::string enc_reply_blob(Reply::from_to const& rep, std::string_view secret)
                                rep.rcpt_to_local_part, '\0',
                                rep.mail_from); // clang-format on
 
-  return fmt::format("{}{}", REP_PREFIX,
-                     cppcodec::base32_crockford::encode(pkt));
+  return to_lower(cppcodec::base32_crockford::encode(pkt));
 }
 
 std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
@@ -72,22 +75,21 @@ std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
     return enc_reply_blob(rep, secret);
   }
 
-  // If rcpt_to_local_part contain a '=' fall back.
-  if (rep.rcpt_to_local_part.find(sep_char) != std::string_view::npos) {
-    return enc_reply_blob(rep, secret);
+  for (auto sep_char : sep_chars) {
+    if (rep.rcpt_to_local_part.find(sep_char) == std::string_view::npos) {
+      // Must never be in the domain part, that's crazy
+      CHECK_EQ(result->domain.find(sep_char), std::string_view::npos);
+      // The sep_char *can* be in the result->local part
+      auto const hash_enc = hash_rep(rep, secret);
+      return fmt::format("{}{}{}{}{}{}{}", // clang-format off
+                         result->local, sep_char,
+                         result->domain, sep_char,
+                         rep.rcpt_to_local_part, sep_char,
+                         hash_enc); // clang-format on
+    }
   }
 
-  auto const mail_from = Mailbox(rep.mail_from);
-
-  auto const hash_enc = hash_rep(rep, secret);
-
-  return fmt::format("{}{}{}{}{}{}{}{}", // clang-format off
-                     REP_PREFIX,         // includes sep_char
-                     hash_enc, sep_char,
-                     rep.rcpt_to_local_part, sep_char,
-                     mail_from.local_part(), sep_char,
-                     mail_from.domain().utf8());
-  // clang-format on
+  return enc_reply_blob(rep, secret);
 }
 
 auto split(std::string const& str, const char delim)
@@ -113,6 +115,11 @@ static std::optional<Reply::from_to> dec_reply_blob(std::string_view addr,
 
   auto const parts = split(pkt, '\0');
 
+  if (parts.size() != 3) {
+    LOG(WARNING) << "invalid blob format";
+    return {};
+  }
+
   auto const hash = parts[0];
 
   Reply::from_to rep;
@@ -131,68 +138,102 @@ static std::optional<Reply::from_to> dec_reply_blob(std::string_view addr,
 
 static bool is_pure_base32(std::string_view s)
 {
-  auto constexpr alpha =
-      std::string_view(cppcodec::detail::base32_crockford_alphabet,
-                       sizeof(cppcodec::detail::base32_crockford_alphabet));
+  // clang-format off
+  static constexpr const char base32_crockford_alphabet_i[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+    'J', 'K',
+    'M', 'N',
+    'P', 'Q', 'R', 'S', 'T',
+    'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+    'j', 'k',
+    'm', 'n',
+    'p', 'q', 'r', 's', 't',
+    'v', 'w', 'x', 'y', 'z'
+  };
+  // clang-format on
+
+  auto constexpr alpha = std::string_view(base32_crockford_alphabet_i,
+                                          sizeof(base32_crockford_alphabet_i));
+
   // If we can't find anything not in the base32 alphabet, it's pure
   return s.find_first_not_of(alpha) == std::string_view::npos;
+}
+
+std::optional<Reply::from_to>
+try_decode(std::string_view addr, std::string_view secret, char sep_char)
+{
+  // {mail_from.local}={mail_from.domain}={rcpt_to_local_part}={hash}
+
+  auto const hash_sep = addr.find_last_of(sep_char);
+  if (hash_sep == std::string_view::npos)
+    return {};
+  auto const hash_pos = hash_sep + 1;
+  auto const hash_len = addr.length() - hash_pos;
+  if ((hash_len < hash_length_min) || (hash_len > hash_length_max))
+    return {};
+  auto const hash = addr.substr(hash_pos, hash_len);
+
+  // The hash part must look like a hash
+  if (!is_pure_base32(hash))
+    return {};
+
+  auto const rcpt_loc_sep = addr.substr(0, hash_sep).find_last_of(sep_char);
+  if (rcpt_loc_sep == std::string_view::npos)
+    return {};
+  auto const rcpt_loc_pos = rcpt_loc_sep + 1;
+  auto const rcpt_loc_len = hash_sep - rcpt_loc_pos;
+  auto const rcpt_loc     = addr.substr(rcpt_loc_pos, rcpt_loc_len);
+
+  auto const mail_from_dom_sep =
+      addr.substr(0, rcpt_loc_sep).find_last_of(sep_char);
+  if (mail_from_dom_sep == std::string_view::npos)
+    return {};
+  auto const mail_from_dom_pos = mail_from_dom_sep + 1;
+  auto const mail_from_dom_len = rcpt_loc_sep - mail_from_dom_pos;
+  auto const mail_from_dom = addr.substr(mail_from_dom_pos, mail_from_dom_len);
+
+  auto const mail_from_loc = addr.substr(0, mail_from_dom_sep);
+  auto const mail_from     = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
+
+  // The mail_from part must be a valid Mailbox address.
+  if (!Mailbox::validate(mail_from))
+    return {};
+
+  Reply::from_to rep;
+  rep.mail_from          = mail_from;
+  rep.rcpt_to_local_part = rcpt_loc;
+
+  auto const hash_computed = hash_rep(rep, secret);
+
+  if (!iequal(hash_computed, hash)) {
+    LOG(WARNING) << "hash check failed";
+    return {};
+  }
+
+  return rep;
 }
 
 std::optional<Reply::from_to> Reply::dec_reply(std::string_view addr,
                                                std::string_view secret)
 {
-  if (!istarts_with(addr, REP_PREFIX)) {
-    LOG(WARNING) << addr << " not a valid reply address";
-    return {};
-  }
-  addr.remove_prefix(REP_PREFIX.length());
-
+  // The blob for the address <"x"@y.z> is 26 bytes long.
   if (is_pure_base32(addr)) {
-    // if everything after REP= is base32 we have a blob
-    return dec_reply_blob(addr, secret);
+    // if everything is base32 we might have a blob
+    if (addr.length() > 25) {
+      return dec_reply_blob(addr, secret);
+    }
+    return {}; // normal local-part
   }
 
-  // REP= has been removed, addr is now:
-  // {hash}={rcpt_to_local_part}={mail_from.local}={mail_from.domain}
-  //       ^1st                 ^2nd              ^last
-  // and mail_from.local can contain '=' chars
-
-  auto const first_sep  = addr.find_first_of(sep_char);
-  auto const last_sep   = addr.find_last_of(sep_char);
-  auto const second_sep = addr.find_first_of(sep_char, first_sep + 1);
-
-  if (first_sep == last_sep || second_sep == last_sep) {
-    LOG(WARNING) << "unrecognized reply format " << addr;
-    return {};
+  for (auto sep_char : sep_chars) {
+    auto const rep = try_decode(addr, secret, sep_char);
+    if (rep)
+      return rep;
   }
 
-  auto const rcpt_to_pos = first_sep + 1;
-  auto const mf_loc_pos  = second_sep + 1;
-  auto const mf_dom_pos  = last_sep + 1;
+  LOG(WARNING) << "not a reply address: " << addr;
 
-  auto const rcpt_to_len = second_sep - rcpt_to_pos;
-  auto const mf_loc_len  = last_sep - mf_loc_pos;
-
-  auto const reply_hash    = addr.substr(0, first_sep);
-  auto const rcpt_to_loc   = addr.substr(rcpt_to_pos, rcpt_to_len);
-  auto const mail_from_loc = addr.substr(mf_loc_pos, mf_loc_len);
-  auto const mail_from_dom = addr.substr(mf_dom_pos, std::string_view::npos);
-
-  Reply::from_to rep;
-  rep.rcpt_to_local_part = rcpt_to_loc;
-  rep.mail_from          = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
-
-  auto const hash_enc = hash_rep(rep, secret);
-
-  if (!iequal(reply_hash, hash_enc)) {
-    LOG(WARNING) << "hash mismatch in reply " << addr;
-    LOG(WARNING) << "   reply_hash == " << reply_hash;
-    LOG(WARNING) << "     hash_enc == " << hash_enc;
-    LOG(WARNING) << "  rcpt_to_loc == " << rcpt_to_loc;
-    LOG(WARNING) << "mail_from_loc == " << mail_from_loc;
-    LOG(WARNING) << "mail_from_dom == " << mail_from_dom;
-    return {};
-  }
-
-  return rep;
+  return {};
 }

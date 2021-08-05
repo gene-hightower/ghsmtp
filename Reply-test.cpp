@@ -24,14 +24,15 @@ int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "rep=RHGA7M=a=x=y.z");
-  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "rep=A0DT6K=a=x=x=y.z");
-  CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret),
-           "rep=6NBM8PA4AR062FB101W40Y9EF8");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "x_y.z_a_rhga7m");
+  CHECK_EQ(Reply::enc_reply({"x_x@y.z", "a"}, secret), "x_x_y.z_a_4797dj");
+  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "x=x_y.z_a_a0dt6k");
+  CHECK_EQ(Reply::enc_reply({"x.x@y.z", "a"}, secret), "x.x_y.z_a_9avgdj");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret), "x_y.z_a=a_5wdydv");
   CHECK_EQ(Reply::enc_reply({"\"x\"@y.z", "a"}, secret),
-           "rep=AWTK8DJQAW062012F0H40Y9EF8");
+           "ewtk8dkqew062012f0h40y9ef8");
   CHECK_EQ(Reply::enc_reply({"x@[IPv6:::1]", "a"}, secret),
-           "rep=8GWKGGAD8C06203R81DMJM3P6RX3MEHHBM");
+           "cgwkgrbdcc06203r81dmjm3p6rx3mehhbm");
 
   Reply::from_to test_cases[] = {
       {"reply@example.com", "local"},
