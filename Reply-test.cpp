@@ -34,6 +34,10 @@ int main(int argc, char* argv[])
   if (*x1 != y1) {
     CHECK(y1 == *x1);
   }
+  auto const z1 = Reply::dec_reply("rep=6nbm8pa4ar062fb101w40y9ef8", secret);
+  if (*x1 != z1) {
+    CHECK(z1 == *x1);
+  }
 
   // LOG(INFO) << Reply::enc_reply({"anybody@mailhog.duck", "mydisabledalias"},
   //                               secret);
