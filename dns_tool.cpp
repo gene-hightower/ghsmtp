@@ -116,7 +116,7 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
 
   TLD  tld_db;
   auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
-  if (dom != reg_dom) {
+  if (reg_dom && dom != reg_dom) {
     std::cout << "registered domain is " << reg_dom << '\n';
   }
 
