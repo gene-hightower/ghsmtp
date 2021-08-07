@@ -28,6 +28,20 @@ sudo dnf install \
   openssl-devel \
   tinycdb-devel
 
+sudo apt-get install \
+  libboost-all-dev   \
+  libcdb-dev         \
+  libfmt-dev         \
+  libgoogle-glog-dev \
+  libidn2-0-dev      \
+  libldns-dev        \
+  libmagic-dev       \
+  libopendkim-dev    \
+  libopendmarc-dev   \
+  libpsl-dev         \
+  libspf2-dev        \
+  libunistring-dev
+
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
 
