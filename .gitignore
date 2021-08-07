@@ -3,6 +3,7 @@
 *.d
 *.eml
 *.o
+*.private
 *~
 SRS.ipp
 TAGS
