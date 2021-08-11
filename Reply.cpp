@@ -92,8 +92,8 @@ std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
       CHECK_EQ(result->domain.find(sep_char), std::string_view::npos);
       // The sep_char *can* be in the result->local part
       auto const hash_enc = hash_rep(rep, secret);
-      return fmt::format("{}{}{}{}{}{}{}", // clang-format off
-                         result->local, sep_char,
+      return fmt::format("{}{}at{}{}{}{}{}{}", // clang-format off
+                         result->local, sep_char, /*at*/ sep_char,
                          result->domain, sep_char,
                          rep.rcpt_to_local_part, sep_char,
                          hash_enc); // clang-format on
@@ -175,6 +175,8 @@ static bool is_pure_base32(std::string_view s)
 std::optional<Reply::from_to>
 try_decode(std::string_view addr, std::string_view secret, char sep_char)
 {
+  // {mail_from.local}=at={mail_from.domain}={rcpt_to_local_part}={hash}
+  //  or
   // {mail_from.local}={mail_from.domain}={rcpt_to_local_part}={hash}
 
   auto const hash_sep = addr.find_last_of(sep_char);
@@ -205,8 +207,14 @@ try_decode(std::string_view addr, std::string_view secret, char sep_char)
   auto const mail_from_dom_len = rcpt_loc_sep - mail_from_dom_pos;
   auto const mail_from_dom = addr.substr(mail_from_dom_pos, mail_from_dom_len);
 
-  auto const mail_from_loc = addr.substr(0, mail_from_dom_sep);
-  auto const mail_from     = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
+  auto mail_from_loc = addr.substr(0, mail_from_dom_sep);
+
+  // Check if the local part ends with _at and remove it.
+  if (iends_with(mail_from_loc, fmt::format("{}at", sep_char))) {
+    mail_from_loc = addr.substr(0, mail_from_dom_sep - 3);
+  }
+
+  auto const mail_from = fmt::format("{}@{}", mail_from_loc, mail_from_dom);
 
   // The mail_from part must be a valid Mailbox address.
   if (!Mailbox::validate(mail_from))
