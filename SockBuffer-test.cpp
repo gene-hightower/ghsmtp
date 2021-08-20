@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
   constexpr auto infile = "body.txt";
 
   int fd_in = open(infile, O_RDONLY);
-  PCHECK(fd_in != -1);
+  PCHECK(fd_in != -1) << "Can't open file " << infile;
 
   char outfile[] = "/tmp/SockBuffer-test-XXXXXX";
 
