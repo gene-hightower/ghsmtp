@@ -662,7 +662,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   state_ = xact_step::data;
 }
 
-// The headers Received and Received-SPF are returned as a string.
+// The headers Return-Path:, Received-SPF:, and Received: are returned
+// as a string.
 
 std::string Session::added_headers_(MessageStore const& msg)
 {
