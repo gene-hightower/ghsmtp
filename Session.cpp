@@ -306,7 +306,7 @@ void Session::greeting()
 
     std::string error_msg;
     if (!verify_ip_address_(error_msg)) {
-      LOG(ERROR) << "IP address blocked: " << error_msg;
+      LOG(INFO) << "IP address blocked: " << error_msg;
       bad_host_(error_msg.c_str());
     }
 
@@ -341,14 +341,14 @@ void Session::greeting()
     if (!(ip_allowed_ || fcrdns_allowed_)) {
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
-        LOG(ERROR) << "input before any greeting from " << client_;
+        LOG(INFO) << "input before any greeting from " << client_;
         bad_host_("input before any greeting");
       }
       // Give a half greeting and wait again.
       out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
-        LOG(ERROR) << "input before full greeting from " << client_;
+        LOG(INFO) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
       }
     }
@@ -390,6 +390,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
 
     std::string error_msg;
     if (!verify_client_(client_identity_, error_msg)) {
+      LOG(INFO) << "client identity blocked: " << error_msg;
       bad_host_(error_msg.c_str());
     }
   }
@@ -497,7 +498,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   std::string error_msg;
   if (!verify_sender_(reverse_path, error_msg)) {
-    LOG(WARNING) << "verify sender failed: " << error_msg;
+    LOG(INFO) << "verify sender failed: " << error_msg;
     bad_host_(error_msg.c_str());
   }
 
@@ -1873,10 +1874,16 @@ void Session::do_spf_check_(Mailbox const& sender)
   LOG(INFO) << "spf_received_ == " << spf_received_;
 
   if (spf_result_ == SPF::Result::FAIL) {
-    LOG(WARNING) << spf_res.header_comment();
+    LOG(INFO) << "FAIL " << spf_res.header_comment();
+  }
+  else if (spf_result_ == SPF::Result::NEUTRAL) {
+    LOG(INFO) << "NEUTRAL " << spf_res.header_comment();
+  }
+  else if (spf_result_ == SPF::Result::PASS) {
+    LOG(INFO) << "PASS " << spf_res.header_comment();
   }
   else {
-    LOG(INFO) << spf_res.header_comment();
+    LOG(INFO) << "INVALID/SOFTFAIL/NONE/xERROR " << spf_res.header_comment();
   }
 }
 
