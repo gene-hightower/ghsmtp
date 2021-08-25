@@ -836,7 +836,7 @@ public:
   data_type   type() const { return type_; }
 
   bool empty() const { return size() == 0; }
-       operator std::string_view() const { return std::string_view(data(), size()); }
+  operator std::string_view() const { return std::string_view(data(), size()); }
 
 private:
   data_type                            type_;
@@ -1015,11 +1015,8 @@ void selftest()
 
 auto get_sender()
 {
-  if (FLAGS_sender.empty()) {
-    FLAGS_sender = {[] {
-      if (!FLAGS_client_id.empty())
-        return FLAGS_client_id;
-
+  if (FLAGS_client_id.empty()) {
+    FLAGS_client_id = [] {
       auto const id_from_env{getenv("GHSMTP_CLIENT_ID")};
       if (id_from_env)
         return std::string{id_from_env};
@@ -1028,8 +1025,12 @@ auto get_sender()
       if (hostname.find('.') != std::string::npos)
         return hostname;
 
-      LOG(FATAL) << "can't determine my client ID, set GHSMTP_CLIENT_ID maybe";
-    }()};
+      LOG(FATAL) << "hostname not a FQDN, set GHSMTP_CLIENT_ID maybe?";
+    }();
+  }
+
+  if (FLAGS_sender.empty()) {
+    FLAGS_sender = FLAGS_client_id;
   };
 
   auto const sender{Domain{FLAGS_sender}};
@@ -1445,17 +1446,17 @@ bool snd(fs::path                    config_path,
   // try EHLO/HELO
 
   if (FLAGS_use_esmtp) {
-    LOG(INFO) << "C: EHLO " << sender.ascii();
+    LOG(INFO) << "C: EHLO " << FLAGS_client_id;
 
     if (FLAGS_slow_strangle) {
-      auto ehlo_str = fmt::format("EHLO {}\r\n", sender.ascii());
+      auto ehlo_str = fmt::format("EHLO {}\r\n", FLAGS_client_id);
       for (auto ch : ehlo_str) {
         cnn.sock.out() << ch << std::flush;
         sleep(1);
       }
     }
     else {
-      cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+      cnn.sock.out() << "EHLO " << FLAGS_client_id << "\r\n" << std::flush;
     }
 
     CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
@@ -1524,8 +1525,8 @@ bool snd(fs::path                    config_path,
 
     LOG(INFO) << "TLS: " << cnn.sock.tls_info();
 
-    LOG(INFO) << "C: EHLO " << sender.ascii();
-    cnn.sock.out() << "EHLO " << sender.ascii() << "\r\n" << std::flush;
+    LOG(INFO) << "C: EHLO " << FLAGS_client_id;
+    cnn.sock.out() << "EHLO " << FLAGS_client_id << "\r\n" << std::flush;
     CHECK((parse<RFC5321::ehlo_rsp, RFC5321::action>(in, cnn)));
   }
   else if (FLAGS_require_tls) {
