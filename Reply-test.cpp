@@ -45,14 +45,14 @@ int main(int argc, char* argv[])
   //                               secret);
   // LOG(INFO) << Reply::enc_reply({"x@y.z", "a"}, secret);
 
-  CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "x_at_y.z_a_rhga7m");
-  CHECK_EQ(Reply::enc_reply({"x_x@y.z", "a"}, secret), "x_x_at_y.z_a_4797dj");
-  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "x=x_at_y.z_a_a0dt6k");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a"}, secret), "x_at_y.z_rhga7m_a");
+  CHECK_EQ(Reply::enc_reply({"x_x@y.z", "a"}, secret), "x_x_at_y.z_4797dj_a");
+  CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a"}, secret), "x=x_at_y.z_a0dt6k_a");
   CHECK_EQ(Reply::enc_reply({"x=x@y.z", "a_a"}, secret),
-           "x=x=at=y.z=a_a=2a2qpd");
-  CHECK_EQ(Reply::enc_reply({"x.x@y.z", "a"}, secret), "x.x_at_y.z_a_9avgdj");
-  CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret), "x_at_y.z_a=a_5wdydv");
-  CHECK_EQ(Reply::enc_reply({"x@y.z", "a_a"}, secret), "x=at=y.z=a_a=3d8qs3");
+           "x=x=at=y.z=2a2qpd=a_a");
+  CHECK_EQ(Reply::enc_reply({"x.x@y.z", "a"}, secret), "x.x_at_y.z_9avgdj_a");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a=a"}, secret), "x_at_y.z_5wdydv_a=a");
+  CHECK_EQ(Reply::enc_reply({"x@y.z", "a_a"}, secret), "x=at=y.z=3d8qs3=a_a");
   CHECK_EQ(Reply::enc_reply({"\"x\"@y.z", "a"}, secret),
            "ewtk8dkqew062012f0h40y9ef8");
   CHECK_EQ(Reply::enc_reply({"x@[IPv6:::1]", "a"}, secret),

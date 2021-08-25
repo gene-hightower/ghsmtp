@@ -95,8 +95,8 @@ std::string Reply::enc_reply(Reply::from_to const& rep, std::string_view secret)
       return fmt::format("{}{}at{}{}{}{}{}{}", // clang-format off
                          result->local, sep_char, /*at*/ sep_char,
                          result->domain, sep_char,
-                         rep.rcpt_to_local_part, sep_char,
-                         hash_enc); // clang-format on
+                         hash_enc, sep_char,
+                         rep.rcpt_to_local_part); // clang-format on
     }
   }
 
@@ -175,36 +175,34 @@ static bool is_pure_base32(std::string_view s)
 std::optional<Reply::from_to>
 try_decode(std::string_view addr, std::string_view secret, char sep_char)
 {
-  // {mail_from.local}=at={mail_from.domain}={rcpt_to_local_part}={hash}
+  // {mail_from.local}=at={mail_from.domain}={hash}={rcpt_to_local_part}
   //  or
-  // {mail_from.local}={mail_from.domain}={rcpt_to_local_part}={hash}
+  // {mail_from.local}={mail_from.domain}={hash}={rcpt_to_local_part}
 
-  auto const hash_sep = addr.find_last_of(sep_char);
+  auto const rcpt_loc_sep = addr.find_last_of(sep_char);
+  if (rcpt_loc_sep == std::string_view::npos)
+    return {};
+  auto const rcpt_loc_pos = rcpt_loc_sep + 1;
+  auto const rcpt_loc_len = addr.length() - rcpt_loc_pos;
+  auto const rcpt_loc     = addr.substr(rcpt_loc_pos, rcpt_loc_len);
+
+  auto const hash_sep = addr.substr(0, rcpt_loc_sep).find_last_of(sep_char);
   if (hash_sep == std::string_view::npos)
     return {};
   auto const hash_pos = hash_sep + 1;
-  auto const hash_len = addr.length() - hash_pos;
-  if ((hash_len < hash_length_min) || (hash_len > hash_length_max))
-    return {};
-  auto const hash = addr.substr(hash_pos, hash_len);
+  auto const hash_len = rcpt_loc_sep - hash_pos;
+  auto const hash     = addr.substr(hash_pos, hash_len);
 
   // The hash part must look like a hash
   if (!is_pure_base32(hash))
     return {};
 
-  auto const rcpt_loc_sep = addr.substr(0, hash_sep).find_last_of(sep_char);
-  if (rcpt_loc_sep == std::string_view::npos)
-    return {};
-  auto const rcpt_loc_pos = rcpt_loc_sep + 1;
-  auto const rcpt_loc_len = hash_sep - rcpt_loc_pos;
-  auto const rcpt_loc     = addr.substr(rcpt_loc_pos, rcpt_loc_len);
-
   auto const mail_from_dom_sep =
-      addr.substr(0, rcpt_loc_sep).find_last_of(sep_char);
+      addr.substr(0, hash_sep).find_last_of(sep_char);
   if (mail_from_dom_sep == std::string_view::npos)
     return {};
   auto const mail_from_dom_pos = mail_from_dom_sep + 1;
-  auto const mail_from_dom_len = rcpt_loc_sep - mail_from_dom_pos;
+  auto const mail_from_dom_len = hash_sep - mail_from_dom_pos;
   auto const mail_from_dom = addr.substr(mail_from_dom_pos, mail_from_dom_len);
 
   auto mail_from_loc = addr.substr(0, mail_from_dom_sep);
