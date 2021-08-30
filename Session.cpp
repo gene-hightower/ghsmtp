@@ -1632,9 +1632,9 @@ bool Session::verify_ip_address_(std::string& error_msg)
           LOG(INFO) << "Excessive number of queries " << bl;
         }
         else {
-          error_msg = fmt::format("{} returned {}", bl, as);
-          out_() << "554 5.7.1 address blocked: " << error_msg << "\r\n"
-                 << std::flush;
+          error_msg = fmt::format("IP address {} blocked: {} returned {}",
+                                  sock_.them_c_str(), bl, as);
+          out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
         }
       }
