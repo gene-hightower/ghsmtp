@@ -2028,19 +2028,22 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   {
     auto fail_db_name = config_path_ / "fail_554";
-    CDB  fail_db;
-    if (fail_db.open(fail_db_name) &&
-        fail_db.contains(recipient.local_part())) {
-      out_() << "554 5.7.1 prohibited for policy reasons" << recipient << "\r\n"
-             << std::flush;
-      LOG(WARNING) << "fail_554 recipient " << recipient;
-      return false;
+    if (fs::exists(fail_db_name)) {
+      CDB fail_db;
+      if (fail_db.open(fail_db_name) &&
+          fail_db.contains(recipient.local_part())) {
+        out_() << "554 5.7.1 prohibited for policy reasons" << recipient
+               << "\r\n"
+               << std::flush;
+        LOG(WARNING) << "fail_554 recipient " << recipient;
+        return false;
+      }
     }
   }
 
   {
     auto temp_fail_db_name = config_path_ / "temp_fail";
-    CDB  temp_fail; // Addresses we make wait...
+    CDB  temp_fail;
     if (temp_fail.open(temp_fail_db_name) &&
         temp_fail.contains(recipient.local_part())) {
       out_() << "432 4.3.0 recipient's incoming mail queue has been stopped\r\n"
