@@ -775,6 +775,10 @@ static std::string folder(Session::SpamStatus         status,
                           std::vector<Mailbox> const& forward_path,
                           Mailbox const&              reverse_path)
 {
+  if (forward_path[0] ==
+      Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
+    return ".Gmail";
+
   if (status == Session::SpamStatus::spam)
     return ".Junk";
 
