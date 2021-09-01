@@ -779,14 +779,20 @@ static std::string folder(Session::SpamStatus         status,
       Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
     return ".Gmail";
 
-  if (forward_path[0] == Mailbox("zfsonlinux.topicbox.com@digilicious.com"))
+  if (forward_path[0].local_part() == "zfsonlinux.topicbox.com")
     return ".INBOX.zfs";
 
-  if (status == Session::SpamStatus::spam)
-    return ".Junk";
+  if (forward_path[0].local_part() == "nest")
+    return ".INBOX.Nest";
+
+  if (forward_path[0].local_part() == "mailop")
+    return ".INBOX.mailop";
 
   if (iends_with(forward_path[0].local_part(), "-at-duck"))
     return ".JunkDuck";
+
+  if (status == Session::SpamStatus::spam)
+    return ".Junk";
 
   return "";
 }
