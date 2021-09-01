@@ -798,6 +798,8 @@ static std::string folder(Session::SpamStatus         status,
       {"i-hate-linkedin", ".linkedin"},
       {"mailop", ".INBOX.mailop"},
       {"nest", ".INBOX.Nest"},
+      {"opendmarc-dev", ".dmarc"},
+      {"opendmarc-users", ".dmarc"},
       {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
   };
 
