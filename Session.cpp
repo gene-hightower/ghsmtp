@@ -788,11 +788,16 @@ static std::string folder(Session::SpamStatus         status,
   };
 
   assignment assignments[] = {
-      {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
-      {"nest", ".INBOX.Nest"},
-      {"mailop", ".INBOX.mailop"},
-      {"i-hate-linkedin", ".linkedin"},
+      {"Emailcore", ".emailcore"},
+      {"bootstrappable", ".bootstrappable"},
+      {"coreboot.org", ".coreboot"},
+      {"dmarc", ".dmarc"},
+      {"dns-privacy", ".dns-privacy"},
       {"gene-ebay", ".EBay"},
+      {"i-hate-linkedin", ".linkedin"},
+      {"mailop", ".INBOX.mailop"},
+      {"nest", ".INBOX.Nest"},
+      {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
   };
 
   for (auto ass : assignments) {
