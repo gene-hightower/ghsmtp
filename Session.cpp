@@ -779,6 +779,9 @@ static std::string folder(Session::SpamStatus         status,
       Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
     return ".Gmail";
 
+  if (forward_path[0] == Mailbox("zfsonlinux.topicbox.com@digilicious.com"))
+    return ".INBOX.zfs";
+
   if (status == Session::SpamStatus::spam)
     return ".Junk";
 
