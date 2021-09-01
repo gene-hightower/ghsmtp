@@ -779,14 +779,23 @@ static std::string folder(Session::SpamStatus         status,
       Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
     return ".Gmail";
 
-  if (forward_path[0].local_part() == "zfsonlinux.topicbox.com")
-    return ".INBOX.zfs";
+  struct assignment {
+    std::string_view local_part;
+    std::string_view folder;
+  };
 
-  if (forward_path[0].local_part() == "nest")
-    return ".INBOX.Nest";
+  assignment assignments[] = {
+      {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
+      {"nest", ".INBOX.Nest"},
+      {"mailop", ".INBOX.mailop"},
+      {"i-hate-linkedin", ".linkedin"},
+      {"gene-ebay", ".EBay"},
+  };
 
-  if (forward_path[0].local_part() == "mailop")
-    return ".INBOX.mailop";
+  for (auto ass : assignments) {
+    if (forward_path[0].local_part() == ass.local_part)
+      return std::string(ass.folder);
+  }
 
   if (iends_with(forward_path[0].local_part(), "-at-duck"))
     return ".JunkDuck";
