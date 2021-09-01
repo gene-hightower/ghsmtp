@@ -779,6 +779,9 @@ static std::string folder(Session::SpamStatus         status,
       Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
     return ".Gmail";
 
+  if (reverse_path == Mailbox("ietf-smtp-bounces@ietf.org"))
+    return ".smtp";
+
   struct assignment {
     std::string_view local_part;
     std::string_view folder;
