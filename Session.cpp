@@ -306,7 +306,7 @@ void Session::greeting()
 
     std::string error_msg;
     if (!verify_ip_address_(error_msg)) {
-      LOG(INFO) << "IP address blocked: " << error_msg;
+      LOG(INFO) << error_msg;
       bad_host_(error_msg.c_str());
     }
 
