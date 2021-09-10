@@ -2042,7 +2042,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   }()};
 
   if (!accepted_domain) {
-    out_() << "554 5.7.1 relay access denied\r\n" << std::flush;
+    out_() << "550 5.7.1 relay access denied\r\n" << std::flush;
     LOG(WARNING) << "relay access denied for domain " << recipient.domain();
     return false;
   }
