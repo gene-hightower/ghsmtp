@@ -6,6 +6,8 @@ namespace gflags {
 // in case we didn't have one
 }
 
+DEFINE_uint64(reps, 1, "now many duplicate transactions per connection");
+
 // This needs to be at least the length of each string it's trying to match.
 DEFINE_uint64(bfr_size, 4 * 1024, "parser buffer size");
 
@@ -58,6 +60,7 @@ DEFINE_string(to_name, "", "RFC5322 To: name");
 
 DEFINE_string(smtp_from, "", "RFC5321 MAIL FROM address");
 DEFINE_string(smtp_to, "", "RFC5321 RCPT TO address");
+DEFINE_string(smtp_to2, "", "second RFC5321 RCPT TO address");
 
 DEFINE_string(content_type, "", "RFC5322 Content-Type");
 DEFINE_string(content_transfer_encoding,
@@ -1657,180 +1660,186 @@ bool snd(fs::path                    config_path,
 
   auto param_str = param_stream.str();
 
-  LOG(INFO) << "C: MAIL FROM:<" << from << '>' << param_str;
-  cnn.sock.out() << "MAIL FROM:<" << from << '>' << param_str << "\r\n";
-  if (!ext_pipelining) {
-    check_for_fail(in, cnn, "MAIL FROM");
-  }
+  for (auto count = 0UL; count < FLAGS_reps; ++count) {
 
-  LOG(INFO) << "C: RCPT TO:<" << to << ">";
-  cnn.sock.out() << "RCPT TO:<" << to << ">\r\n";
-  if (!ext_pipelining) {
-    check_for_fail(in, cnn, "RCPT TO");
-  }
-
-  if (FLAGS_nosend) {
-    LOG(INFO) << "C: QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    if (ext_pipelining) {
+    LOG(INFO) << "C: MAIL FROM:<" << smtp_from_mbx.as_string(enc) << '>'
+              << param_str;
+    cnn.sock.out() << "MAIL FROM:<" << smtp_from_mbx.as_string(enc) << '>'
+                   << param_str << "\r\n";
+    if (!ext_pipelining) {
       check_for_fail(in, cnn, "MAIL FROM");
+    }
+
+    LOG(INFO) << "C: RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">";
+    cnn.sock.out() << "RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">\r\n";
+    if (!ext_pipelining) {
       check_for_fail(in, cnn, "RCPT TO");
     }
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    LOG(INFO) << "no-sending";
-    exit(EXIT_SUCCESS);
-  }
 
-  if (bad_dad) {
-    if (ext_pipelining) {
-      cnn.sock.out() << std::flush;
-      check_for_fail(in, cnn, "MAIL FROM");
-      check_for_fail(in, cnn, "RCPT TO");
-    }
-    bad_daddy(in, cnn);
-    return true;
-  }
-
-  auto msg = std::make_unique<MessageStore>();
-
-  // if service is smtp (i.e. sending real mail, not smtp-test)
-  try {
-    if (FLAGS_save) {
-      msg->open(sender.ascii(), total_size * 2, ".Sent");
-      msg->write(hdr_str.data(), hdr_str.size());
-      for (auto const& body : bodies) {
-        msg->write(body.data(), body.size());
-      }
-    }
-  }
-  catch (std::system_error const& e) {
-    switch (errno) {
-    case ENOSPC:
-      msg->trash();
-      msg.reset();
-      LOG(FATAL) << "no space";
-
-    default:
-      msg->trash();
-      msg.reset();
-      LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
-      LOG(FATAL) << e.what();
-    }
-  }
-  catch (std::exception const& e) {
-    msg->trash();
-    msg.reset();
-    LOG(FATAL) << e.what();
-  }
-
-  if (ext_chunking) {
-    std::ostringstream bdat_stream;
-    bdat_stream << "BDAT " << total_size << " LAST";
-    LOG(INFO) << "C: " << bdat_stream.str();
-
-    cnn.sock.out() << bdat_stream.str() << "\r\n";
-    cnn.sock.out().write(hdr_str.data(), hdr_str.size());
-    CHECK(cnn.sock.out().good());
-
-    for (auto const& body : bodies) {
-      cnn.sock.out().write(body.data(), body.size());
-      CHECK(cnn.sock.out().good());
-    }
-
-    if (FLAGS_pipeline_quit) {
+    if (FLAGS_nosend) {
       LOG(INFO) << "C: QUIT";
       cnn.sock.out() << "QUIT\r\n" << std::flush;
+      if (ext_pipelining) {
+        check_for_fail(in, cnn, "MAIL FROM");
+        check_for_fail(in, cnn, "RCPT TO");
+      }
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      LOG(INFO) << "no-sending";
+      exit(EXIT_SUCCESS);
     }
 
-    cnn.sock.out() << std::flush;
-    CHECK(cnn.sock.out().good());
-
-    // NOW check returns
-    if (ext_pipelining) {
-      check_for_fail(in, cnn, "MAIL FROM");
-      check_for_fail(in, cnn, "RCPT TO");
+    if (bad_dad) {
+      if (ext_pipelining) {
+        cnn.sock.out() << std::flush;
+        check_for_fail(in, cnn, "MAIL FROM");
+        check_for_fail(in, cnn, "RCPT TO");
+      }
+      bad_daddy(in, cnn);
+      return true;
     }
 
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    if (cnn.reply_code != "250") {
-      LOG(ERROR) << "BDAT returned " << cnn.reply_code;
-      fail(in, cnn);
-    }
-  }
-  else {
-    LOG(INFO) << "C: DATA";
-    cnn.sock.out() << "DATA\r\n";
+    auto msg = std::make_unique<MessageStore>();
 
-    // NOW check returns
-    if (ext_pipelining) {
-      check_for_fail(in, cnn, "MAIL FROM");
-      check_for_fail(in, cnn, "RCPT TO");
-    }
-    cnn.sock.out() << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    if (cnn.reply_code != "354") {
-      LOG(ERROR) << "DATA returned " << cnn.reply_code;
-      fail(in, cnn);
-    }
-
-    cnn.sock.out() << eml;
-
-    for (auto const& body : bodies) {
-      auto lineno = 0;
-      auto line{std::string{}};
-      auto isbody{imemstream{body.data(), body.size()}};
-      while (std::getline(isbody, line)) {
-        ++lineno;
-        if (!cnn.sock.out().good()) {
-          cnn.sock.log_stats();
-          LOG(FATAL) << "output no good at line " << lineno;
-        }
-        if (FLAGS_rawdog) {
-          // This adds a final newline at the end of the file, if no
-          // line ending was present.
-          cnn.sock.out() << line << '\n';
-        }
-        else {
-          // This code converts single LF line endings into CRLF.
-          // This code does nothing to fix single CR characters not
-          // part of a CRLF pair.
-
-          // This loop adds a CRLF and the end of the transmission if
-          // the file doesn't already end with one.  This is a
-          // requirement of the SMTP DATA protocol.
-
-          if (line.length() && (line.at(0) == '.')) {
-            cnn.sock.out() << '.';
-          }
-          cnn.sock.out() << line;
-          if (line.length() && line.back() != '\r')
-            cnn.sock.out() << '\r';
-          cnn.sock.out() << '\n';
+    // if service is smtp (i.e. sending real mail, not smtp-test)
+    try {
+      if (FLAGS_save) {
+        msg->open(sender.ascii(), total_size * 2, ".Sent");
+        msg->write(hdr_str.data(), hdr_str.size());
+        for (auto const& body : bodies) {
+          msg->write(body.data(), body.size());
         }
       }
     }
-    CHECK(cnn.sock.out().good());
+    catch (std::system_error const& e) {
+      switch (errno) {
+      case ENOSPC:
+        msg->trash();
+        msg.reset();
+        LOG(FATAL) << "no space";
+        [[fallthrough]];
 
-    // Done!
-    if (FLAGS_pipeline_quit) {
-      LOG(INFO) << "C: QUIT";
-      cnn.sock.out() << ".\r\nQUIT\r\n" << std::flush;
+      default:
+        msg->trash();
+        msg.reset();
+        LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
+        LOG(FATAL) << e.what();
+      }
     }
-    else {
-      cnn.sock.out() << ".\r\n" << std::flush;
-    }
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-  }
-  if (cnn.reply_code.at(0) == '2') {
-    if (FLAGS_save) {
-      msg->deliver();
-    }
-    else {
+    catch (std::exception const& e) {
       msg->trash();
+      msg.reset();
+      LOG(FATAL) << e.what();
     }
-    LOG(INFO) << "mail was sent successfully";
+
+    if (ext_chunking) {
+      std::ostringstream bdat_stream;
+      bdat_stream << "BDAT " << total_size << " LAST";
+      LOG(INFO) << "C: " << bdat_stream.str();
+
+      cnn.sock.out() << bdat_stream.str() << "\r\n";
+      cnn.sock.out().write(hdr_str.data(), hdr_str.size());
+      CHECK(cnn.sock.out().good());
+
+      for (auto const& body : bodies) {
+        cnn.sock.out().write(body.data(), body.size());
+        CHECK(cnn.sock.out().good());
+      }
+
+      if (FLAGS_pipeline_quit) {
+        LOG(INFO) << "C: QUIT";
+        cnn.sock.out() << "QUIT\r\n" << std::flush;
+      }
+
+      cnn.sock.out() << std::flush;
+      CHECK(cnn.sock.out().good());
+
+      // NOW check returns
+      if (ext_pipelining) {
+        check_for_fail(in, cnn, "MAIL FROM");
+        check_for_fail(in, cnn, "RCPT TO");
+      }
+
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      if (cnn.reply_code != "250") {
+        LOG(ERROR) << "BDAT returned " << cnn.reply_code;
+        fail(in, cnn);
+      }
+    }
+    else {
+      LOG(INFO) << "C: DATA";
+      cnn.sock.out() << "DATA\r\n";
+
+      // NOW check returns
+      if (ext_pipelining) {
+        check_for_fail(in, cnn, "MAIL FROM");
+        check_for_fail(in, cnn, "RCPT TO");
+      }
+      cnn.sock.out() << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      if (cnn.reply_code != "354") {
+        LOG(ERROR) << "DATA returned " << cnn.reply_code;
+        fail(in, cnn);
+      }
+
+      cnn.sock.out() << eml;
+
+      for (auto const& body : bodies) {
+        auto lineno = 0;
+        auto line{std::string{}};
+        auto isbody{imemstream{body.data(), body.size()}};
+        while (std::getline(isbody, line)) {
+          ++lineno;
+          if (!cnn.sock.out().good()) {
+            cnn.sock.log_stats();
+            LOG(FATAL) << "output no good at line " << lineno;
+          }
+          if (FLAGS_rawdog) {
+            // This adds a final newline at the end of the file, if no
+            // line ending was present.
+            cnn.sock.out() << line << '\n';
+          }
+          else {
+            // This code converts single LF line endings into CRLF.
+            // This code does nothing to fix single CR characters not
+            // part of a CRLF pair.
+
+            // This loop adds a CRLF and the end of the transmission if
+            // the file doesn't already end with one.  This is a
+            // requirement of the SMTP DATA protocol.
+
+            if (line.length() && (line.at(0) == '.')) {
+              cnn.sock.out() << '.';
+            }
+            cnn.sock.out() << line;
+            if (line.length() && line.back() != '\r')
+              cnn.sock.out() << '\r';
+            cnn.sock.out() << '\n';
+          }
+        }
+      }
+      CHECK(cnn.sock.out().good());
+
+      // Done!
+      if (FLAGS_pipeline_quit) {
+        LOG(INFO) << "C: QUIT";
+        cnn.sock.out() << ".\r\nQUIT\r\n" << std::flush;
+      }
+      else {
+        cnn.sock.out() << ".\r\n" << std::flush;
+      }
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+    }
+    if (cnn.reply_code.at(0) == '2') {
+      if (FLAGS_save) {
+        msg->deliver();
+      }
+      else {
+        msg->trash();
+      }
+      LOG(INFO) << "mail was sent successfully";
+    }
+    in.discard();
   }
-  in.discard();
 
   if (!FLAGS_pipeline_quit) {
     LOG(INFO) << "C: QUIT";
