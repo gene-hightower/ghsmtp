@@ -1212,6 +1212,9 @@ auto parse_mailboxes()
         memory_input<>{smtp_from_mbx.local_part(), "SMTP.from.local"}};
     FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_from);
   }
+  else {
+    smtp_from_mbx = from_mbx;
+  }
 
   auto smtp_to_mbx{Mailbox{}};
   if (!FLAGS_smtp_to.empty()) {
@@ -1224,6 +1227,9 @@ auto parse_mailboxes()
     auto local_smtp_to{
         memory_input<>{smtp_to_mbx.local_part(), "SMTP.to.local"}};
     FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to);
+  }
+  else {
+    smtp_to_mbx = to_mbx;
   }
 
   return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
