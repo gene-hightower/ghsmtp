@@ -175,13 +175,15 @@ DEFINE_bool(immortal, false, "don't set process timout");
 DEFINE_uint64(max_read, 0, "max data to read");
 DEFINE_uint64(max_write, 0, "max data to write");
 
-DEFINE_bool(rrvs, false, "support RRVS à la RFC 7293");
-
 DEFINE_string(selector, "ghsmtp", "DKIM selector");
 
 DEFINE_bool(test_mode, false, "ease up on some checks");
 
-DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
+DEFINE_bool(use_binarymime, true, "support BINARYMIME extension, RFC 3030");
+DEFINE_bool(use_chunking, true, "support CHUNKING extension, RFC 3030");
+DEFINE_bool(use_pipelining, true, "support PIPELINING extension, RFC 2920");
+DEFINE_bool(use_rrvs, false, "support RRVS extension, RFC 7293");
+DEFINE_bool(use_smtputf8, true, "support SMTPUTF8 extension, RFC 6531");
 
 boost::xpressive::mark_tag     secs_(1);
 boost::xpressive::sregex const all_rex = boost::xpressive::icase("wait-all-") >>
@@ -414,7 +416,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
     out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
     out_() << "250-8BITMIME\r\n";                      // RFC 6152
 
-    if (FLAGS_rrvs) {
+    if (FLAGS_use_rrvs) {
       out_() << "250-RRVS\r\n"; // RFC 7293
     }
 
@@ -436,9 +438,19 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-PIPELINING\r\n"; // RFC 2920
     }
 
-    out_() << "250-BINARYMIME\r\n"; // RFC 3030
-    out_() << "250-CHUNKING\r\n";   // RFC 3030
-    out_() << "250 SMTPUTF8\r\n";   // RFC 6531
+    if (FLAGS_use_binarymime) {
+      out_() << "250-BINARYMIME\r\n"; // RFC 3030
+    }
+
+    if (FLAGS_use_chunking) {
+      out_() << "250-CHUNKING\r\n"; // RFC 3030
+    }
+
+    if (FLAGS_use_smtputf8) {
+      out_() << "250-SMTPUTF8\r\n"; // RFC 6531
+    }
+
+    out_() << "250 OK\r\n"; // RFC 6531
   }
 
   out_() << std::flush;
