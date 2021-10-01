@@ -39,23 +39,24 @@ int main(int argc, char const* argv[])
   req2.set_helo_dom("digilicious.com");
   req2.set_env_from("postmaster@digilicious.com");
   SPF::Response const res2{req2};
-  CHECK_EQ(res2.result(), SPF::Result::FAIL);
-  CHECK(0 == strcmp(res2.header_comment(), "Example.com: domain of "
-                                           "digilicious.com does not designate "
-                                           "10.1.1.1 as permitted sender"));
-
-  auto fail_new = "Received-SPF: fail (Example.com: "
-                  "domain of digilicious.com does not "
-                  "designate 10.1.1.1 as permitted "
-                  "sender) client-ip=10.1.1.1; "
-                  "envelope-from=\"postmaster@digilicious."
-                  "com\"; helo=digilicious.com;";
+  CHECK_EQ(res2.result(), SPF::Result::SOFTFAIL);
+  CHECK(0 == strcmp(res2.header_comment(),
+                    "Example.com: transitioning domain of "
+                    "digilicious.com does not designate "
+                    "10.1.1.1 as permitted sender"));
+  auto fail_new =
+      "Received-SPF: softfail (Example.com: transitioning domain of "
+      "digilicious.com does not designate 10.1.1.1 as permitted sender) "
+      "client-ip=10.1.1.1; envelope-from=postmaster@digilicious.com; "
+      "helo=digilicious.com;";
   auto fail_old = "Received-SPF: fail (Example.com: "
                   "domain of digilicious.com does not "
                   "designate 10.1.1.1 as permitted "
                   "sender) client-ip=10.1.1.1; "
                   "envelope-from=postmaster@digilicious."
                   "com; helo=digilicious.com;";
+
+  LOG(INFO) << res2.received_spf();
 
   CHECK((0 == strcmp(res2.received_spf(), fail_new)) ||
         (0 == strcmp(res2.received_spf(), fail_old)));
