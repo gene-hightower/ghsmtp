@@ -913,6 +913,7 @@ bool validate_address_RFC5321(const char* flagname, std::string const& value)
 
 DEFINE_validator(smtp_from, &validate_address_RFC5321);
 DEFINE_validator(smtp_to, &validate_address_RFC5321);
+DEFINE_validator(smtp_to2, &validate_address_RFC5321);
 
 void selftest()
 {
@@ -985,7 +986,8 @@ void selftest()
       "250-PIPELINING\r\n"
       "250-BINARYMIME\r\n"
       "250-CHUNKING\r\n"
-      "250 SMTPUTF8\r\n",
+      "250-SMTPUTF8\r\n",
+      "250 OK\r\n",
 
       "500 5.5.1 command unrecognized: \"EHLO digilicious.com\\r\\n\"\r\n",
 
