@@ -1250,7 +1250,20 @@ void Session::data_done()
     }
   }
 
-  do_deliver_();
+  if (do_deliver_()) {
+    auto temp_fail_db_name = config_path_ / "temp_fail_data";
+    CDB  temp_fail;
+
+    for (auto fp : forward_path_) {
+      if (temp_fail.open(temp_fail_db_name) &&
+          temp_fail.contains(fp.local_part())) {
+        out_() << "450 4.2.2 Mailbox full.\r\n" << std::flush;
+        LOG(WARNING) << "temp fail at DATA for recipient " << fp;
+        reset_();
+        return;
+      }
+    }
+  }
 
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
