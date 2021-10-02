@@ -10,6 +10,6 @@
 250-SMTPUTF8
 250 OK
 250 2.1.0 MAIL FROM OK
-554 5.7.1 relay access denied
+550 5.7.1 relay access denied
 503 5.5.1 sequence error, expecting RCPT
 221 2.0.0 closing connection
