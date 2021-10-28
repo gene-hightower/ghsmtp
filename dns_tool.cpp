@@ -18,6 +18,7 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
 {
   char const* rbls[]{
       "b.barracudacentral.org",
+      "dnsbl-1.uceprotect.net",
       "psbl.surriel.com",
       "zen.spamhaus.org",
   };
