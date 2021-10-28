@@ -177,7 +177,7 @@ DEFINE_uint64(max_write, 0, "max data to write");
 
 DEFINE_bool(rrvs, false, "support RRVS à la RFC 7293");
 
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
+DEFINE_string(selector, "dkim.private.key", "DKIM selector");
 
 DEFINE_bool(test_mode, false, "ease up on some checks");
 

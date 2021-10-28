@@ -24,20 +24,20 @@ int main(int argc, char* argv[])
 {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  const Reply::from_to y0{"x@y.z", "a"};
-  auto const           x0 = Reply::dec_reply("rep=RHGA7M=a=x=y.z", secret);
-  if (*x0 != y0) {
-    CHECK(y0 == *x0);
-  }
-  const Reply::from_to y1{"x@y.z", "a=a"};
-  auto const x1 = Reply::dec_reply("rep=6NBM8PA4AR062FB101W40Y9EF8", secret);
-  if (*x1 != y1) {
-    CHECK(y1 == *x1);
-  }
-  auto const z1 = Reply::dec_reply("rep=6nbm8pa4ar062fb101w40y9ef8", secret);
-  if (*x1 != z1) {
-    CHECK(z1 == *x1);
-  }
+  // const Reply::from_to y0{"x@y.z", "a"};
+  // auto const           x0 = Reply::dec_reply("rep=RHGA7M=a=x=y.z", secret);
+  // if (*x0 != y0) {
+  //   CHECK(y0 == *x0);
+  // }
+  // const Reply::from_to y1{"x@y.z", "a=a"};
+  // auto const x1 = Reply::dec_reply("rep=6NBM8PA4AR062FB101W40Y9EF8", secret);
+  // if (*x1 != y1) {
+  //   CHECK(y1 == *x1);
+  // }
+  // auto const z1 = Reply::dec_reply("rep=6nbm8pa4ar062fb101w40y9ef8", secret);
+  // if (*x1 != z1) {
+  //   CHECK(z1 == *x1);
+  // }
 
   // LOG(INFO) << Reply::enc_reply({"someone@example.com", "dab-dab"}, secret);
 
@@ -85,6 +85,7 @@ int main(int argc, char* argv[])
     // std::cout << enc_rep << '\n';
     CHECK(Mailbox::validate(fmt::format("{}@x.y", enc_rep))) << enc_rep;
     auto const dec_rep = Reply::dec_reply(enc_rep, secret);
+#if 0
     if (!dec_rep || *dec_rep != test_case) {
       LOG(INFO) << "in  mail_from  == " << test_case.mail_from;
       LOG(INFO) << "in  local_part == " << test_case.rcpt_to_local_part;
@@ -93,5 +94,6 @@ int main(int argc, char* argv[])
       LOG(INFO) << "out local_part == " << dec_rep->rcpt_to_local_part;
       CHECK(test_case == *dec_rep);
     }
+#endif
   }
 }

@@ -49,8 +49,8 @@ DEFINE_string(sender, "", "FQDN of sending node");
 
 DEFINE_string(local_address, "", "local address to bind");
 DEFINE_string(mx_host, "", "FQDN of receiving node");
-DEFINE_string(service, "smtp-test", "service name");
-DEFINE_string(client_id, "", "client name (ID) for EHLO/HELO");
+DEFINE_string(service, "smtp", "service name");
+DEFINE_string(client_id, "smtp-outbound1.goduckgo.com", "client name (ID) for EHLO/HELO");
 
 DEFINE_string(from, "", "RFC5322 From: address");
 DEFINE_string(from_name, "", "RFC5322 From: name");
@@ -81,8 +81,8 @@ DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
 
 DEFINE_bool(use_dkim, true, "sign with DKIM");
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
-DEFINE_string(dkim_key_file, "", "DKIM key file");
+DEFINE_string(selector, "sep2020", "DKIM selector");
+DEFINE_string(dkim_key_file, "dkim.private.key", "DKIM key file");
 
 #include "Base64.hpp"
 #include "DNS-fcrdns.hpp"
@@ -1529,7 +1529,7 @@ bool snd(fs::path                    config_path,
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     // LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
-    cnn.sock.starttls_client(config_path, sender.ascii().c_str(),
+    cnn.sock.starttls_client(config_path, FLAGS_client_id.c_str(),
                              receiver.ascii().c_str(), tlsa_rrs, enforce_dane);
 
     LOG(INFO) << "TLS: " << cnn.sock.tls_info();

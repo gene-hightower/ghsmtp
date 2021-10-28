@@ -1,4 +1,4 @@
-USES := ldns libglog libidn2 opendkim openssl
+USES := libldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -IPEGTL/include -Ijson/include -Icppcodec
 
@@ -10,19 +10,18 @@ LDLIBS += \
 	-lfmt \
 	-lgflags \
 	-lmagic \
-	-lopenarc \
 	-lopendmarc \
 	-lpsl \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := arcsign arcverify dns_tool smtp msg sasl snd socks5
+PROGRAMS := dns_tool smtp msg sasl snd socks5
 
 arcsign_STEMS := arcsign \
-	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
+	message Domain IP IP4 IP6 Mailbox  OpenDKIM OpenDMARC Pill Reply osutil esc
 
 arcverify_STEMS := arcverify \
-	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
+	message Domain IP IP4 IP6 Mailbox  OpenDKIM OpenDMARC Pill Reply osutil esc
 
 DNS := DNS DNS-rrs DNS-fcrdns DNS-message
 
@@ -80,7 +79,6 @@ smtp_STEMS := smtp \
 	IP6 \
 	Mailbox \
 	MessageStore \
-	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
 	POSIX \
@@ -93,7 +91,6 @@ smtp_STEMS := smtp \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	message \
 	osutil
 
 snd_STEMS := snd \
@@ -131,6 +128,8 @@ socks5_STEMS := socks5 \
 	esc \
 	osutil
 
+#	Send-test \
+
 TESTS := \
 	Base64-test \
 	CDB-test \
@@ -148,7 +147,6 @@ TESTS := \
 	Pill-test \
 	Reply-test \
 	SPF-test \
-	Send-test \
 	Session-test \
 	Sock-test \
 	SockBuffer-test \
@@ -159,7 +157,6 @@ TESTS := \
 	iequal-test \
 	iobuffer-test \
 	is_ascii-test \
-	message-test \
 	osutil-test
 
 Base64-test_STEMS := Base64
@@ -179,10 +176,10 @@ Pill-test_STEMS := Pill
 Reply-test_STEMS := Reply osutil Domain IP IP4 IP6 Mailbox
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS Domain Mailbox IP IP4 IP6
-Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc message osutil
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox  OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc osutil
 
 osutil-test_STEMS := osutil
-message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
+# message-test_STEMS := message Domain IP IP4 IP6 Mailbox  OpenDKIM OpenDMARC Pill Reply osutil esc
 
 Session-test_STEMS := \
 	CDB \
@@ -193,7 +190,6 @@ Session-test_STEMS := \
 	IP6 \
 	Mailbox \
 	MessageStore \
-	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
 	POSIX \
@@ -206,7 +202,6 @@ Session-test_STEMS := \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	message \
 	osutil
 
 Sock-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
@@ -320,4 +315,16 @@ show::
 
 init::
 	touch accept_domains bad_recipients bad_senders block ip-block temp_fail
-	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel
+	sudo apt-get install \
+	  libboost-all-dev   \
+	  libcdb-dev         \
+	  libfmt-dev         \
+	  libgoogle-glog-dev \
+	  libidn2-0-dev      \
+	  libldns-dev        \
+	  libmagic-dev       \
+	  libopendkim-dev    \
+	  libopendmarc-dev   \
+	  libpsl-dev         \
+	  libspf2-dev        \
+	  libunistring-dev
