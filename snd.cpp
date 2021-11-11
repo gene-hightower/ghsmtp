@@ -1341,7 +1341,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   if (std::find(begin(auth->second), end(auth->second), "PLAIN") !=
       end(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
-    auto const tok = fmt::format("\0{}\0{}"s, FLAGS_username, FLAGS_password);
+    auto const tok = fmt::format("\0{}\0{}", FLAGS_username, FLAGS_password);
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok) << "\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     if (cnn.reply_code != "235") {

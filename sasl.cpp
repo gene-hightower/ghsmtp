@@ -218,7 +218,7 @@ int main()
       << std::flush;
 
   auto ctx = dovecot::Context{};
-  auto in = istream_input<eol::lf, 1>{ios, 8 * 1024, "sasl"};
+  auto in  = istream_input<eol::lf, 1>{ios, 8 * 1024, "sasl"};
   if (!parse<dovecot::resp, dovecot::action>(in, ctx)) {
     LOG(WARNING) << "handshake response parse failed";
   }
@@ -227,7 +227,7 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  auto const tok{fmt::format("\0{}\0{}"s, test::username, test::password)};
+  auto const tok{fmt::format("\0{}\0{}", test::username, test::password)};
   auto const init{Base64::enc(tok)};
 
   if (ctx.mechs.find("PLAIN") != end(ctx.mechs)) {
