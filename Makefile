@@ -13,6 +13,7 @@ LDLIBS += \
 	-lopenarc \
 	-lopendmarc \
 	-lpsl \
+	-lresolv \
 	-lspf2 \
 	-lunistring
 
