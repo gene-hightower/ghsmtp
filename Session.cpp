@@ -812,6 +812,7 @@ static std::string folder(Session::SpamStatus         status,
       {"nest", ".INBOX.Nest"},
       {"opendmarc-dev", ".dmarc"},
       {"opendmarc-users", ".dmarc"},
+      {"theatlantic.com", ""},
       {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
   };
 
