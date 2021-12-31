@@ -931,9 +931,9 @@ bool authentication(message::parsed& msg,
       if (iequal(env_from.local_part(), "Postmaster") &&
           env_from.domain() == helo_dom) {
         if (validated_doms.count(helo_dom) == 0) {
-          fmt::format_to(bfr, ";\r\n\tspf={}", spf_parsed.result);
-          fmt::format_to(bfr, " {}", spf_parsed.comment);
-          fmt::format_to(bfr, " smtp.helo={}", helo_dom.ascii());
+          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}", spf_parsed.result);
+          fmt::format_to(std::back_inserter(bfr), " {}", spf_parsed.comment);
+          fmt::format_to(std::back_inserter(bfr), " smtp.helo={}", helo_dom.ascii());
           validated_doms.emplace(helo_dom);
 
           if (spf_parsed.kv_map.contains(client_ip)) {
@@ -945,9 +945,9 @@ bool authentication(message::parsed& msg,
       }
       else {
         if (validated_doms.count(env_from.domain()) == 0) {
-          fmt::format_to(bfr, ";\r\n\tspf={}", spf_parsed.result);
-          fmt::format_to(bfr, " {}", spf_parsed.comment);
-          fmt::format_to(bfr, " smtp.mailfrom={}",
+          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}", spf_parsed.result);
+          fmt::format_to(std::back_inserter(bfr), " {}", spf_parsed.comment);
+          fmt::format_to(std::back_inserter(bfr), " smtp.mailfrom={}",
                          env_from.as_string(Mailbox::domain_encoding::ascii));
           validated_doms.emplace(env_from.domain());
 
@@ -1037,10 +1037,10 @@ bool authentication(message::parsed& msg,
 
     auto bs = std::string_view(b, strlen(b)).substr(0, 8);
 
-    fmt::format_to(bfr, ";\r\n\tdkim={}", human_result);
-    fmt::format_to(bfr, " header.i={}", identity);
-    fmt::format_to(bfr, " header.s={}", sel);
-    fmt::format_to(bfr, " header.b=\"{}\"", bs);
+    fmt::format_to(std::back_inserter(bfr), ";\r\n\tdkim={}", human_result);
+    fmt::format_to(std::back_inserter(bfr), " header.i={}", identity);
+    fmt::format_to(std::back_inserter(bfr), " header.s={}", sel);
+    fmt::format_to(std::back_inserter(bfr), " header.b=\"{}\"", bs);
   });
 
   // Set DMARC status in AR
@@ -1050,7 +1050,7 @@ bool authentication(message::parsed& msg,
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
 
-  fmt::format_to(bfr, ";\r\n\tdmarc={} header.from={}", dmarc_result,
+  fmt::format_to(std::back_inserter(bfr), ";\r\n\tdmarc={} header.from={}", dmarc_result,
                  msg.dmarc_from_domain);
 
   // ARC
@@ -1068,7 +1068,7 @@ bool authentication(message::parsed& msg,
 
   auto const arc_status = arv.chain_status_str();
 
-  fmt::format_to(bfr, ";\r\n\tarc={}", arc_status);
+  fmt::format_to(std::back_inserter(bfr), ";\r\n\tarc={}", arc_status);
 
   // New AR header on the top
 
@@ -1227,10 +1227,10 @@ std::string parsed::as_string() const
   fmt::memory_buffer bfr;
 
   for (auto const& h : headers)
-    fmt::format_to(bfr, "{}\r\n", h.as_string());
+    fmt::format_to(std::back_inserter(bfr), "{}\r\n", h.as_string());
 
   if (!body.empty())
-    fmt::format_to(bfr, "\r\n{}", body);
+    fmt::format_to(std::back_inserter(bfr), "\r\n{}", body);
 
   return fmt::to_string(bfr);
 }
