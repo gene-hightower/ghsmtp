@@ -219,6 +219,7 @@ databases := \
 	accept_domains.cdb \
 	allow.cdb \
 	bad_recipients.cdb \
+	bad_recipients_data.cdb \
 	bad_senders.cdb \
 	block.cdb \
 	forward.cdb \
@@ -320,5 +321,5 @@ show::
 	llvm-cov show ./smtp -instr-profile=smtp.profdata
 
 init::
-	touch accept_domains bad_recipients bad_senders block ip-block temp_fail
+	touch accept_domains bad_recipients bad_recipients_data bad_senders block ip-block temp_fail
 	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel

@@ -1273,6 +1273,22 @@ void Session::data_done()
     }
   }
 
+  // Check for addresses we reject after data.
+  {
+    auto bad_recipients_db_name = config_path_ / "bad_recipients_data";
+    CDB  bad_recipients_db;
+    if (bad_recipients_db.open(bad_recipients_db_name)) {
+      for (auto fp : forward_path_) {
+        if (bad_recipients_db.contains(fp.local_part())) {
+          out_() << "550 5.1.1 bad recipient " << fp << "\r\n" << std::flush;
+          LOG(WARNING) << "bad recipient " << fp;
+          reset_();
+          return;
+        }
+      }
+    }
+  }
+
   out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
   LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
             << msg_->id();
