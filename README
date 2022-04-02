@@ -33,14 +33,15 @@ sudo apt-get install \
   libcdb-dev         \
   libfmt-dev         \
   libgoogle-glog-dev \
-  libidn2-0-dev      \
+  libidn2-dev        \
   libldns-dev        \
   libmagic-dev       \
   libopendkim-dev    \
   libopendmarc-dev   \
   libpsl-dev         \
   libspf2-dev        \
-  libunistring-dev
+  libunistring-dev   \
+  pkg-config
 
 Run it from (x)inetd or daemontools as a non-root user.  It will
 accept mail and store it in that user's ~/Maildir.
