@@ -45,20 +45,24 @@ int main(int argc, char* argv[])
       fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
 
   fmt::memory_buffer bfr;
-  fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
-  fmt::format_to(bfr, "From: \"Gene Hightower\" <{}>\r\n",
+  fmt::format_to(std::back_inserter(bfr), "Message-ID: {}\r\n",
+                 mid_str.c_str());
+  fmt::format_to(std::back_inserter(bfr), "From: \"Gene Hightower\" <{}>\r\n",
                  from.as_string(Mailbox::domain_encoding::utf8));
-  fmt::format_to(bfr, "To: \"Gene Hightower\" <{}>\r\n",
+  fmt::format_to(std::back_inserter(bfr), "To: \"Gene Hightower\" <{}>\r\n",
                  to.as_string(Mailbox::domain_encoding::utf8));
-  fmt::format_to(bfr, "Subject: Testing, one, two, three.\r\n");
-  fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
-  fmt::format_to(bfr, "Authentication-Results: {}; none\r\n", server_identity);
-  fmt::format_to(bfr, "MIME-Version: 1.0\r\n");
-  fmt::format_to(bfr, "Content-Type: text/plain; charset=utf-8\r\n");
+  fmt::format_to(std::back_inserter(bfr),
+                 "Subject: Testing, one, two, three.\r\n");
+  fmt::format_to(std::back_inserter(bfr), "Date: {}\r\n", date.c_str());
+  fmt::format_to(std::back_inserter(bfr),
+                 "Authentication-Results: {}; none\r\n", server_identity);
+  fmt::format_to(std::back_inserter(bfr), "MIME-Version: 1.0\r\n");
+  fmt::format_to(std::back_inserter(bfr),
+                 "Content-Type: text/plain; charset=utf-8\r\n");
 
-  fmt::format_to(bfr, "\r\n");
+  fmt::format_to(std::back_inserter(bfr), "\r\n");
 
-  fmt::format_to(bfr, "This is the body of the email.\r\n");
+  fmt::format_to(std::back_inserter(bfr), "This is the body of the email.\r\n");
   auto const msg_str = fmt::to_string(bfr);
 
   auto res{DNS::Resolver{config_path}};
