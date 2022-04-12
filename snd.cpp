@@ -22,6 +22,7 @@ DEFINE_bool(noconn, false, "don't connect to any host");
 DEFINE_bool(noop, false, "send a NOOP right after EHLO");
 DEFINE_bool(nosend, false, "don't actually send any mail");
 DEFINE_bool(pipe, false, "send to stdin/stdout");
+DEFINE_bool(rawmsg, false, "the body file includes the headers");
 DEFINE_bool(rawdog,
             false,
             "send the body exactly as is, don't fix CRLF issues "
@@ -81,6 +82,7 @@ DEFINE_string(username, "", "AUTH username");
 DEFINE_string(password, "", "AUTH password");
 
 DEFINE_bool(use_dkim, true, "sign with DKIM");
+DEFINE_bool(bogus_dkim, false, "sign with bogus DKIM");
 DEFINE_string(selector, "ghsmtp", "DKIM selector");
 DEFINE_string(dkim_key_file, "", "DKIM key file");
 
@@ -427,13 +429,15 @@ struct path_only : seq<path, eof> {};
 // textstring     = 1*(%d09 / %d32-126) ; HT, SP, Printable US-ASCII
 
 // Although not explicit in the grammar of RFC-6531, in practice UTF-8
-// is used in the replys.
+// is used in the replies.
 
 // struct textstring : plus<sor<one<9>, range<32, 126>>> {};
 
-  struct textstring : plus<sor<one<9>, range<32, 126>, chars::non_ascii>> {};
+struct textstring : plus<sor<one<9>, range<32, 126>, chars::non_ascii>> {};
 
-struct server_id : sor<domain, address_literal> {};
+struct crap : plus<range<32, 126>> {};
+
+struct server_id : sor<domain, address_literal, crap> {};
 
 // Greeting       = ( "220 " (Domain / address-literal) [ SP textstring ] CRLF )
 //                  /
@@ -703,6 +707,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
         LOG(FATAL) << "can't interpret " << FLAGS_local_address
                    << " as IPv4 address";
       }
+      LOG(INFO) << "bind " << FLAGS_local_address;
       PCHECK(0 == bind(fd, reinterpret_cast<sockaddr*>(&loc), sizeof(loc)));
     }
 
@@ -764,7 +769,8 @@ private:
     for (auto const& [name, value] : eml.hdrs_) {
       os << name << ": " << value << "\r\n";
     }
-    return os << "\r\n"; // end of headers
+    //    return os << "\r\n"; // end of headers
+    return os /* << "\r\n" */; // end of headers
   }
 };
 
@@ -1256,12 +1262,12 @@ auto create_eml(Domain const&               sender,
   else
     eml.add_hdr("From", from);
 
+  eml.add_hdr("Subject", FLAGS_subject);
+
   if (!FLAGS_to_name.empty())
     eml.add_hdr("To", fmt::format("{} <{}>", FLAGS_to_name, to));
   else
     eml.add_hdr("To", to);
-
-  eml.add_hdr("Subject", FLAGS_subject);
 
   if (!FLAGS_keywords.empty())
     eml.add_hdr("Keywords", FLAGS_keywords);
@@ -1530,7 +1536,7 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "STARTTLS\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
-    // LOG(INFO) << "cnn.sock.starttls_client(" << receiver.ascii() << ");";
+    LOG(INFO) << "cnn.sock.starttls_client(\"" << receiver.ascii() << "\");";
     cnn.sock.starttls_client(config_path, sender.ascii().c_str(),
                              receiver.ascii().c_str(), tlsa_rrs, enforce_dane);
 
@@ -1614,10 +1620,15 @@ bool snd(fs::path                    config_path,
     auto const dom = Mailbox(from).domain().ascii();
     sign_eml(eml, dom.c_str(), bodies);
   }
+  else if (FLAGS_bogus_dkim) {
+    eml.add_hdr("DKIM-Signature", "");
+  }
 
   // Get the header as one big string
   std::ostringstream hdr_stream;
   hdr_stream << eml;
+  if (!FLAGS_rawmsg)
+    hdr_stream << "\r\n";
   auto const& hdr_str = hdr_stream.str();
 
   // In the case of DATA style transfer, this total_size number is an
