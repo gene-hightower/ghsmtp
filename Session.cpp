@@ -450,7 +450,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-SMTPUTF8\r\n"; // RFC 6531
     }
 
-    out_() << "250 OK\r\n"; // RFC 6531
+    out_() << "250 HELP\r\n";
   }
 
   out_() << std::flush;
@@ -1464,7 +1464,13 @@ void Session::vrfy(std::string_view str)
 
 void Session::help(std::string_view str)
 {
-  out_() << "214 2.0.0 see https://digilicious.com/smtp.html\r\n" << std::flush;
+  if (iequal(str, "help\r\n")) {
+    out_() << "214 2.0.0 Now you're sounding desperate.\r\n" << std::flush;
+  }
+  else {
+    out_() << "214 2.0.0 see https://digilicious.com/smtp.html\r\n"
+           << std::flush;
+  }
   LOG(INFO) << "HELP" << (str.length() ? " " : "") << str;
 }
 
