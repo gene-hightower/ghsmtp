@@ -1801,6 +1801,8 @@ bool snd(fs::path                    config_path,
       }
 
       cnn.sock.out() << eml;
+      if (!FLAGS_rawmsg)
+        cnn.sock.out() << "\r\n";
 
       for (auto const& body : bodies) {
         auto lineno = 0;
