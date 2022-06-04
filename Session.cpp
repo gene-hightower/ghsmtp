@@ -1285,7 +1285,13 @@ void Session::data_done()
           reset_();
           return;
         }
+        else {
+          LOG(INFO) << "unbad recipient " << fp.local_part();
+        }
       }
+    }
+    else {
+      LOG(WARNING) << "can't open bad_recipients_data";
     }
   }
 
@@ -1972,7 +1978,7 @@ void Session::do_spf_check_(Mailbox const& sender)
     LOG(INFO) << "PASS " << spf_res.header_comment();
   }
   else {
-    LOG(INFO) << "INVALID/SOFTFAIL/NONE/xERROR " << spf_res.header_comment();
+    LOG(INFO) << "INVALID/SOFTFAIL/NONE/xERROR " << server_id_().c_str();
   }
 }
 
@@ -2074,7 +2080,9 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       if (recipient.domain() != sock_.us_address_literal()) {
         LOG(WARNING) << "recipient.domain address " << recipient.domain()
                      << " does not match ours " << sock_.us_address_literal();
-        return false;
+        /*
+            return false;
+        */
       }
       return true;
     }
