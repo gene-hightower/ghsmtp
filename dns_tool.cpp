@@ -1,4 +1,5 @@
 #include "DNS-fcrdns.hpp"
+#include "DNS-iostream.hpp"
 #include "DNS.hpp"
 #include "IP.hpp"
 #include "IP4.hpp"
@@ -89,6 +90,29 @@ void do_addr(DNS::Resolver& res, char const* a)
   }
 }
 
+DNS::RR_collection
+get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
+{
+  auto const tlsa = fmt::format("_{}._tcp.{}", port, domain.ascii());
+
+  DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
+
+  if (q.nx_domain()) {
+    LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
+  }
+
+  if (q.bogus_or_indeterminate()) {
+    LOG(WARNING) << "TLSA data is bogus or indeterminate";
+  }
+
+  auto tlsa_rrs = q.get_records();
+  if (!tlsa_rrs.empty()) {
+    LOG(INFO) << "### TLSA data found for " << domain << ':' << port << " ###";
+  }
+
+  return tlsa_rrs;
+}
+
 void do_domain(DNS::Resolver& res, char const* dom_cp)
 {
   auto const dom{Domain{dom_cp}};
@@ -108,6 +132,15 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto aaaas = res.get_strings(DNS::RR_type::AAAA, dom.ascii().c_str());
   for (auto const& aaaa : aaaas) {
     do_addr(res, aaaa.c_str());
+  }
+
+  uint16_t port = 25;
+  auto     tlsa_rrs{get_tlsa_rrs(res, dom, port)};
+  if (!tlsa_rrs.empty()) {
+    for (auto const& tlsa_rr : tlsa_rrs) {
+      auto const rp = std::get<DNS::RR_TLSA>(tlsa_rr);
+      std::cout << rp << "\n";
+    }
   }
 
   auto q{DNS::Query{res, DNS::RR_type::MX, dom.ascii()}};
