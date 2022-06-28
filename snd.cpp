@@ -1886,6 +1886,13 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
     LOG(WARNING) << "TLSA data is bogus or indeterminate";
   }
 
+  if (q.authentic_data()) {
+    LOG(INFO) << "### TLSA records authentic for domain " << domain << " ###";
+  }
+  else {
+    LOG(INFO) << "TLSA records can't be authenticated for domain " << domain;
+  }
+
   auto tlsa_rrs = q.get_records();
   if (!tlsa_rrs.empty()) {
     LOG(INFO) << "### TLSA data found for " << domain << ':' << port << " ###";
