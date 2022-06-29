@@ -32,9 +32,11 @@
 using namespace std::string_literals;
 
 namespace Config {
+/*
 char const* wls[]{
     "list.dnswl.org",
 };
+*/
 
 /*
 <https://www.dnswl.org/?page_id=15#query>
@@ -81,20 +83,10 @@ this situation.
 
 char const* bls[]{
     "b.barracudacentral.org",
-    "sbl.spamhaus.org",
+    "sbl-xbl.spamhaus.org",
 };
 
 /*** Last octet from A record returned by blocklists ***
-
-From <http://uribl.com/about.shtml#implementation>
-
-X   Binary    On List
----------------------------------------------------------
-1   00000001  Query blocked, possibly due to high volume
-2   00000010  black
-4   00000100  grey
-8   00001000  red
-14  00001110  black,grey,red (for testpoints)
 
 <https://www.spamhaus.org/faq/section/DNSBL%20Usage>
 
@@ -155,10 +147,12 @@ that last octet for membership in the different lists are:
 
 */
 
+/*
 char const* uribls[]{
     "dbl.spamhaus.org",
     "multi.uribl.com",
 };
+*/
 
 constexpr auto greeting_wait              = std::chrono::seconds{6};
 constexpr int  max_recipients_per_message = 100;
@@ -450,7 +444,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-SMTPUTF8\r\n"; // RFC 6531
     }
 
-    out_() << "250 HELP\r\n";
+    out_() << "250 OK\r\n";
   }
 
   out_() << std::flush;
@@ -1609,16 +1603,16 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return true;
   }
 
+  auto const fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
+  for (auto const& fcr : fcrdns) {
+    client_fcrdns_.emplace_back(fcr);
+  }
+
   if (IP::is_private(sock_.them_address_literal())) {
     LOG(INFO) << "private address allowed";
     ip_allowed_ = true;
     client_     = sock_.them_address_literal();
     return true;
-  }
-
-  auto const fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
-  for (auto const& fcr : fcrdns) {
-    client_fcrdns_.emplace_back(fcr);
   }
 
   if (!client_fcrdns_.empty()) {
@@ -1716,6 +1710,9 @@ bool Session::verify_ip_address_(std::string& error_msg)
         if (as == "127.0.1.1") {
           LOG(INFO) << "Query blocked by " << bl;
         }
+        else if (as == "127.0.0.10" || as == "127.0.0.11") {
+          LOG(INFO) << "PBL listed, ignoring " << bl;
+        }
         else if (as == "127.255.255.252") {
           LOG(INFO) << "Typing error in DNSBL name " << bl;
         }
@@ -1738,6 +1735,20 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   LOG(INFO) << "IP address okay";
   return true;
+}
+
+bool domain_blocked(DNS::Resolver& res, Domain const& identity)
+{
+  Domain     lookup{fmt::format("{}.dbl.spamhaus.org", identity.ascii())};
+  DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
+  if (q.has_record()) {
+    auto const as = q.get_strings()[0];
+    if (istarts_with(as, "127.0.1.")) {
+      LOG(INFO) << "Domain " << identity << " blocked by spamhaus";
+      return true;
+    }
+  }
+  return false;
 }
 
 // check the identity from HELO/EHLO
@@ -1824,6 +1835,22 @@ bool Session::verify_client_(Domain const& client_identity,
     error_msg =
         fmt::format("claimed identity has blocked registered domain {}", tld);
     out_() << "550 4.7.1 blocked registered domain\r\n" << std::flush;
+    return false;
+  }
+
+  if (domain_blocked(res_, client_identity) ||
+      domain_blocked(res_, Domain(tld))) {
+    error_msg = fmt::format("claimed identity {} blocked by spamhaus",
+                            client_identity.ascii());
+    out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
+    return false;
+  }
+
+  DNS::Query q(res_, DNS::RR_type::A, client_identity.ascii());
+  if (!q.has_record()) {
+    error_msg = fmt::format("claimed identity {} not DNS resolvable",
+                            client_identity.ascii());
+    out_() << "550 4.7.1 identity not DNS resolvable\r\n" << std::flush;
     return false;
   }
 
