@@ -1848,10 +1848,8 @@ bool Session::verify_client_(Domain const& client_identity,
 
   DNS::Query q(res_, DNS::RR_type::A, client_identity.ascii());
   if (!q.has_record()) {
-    error_msg = fmt::format("claimed identity {} not DNS resolvable",
-                            client_identity.ascii());
-    out_() << "550 4.7.1 identity not DNS resolvable\r\n" << std::flush;
-    return false;
+    LOG(WARNING) << "claimed identity " << client_identity.ascii()
+                 << " not DNS resolvable",
   }
 
   // not otherwise objectionable
