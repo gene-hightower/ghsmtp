@@ -444,7 +444,7 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-SMTPUTF8\r\n"; // RFC 6531
     }
 
-    out_() << "250 OK\r\n";
+    out_() << "250 HELP\r\n";
   }
 
   out_() << std::flush;
@@ -1861,7 +1861,21 @@ bool Session::verify_client_(Domain const& client_identity,
 // check sender from RFC5321 MAIL FROM:
 bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
+  do_spf_check_(sender);
+
   std::string const sender_str{sender};
+
+  if (sender.empty()) {
+    // MAIL FROM:<>
+    // is used to send bounce messages.
+    return true;
+  }
+
+  if (domain_blocked(res_, sender.domain())) {
+    error_msg = fmt::format("{} sender domain blocked by spamhaus", sender_str);
+    out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
+    return false;
+  }
 
   auto bad_senders_db_name = config_path_ / "bad_senders";
   CDB  bad_senders;
@@ -1898,8 +1912,6 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     }
     return true;
   }
-
-  do_spf_check_(sender);
 
   if (!verify_sender_domain_(sender.domain(), error_msg)) {
     return false;
