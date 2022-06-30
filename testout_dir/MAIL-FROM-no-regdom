@@ -1,4 +1,2 @@
 220 digilicious.com ESMTP - ghsmtp
-250 digilicious.com
-250 2.1.0 MAIL FROM OK
-221 2.0.0 closing connection
+550 4.7.1 identity not DNS resolvable
