@@ -1849,7 +1849,7 @@ bool Session::verify_client_(Domain const& client_identity,
   DNS::Query q(res_, DNS::RR_type::A, client_identity.ascii());
   if (!q.has_record()) {
     LOG(WARNING) << "claimed identity " << client_identity.ascii()
-                 << " not DNS resolvable",
+                 << " not DNS resolvable";
   }
 
   // not otherwise objectionable
