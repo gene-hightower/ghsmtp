@@ -185,6 +185,10 @@ bool TLS::starttls_client(fs::path                  config_path,
 
       // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
+      // Allow any old and crufty protocol version.
+      CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+          << "unable to set min proto version";
+
       CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
           << "unable to enable DANE on SSL context";
 
@@ -346,7 +350,7 @@ bool TLS::starttls_client(fs::path                  config_path,
       auto const rp   = std::get<DNS::RR_TLSA>(tlsa_rr);
       auto       data = rp.assoc_data();
       auto       rc   = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
-                                  rp.matching_type(), data.data(), data.size());
+                                          rp.matching_type(), data.data(), data.size());
 
       if (rc < 0) {
         auto const cp = bin2hexstring(data.data(), data.size());
