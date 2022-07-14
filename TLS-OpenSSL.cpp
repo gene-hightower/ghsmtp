@@ -497,6 +497,10 @@ bool TLS::starttls_server(fs::path                  config_path,
     SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
     SSL_CTX_clear_options(ctx, SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 
+    // Allow any old and crufty protocol version.
+    CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+        << "unable to set min proto version";
+
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
@@ -723,8 +727,8 @@ bool TLS::starttls_server(fs::path                  config_path,
         LOG(INFO) << "DANE TLSA " << usage << " " << selector << " " << mtype
                   << " [" << bin2hexstring(certdata, 6) << "...] "
                   << ((mspki != nullptr) ? "TA public key verified certificate"
-                                         : depth ? "matched TA certificate"
-                                                 : "matched EE certificate")
+                      : depth            ? "matched TA certificate"
+                                         : "matched EE certificate")
                   << " at depth " << depth;
       }
     }
