@@ -9,6 +9,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #define FMT_STRING_ALIAS 1
@@ -17,6 +18,10 @@
 #include "DNS.hpp"
 #include "POSIX.hpp"
 #include "osutil.hpp"
+
+DEFINE_bool(support_all_tls_versions,
+            false,
+            "lift restrictions on TLS versions");
 
 // <https://tools.ietf.org/html/rfc7919>
 // <https://wiki.mozilla.org/Security/Server_Side_TLS#DHE_handshake_and_dhparam>
@@ -186,8 +191,10 @@ bool TLS::starttls_client(fs::path                  config_path,
       // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
       // Allow any old and crufty protocol version.
-      CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-          << "unable to set min proto version";
+      if (FLAGS_support_all_tls_versions) {
+        CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+            << "unable to set min proto version";
+      }
 
       CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
           << "unable to enable DANE on SSL context";
@@ -498,8 +505,10 @@ bool TLS::starttls_server(fs::path                  config_path,
     SSL_CTX_clear_options(ctx, SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 
     // Allow any old and crufty protocol version.
-    CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-        << "unable to set min proto version";
+    if (FLAGS_support_all_tls_versions) {
+      CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+          << "unable to set min proto version";
+    }
 
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
