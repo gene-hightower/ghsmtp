@@ -30,6 +30,9 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
     auto as = DNS::get_strings(res, DNS::RR_type::A, reversed + rbl);
     if (!as.empty()) {
       std::cout << a << " blocked on advice from " << rbl << '\n';
+      for (auto aa : as) {
+        std::cout << aa << '\n';
+      }
     }
   }
 }
@@ -48,7 +51,14 @@ void check_uribls(DNS::Resolver& res, char const* dom)
     if (!as.empty()) {
       if (as.front() == "127.0.0.1")
         continue;
+      if (as.front() == "127.255.255.254") {
+        // Anonymous query through public resolver
+        continue;
+      }
       std::cout << dom << " blocked on advice from " << uribl << '\n';
+      for (auto aa : as) {
+        std::cout << aa << '\n';
+      }
     }
   }
 }
@@ -98,7 +108,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
   DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
   if (q.nx_domain()) {
-    LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
+    // LOG(INFO) << "TLSA data not found for " << domain << ':' << port;
   }
 
   if (q.bogus_or_indeterminate()) {
