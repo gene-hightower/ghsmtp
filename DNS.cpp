@@ -19,6 +19,7 @@
 #include "osutil.hpp"
 
 DEFINE_bool(log_dns_data, false, "log all DNS TCP protocol data");
+DEFINE_bool(random_dns_servers, false, "Pick starting DNS server at random");
 
 namespace Config {
 // The default timeout in glibc is 5 seconds.  My setup with unbound
@@ -145,8 +146,13 @@ Resolver::Resolver(fs::path config_path)
 {
   auto tries = countof(Config::nameservers);
 
-  ns_ = std::experimental::randint(
-      0, static_cast<int>(countof(Config::nameservers) - 1));
+  if (FLAGS_random_dns_servers) {
+    ns_ = std::experimental::randint(
+        0, static_cast<int>(countof(Config::nameservers) - 1));
+  }
+  else {
+    ns_ = static_cast<int>(countof(Config::nameservers) - 1);
+  }
 
   while (tries--) {
 
@@ -155,9 +161,9 @@ Resolver::Resolver(fs::path config_path)
       ns_ = 0;
 
     auto const& nameserver = Config::nameservers[ns_];
-
     auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
                                                              : SOCK_DGRAM;
+
     uint16_t port =
         osutil::get_port(nameserver.port, (typ == SOCK_STREAM) ? "tcp" : "udp");
     ns_fd_ = -1;
