@@ -39,12 +39,6 @@ struct nameserver {
 
 constexpr nameserver nameservers[]{
     {
-        "one.one.one.one",
-        "1.1.1.1",
-        "domain-s",
-        sock_type::stream,
-    },
-    {
         "localhost",
         "127.0.0.1",
         "domain",
@@ -54,6 +48,12 @@ constexpr nameserver nameservers[]{
         "localhost",
         "::1",
         "domain",
+        sock_type::stream,
+    },
+    {
+        "one.one.one.one",
+        "1.1.1.1",
+        "domain-s",
         sock_type::stream,
     },
     /*
