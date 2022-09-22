@@ -341,17 +341,25 @@ void Session::greeting()
         bad_host_("input before any greeting");
       }
       // Give a half greeting and wait again.
-      out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
+      out_() << "220-" << server_id_() << " ESMTP slowstart - ghsmtp\r\n"
+             << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         LOG(INFO) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
       }
+      out_() << "220\r\n" << std::flush;
     }
-    LOG(INFO) << "connect from " << client_;
+    else {
+      out_() << "220 " << server_id_() << " ESMTP faststart - ghsmtp\r\n"
+             << std::flush;
+    }
+  }
+  else {
+    out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
   }
 
-  out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
+  LOG(INFO) << "connect from " << client_;
 
   if ((!FLAGS_immortal) && (getenv("GHSMTP_IMMORTAL") == nullptr)) {
     alarm(2 * 60); // initial alarm
