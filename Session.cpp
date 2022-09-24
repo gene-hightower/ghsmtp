@@ -348,7 +348,24 @@ void Session::greeting()
         LOG(INFO) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
       }
-      out_() << "220\r\n" << std::flush;
+      /*
+        <https://www.rfc-editor.org/rfc/rfc5321#section-4.2>
+
+        An SMTP client MUST determine its actions only by the reply code, not
+        by the text (except for the "change of address" 251 and 551 and, if
+        necessary, 220, 221, and 421 replies); in the general case, any text,
+        including no text at all (although senders SHOULD NOT send bare
+        codes), MUST be acceptable.  The space (blank) following the reply
+        code is considered part of the text.  Whenever possible, a receiver-
+        SMTP SHOULD test the first digit (severity indication) of the reply
+        code.
+
+        Except the following chokes a lot of senders:
+
+        out_() << "220\r\n" << std::flush;
+
+      */
+      out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
     }
     else {
       out_() << "220 " << server_id_() << " ESMTP faststart - ghsmtp\r\n"
