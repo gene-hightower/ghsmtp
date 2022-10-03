@@ -29,10 +29,25 @@ void check_dnsrbl(DNS::Resolver& res, char const* a)
   for (auto rbl : rbls) {
     auto as = DNS::get_strings(res, DNS::RR_type::A, reversed + rbl);
     if (!as.empty()) {
-      std::cout << a << " blocked on advice from " << rbl << '\n';
-      for (auto aa : as) {
-        std::cout << aa << '\n';
+      if (as.front() == "127.255.255.252") {
+        LOG(INFO) << "Typing error in DNSBL Name";
+        continue;
       }
+      if (as.front() == "127.255.255.254") {
+        LOG(INFO) << "Anonymous query through public resolver";
+        continue;
+      }
+      if (as.front() == "127.255.255.255") {
+        LOG(INFO) << "Excessive Number of Queries";
+        continue;
+      }
+      std::cout << a << " advice from " << rbl << '\n';
+      for (auto aa : as) {
+        std::cout << "  returned: " << aa << '\n';
+      }
+    }
+    else {
+      std::cout << "not on " << rbl << '\n';
     }
   }
 }
@@ -49,15 +64,21 @@ void check_uribls(DNS::Resolver& res, char const* dom)
     auto const lookup = fmt::format("{}.{}", dom, uribl);
     auto       as     = DNS::get_strings(res, DNS::RR_type::A, lookup);
     if (!as.empty()) {
-      if (as.front() == "127.0.0.1")
-        continue;
-      if (as.front() == "127.255.255.254") {
-        // Anonymous query through public resolver
+      if (as.front() == "127.255.255.252") {
+        LOG(INFO) << "Typing error in DNSBL Name";
         continue;
       }
-      std::cout << dom << " blocked on advice from " << uribl << '\n';
+      if (as.front() == "127.255.255.254") {
+        LOG(INFO) << "Anonymous query through public resolver";
+        continue;
+      }
+      if (as.front() == "127.255.255.255") {
+        LOG(INFO) << "Excessive Number of Queries";
+        continue;
+      }
+      std::cout << dom << " advice from " << uribl << '\n';
       for (auto aa : as) {
-        std::cout << aa << '\n';
+        std::cout << "  returned: " << aa << '\n';
       }
     }
   }
@@ -79,24 +100,24 @@ void do_addr(DNS::Resolver& res, char const* a)
   else {
     if (IP4::is_address(a)) {
       auto const reversed{IP4::reverse(a)};
-      auto const ptrs
-          = res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
+      auto const ptrs =
+          res.get_strings(DNS::RR_type::PTR, reversed + "in-addr.arpa");
       for (auto const& ptr : ptrs) {
         std::cout << a << " has a PTR to " << ptr << '\n';
       }
     }
     if (IP6::is_address(a)) {
       auto const reversed{IP6::reverse(a)};
-      auto const ptrs
-          = res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
+      auto const ptrs =
+          res.get_strings(DNS::RR_type::PTR, reversed + "ip6.arpa");
       for (auto const& ptr : ptrs) {
         std::cout << a << " has a PTR to " << ptr << '\n';
       }
     }
-    if (IP4::is_address(a)) {
-      check_dnsrbl(res, a);
-    }
     std::cout << a << '\n';
+  }
+  if (IP4::is_address(a)) {
+    check_dnsrbl(res, a);
   }
 }
 
@@ -148,8 +169,13 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
   auto     tlsa_rrs{get_tlsa_rrs(res, dom, port)};
   if (!tlsa_rrs.empty()) {
     for (auto const& tlsa_rr : tlsa_rrs) {
-      auto const rp = std::get<DNS::RR_TLSA>(tlsa_rr);
-      std::cout << rp << "\n";
+      if (std::holds_alternative<DNS::RR_TLSA>(tlsa_rr)) {
+        auto const rp = std::get<DNS::RR_TLSA>(tlsa_rr);
+        std::cout << rp << "\n";
+      }
+      else {
+        std::cout << "not a RR_TLSA\n";
+      }
     }
   }
 
