@@ -443,13 +443,13 @@ struct server_id : sor<domain, address_literal, crap> {};
 //                  /
 //                  ( "220-" (Domain / address-literal) [ SP textstring ] CRLF
 //                 *( "220-" [ textstring ] CRLF )
-//                    "220 " [ textstring ] CRLF )
+//                    "220" [ SP textstring ] CRLF )
 
 struct greeting_ok
 : sor<seq<TAO_PEGTL_ISTRING("220 "), server_id, opt<textstring>, CRLF>,
       seq<TAO_PEGTL_ISTRING("220-"), server_id, opt<textstring>, CRLF,
  star<seq<TAO_PEGTL_ISTRING("220-"), opt<textstring>, CRLF>>,
-      seq<TAO_PEGTL_ISTRING("220 "), opt<textstring>, CRLF>>> {};
+      seq<TAO_PEGTL_ISTRING("220"), opt<seq<SP, textstring>>, CRLF>>> {};
 
 // Reply-code     = %x32-35 %x30-35 %x30-39
 
