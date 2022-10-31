@@ -26,6 +26,47 @@ namespace OpenDKIM {
 lib::lib()
   : lib_(CHECK_NOTNULL(dkim_init(nullptr, nullptr)))
 {
+  char const* signhdrs[] = {"cc",
+                            "content-language",
+                            "content-transfer-encoding",
+                            "content-type",
+                            "date",
+                            "from",
+                            "in-reply-to",
+                            "list-archive",
+                            "list-help",
+                            "list-id",
+                            "list-owner",
+                            "list-post",
+                            "list-subscribe",
+                            "list-unsubscribe",
+                            "references",
+                            "message-id",
+                            "mime-version",
+                            "precedence",
+                            "references",
+                            "reply-to",
+                            "resent-cc",
+                            "resent-date",
+                            "resent-from",
+                            "resent-sender",
+                            "resent-to",
+                            "sender",
+                            "subject",
+                            "to",
+                            nullptr};
+
+  CHECK_EQ(dkim_options(lib_, DKIM_OP_SETOPT, DKIM_OPTS_SIGNHDRS, signhdrs,
+                        sizeof(char const**)),
+           DKIM_STAT_OK);
+
+  char const* oversign[] = {"cc",          "date",       "from",
+                            "in-reply-to", "message-id", "sender",
+                            "subject",     "to",         nullptr};
+
+  CHECK_EQ(dkim_options(lib_, DKIM_OP_SETOPT, DKIM_OPTS_OVERSIGNHDRS, oversign,
+                        sizeof(char const**)),
+           DKIM_STAT_OK);
 }
 
 lib::~lib()
@@ -117,36 +158,6 @@ sign::sign(char const* secretkey,
   // clang-format on
   CHECK_NOTNULL(dkim_);
   CHECK_EQ(status_, DKIM_STAT_OK);
-
-  char const* hdrlist[] = {"cc",
-                           "content-language",
-                           "content-transfer-encoding",
-                           "content-type",
-                           "date",
-                           "feedback-id",
-                           "from",
-                           "in-reply-to",
-                           "list-archive",
-                           "list-help",
-                           "list-id",
-                           "list-owner",
-                           "list-post",
-                           "list-subscribe",
-                           "list-unsubscribe",
-                           "message-id",
-                           "mime-version",
-                           "precedence",
-                           "references",
-                           "reply-to",
-                           "resent-cc",
-                           "resent-date",
-                           "resent-from",
-                           "resent-to",
-                           "subject",
-                           "to",
-                           nullptr};
-
-  dkim_signhdrs(dkim_, hdrlist);
 }
 
 std::string sign::getsighdr()
@@ -155,6 +166,7 @@ std::string sign::getsighdr()
   unsigned char* buf = nullptr;
   size_t         len = 0;
   status_            = dkim_getsighdr_d(dkim_, initial, &buf, &len);
+  CHECK_EQ(status_, DKIM_STAT_OK);
   return std::string(c(buf), len);
 }
 
