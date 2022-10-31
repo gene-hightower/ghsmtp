@@ -1452,6 +1452,11 @@ bool snd(fs::path                    config_path,
       istream_input<eol::crlf, 1>{cnn.sock.in(), FLAGS_bfr_size, "session"}};
   if (!parse<RFC5321::greeting, RFC5321::action>(in, cnn)) {
     LOG(WARNING) << "can't parse greeting";
+
+    LOG(WARNING) << "  us: " << cnn.sock.us_c_str();
+    LOG(WARNING) << "them: " << cnn.sock.them_c_str();
+
+    cnn.sock.log_stats();
     return false;
   }
 
