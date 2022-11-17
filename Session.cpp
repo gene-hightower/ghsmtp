@@ -748,7 +748,8 @@ std::string Session::added_headers_(MessageStore const& msg)
   if (tls_info.length()) {
     fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
   }
-  fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n", msg.when());
+  fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
+                 msg.when().as_string_view());
 
   return fmt::to_string(headers);
 }
