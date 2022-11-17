@@ -1970,8 +1970,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
   }
 
   if (lookup_domain(block_, sender)) {
-    error_msg =
-        fmt::format("SPF sender domain ({}) is blocked", spf_sender_domain_);
+    error_msg = fmt::format("SPF sender domain ({}) is blocked",
+                            spf_sender_domain_.ascii());
     out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
