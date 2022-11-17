@@ -2000,11 +2000,10 @@ void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
     auto const ip_addr = "127.0.0.1"; // use localhost for local socket
-    spf_received_ =
-        fmt::format("Received-SPF: pass ({}: allow-listed) client-ip={}; "
-                    "envelope-from={}; helo={};",
-                    server_id_(), ip_addr, sender.as_string(),
-                    client_identity_.as_string_view());
+    spf_received_      = fmt::format(
+             "Received-SPF: pass ({}: allow-listed) client-ip={}; "
+                  "envelope-from={}; helo={};",
+             server_id_(), ip_addr, sender.as_string(), client_identity_.ascii());
     spf_sender_domain_ = "localhost";
     return;
   }
