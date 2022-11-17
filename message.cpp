@@ -788,7 +788,7 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 
           auto const human_result = fmt::format(
               "{}, RFC5321.MailFrom is <>, implicit origin hello, domain {}",
-              spf.result, dom);
+              spf.result, dom.ascii());
           LOG(INFO) << "SPF result " << human_result;
           dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin,
                         human_result.c_str());
