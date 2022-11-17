@@ -735,7 +735,7 @@ std::string Session::added_headers_(MessageStore const& msg)
                  server_identity_.utf8(), protocol, msg.id().as_string_view());
   if (forward_path_.size()) {
     fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
-                   forward_path_[0]);
+                   forward_path_[0].as_string());
     // From <https://datatracker.ietf.org/doc/html/rfc5321#section-4.4>:
     // “If the FOR clause appears, it MUST contain exactly one <path>
     //  entry, even when multiple RCPT commands have been given.  Multiple
