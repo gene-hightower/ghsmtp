@@ -1253,7 +1253,8 @@ auto create_eml(Domain const&               sender,
   auto const date{Now{}};
   auto const pill{Pill{}};
 
-  auto mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill, sender.ascii());
+  auto mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill.as_string_view(),
+                             sender.ascii());
   eml.add_hdr("Message-ID", mid_str.c_str());
   eml.add_hdr("Date", date.c_str());
 

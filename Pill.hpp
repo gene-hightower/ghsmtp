@@ -3,7 +3,9 @@
 
 #include <climits>
 #include <cstddef>
+#include <cstring>
 #include <ostream>
+#include <string_view>
 
 // A pill is a unit of entropy.
 
@@ -13,6 +15,11 @@ public:
 
   bool operator==(Pill const& that) const { return this->s_ == that.s_; }
   bool operator!=(Pill const& that) const { return !(*this == that); }
+
+  std::string_view as_string_view() const
+  {
+    return std::string_view{b32_str_, strlen(b32_str_)};
+  }
 
 private:
   unsigned long long s_;
