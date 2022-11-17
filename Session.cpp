@@ -1927,7 +1927,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
         return true;
       }
       out_() << "550 5.7.1 liar\r\n" << std::flush;
-      error_msg = fmt::format("liar, claimed to be {}", sender.domain());
+      error_msg = fmt::format("liar, claimed to be {}", sender.domain().utf8());
       return false;
     }
   }
