@@ -810,8 +810,8 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
       spf_dom    = mbx.domain().ascii();
       spf_origin = DMARC_POLICY_SPF_ORIGIN_MAILFROM;
 
-      auto const human_result =
-          fmt::format("{}, implicit RFC5321.MailFrom <{}>", spf.result, mbx);
+      auto const human_result = fmt::format(
+          "{}, implicit RFC5321.MailFrom <{}>", spf.result, mbx.as_string());
       LOG(INFO) << "SPF result " << human_result;
       dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin, human_result.c_str());
       return;
@@ -827,7 +827,7 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
       spf_origin = DMARC_POLICY_SPF_ORIGIN_HELO;
 
       auto const human_result =
-          fmt::format("{}, hello domain {}", spf.result, dom);
+          fmt::format("{}, hello domain {}", spf.result, dom.ascii());
       LOG(INFO) << "SPF result " << human_result;
       dmp.store_spf(spf_dom.c_str(), spf_pol, spf_origin, human_result.c_str());
       return;
