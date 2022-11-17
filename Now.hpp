@@ -1,6 +1,8 @@
 #ifndef NOW_DOT_HPP
 #define NOW_DOT_HPP
 
+#include <cstring>
+#include <string_view>
 #include <sys/time.h>
 
 #include <glog/logging.h>
@@ -12,6 +14,11 @@ public:
   auto        sec() const { return tv_.tv_sec; }
   auto        usec() const { return tv_.tv_usec; }
   const char* c_str() const { return c_str_; }
+
+  std::string_view as_string_view() const
+  {
+    return std::string_view{c_str(), strlen(c_str())};
+  }
 
 private:
   timeval tv_;
