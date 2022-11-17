@@ -39,11 +39,13 @@ void MessageStore::open(std::string_view fqdn,
   create_directories(tmpfn_, ec);
 
   // Unique name, see: <https://cr.yp.to/proto/maildir.html>
-  auto const uniq{fmt::format("{}.R{}.{}", then_.sec(), s_, fqdn)};
+  auto const uniq{
+      fmt::format("{}.R{}.{}", then_.sec(), s_.as_string_view(), fqdn)};
   newfn_ /= uniq;
   tmpfn_ /= uniq;
 
-  auto const uniq2{fmt::format("{}.R{}2.{}", then_.sec(), s_, fqdn)};
+  auto const uniq2{
+      fmt::format("{}.R{}2.{}", then_.sec(), s_.as_string_view(), fqdn)};
   tmp2fn_ /= uniq2;
 
   // open
