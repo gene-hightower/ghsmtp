@@ -716,7 +716,8 @@ std::string Session::added_headers_(MessageStore const& msg)
   fmt::memory_buffer headers;
 
   // Return-Path:
-  fmt::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n", reverse_path_);
+  fmt::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
+                 reverse_path_.as_string());
 
   // Received-SPF:
   if (!spf_received_.empty()) {
@@ -725,14 +726,16 @@ std::string Session::added_headers_(MessageStore const& msg)
 
   // Received:
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
-  fmt::format_to(std::back_inserter(headers), "Received: from {}", client_identity_.utf8());
+  fmt::format_to(std::back_inserter(headers), "Received: from {}",
+                 client_identity_.utf8());
   if (sock_.has_peername()) {
     fmt::format_to(std::back_inserter(headers), " ({})", client_);
   }
-  fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}", server_identity_.utf8(),
-                 protocol, msg.id());
+  fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
+                 server_identity_.utf8(), protocol, msg.id());
   if (forward_path_.size()) {
-    fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>", forward_path_[0]);
+    fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
+                   forward_path_[0]);
     // From <https://datatracker.ietf.org/doc/html/rfc5321#section-4.4>:
     // “If the FOR clause appears, it MUST contain exactly one <path>
     //  entry, even when multiple RCPT commands have been given.  Multiple
