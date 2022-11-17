@@ -930,9 +930,10 @@ struct action<from> {
   {
     if (!ctx.from_list.empty()) {
       fmt::memory_buffer msg;
-      fmt::format_to(std::back_inserter(msg), "multiple 'From:' address headers, previous:\n");
+      fmt::format_to(std::back_inserter(msg),
+                     "multiple 'From:' address headers, previous:\n");
       for (auto const& add : ctx.from_list) {
-        fmt::format_to(std::back_inserter(msg), " {}\n", add);
+        fmt::format_to(std::back_inserter(msg), " {}\n", add.as_string());
       }
       fmt::format_to(std::back_inserter(msg), "new: {}", in.string());
       ctx.msg_errors.push_back(fmt::to_string(msg));
