@@ -732,7 +732,7 @@ std::string Session::added_headers_(MessageStore const& msg)
     fmt::format_to(std::back_inserter(headers), " ({})", client_);
   }
   fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
-                 server_identity_.utf8(), protocol, msg.id());
+                 server_identity_.utf8(), protocol, msg.id().as_string_view());
   if (forward_path_.size()) {
     fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
                    forward_path_[0]);
