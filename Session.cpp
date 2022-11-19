@@ -1737,27 +1737,32 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
       DNS::Query q(res_, DNS::RR_type::A, reversed + bl);
       if (q.has_record()) {
-        auto const as = q.get_strings()[0];
-        if (as == "127.0.0.1") {
-          LOG(INFO) << "Should never get 127.0.0.1, from " << bl;
+        const auto a_strings = q.get_strings();
+        for (auto const& as : a_strings) {
+          LOG(INFO) << bl << " returned " << as;
         }
-        else if (as == "127.0.0.10" || as == "127.0.0.11") {
-          LOG(INFO) << "PBL listed, ignoring " << bl;
-        }
-        else if (as == "127.255.255.252") {
-          LOG(INFO) << "Typing error in DNSBL name " << bl;
-        }
-        else if (as == "127.255.255.254") {
-          LOG(INFO) << "Anonymous query through public resolver " << bl;
-        }
-        else if (as == "127.255.255.255") {
-          LOG(INFO) << "Excessive number of queries " << bl;
-        }
-        else {
-          error_msg = fmt::format("IP address {} blocked: {} returned {}",
-                                  sock_.them_c_str(), bl, as);
-          out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
-          return false;
+        for (auto const& as : a_strings) {
+          if (as == "127.0.0.1") {
+            LOG(INFO) << "Should never get 127.0.0.1, from " << bl;
+          }
+          else if (as == "127.0.0.10" || as == "127.0.0.11") {
+            LOG(INFO) << "PBL listed, ignoring " << bl;
+          }
+          else if (as == "127.255.255.252") {
+            LOG(INFO) << "Typing error in DNSBL name " << bl;
+          }
+          else if (as == "127.255.255.254") {
+            LOG(INFO) << "Anonymous query through public resolver " << bl;
+          }
+          else if (as == "127.255.255.255") {
+            LOG(INFO) << "Excessive number of queries " << bl;
+          }
+          else {
+            error_msg = fmt::format("IP address {} blocked: {} returned {}",
+                                    sock_.them_c_str(), bl, as);
+            out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
+            return false;
+          }
         }
       }
     }
@@ -1773,10 +1778,12 @@ bool domain_blocked(DNS::Resolver& res, Domain const& identity)
   Domain     lookup{fmt::format("{}.dbl.spamhaus.org", identity.ascii())};
   DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
   if (q.has_record()) {
-    auto const as = q.get_strings()[0];
-    if (istarts_with(as, "127.0.1.")) {
-      LOG(INFO) << "Domain " << identity << " blocked by spamhaus, " << as;
-      return true;
+    const auto a_strings = q.get_strings();
+    for (auto const& as : a_strings) {
+      if (istarts_with(as, "127.0.1.")) {
+        LOG(INFO) << "Domain " << identity << " blocked by spamhaus, " << as;
+        return true;
+      }
     }
   }
   return false;
