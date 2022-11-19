@@ -88,7 +88,7 @@ char const* bls[]{
 
 /*** Last octet from A record returned by blocklists ***
 
-<https://www.spamhaus.org/faq/section/DNSBL%20Usage>
+<https://www.spamhaus.org/faq/section/DNSBL%20Usage#200>
 
  Spamhaus uses this general convention for return codes:
 
@@ -1738,8 +1738,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
       DNS::Query q(res_, DNS::RR_type::A, reversed + bl);
       if (q.has_record()) {
         auto const as = q.get_strings()[0];
-        if (as == "127.0.1.1") {
-          LOG(INFO) << "Query blocked by " << bl;
+        if (as == "127.0.0.1") {
+          LOG(INFO) << "Should never get 127.0.0.1, from " << bl;
         }
         else if (as == "127.0.0.10" || as == "127.0.0.11") {
           LOG(INFO) << "PBL listed, ignoring " << bl;
@@ -1775,7 +1775,7 @@ bool domain_blocked(DNS::Resolver& res, Domain const& identity)
   if (q.has_record()) {
     auto const as = q.get_strings()[0];
     if (istarts_with(as, "127.0.1.")) {
-      LOG(INFO) << "Domain " << identity << " blocked by spamhaus";
+      LOG(INFO) << "Domain " << identity << " blocked by spamhaus, " << as;
       return true;
     }
   }
