@@ -41,8 +41,8 @@ int main(int argc, char* argv[])
 
   auto const date{Now{}};
   auto const pill{Pill{}};
-  auto const mid_str =
-      fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity);
+  auto const mid_str = fmt::format("<{}.{}@{}>", date.sec(),
+                                   pill.as_string_view(), server_identity);
 
   fmt::memory_buffer bfr;
   fmt::format_to(std::back_inserter(bfr), "Message-ID: {}\r\n",
