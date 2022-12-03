@@ -432,6 +432,9 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-" << server_id_() << "\r\n";
     }
 
+    // https://datatracker.ietf.org/doc/draft-freed-smtp-limits/
+    out_() << "250-LIMITS RCPTMAX=" << Config::max_recipients_per_message
+           << "\r\n";
     out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
     out_() << "250-8BITMIME\r\n";                      // RFC 6152
 

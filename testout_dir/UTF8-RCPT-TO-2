@@ -1,5 +1,6 @@
 220 digilicious.com ESMTP - ghsmtp
 250-digilicious.com
+250-LIMITS RCPTMAX=100
 250-SIZE 15728640
 250-8BITMIME
 250-STARTTLS
