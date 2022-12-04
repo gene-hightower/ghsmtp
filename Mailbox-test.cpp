@@ -56,6 +56,9 @@ int main(int argc, char* argv[])
   // (space between the quotes)
   CHECK(Mailbox::validate("\" \"@example.org"));
 
+  // (quoted angle brackets)
+  CHECK(Mailbox::validate("\"\\<foo-bar\\>\"@example.org"));
+
   // (quoted double dot)
   CHECK(Mailbox::validate("\"john..doe\"@example.org"));
 
