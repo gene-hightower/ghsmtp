@@ -424,7 +424,9 @@ struct a_d_l : list<at_domain, one<','>> {};
 
 struct path : seq<opt<seq<a_d_l, colon>>, mailbox> {};
 
-struct path_only : seq<path, eof> {};
+struct postmaster : TAO_PEGTL_ISTRING("Postmaster") {};
+
+struct path_or_postmaster : seq<sor<path, postmaster>, eof> {};
 
 // textstring     = 1*(%d09 / %d32-126) ; HT, SP, Printable US-ASCII
 
@@ -907,11 +909,12 @@ DEFINE_validator(to, &validate_address_RFC5322);
 
 bool validate_address_RFC5321(const char* flagname, std::string const& value)
 {
-  if (value.empty()) // empty name needs to validate, but
-    return true;     // will not be used
+  if (value.empty()) { // empty name needs to validate, but
+    return true;       // will not be used
+  }
   memory_input<> name_in(value.c_str(), "path");
-  if (!parse<RFC5321::path_only, RFC5321::inaction>(name_in)) {
-    LOG(ERROR) << "bad address syntax " << value;
+  if (!parse<RFC5321::path_or_postmaster, RFC5321::inaction>(name_in)) {
+    LOG(ERROR) << "bad RFC-5321 address syntax " << value;
     return false;
   }
   return true;
@@ -1211,8 +1214,8 @@ auto parse_mailboxes()
   auto smtp_from_mbx{Mailbox{}};
   if (!FLAGS_smtp_from.empty()) {
     auto smtp_from_in{memory_input<>{FLAGS_smtp_from, "SMTP.from"}};
-    if (!parse<RFC5321::path_only, RFC5321::action>(smtp_from_in,
-                                                    smtp_from_mbx)) {
+    if (!parse<RFC5321::path_or_postmaster, RFC5321::action>(smtp_from_in,
+                                                             smtp_from_mbx)) {
       LOG(FATAL) << "bad MAIL FROM: address syntax <" << FLAGS_smtp_from << ">";
     }
     LOG(INFO) << " smtp_from_mbx == " << smtp_from_mbx;
@@ -1227,7 +1230,8 @@ auto parse_mailboxes()
   auto smtp_to_mbx{Mailbox{}};
   if (!FLAGS_smtp_to.empty()) {
     auto smtp_to_in{memory_input<>{FLAGS_smtp_to, "SMTP.to"}};
-    if (!parse<RFC5321::path_only, RFC5321::action>(smtp_to_in, smtp_to_mbx)) {
+    if (!parse<RFC5321::path_or_postmaster, RFC5321::action>(smtp_to_in,
+                                                             smtp_to_mbx)) {
       LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to << ">";
     }
     LOG(INFO) << " smtp_to_mbx == " << smtp_to_mbx;
