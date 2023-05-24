@@ -3,6 +3,7 @@
 
 #include "Domain.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <ostream>
 #include <string>
