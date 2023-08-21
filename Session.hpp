@@ -157,6 +157,9 @@ private:
 
   std::random_device random_device_;
 
+  // Domains we receive mail for.
+  CDB accept_domains_;
+
   // Allow and block lists for domains.
   CDB allow_;
   CDB block_;
@@ -164,8 +167,8 @@ private:
   // Forwards
   CDB forward_;
 
-  // Domains we receive mail for.
-  CDB accept_domains_;
+  // Allow (and someday block?) for IPv4 addresses
+  CDB ip_allow_;
 
   size_t max_msg_size_;
 

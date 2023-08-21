@@ -193,15 +193,17 @@ Session::Session(fs::path                  config_path,
 //, send_(config_path, "smtp")
 //, srs_(config_path)
 {
-  auto accept_db_name  = config_path_ / "accept_domains";
-  auto allow_db_name   = config_path_ / "allow";
-  auto block_db_name   = config_path_ / "block";
-  auto forward_db_name = config_path_ / "forward";
+  auto accept_db_name   = config_path_ / "accept_domains";
+  auto allow_db_name    = config_path_ / "allow";
+  auto block_db_name    = config_path_ / "block";
+  auto forward_db_name  = config_path_ / "forward";
+  auto ip_allow_db_name = config_path_ / "ip-allow";
 
   accept_domains_.open(accept_db_name);
   allow_.open(allow_db_name);
   block_.open(block_db_name);
   forward_.open(forward_db_name);
+  ip_allow_.open(ip_allow_db_name);
 
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
