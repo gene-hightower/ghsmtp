@@ -323,3 +323,7 @@ show::
 init::
 	touch accept_domains bad_recipients bad_recipients_data bad_senders block ip-block temp_fail
 	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel
+
+.PHONY:: list
+list:
+	@LC_ALL=C $(MAKE) -pRrq -f $(firstword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/(^|\n)# Files(\n|$$)/,/(^|\n)# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | uniq | grep -E -v -e '^[^[:alnum:]]' -e '^$@$$'
