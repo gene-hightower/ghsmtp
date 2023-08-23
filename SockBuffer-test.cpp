@@ -34,6 +34,7 @@ int main(int argc, char* argv[])
   while (std::getline(iostream, line)) {
     iostream << line << '\n';
   }
+  iostream.clear(); // unset eof bit, if set will short-circut flush
   iostream << std::flush;
 
   auto const diff_cmd{fmt::format("diff {} {}", infile, outfile)};
