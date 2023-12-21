@@ -44,6 +44,7 @@ constexpr nameserver nameservers[]{
         "domain",
         sock_type::stream,
     },
+    /*
     {
         "localhost",
         "::1",
@@ -56,7 +57,6 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
-    /*
     {
         "one.one.one.one",
         "1.1.1.1",
