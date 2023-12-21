@@ -3,5 +3,6 @@
 250 2.1.0 MAIL FROM OK
 250 2.1.5 RCPT TO OK
 354 go, end with <CR><LF>.<CR><LF>
-250 2.0.0 DATA OK
-221 2.0.0 closing connection
+421 4.3.5 system error: bad DATA syntax
+500 5.5.1 command unrecognized: "nything\r\n"
+500 5.5.1 command unrecognized: "anything\r\n"

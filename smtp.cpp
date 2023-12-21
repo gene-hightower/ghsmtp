@@ -233,36 +233,38 @@ struct bdat_last : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, SP, last, CRLF
 
 struct data : seq<TAO_PEGTL_ISTRING("DATA"), CRLF> {};
 
+// ## below: DATA sub parse ##
+
 struct data_end : seq<dot, CRLF> {};
 
 struct data_blank : CRLF {};
 
-// Rules for strict RFC adherence:
-
-// RFC 5321 text line length section 4.5.3.1.6.
-struct data_dot
-    : seq<one<'.'>, rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
-
-struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
-
-// But let's accept real-world crud, up to a point...
-
-struct anything_else : seq<star<not_one<'\n'>>, one<'\n'>> {};
-
 // This particular crud will trigger an error return with the "no bare
 // LF" message.
 
-struct not_data_end : seq<dot, LF> {};
+struct data_not_end : seq<dot, LF> {};
 
-struct data_line : sor<at<data_end>,
-                       seq<sor<data_blank,
-                               data_dot,
-                               data_plain,
-                               not_data_end,
-                               anything_else>,
-                           discard>> {};
+struct data_also_not_end : seq<LF, dot, CRLF> {};
+
+
+// RFC 5321 text line length section 4.5.3.1.6.
+struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
+
+struct data_dot : seq<one<'.'>, rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
+
+struct data_long : seq<star<not_one<'\r', '\n'>>, CRLF> {};
+
+struct data_line : seq<sor<data_blank,
+                           data_not_end,
+                           data_also_not_end,
+                           data_plain,
+                           data_dot,
+                           data_long>,
+                       discard> {};
 
 struct data_grammar : until<data_end, data_line> {};
+
+// ## above: DATA sub parse ##
 
 struct rset : seq<TAO_PEGTL_ISTRING("RSET"), CRLF> {};
 
@@ -346,8 +348,7 @@ struct any_cmd : seq<sor<bogus_cmd_short,
                          rcpt_to,
                          mail_from,
                          auth,
-                         bogus_cmd_long,
-                         anything_else>,
+                         bogus_cmd_long>,
                      discard> {};
 
 struct grammar : plus<any_cmd> {};
@@ -387,16 +388,6 @@ struct action<bogus_cmd_long> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(INFO) << "bogus_cmd_long";
-    ctx.session.cmd_unrecognized(in.string());
-  }
-};
-
-template <>
-struct action<anything_else> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    LOG(INFO) << "anything_else";
     ctx.session.cmd_unrecognized(in.string());
   }
 };
@@ -615,15 +606,7 @@ struct data_action<data_dot> {
 };
 
 template <>
-struct data_action<not_data_end> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn))
-  {
-    ctx.session.bare_lf();
-  }
-};
-
-template <>
-struct data_action<anything_else> {
+struct data_action<data_long> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
@@ -634,6 +617,22 @@ struct data_action<anything_else> {
     if (len > 1000) {
       LOG(WARNING) << "line too long at " << len << " octets";
     }
+  }
+};
+
+template <>
+struct data_action<data_not_end> {
+  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  {
+    ctx.session.bare_lf();
+  }
+};
+
+template <>
+struct data_action<data_also_not_end> {
+  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  {
+    ctx.session.bare_lf();
   }
 };
 
