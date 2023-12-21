@@ -28,7 +28,7 @@ class Session {
 public:
   using parameters_t = std::unordered_map<std::string, std::string>;
 
-  Session(Session const&) = delete;
+  Session(Session const&)            = delete;
   Session& operator=(Session const&) = delete;
 
   explicit Session(
@@ -166,9 +166,6 @@ private:
 
   // Forwards
   CDB forward_;
-
-  // Allow (and someday block?) for IPv4 addresses
-  CDB ip_allow_;
 
   size_t max_msg_size_;
 
