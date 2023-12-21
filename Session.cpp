@@ -1307,7 +1307,10 @@ void Session::data_done()
     CDB  bad_recipients_db;
     if (bad_recipients_db.open(bad_recipients_db_name)) {
       for (auto fp : forward_path_) {
-        if (bad_recipients_db.contains(fp.local_part())) {
+        std::string loc = fp.local_part();
+        std::transform(loc.begin(), loc.end(), loc.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (bad_recipients_db.contains(loc)) {
           out_() << "550 5.1.1 bad recipient " << fp << "\r\n" << std::flush;
           LOG(WARNING) << "bad recipient " << fp;
           reset_();
@@ -2192,8 +2195,13 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   {
     auto bad_recipients_db_name = config_path_ / "bad_recipients";
     CDB  bad_recipients_db;
+
+    std::string loc = recipient.local_part();
+    std::transform(loc.begin(), loc.end(), loc.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
     if (bad_recipients_db.open(bad_recipients_db_name) &&
-        bad_recipients_db.contains(recipient.local_part())) {
+        bad_recipients_db.contains(loc)) {
       out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
       return false;
@@ -2249,14 +2257,14 @@ bool Session::verify_recipient_(Mailbox const& recipient)
 
   // This is a trap for a probe done by some senders to see if we
   // accept just any old local-part.
-  if (!extensions_) {
-    if (recipient.local_part().length() > 8) {
-      out_() << "550 5.1.1 unknown recipient " << recipient << "\r\n"
-             << std::flush;
-      LOG(WARNING) << "unknown recipient for HELO " << recipient;
-      return false;
-    }
-  }
+  // if (!extensions_) {
+  //   if (recipient.local_part().length() > 8) {
+  //     out_() << "550 5.1.1 unknown recipient " << recipient << "\r\n"
+  //            << std::flush;
+  //     LOG(WARNING) << "unknown recipient for HELO " << recipient;
+  //     return false;
+  //   }
+  // }
 
   return true;
 }
