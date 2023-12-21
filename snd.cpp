@@ -1134,6 +1134,9 @@ get_receivers(DNS::Resolver& res, Mailbox const& to_mbx, bool& enforce_dane)
       enforce_dane = false;
     }
   }
+  else {
+    LOG(INFO) << "no MX records found for domain " << domain;
+  }
   auto mxs{q.get_records()};
 
   mxs.erase(std::remove_if(begin(mxs), end(mxs), is_localhost), end(mxs));
