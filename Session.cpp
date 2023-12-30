@@ -2191,6 +2191,18 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return false;
   }
 
+  if (recipient.local_part() == "gene") {
+    if (client_fcrdns_.size() &&
+        client_fcrdns_[0].ascii().ends_with("outlook.com")) {
+      // Getting Spam'ed by MS
+      std::string error_msg = fmt::format("rejecting bounce message from {}",
+                                          client_fcrdns_[0].ascii());
+      LOG(WARNING) << error_msg;
+      out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
+      return false;
+    }
+  }
+
   // Check for local addresses we reject.
   {
     auto bad_recipients_db_name = config_path_ / "bad_recipients";
