@@ -2191,7 +2191,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return false;
   }
 
-  if (recipient.local_part() == "gene") {
+  if (reverse_path_.empty() && recipient.local_part() == "gene") {
     if (client_fcrdns_.size() &&
         client_fcrdns_[0].ascii().ends_with("outlook.com")) {
       // Getting Spam'ed by MS
