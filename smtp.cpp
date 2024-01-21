@@ -257,8 +257,8 @@ struct data_long : seq<star<not_one<'\r', '\n'>>, CRLF> {};
 struct data_line : seq<sor<data_blank,
                            data_not_end,
                            data_also_not_end,
-                           data_plain,
                            data_dot,
+                           data_plain,
                            data_long>,
                        discard> {};
 
