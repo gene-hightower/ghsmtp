@@ -2195,7 +2195,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   if (recipient.local_part() == "gene" && client_fcrdns_.size() &&
       client_fcrdns_[0].ascii().ends_with("outlook.com")) {
     // Getting Spam'ed by MS
-    if (reverse_path_.empty() ||
+    if (reverse_path_.empty() || (reverse_path_.length() > 40) ||
         reverse_path_.domain().ascii().ends_with(".onmicrosoft.com")) {
       std::string error_msg = fmt::format("rejecting spammy message from {}",
                                           client_fcrdns_[0].ascii());
