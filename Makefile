@@ -17,7 +17,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := arcsign arcverify dns_tool smtp msg sasl snd socks5
+PROGRAMS := dns_tool smtp msg sasl snd socks5
 
 arcsign_STEMS := arcsign \
 	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
@@ -86,7 +86,6 @@ smtp_STEMS := smtp \
 	OpenDMARC \
 	POSIX \
 	Pill \
-	Reply \
 	SPF \
 	Send \
 	Session \
@@ -94,7 +93,6 @@ smtp_STEMS := smtp \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	message \
 	osutil
 
 snd_STEMS := snd \
@@ -137,7 +135,6 @@ TESTS := \
 	CDB-test \
 	DNS-test \
 	Domain-test \
-	Hash-test \
 	IP4-test \
 	IP6-test \
 	Magic-test \
@@ -147,7 +144,6 @@ TESTS := \
 	OpenDKIM-test \
 	POSIX-test \
 	Pill-test \
-	Reply-test \
 	SPF-test \
 	Send-test \
 	Session-test \
@@ -160,7 +156,6 @@ TESTS := \
 	iequal-test \
 	iobuffer-test \
 	is_ascii-test \
-	message-test \
 	osutil-test
 
 Base64-test_STEMS := Base64
@@ -177,13 +172,11 @@ MessageStore-test_STEMS := $(DNS) Domain IP IP4 IP6 MessageStore Pill POSIX Sock
 OpenDKIM-test_STEMS := OpenDKIM
 POSIX-test_STEMS := POSIX
 Pill-test_STEMS := Pill
-Reply-test_STEMS := Reply osutil Domain IP IP4 IP6 Mailbox
 SPF-test_STEMS := $(DNS) Domain IP IP4 IP6 SPF POSIX Sock SockBuffer TLS-OpenSSL esc osutil
 SRS-test_STEMS := SRS Domain Mailbox IP IP4 IP6
-Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc message osutil
+Send-test_STEMS := $(DNS) Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC POSIX Pill SPF Send Sock SockBuffer TLS-OpenSSL esc osutil
 
 osutil-test_STEMS := osutil
-message-test_STEMS := message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
 
 Session-test_STEMS := \
 	CDB \
@@ -199,7 +192,6 @@ Session-test_STEMS := \
 	OpenDMARC \
 	POSIX \
 	Pill \
-	Reply \
 	SPF \
 	Send \
 	Session \
