@@ -186,15 +186,13 @@ bool TLS::starttls_client(fs::path                  config_path,
       auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
       std::vector<Domain> cn;
 
-      SSL_CTX_set_ecdh_auto(ctx, 1);
+      SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
 
-      // SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
-      // Allow any old and crufty protocol version.
-      if (FLAGS_support_all_tls_versions) {
-        CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-            << "unable to set min proto version";
-      }
+      // // Allow any old and crufty protocol version.
+      // if (FLAGS_support_all_tls_versions) {
+      //   CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+      //       << "unable to set min proto version";
+      // }
 
       CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
           << "unable to enable DANE on SSL context";
@@ -489,8 +487,6 @@ bool TLS::starttls_server(fs::path                  config_path,
 
   auto const bio =
       CHECK_NOTNULL(BIO_new_mem_buf(const_cast<char*>(ffdhe4096), -1));
-  auto const dh =
-      CHECK_NOTNULL(PEM_read_bio_DHparams(bio, nullptr, nullptr, nullptr));
 
   auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
@@ -505,12 +501,10 @@ bool TLS::starttls_server(fs::path                  config_path,
     SSL_CTX_clear_options(ctx, SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
 
     // Allow any old and crufty protocol version.
-    if (FLAGS_support_all_tls_versions) {
-      CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-          << "unable to set min proto version";
-    }
-
-    SSL_CTX_set_ecdh_auto(ctx, 1);
+    // if (FLAGS_support_all_tls_versions) {
+    //   CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+    //       << "unable to set min proto version";
+    // }
 
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
         << "unable to enable DANE on SSL context";
@@ -533,13 +527,6 @@ bool TLS::starttls_server(fs::path                  config_path,
       CHECK(SSL_CTX_check_private_key(ctx))
           << "SSL_CTX_check_private_key failed for " << key;
     }
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-
-    SSL_CTX_set_tmp_dh(ctx, dh);
-
-#pragma GCC diagnostic pop
 
     SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
 
@@ -655,7 +642,6 @@ bool TLS::starttls_server(fs::path                  config_path,
     cert_ctx_.emplace_back(ctx, names);
   }
 
-  DH_free(dh);
   BIO_free(bio);
 
   ssl_ = CHECK_NOTNULL(SSL_new(cert_ctx_.back().ctx));
