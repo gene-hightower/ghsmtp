@@ -169,8 +169,6 @@ DEFINE_bool(immortal, false, "don't set process timout");
 DEFINE_uint64(max_read, 0, "max data to read");
 DEFINE_uint64(max_write, 0, "max data to write");
 
-DEFINE_string(selector, "ghsmtp", "DKIM selector");
-
 DEFINE_bool(test_mode, false, "ease up on some checks");
 
 DEFINE_bool(use_binarymime, true, "support BINARYMIME extension, RFC 3030");
@@ -1742,7 +1740,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
                  random_device_);
 
     for (auto bl : Config::bls) {
-
       DNS::Query q(res_, DNS::RR_type::A, reversed + bl);
       if (q.has_record()) {
         const auto a_strings = q.get_strings();
