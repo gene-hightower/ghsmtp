@@ -199,7 +199,6 @@ Session-test_STEMS := \
 	SockBuffer \
 	TLS-OpenSSL \
 	esc \
-	message \
 	osutil
 
 Sock-test_STEMS := Domain IP IP4 IP6 POSIX Sock SockBuffer TLS-OpenSSL esc osutil
@@ -314,7 +313,7 @@ show::
 
 init::
 	touch accept_domains bad_recipients bad_recipients_data bad_senders block ip-block temp_fail
-	sudo dnf install  boost-devel file-devel fmt-devel glog-devel ldns-devel  libidn2-devel libopenarc-devel libopendkim-devel libopendmarc-devel libpsl-devel libspf2-devel tinycdb-devel libunistring-devel
+	sudo dnf install boost-devel file-devel fmt-devel glog-devel ldns-devel libidn2-devel tinycdb-devel libunistring-devel
 
 .PHONY:: list
 list:
