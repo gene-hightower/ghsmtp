@@ -1,0 +1,5 @@
+220 digilicious.com ESMTP - ghsmtp
+250 digilicious.com
+250 2.1.0 MAIL FROM OK
+250 2.1.5 RCPT TO OK
+354 go, end with <CR><LF>.<CR><LF>

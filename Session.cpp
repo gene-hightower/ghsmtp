@@ -174,8 +174,8 @@ DEFINE_bool(test_mode, false, "ease up on some checks");
 DEFINE_bool(use_binarymime, true, "support BINARYMIME extension, RFC 3030");
 DEFINE_bool(use_chunking, true, "support CHUNKING extension, RFC 3030");
 DEFINE_bool(use_pipelining, true, "support PIPELINING extension, RFC 2920");
-DEFINE_bool(use_rrvs, false, "support RRVS extension, RFC 7293");
-DEFINE_bool(use_prdr, false, "support PRDR extension");
+DEFINE_bool(use_rrvs, true, "support RRVS extension, RFC 7293");
+DEFINE_bool(use_prdr, true, "support PRDR extension");
 DEFINE_bool(use_smtputf8, true, "support SMTPUTF8 extension, RFC 6531");
 
 boost::xpressive::mark_tag     secs_(1);
