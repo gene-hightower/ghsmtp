@@ -105,6 +105,7 @@ private:
   // bool do_forward_(message::parsed& msg);
   // bool do_reply_(message::parsed& msg);
   bool do_deliver_();
+  void xfer_response_(std::string_view success_msg);
 
   // clear per transaction data, preserve per connection data
   void reset_();
@@ -190,7 +191,7 @@ private:
   bool binarymime_{false};
   bool extensions_{false};
   bool smtputf8_{false};
-  // bool prdr_{false};
+  bool prdr_{false};
 
   // per connection
   bool fcrdns_allowed_{false};

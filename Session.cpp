@@ -175,6 +175,7 @@ DEFINE_bool(use_binarymime, true, "support BINARYMIME extension, RFC 3030");
 DEFINE_bool(use_chunking, true, "support CHUNKING extension, RFC 3030");
 DEFINE_bool(use_pipelining, true, "support PIPELINING extension, RFC 2920");
 DEFINE_bool(use_rrvs, false, "support RRVS extension, RFC 7293");
+DEFINE_bool(use_prdr, false, "support PRDR extension");
 DEFINE_bool(use_smtputf8, true, "support SMTPUTF8 extension, RFC 6531");
 
 boost::xpressive::mark_tag     secs_(1);
@@ -276,7 +277,7 @@ void Session::reset_()
 
   binarymime_ = false;
   smtputf8_   = false;
-  // prdr_     = false;
+  prdr_       = false;
 
   if (msg_) {
     msg_.reset();
@@ -440,7 +441,9 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-RRVS\r\n"; // RFC 7293
     }
 
-    // out_() << "250-PRDR\r\n"; // draft-hall-prdr-00.txt
+    if (FLAGS_use_prdr) {
+      out_() << "250-PRDR\r\n"; // draft-hall-prdr-00.txt
+    }
 
     if (sock_.tls()) {
       // Check sasl sources for auth types.
@@ -1000,7 +1003,7 @@ bool Session::data_start()
     /******************************************************************
     <https://tools.ietf.org/html/rfc5321#section-3.3> says:
 
-    The DATA command can fail at only two points in the protocol exchange:
+    The DATA command can fail for only two reasons:
 
     If there was no MAIL, or no RCPT, command, or all such commands were
     rejected, the server MAY return a "command out of sequence" (503) or
@@ -1051,178 +1054,12 @@ bool Session::data_start()
   return true;
 }
 
-// bool Session::do_forward_(message::parsed& msg)
-// {
-//   auto msg_fwd = msg;
-
-//   // Generate a reply address
-//   Reply::from_to reply;
-//   reply.mail_from          = msg_fwd.dmarc_from;
-//   reply.rcpt_to_local_part = fwd_from_.local_part();
-
-//   auto const reply_addr =
-//       fmt::format("{}@{}", srs_.enc_reply(reply), server_id_());
-
-//   auto const munging = false;
-
-//   auto const sender   = server_identity_.ascii().c_str();
-//   auto const selector = FLAGS_selector.c_str();
-//   auto const key_file =
-//       (config_path_ / FLAGS_selector).replace_extension("private");
-//   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
-
-//   if (munging) {
-//     auto const from_hdr =
-//         fmt::format("From: \"{} via\" <@>", msg_fwd.dmarc_from, reply_addr);
-//     message::rewrite_from_to(msg_fwd, from_hdr, "", sender, selector,
-//     key_file);
-//   }
-//   else {
-//     auto const reply_to_hdr = fmt::format("Reply-To: {}", reply_addr);
-//     message::rewrite_from_to(msg_fwd, "", reply_to_hdr, sender, selector,
-//                              key_file);
-//   }
-
-//   // Forward it on
-//   if (!send_.send(msg_fwd.as_string())) {
-//     out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-//               "stopped\r\n"
-//            << std::flush;
-
-//     LOG(ERROR) << "failed to send for " << fwd_path_;
-//     return false;
-//   }
-
-//   LOG(INFO) << "successfully sent for " << fwd_path_;
-//   return true;
-// }
-
-// bool Session::do_reply_(message::parsed& msg)
-// {
-//   Mailbox to_mbx(rep_info_.mail_from);
-//   Mailbox from_mbx(rep_info_.rcpt_to_local_part, server_identity_);
-
-//   auto reply = std::make_unique<MessageStore>();
-//   reply->open(server_id_(), FLAGS_max_write, ".Drafts");
-
-//   auto const date{Now{}};
-//   auto const pill{Pill{}};
-//   auto const mid_str =
-//       fmt::format("<{}.{}@{}>", date.sec(), pill, server_identity_);
-
-//   fmt::memory_buffer bfr;
-
-//   fmt::format_to(bfr, "From: <{}>\r\n", from_mbx);
-//   fmt::format_to(bfr, "To: <{}>\r\n", to_mbx);
-
-//   fmt::format_to(bfr, "Date: {}\r\n", date.c_str());
-
-//   fmt::format_to(bfr, "Message-ID: {}\r\n", mid_str.c_str());
-
-//   if (!msg.get_header(message::Subject).empty()) {
-//     fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
-//                    msg.get_header(message::Subject));
-//   }
-//   else {
-//     fmt::format_to(bfr, "{}: {}\r\n", message::Subject,
-//                    "Reply to your message");
-//   }
-
-//   if (!msg.get_header(message::In_Reply_To).empty()) {
-//     fmt::format_to(bfr, "{}: {}\r\n", message::In_Reply_To,
-//                    msg.get_header(message::In_Reply_To));
-//   }
-
-//   if (!msg.get_header(message::MIME_Version).empty() &&
-//       msg.get_header(message::Content_Type).empty()) {
-//     fmt::format_to(bfr, "{}: {}\r\n", message::MIME_Version,
-//                    msg.get_header(message::MIME_Version));
-//     fmt::format_to(bfr, "{}: {}\r\n", message::Content_Type,
-//                    msg.get_header(message::Content_Type));
-//   }
-
-//   reply->write(fmt::to_string(bfr));
-
-//   if (!msg.body.empty()) {
-//     reply->write("\r\n");
-//     reply->write(msg.body);
-//   }
-
-//   auto const      msg_data = reply->freeze();
-//   message::parsed msg_reply;
-//   CHECK(msg_reply.parse(msg_data));
-
-//   auto const sender   = server_identity_.ascii().c_str();
-//   auto const selector = FLAGS_selector.c_str();
-//   auto const key_file =
-//       (config_path_ / FLAGS_selector).replace_extension("private");
-//   CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
-
-//   message::dkim_sign(msg_reply, sender, selector, key_file);
-
-//   if (!send_.send(msg_reply.as_string())) {
-//     out_() << "432 4.3.0 Recipient's incoming mail queue has been "
-//               "stopped\r\n"
-//            << std::flush;
-
-//     LOG(ERROR) << "send failed for reply to " << to_mbx << " from " <<
-//     from_mbx; return false;
-//   }
-
-//   LOG(INFO) << "successful reply to " << to_mbx << " from " << from_mbx;
-//   return true;
-// }
-
 bool Session::do_deliver_()
 {
   CHECK(msg_);
 
-  // auto const sender   = server_identity_.ascii().c_str();
-  // auto const selector = FLAGS_selector.c_str();
-  // auto const key_file =
-  //     (config_path_ / FLAGS_selector).replace_extension("private");
-  // CHECK(fs::exists(key_file)) << "can't find key file " << key_file;
-
   try {
-    // auto const msg_data = msg_->freeze();
-
-    // message::parsed msg;
-
-    // // Only deal in RFC-5322 Mail Objects.
-    // bool const message_parsed = msg.parse(msg_data);
-    // if (message_parsed) {
-
-    //   // remove any Return-Path
-    //   message::remove_delivery_headers(msg);
-
-    //   auto const authentic =
-    //       message_parsed &&
-    //       message::authentication(msg, sender, selector, key_file);
-
-    // // write a new Return-Path
-    // msg_->write(fmt::format("Return-Path: <{}>\r\n", reverse_path_));
-
-    //   for (auto const h : msg.headers) {
-    //     msg_->write(h.as_string());
-    //     msg_->write("\r\n");
-    //   }
-    //   if (!msg.body.empty()) {
-    //     msg_->write("\r\n");
-    //     msg_->write(msg.body);
-    //   }
-
     msg_->deliver();
-
-    // if (authentic && !fwd_path_.empty()) {
-    //   if (!do_forward_(msg))
-    //     return false;
-    // }
-    // if (authentic && !rep_info_.empty()) {
-    //   if (!do_reply_(msg))
-    //     return false;
-    // }
-    // }
-
     msg_->close();
   }
   catch (std::system_error const& e) {
@@ -1245,7 +1082,79 @@ bool Session::do_deliver_()
     }
   }
 
+  LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
+            << msg_->id();
   return true;
+}
+
+void Session::xfer_response_(std::string_view success_msg)
+{
+  auto bad_recipients_db_name = config_path_ / "bad_recipients_data";
+  CDB  bad_recipients_db;
+  if (!bad_recipients_db.open(bad_recipients_db_name)) {
+    LOG(WARNING) << "can't open bad_recipients_data";
+  }
+
+  auto temp_fail_db_name = config_path_ / "temp_fail_data";
+  CDB  temp_fail_db;
+  if (!temp_fail_db.open(temp_fail_db_name)) {
+    LOG(WARNING) << "can't open temp_fail_data";
+  }
+
+  if (prdr_ && forward_path_.size() > 1) {
+    out_() << "353\r\n";
+    for (auto fp : forward_path_) {
+      std::string loc = fp.local_part();
+      std::transform(loc.begin(), loc.end(), loc.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      if (bad_recipients_db.is_open() && bad_recipients_db.contains(loc)) {
+        out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
+        LOG(WARNING) << "bad recipient " << fp;
+      }
+      else if (temp_fail_db.is_open() && temp_fail_db.contains(loc)) {
+        out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
+        LOG(WARNING) << "temp fail for " << fp;
+      }
+      else {
+        out_() << "250 2.0.0 " << success_msg << " OK\r\n";
+      }
+    }
+  }
+  else {
+    std::vector<std::string> bad_recipients;
+    if (bad_recipients_db.is_open()) {
+      for (auto fp : forward_path_) {
+        std::string loc = fp.local_part();
+        std::transform(loc.begin(), loc.end(), loc.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (bad_recipients_db.contains(loc)) {
+          bad_recipients.push_back(fp);
+          LOG(WARNING) << "bad recipient " << fp;
+        }
+      }
+    }
+    std::vector<std::string> temp_failed;
+    if (temp_fail_db.is_open()) {
+      for (auto fp : forward_path_) {
+        std::string loc = fp.local_part();
+        std::transform(loc.begin(), loc.end(), loc.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (temp_fail_db.contains(loc)) {
+          temp_failed.push_back(fp);
+          LOG(WARNING) << "temp failed recipient " << fp;
+        }
+      }
+    }
+    if (bad_recipients.size()) {
+      out_() << "550 5.1.1 bad recipient";
+    }
+    else if (temp_failed.size()) {
+      out_() << "450 4.1.1 temporary failure";
+    }
+    else {
+      out_() << "250 2.0.0 " << success_msg << " OK\r\n";
+    }
+  }
 }
 
 void Session::data_done()
@@ -1256,13 +1165,6 @@ void Session::data_done()
     data_size_error();
     return;
   }
-
-  // if (prdr_) {
-  //   out_() << "353\r\n";
-  //   for (auto fp : forward_path_) {
-  //     out_() << "250 2.1.5 RCPT TO OK\r\n";
-  //   }
-  // }
 
   // Check for and act on magic "wait" address.
   {
@@ -1286,49 +1188,13 @@ void Session::data_done()
     }
   }
 
-  if (do_deliver_()) {
-    auto temp_fail_db_name = config_path_ / "temp_fail_data";
-    CDB  temp_fail;
-
-    for (auto fp : forward_path_) {
-      if (temp_fail.open(temp_fail_db_name) &&
-          temp_fail.contains(fp.local_part())) {
-        out_() << "450 4.2.2 Mailbox full.\r\n" << std::flush;
-        LOG(WARNING) << "temp fail at DATA for recipient " << fp;
-        reset_();
-        return;
-      }
-    }
+  if (!do_deliver_()) {
+    return;
   }
 
-  // Check for addresses we reject after data.
-  {
-    auto bad_recipients_db_name = config_path_ / "bad_recipients_data";
-    CDB  bad_recipients_db;
-    if (bad_recipients_db.open(bad_recipients_db_name)) {
-      for (auto fp : forward_path_) {
-        std::string loc = fp.local_part();
-        std::transform(loc.begin(), loc.end(), loc.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (bad_recipients_db.contains(loc)) {
-          out_() << "550 5.1.1 bad recipient " << fp << "\r\n" << std::flush;
-          LOG(WARNING) << "bad recipient " << fp;
-          reset_();
-          return;
-        }
-        else {
-          LOG(INFO) << "unbad recipient " << fp.local_part();
-        }
-      }
-    }
-    else {
-      LOG(WARNING) << "can't open bad_recipients_data";
-    }
-  }
+  xfer_response_("DATA");
 
-  out_() << "250 2.0.0 DATA OK\r\n" << std::flush;
-  LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
-            << msg_->id();
+  out_() << std::flush;
   reset_();
 }
 
@@ -1413,6 +1279,8 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
+  LOG(INFO) << "BDAT " << n << " LAST";
+
   // Check for and act on magic "wait" address.
   {
     using namespace boost::xpressive;
@@ -1435,12 +1303,13 @@ void Session::bdat_done(size_t n, bool last)
     }
   }
 
-  do_deliver_();
+  if (!do_deliver_()) {
+    return;
+  }
 
-  out_() << "250 2.0.0 BDAT " << n << " LAST OK\r\n" << std::flush;
-  LOG(INFO) << "BDAT " << n << " LAST";
-  LOG(INFO) << "message delivered, " << msg_->size() << " octets, with id "
-            << msg_->id();
+  xfer_response_(fmt::format("BDAT {} LAST", n));
+
+  out_() << std::flush;
   reset_();
 }
 
@@ -1676,7 +1545,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       if (block_.contains(client_fcrdns.ascii())) {
         error_msg =
             fmt::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
-        out_() << "554 5.7.1 blocklisted\r\n" << std::flush;
+        out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
         return false;
       }
 
@@ -1685,7 +1554,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         if (block_.contains(tld)) {
           error_msg = fmt::format(
               "FCrDNS registered domain {} on static blocklist", tld);
-          out_() << "554 5.7.1 blocklisted\r\n" << std::flush;
+          out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
         }
       }
@@ -1883,8 +1752,8 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (domain_blocked(res_, client_identity) ||
       domain_blocked(res_, Domain(tld))) {
-    error_msg = fmt::format("claimed identity {} blocked by spamhaus",
-                            client_identity.ascii());
+    error_msg =
+        fmt::format("claimed identity {} blocked", client_identity.ascii());
     out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
@@ -1913,7 +1782,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   }
 
   if (domain_blocked(res_, sender.domain())) {
-    error_msg = fmt::format("{} sender domain blocked by spamhaus", sender_str);
+    error_msg = fmt::format("{} sender domain blocked", sender_str);
     out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
   }
@@ -2074,6 +1943,7 @@ bool Session::verify_from_params_(parameters_t const& parameters)
         // nothing to see here, move along...
       }
       else if (iequal(value, "BINARYMIME")) {
+        LOG(INFO) << "using BINARYMIME";
         binarymime_ = true;
       }
       else {
@@ -2086,11 +1956,10 @@ bool Session::verify_from_params_(parameters_t const& parameters)
       }
       smtputf8_ = true;
     }
-
-    // else if (iequal(name, "PRDR")) {
-    //   LOG(INFO) << "using PRDR";
-    //   prdr_ = true;
-    // }
+    else if (iequal(name, "PRDR")) {
+      LOG(INFO) << "using PRDR";
+      prdr_ = true;
+    }
 
     else if (iequal(name, "SIZE")) {
       if (value.empty()) {
@@ -2234,49 +2103,6 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       }
     }
   }
-
-  {
-    auto temp_fail_db_name = config_path_ / "temp_fail";
-    CDB  temp_fail;
-    if (temp_fail.open(temp_fail_db_name) &&
-        temp_fail.contains(recipient.local_part())) {
-      out_() << "432 4.3.0 recipient's incoming mail queue has been stopped\r\n"
-             << std::flush;
-      LOG(WARNING) << "temp fail for recipient " << recipient;
-      return false;
-    }
-  }
-
-  // Check for and act on magic "wait" address.
-  {
-    using namespace boost::xpressive;
-
-    sregex const rex = icase("wait-rcpt-") >> (secs_ = +_d);
-    smatch       what;
-
-    if (regex_match(recipient.local_part(), what, rex) ||
-        regex_match(recipient.local_part(), what, all_rex)) {
-      auto const str = what[secs_].str();
-      LOG(INFO) << "waiting at RCPT TO " << str << " seconds";
-      long value = 0;
-      std::from_chars(str.data(), str.data() + str.size(), value);
-      google::FlushLogFiles(google::INFO);
-      out_() << std::flush;
-      sleep(value);
-      LOG(INFO) << "done waiting";
-    }
-  }
-
-  // This is a trap for a probe done by some senders to see if we
-  // accept just any old local-part.
-  // if (!extensions_) {
-  //   if (recipient.local_part().length() > 8) {
-  //     out_() << "550 5.1.1 unknown recipient " << recipient << "\r\n"
-  //            << std::flush;
-  //     LOG(WARNING) << "unknown recipient for HELO " << recipient;
-  //     return false;
-  //   }
-  // }
 
   return true;
 }
