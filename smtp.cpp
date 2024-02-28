@@ -541,9 +541,7 @@ void bdat_act(Ctx& ctx, bool last)
       }
       return;
     }
-    if (!ctx.session.msg_write(bfr.data(), xfer_sz)) {
-      if (!status_returned)
-        ctx.session.bdat_size_error();
+    if (!status_returned && !ctx.session.msg_write(bfr.data(), xfer_sz)) {
       status_returned = true;
     }
 
