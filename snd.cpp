@@ -1912,11 +1912,12 @@ bool snd(fs::path                    config_path,
         success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
         CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
         success =
-            success || (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
+            success && (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
       }
       else {
         // something *other* than 353
-        LOG(WARNING) << "DATA returned " << cnn.reply_code;
+        LOG(INFO) << "DATA returned " << cnn.reply_code;
+        success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
       }
     }
     else {
@@ -1930,7 +1931,10 @@ bool snd(fs::path                    config_path,
       else {
         msg->trash();
       }
-      LOG(INFO) << "mail was sent successfully";
+      LOG(INFO) << "all mail was sent successfully";
+    }
+    else {
+      LOG(INFO) << "some mail was *NOT* sent successfully";
     }
 
     in.discard();
