@@ -192,15 +192,15 @@ Session::Session(fs::path                  config_path,
 //, send_(config_path, "smtp")
 //, srs_(config_path)
 {
-  auto accept_db_name  = config_path_ / "accept_domains";
-  auto allow_db_name   = config_path_ / "allow";
-  auto block_db_name   = config_path_ / "block";
-  auto forward_db_name = config_path_ / "forward";
+  auto accept_db_name = config_path_ / "accept_domains";
+  auto allow_db_name  = config_path_ / "allow";
+  auto block_db_name  = config_path_ / "block";
+  // auto forward_db_name = config_path_ / "forward";
 
   accept_domains_.open(accept_db_name);
   allow_.open(allow_db_name);
   block_.open(block_db_name);
-  forward_.open(forward_db_name);
+  // forward_.open(forward_db_name);
 
   if (sock_.has_peername() && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
@@ -556,74 +556,6 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   state_ = xact_step::rcpt;
 }
 
-// bool Session::forward_to_(std::string const& forward, Mailbox const& rcpt_to)
-// {
-//   // If we're already forwarding or replying, reject
-//   if (!fwd_path_.empty() || !rep_info_.empty()) {
-//     out_() << "432 4.3.0 Recipient's incoming mail queue has been
-//     stopped\r\n"
-//            << std::flush;
-//     LOG(WARNING) << "failed to forward to <" << forward
-//                  << "> already forwarding or replying for: " << rcpt_to;
-//     return false;
-//   }
-
-//   fwd_path_ = Mailbox(forward);
-//   fwd_from_ = rcpt_to;
-
-//   // New bounce address
-//   Reply::from_to bounce;
-//   bounce.mail_from = reverse_path_.as_string();
-
-//   auto const new_bounce = srs_.enc_bounce(bounce, server_id_().c_str());
-
-//   auto const mail_from = Mailbox(new_bounce);
-
-//   std::string error_msg;
-//   if (!send_.mail_from_rcpt_to(res_, mail_from, fwd_path_, error_msg)) {
-//     out_() << error_msg << std::flush;
-//     LOG(WARNING) << "failed to forward <" << fwd_path_ << "> " << error_msg;
-//     return false;
-//   }
-
-//   LOG(INFO) << "RCPT TO:<" << rcpt_to << "> forwarding to == <" << fwd_path_
-//             << ">";
-//   return true;
-// }
-
-// bool Session::reply_to_(Reply::from_to const& reply_info, Mailbox const&
-// rcpt_to)
-// {
-//   // If we're already forwarding or replying, reject
-//   if (!fwd_path_.empty() || !rep_info_.empty()) {
-//     out_() << "432 4.3.0 Recipient's incoming mail queue has been
-//     stopped\r\n"
-//            << std::flush;
-//     LOG(WARNING) << "failed to reply to <" << reply_info.mail_from
-//                  << "> already forwarding or replying for: " << rcpt_to;
-//     return false;
-//   }
-
-//   rep_info_ = reply_info;
-
-//   Mailbox const from(rep_info_.rcpt_to_local_part, server_identity_);
-//   Mailbox const to(rep_info_.mail_from);
-
-//   std::string error_msg;
-//   if (!send_.mail_from_rcpt_to(res_, from, to, error_msg)) {
-//     out_() << error_msg << std::flush;
-//     LOG(WARNING) << "failed to reply from <" << from << "> to <" << to << ">
-//     "
-//                  << error_msg;
-//     return false;
-//   }
-
-//   LOG(INFO) << "RCPT TO:<" << rcpt_to << "> is a reply to "
-//             << rep_info_.mail_from << " from " <<
-//             rep_info_.rcpt_to_local_part;
-//   return true;
-// }
-
 void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   check_for_pipeline_error_("RCPT TO");
@@ -675,21 +607,6 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   Mailbox const& rcpt_to_mbx = forward_path_.back();
 
   LOG(INFO) << "RCPT TO:<" << rcpt_to_mbx << ">";
-
-  // auto const rcpt_to_str = rcpt_to_mbx.as_string();
-
-  // if (auto reply = srs_.dec_reply(rcpt_to_mbx.local_part()); reply) {
-  //   if (!reply_to_(*reply, rcpt_to_mbx))
-  //     return;
-  // }
-  // else if (auto const forward = forward_.find(rcpt_to_str.c_str()); forward)
-  // {
-  //   if (!forward_to_(*forward, rcpt_to_mbx))
-  //     return;
-  // }
-  // else {
-  //   LOG(INFO) << "RCPT TO:<" << rcpt_to_str << ">";
-  // }
 
   // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
@@ -1101,50 +1018,57 @@ void Session::xfer_response_(std::string_view success_msg)
     LOG(WARNING) << "can't open temp_fail_data";
   }
 
-  if (prdr_ && forward_path_.size() > 1) {
-    out_() << "353\r\n";
+  std::vector<std::string> bad_recipients;
+  if (bad_recipients_db.is_open()) {
     for (auto fp : forward_path_) {
       std::string loc = fp.local_part();
       std::transform(loc.begin(), loc.end(), loc.begin(),
                      [](unsigned char c) { return std::tolower(c); });
-      if (bad_recipients_db.is_open() && bad_recipients_db.contains(loc)) {
-        out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
+      if (bad_recipients_db.contains(loc)) {
+        bad_recipients.push_back(fp);
         LOG(WARNING) << "bad recipient " << fp;
-      }
-      else if (temp_fail_db.is_open() && temp_fail_db.contains(loc)) {
-        out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
-        LOG(WARNING) << "temp fail for " << fp;
-      }
-      else {
-        out_() << "250 2.0.0 " << success_msg << " OK\r\n";
       }
     }
   }
-  else {
-    std::vector<std::string> bad_recipients;
-    if (bad_recipients_db.is_open()) {
+  std::vector<std::string> temp_failed;
+  if (temp_fail_db.is_open()) {
+    for (auto fp : forward_path_) {
+      std::string loc = fp.local_part();
+      std::transform(loc.begin(), loc.end(), loc.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      if (temp_fail_db.contains(loc)) {
+        temp_failed.push_back(fp);
+        LOG(WARNING) << "temp failed recipient " << fp;
+      }
+    }
+  }
+
+  if (prdr_ && forward_path_.size() > 1) {
+
+    if (bad_recipients.size() || temp_failed.size()) {
+      out_() << "353 per recipient responses follow\r\n";
       for (auto fp : forward_path_) {
         std::string loc = fp.local_part();
         std::transform(loc.begin(), loc.end(), loc.begin(),
                        [](unsigned char c) { return std::tolower(c); });
-        if (bad_recipients_db.contains(loc)) {
-          bad_recipients.push_back(fp);
+        if (bad_recipients_db.is_open() && bad_recipients_db.contains(loc)) {
+          out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
           LOG(WARNING) << "bad recipient " << fp;
         }
-      }
-    }
-    std::vector<std::string> temp_failed;
-    if (temp_fail_db.is_open()) {
-      for (auto fp : forward_path_) {
-        std::string loc = fp.local_part();
-        std::transform(loc.begin(), loc.end(), loc.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (temp_fail_db.contains(loc)) {
-          temp_failed.push_back(fp);
-          LOG(WARNING) << "temp failed recipient " << fp;
+        else if (temp_fail_db.is_open() && temp_fail_db.contains(loc)) {
+          out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
+          LOG(WARNING) << "temp fail for " << fp;
+        }
+        else {
+          out_() << "250 2.0.0 " << success_msg << " OK\r\n";
         }
       }
     }
+    else {
+      out_() << "250 2.0.0 " << success_msg << " OK\r\n";
+    }
+  }
+  else {
     if (bad_recipients.size()) {
       out_() << "550 5.1.1 bad recipient";
     }
