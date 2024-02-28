@@ -12,10 +12,14 @@ coproc \
     MAILDIR=/tmp/Maildir \
     GOOGLE_LOG_DIR=${log_dir} \
     GLOG_minloglevel=0 \
-    ./smtp
+    ./smtp -use_prdr=true
 
 ASAN_OPTIONS=detect_odr_violation=0 \
             ./snd \
+            -use_chunking=false \
+            -log_data \
             -service=smtp \
             -pipe=true \
+            -smtp_to='one@digilicious.com' \
+            -smtp_to2='two@digilicious.com' \
             <&${COPROC[0]} >&${COPROC[1]}
