@@ -38,6 +38,7 @@ DEFINE_bool(use_chunking, true, "use CHUNKING extension");
 DEFINE_bool(use_deliverby, false, "use DELIVERBY extension");
 DEFINE_bool(use_esmtp, true, "use ESMTP (EHLO)");
 DEFINE_bool(use_pipelining, true, "use PIPELINING extension");
+DEFINE_bool(use_prdr, true, "use PRDR extension");
 DEFINE_bool(use_size, true, "use SIZE extension");
 DEFINE_bool(use_smtputf8, true, "use SMTPUTF8 extension");
 DEFINE_bool(use_tls, true, "use STARTTLS extension");
@@ -1247,7 +1248,21 @@ auto parse_mailboxes()
     smtp_to_mbx = to_mbx;
   }
 
-  return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx);
+  auto smtp_to2_mbx{Mailbox{}};
+  if (!FLAGS_smtp_to2.empty()) {
+    auto smtp_to2_in{memory_input<>{FLAGS_smtp_to2, "SMTP.to"}};
+    if (!parse<RFC5321::path_or_postmaster, RFC5321::action>(smtp_to2_in,
+                                                             smtp_to2_mbx)) {
+      LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to2 << ">";
+    }
+    LOG(INFO) << " smtp_to2_mbx == " << smtp_to2_mbx;
+
+    auto local_smtp_to2{
+        memory_input<>{smtp_to2_mbx.local_part(), "SMTP.to.local"}};
+    FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to2);
+  }
+
+  return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx);
 }
 
 auto create_eml(Domain const&               sender,
@@ -1450,6 +1465,7 @@ bool snd(fs::path                    config_path,
          Mailbox const&              to_mbx,
          Mailbox const&              smtp_from_mbx,
          Mailbox const&              smtp_to_mbx,
+         Mailbox const&              smtp_to2_mbx,
          std::vector<content> const& bodies)
 {
   auto constexpr read_hook{[]() {}};
@@ -1533,6 +1549,8 @@ bool snd(fs::path                    config_path,
   auto const ext_pipelining{FLAGS_use_pipelining &&
                             cnn.has_extension("PIPELINING")};
 
+  auto const ext_prdr{FLAGS_use_prdr && cnn.has_extension("PRDR")};
+
   auto const ext_size{FLAGS_use_size && cnn.has_extension("SIZE")};
 
   auto const ext_smtputf8{FLAGS_use_smtputf8 && cnn.has_extension("SMTPUTF8")};
@@ -1615,6 +1633,9 @@ bool snd(fs::path                    config_path,
       }
     }
   }
+  if (deliver_by_min) {
+    LOG(INFO) << "DELIVERBY " << deliver_by_min;
+  }
   do_auth(in, cnn);
 
   in.discard();
@@ -1677,6 +1698,10 @@ bool snd(fs::path                    config_path,
     param_stream << " BODY=8BITMIME";
   }
 
+  if (ext_prdr && !smtp_to2_mbx.empty()) {
+    param_stream << " PRDR";
+  }
+
   if (ext_deliverby) {
     param_stream << " BY=1200;NT";
   }
@@ -1706,6 +1731,14 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">\r\n";
     if (!ext_pipelining) {
       check_for_fail(in, cnn, "RCPT TO");
+    }
+
+    if (!smtp_to2_mbx.empty()) {
+      LOG(INFO) << "C: RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">";
+      cnn.sock.out() << "RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">\r\n";
+      if (!ext_pipelining) {
+        check_for_fail(in, cnn, "RCPT TO");
+      }
     }
 
     if (FLAGS_nosend) {
@@ -1789,6 +1822,9 @@ bool snd(fs::path                    config_path,
       if (ext_pipelining) {
         check_for_fail(in, cnn, "MAIL FROM");
         check_for_fail(in, cnn, "RCPT TO");
+        if (!smtp_to2_mbx.empty()) {
+          check_for_fail(in, cnn, "RCPT TO");
+        }
       }
 
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -1805,6 +1841,9 @@ bool snd(fs::path                    config_path,
       if (ext_pipelining) {
         check_for_fail(in, cnn, "MAIL FROM");
         check_for_fail(in, cnn, "RCPT TO");
+        if (!smtp_to2_mbx.empty()) {
+          check_for_fail(in, cnn, "RCPT TO");
+        }
       }
       cnn.sock.out() << std::flush;
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -1863,7 +1902,28 @@ bool snd(fs::path                    config_path,
       }
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
-    if (cnn.reply_code.at(0) == '2') {
+
+    auto success{false};
+
+    // Now, either DATA or BDATs lets check replies
+    if (ext_prdr && !smtp_to2_mbx.empty()) {
+      if (cnn.reply_code == "353") {
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        success =
+            success || (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
+      }
+      else {
+        // something *other* than 353
+        LOG(WARNING) << "DATA returned " << cnn.reply_code;
+      }
+    }
+    else {
+      success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
+    }
+
+    if (success) {
       if (FLAGS_save) {
         msg->deliver();
       }
@@ -1872,6 +1932,7 @@ bool snd(fs::path                    config_path,
       }
       LOG(INFO) << "mail was sent successfully";
     }
+
     in.discard();
   }
 
@@ -1950,10 +2011,18 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx] = parse_mailboxes();
+  auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx] =
+      parse_mailboxes();
 
   if (to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
     LOG(ERROR) << "don't know who to send this mail to";
+    return 0;
+  }
+
+  if (!smtp_to2_mbx.domain().empty() &&
+      smtp_to2_mbx.domain() != smtp_to_mbx.domain()) {
+    LOG(ERROR) << "can't send to both " << smtp_to_mbx.domain() << " and "
+               << smtp_to2_mbx.domain();
     return 0;
   }
 
@@ -1965,7 +2034,7 @@ int main(int argc, char* argv[])
   if (FLAGS_pipe) {
     return snd(config_path, STDIN_FILENO, STDOUT_FILENO, sender,
                to_mbx.domain(), tlsa_rrs, false, from_mbx, to_mbx,
-               smtp_from_mbx, smtp_to_mbx, bodies)
+               smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
@@ -2045,7 +2114,8 @@ int main(int argc, char* argv[])
 
     if (to_mbx.domain() == receiver) {
       if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs, enforce_dane,
-              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
+              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
+              bodies)) {
         return EXIT_SUCCESS;
       }
     }
@@ -2053,7 +2123,8 @@ int main(int argc, char* argv[])
       auto tlsa_rrs_mx{get_tlsa_rrs(res, receiver, port)};
       tlsa_rrs_mx.insert(end(tlsa_rrs_mx), begin(tlsa_rrs), end(tlsa_rrs));
       if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane,
-              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, bodies)) {
+              from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
+              bodies)) {
         return EXIT_SUCCESS;
       }
     }
