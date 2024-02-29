@@ -31,7 +31,7 @@ public:
   }
 
   explicit message(container_t&& bfr)
-    : bfr_{std::move(bfr)}
+    : bfr_{bfr}
   {
     CHECK_LE(size(), std::numeric_limits<uint16_t>::max());
   }
