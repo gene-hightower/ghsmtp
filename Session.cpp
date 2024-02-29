@@ -431,7 +431,8 @@ void Session::lo_(char const* verb, std::string_view client_identity)
       out_() << "250-" << server_id_() << "\r\n";
     }
 
-    // https://datatracker.ietf.org/doc/draft-freed-smtp-limits/
+    // LIMITS SMTP Service Extension,
+    // <https://www.rfc-editor.org/rfc/rfc9422.html>
     out_() << "250-LIMITS RCPTMAX=" << Config::max_recipients_per_message
            << "\r\n";
     out_() << "250-SIZE " << max_msg_size() << "\r\n"; // RFC 1870
@@ -989,7 +990,7 @@ bool Session::do_deliver_()
       return false;
 
     default:
-      out_() << "550 5.0.0 mail system error\r\n" << std::flush;
+      out_() << "451 4.3.0 mail system error\r\n" << std::flush;
       if (errno)
         LOG(ERROR) << "errno==" << errno << ": " << strerror(errno);
       LOG(ERROR) << e.what();
