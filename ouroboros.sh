@@ -20,6 +20,7 @@ ASAN_OPTIONS=detect_odr_violation=0 \
             -log_data \
             -service=smtp \
             -pipe=true \
-            -smtp_to='somebody@digilicious.com' \
-            -smtp_to2='body@digilicious.com' \
+            -smtp_to='a@digilicious.com' \
+            -smtp_to2='anybody@digilicious.com' \
+            -smtp_to3='c@digilicious.com' \
             <&${COPROC[0]} >&${COPROC[1]}

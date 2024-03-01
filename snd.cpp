@@ -63,6 +63,7 @@ DEFINE_string(to_name, "", "RFC5322 To: name");
 DEFINE_string(smtp_from, "", "RFC5321 MAIL FROM address");
 DEFINE_string(smtp_to, "", "RFC5321 RCPT TO address");
 DEFINE_string(smtp_to2, "", "second RFC5321 RCPT TO address");
+DEFINE_string(smtp_to3, "", "third RFC5321 RCPT TO address");
 
 DEFINE_string(content_type, "", "RFC5322 Content-Type");
 DEFINE_string(content_transfer_encoding,
@@ -867,7 +868,7 @@ void fail(Input& in, RFC5321::Connection& cnn)
 }
 
 template <typename Input>
-void check_for_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
+void quit_on_fail(Input& in, RFC5321::Connection& cnn, std::string_view cmd)
 {
   cnn.sock.out() << std::flush;
   CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
@@ -924,6 +925,7 @@ bool validate_address_RFC5321(const char* flagname, std::string const& value)
 DEFINE_validator(smtp_from, &validate_address_RFC5321);
 DEFINE_validator(smtp_to, &validate_address_RFC5321);
 DEFINE_validator(smtp_to2, &validate_address_RFC5321);
+DEFINE_validator(smtp_to3, &validate_address_RFC5321);
 
 void selftest()
 {
@@ -1262,7 +1264,22 @@ auto parse_mailboxes()
     FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to2);
   }
 
-  return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx);
+  auto smtp_to3_mbx{Mailbox{}};
+  if (!FLAGS_smtp_to3.empty()) {
+    auto smtp_to3_in{memory_input<>{FLAGS_smtp_to3, "SMTP.to"}};
+    if (!parse<RFC5321::path_or_postmaster, RFC5321::action>(smtp_to3_in,
+                                                             smtp_to3_mbx)) {
+      LOG(FATAL) << "bad RCPT TO: address syntax <" << FLAGS_smtp_to3 << ">";
+    }
+    LOG(INFO) << " smtp_to3_mbx == " << smtp_to3_mbx;
+
+    auto local_smtp_to3{
+        memory_input<>{smtp_to3_mbx.local_part(), "SMTP.to.local"}};
+    FLAGS_force_smtputf8 |= !parse<chars::ascii_only>(local_smtp_to3);
+  }
+
+  return std::tuple(from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
+                    smtp_to3_mbx);
 }
 
 auto create_eml(Domain const&               sender,
@@ -1466,6 +1483,7 @@ bool snd(fs::path                    config_path,
          Mailbox const&              smtp_from_mbx,
          Mailbox const&              smtp_to_mbx,
          Mailbox const&              smtp_to2_mbx,
+         Mailbox const&              smtp_to3_mbx,
          std::vector<content> const& bodies)
 {
   auto constexpr read_hook{[]() {}};
@@ -1698,7 +1716,7 @@ bool snd(fs::path                    config_path,
     param_stream << " BODY=8BITMIME";
   }
 
-  if (ext_prdr && !smtp_to2_mbx.empty()) {
+  if (ext_prdr && (!smtp_to2_mbx.empty() || !smtp_to3_mbx.empty())) {
     param_stream << " PRDR";
   }
 
@@ -1715,6 +1733,10 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "NOOP\r\nNOOP\r\n" << std::flush;
   }
 
+  bool rcpt_to_ok  = false;
+  bool rcpt_to2_ok = false;
+  bool rcpt_to3_ok = false;
+
   auto param_str = param_stream.str();
 
   for (auto count = 0UL; count < FLAGS_reps; ++count) {
@@ -1724,30 +1746,49 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "MAIL FROM:<" << smtp_from_mbx.as_string(enc) << '>'
                    << param_str << "\r\n";
     if (!ext_pipelining) {
-      check_for_fail(in, cnn, "MAIL FROM");
+      quit_on_fail(in, cnn, "MAIL FROM");
     }
 
     LOG(INFO) << "C: RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">";
     cnn.sock.out() << "RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">\r\n";
     if (!ext_pipelining) {
-      check_for_fail(in, cnn, "RCPT TO");
+      // check RCPT TO #1
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      rcpt_to_ok = cnn.reply_code.at(0) == '2';
     }
 
     if (!smtp_to2_mbx.empty()) {
       LOG(INFO) << "C: RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">";
       cnn.sock.out() << "RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">\r\n";
       if (!ext_pipelining) {
-        check_for_fail(in, cnn, "RCPT TO");
+        // check RCPT TO #2
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        rcpt_to2_ok = cnn.reply_code.at(0) == '2';
+      }
+    }
+
+    if (!smtp_to3_mbx.empty()) {
+      LOG(INFO) << "C: RCPT TO:<" << smtp_to3_mbx.as_string(enc) << ">";
+      cnn.sock.out() << "RCPT TO:<" << smtp_to3_mbx.as_string(enc) << ">\r\n";
+      if (!ext_pipelining) {
+        // check RCPT TO #3
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        rcpt_to3_ok = cnn.reply_code.at(0) == '2';
       }
     }
 
     if (FLAGS_nosend) {
+      if (ext_pipelining) {
+        quit_on_fail(in, cnn, "MAIL FROM");
+        if (rcpt_to_ok)
+          quit_on_fail(in, cnn, "RCPT TO");
+        if (rcpt_to2_ok)
+          quit_on_fail(in, cnn, "RCPT TO");
+        if (rcpt_to3_ok)
+          quit_on_fail(in, cnn, "RCPT TO");
+      }
       LOG(INFO) << "C: QUIT";
       cnn.sock.out() << "QUIT\r\n" << std::flush;
-      if (ext_pipelining) {
-        check_for_fail(in, cnn, "MAIL FROM");
-        check_for_fail(in, cnn, "RCPT TO");
-      }
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       LOG(INFO) << "no-sending";
       exit(EXIT_SUCCESS);
@@ -1756,8 +1797,8 @@ bool snd(fs::path                    config_path,
     if (bad_dad) {
       if (ext_pipelining) {
         cnn.sock.out() << std::flush;
-        check_for_fail(in, cnn, "MAIL FROM");
-        check_for_fail(in, cnn, "RCPT TO");
+        quit_on_fail(in, cnn, "MAIL FROM");
+        quit_on_fail(in, cnn, "RCPT TO");
       }
       bad_daddy(in, cnn);
       return true;
@@ -1797,6 +1838,32 @@ bool snd(fs::path                    config_path,
     }
 
     if (ext_chunking) {
+
+      if (ext_pipelining) {
+        quit_on_fail(in, cnn, "MAIL FROM");
+
+        // check RCPT TO #1
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        rcpt_to_ok = cnn.reply_code.at(0) == '2';
+
+        if (!smtp_to2_mbx.empty()) {
+          // check RCPT TO #2
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          rcpt_to2_ok = cnn.reply_code.at(0) == '2';
+        }
+
+        if (!smtp_to3_mbx.empty()) {
+          // check RCPT TO #3
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          rcpt_to3_ok = cnn.reply_code.at(0) == '2';
+        }
+
+        // If all RCPT TOs failed, we give up.
+        if (!(rcpt_to_ok || rcpt_to2_ok || rcpt_to3_ok)) {
+          fail(in, cnn);
+        }
+      }
+
       std::ostringstream bdat_stream;
       bdat_stream << "BDAT " << total_size << " LAST";
       LOG(INFO) << "C: " << bdat_stream.str();
@@ -1810,42 +1877,49 @@ bool snd(fs::path                    config_path,
         CHECK(cnn.sock.out().good());
       }
 
+      // Done sending data
       if (FLAGS_pipeline_quit) {
         LOG(INFO) << "C: QUIT";
         cnn.sock.out() << "QUIT\r\n" << std::flush;
       }
-
-      cnn.sock.out() << std::flush;
-      CHECK(cnn.sock.out().good());
-
-      // NOW check returns
-      if (ext_pipelining) {
-        check_for_fail(in, cnn, "MAIL FROM");
-        check_for_fail(in, cnn, "RCPT TO");
-        if (!smtp_to2_mbx.empty()) {
-          check_for_fail(in, cnn, "RCPT TO");
-        }
-      }
-
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-      if (cnn.reply_code != "250") {
-        LOG(ERROR) << "BDAT returned " << cnn.reply_code;
-        fail(in, cnn);
+      else {
+        cnn.sock.out() << std::flush;
       }
     }
+    // Not CHUNKING
     else {
       LOG(INFO) << "C: DATA";
       cnn.sock.out() << "DATA\r\n";
 
-      // NOW check returns
+      // Now check returns, after DATA
       if (ext_pipelining) {
-        check_for_fail(in, cnn, "MAIL FROM");
-        check_for_fail(in, cnn, "RCPT TO");
+        quit_on_fail(in, cnn, "MAIL FROM");
+
+        // check RCPT TO #1
+        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+        rcpt_to_ok = cnn.reply_code.at(0) == '2';
+
         if (!smtp_to2_mbx.empty()) {
-          check_for_fail(in, cnn, "RCPT TO");
+          // check RCPT TO #2
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          rcpt_to2_ok = cnn.reply_code.at(0) == '2';
+        }
+
+        if (!smtp_to3_mbx.empty()) {
+          // check RCPT TO #3
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          rcpt_to3_ok = cnn.reply_code.at(0) == '2';
+        }
+
+        // If all RCPT TOs failed, we give up.
+        if (!(rcpt_to_ok || rcpt_to2_ok || rcpt_to3_ok)) {
+          fail(in, cnn);
         }
       }
-      cnn.sock.out() << std::flush;
+      else {
+        cnn.sock.out() << std::flush;
+      }
+
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       if (cnn.reply_code != "354") {
         LOG(ERROR) << "DATA returned " << cnn.reply_code;
@@ -1892,7 +1966,7 @@ bool snd(fs::path                    config_path,
       }
       CHECK(cnn.sock.out().good());
 
-      // Done!
+      // Done sending data
       if (FLAGS_pipeline_quit) {
         LOG(INFO) << "C: QUIT";
         cnn.sock.out() << ".\r\nQUIT\r\n" << std::flush;
@@ -1900,27 +1974,37 @@ bool snd(fs::path                    config_path,
       else {
         cnn.sock.out() << ".\r\n" << std::flush;
       }
-      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     }
 
     auto success{false};
+    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
 
     // Now, either DATA or BDATs lets check replies
-    if (ext_prdr && !smtp_to2_mbx.empty()) {
+    if (ext_prdr) {
       if (cnn.reply_code == "353") {
-        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-        success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
-        CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-        success =
-            success && (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
+        if (rcpt_to_ok) {
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
+        }
+        if (rcpt_to2_ok) {
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          success = success &&
+                    (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
+        }
+        if (rcpt_to3_ok) {
+          CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+          success = success &&
+                    (cnn.reply_code.length() && cnn.reply_code.at(0) == '2');
+        }
       }
       else {
-        // something *other* than 353
+        // last (and useless?) response.
         LOG(INFO) << "DATA returned " << cnn.reply_code;
         success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
       }
     }
     else {
+      LOG(INFO) << "DATA returned " << cnn.reply_code;
       success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
     }
 
@@ -1938,7 +2022,7 @@ bool snd(fs::path                    config_path,
     }
 
     in.discard();
-  }
+  } // FLAGS_reps
 
   if (!FLAGS_pipeline_quit) {
     LOG(INFO) << "C: QUIT";
@@ -2015,8 +2099,8 @@ int main(int argc, char* argv[])
   if (FLAGS_force_smtputf8)
     FLAGS_use_smtputf8 = true;
 
-  auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx] =
-      parse_mailboxes();
+  auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
+          smtp_to3_mbx] = parse_mailboxes();
 
   if (to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
     LOG(ERROR) << "don't know who to send this mail to";
@@ -2030,6 +2114,13 @@ int main(int argc, char* argv[])
     return 0;
   }
 
+  if (!smtp_to3_mbx.domain().empty() &&
+      smtp_to3_mbx.domain() != smtp_to_mbx.domain()) {
+    LOG(ERROR) << "can't send to both " << smtp_to_mbx.domain() << " and "
+               << smtp_to3_mbx.domain();
+    return 0;
+  }
+
   auto const port{osutil::get_port(FLAGS_service.c_str(), "tcp")};
 
   auto res{DNS::Resolver{config_path}};
@@ -2038,7 +2129,7 @@ int main(int argc, char* argv[])
   if (FLAGS_pipe) {
     return snd(config_path, STDIN_FILENO, STDOUT_FILENO, sender,
                to_mbx.domain(), tlsa_rrs, false, from_mbx, to_mbx,
-               smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx, bodies)
+               smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx, smtp_to3_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
@@ -2119,7 +2210,7 @@ int main(int argc, char* argv[])
     if (to_mbx.domain() == receiver) {
       if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs, enforce_dane,
               from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
-              bodies)) {
+              smtp_to3_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }
@@ -2128,7 +2219,7 @@ int main(int argc, char* argv[])
       tlsa_rrs_mx.insert(end(tlsa_rrs_mx), begin(tlsa_rrs), end(tlsa_rrs));
       if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs_mx, enforce_dane,
               from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
-              bodies)) {
+              smtp_to3_mbx, bodies)) {
         return EXIT_SUCCESS;
       }
     }

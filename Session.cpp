@@ -17,6 +17,8 @@
 #include "is_ascii.hpp"
 #include "osutil.hpp"
 
+#include <experimental/iterator>
+
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
@@ -1044,37 +1046,60 @@ void Session::xfer_response_(std::string_view success_msg)
     }
   }
 
-  if (prdr_ && forward_path_.size() > 1) {
+  if (prdr_ && forward_path_.size() > 1 &&
+      (bad_recipients.size() || temp_failed.size())) {
 
-    if (bad_recipients.size() || temp_failed.size()) {
-      out_() << "353 per recipient responses follow\r\n";
+    if (forward_path_.size() == bad_recipients.size()) {
+      out_() << "550 5.1.1 all recipients bad\r\n";
+    }
+    else if (forward_path_.size() == temp_failed.size()) {
+      out_() << "450 4.1.1 temporary failure for all recipients\r\n";
+    }
+    else {
+      // this is the mixed situation
+      out_() << "353 per recipient responses follow:\r\n";
       for (auto fp : forward_path_) {
         std::string loc = fp.local_part();
         std::transform(loc.begin(), loc.end(), loc.begin(),
                        [](unsigned char c) { return std::tolower(c); });
         if (bad_recipients_db.is_open() && bad_recipients_db.contains(loc)) {
           out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
-          LOG(WARNING) << "bad recipient " << fp;
+          LOG(INFO) << "bad recipient " << fp;
         }
         else if (temp_fail_db.is_open() && temp_fail_db.contains(loc)) {
           out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
-          LOG(WARNING) << "temp fail for " << fp;
+          LOG(INFO) << "temp fail for " << fp;
         }
         else {
-          out_() << "250 2.0.0 " << success_msg << " OK\r\n";
+          out_() << "250 2.0.0 success for " << fp << "\r\n";
+          LOG(INFO) << "success for " << fp;
         }
       }
-    }
-    else {
-      out_() << "250 2.0.0 " << success_msg << " OK\r\n";
+
+      // after the per recipient status, a final and I think useless message.
+      if (forward_path_.size() > (bad_recipients.size() + temp_failed.size())) {
+        out_() << "250 2.0.0 success for some recipients\r\n";
+      }
+      else if (temp_failed.size()) {
+        out_() << "450 4.1.1 temporary failure for some recipients\r\n";
+      }
+      else {
+        out_() << "550 5.1.1 some bad recipients\r\n";
+      }
     }
   }
   else {
     if (bad_recipients.size()) {
-      out_() << "550 5.1.1 bad recipient";
+      out_() << "550 5.1.1 bad recipient(s) ";
+      std::copy(begin(bad_recipients), end(bad_recipients),
+                std::experimental::make_ostream_joiner(out_(), ", "));
+      out_() << "\r\n";
     }
     else if (temp_failed.size()) {
-      out_() << "450 4.1.1 temporary failure";
+      out_() << "450 4.1.1 temporary failure for ";
+      std::copy(begin(temp_failed), end(temp_failed),
+                std::experimental::make_ostream_joiner(out_(), ", "));
+      out_() << "\r\n";
     }
     else {
       out_() << "250 2.0.0 " << success_msg << " OK\r\n";
