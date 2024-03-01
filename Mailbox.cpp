@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
@@ -249,18 +252,28 @@ Mailbox::Mailbox(std::string_view mailbox)
   // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
 
   if (results.local.length() > 64) { // Section 4.5.3.1.1.  Local-part
-    LOG(WARNING) << "local part > 64 octets «" << mailbox << "»";
+    LOG(ERROR) << "local part > 64 octets in «" << mailbox << "»";
+    throw std::invalid_argument("invalid mailbox syntax");
   }
   if (results.domain.length() > 255) { // Section 4.5.3.1.2.
     // Also RFC 2181 section 11. Name syntax
-    LOG(WARNING) << "domain > 255 octets «" << mailbox << "»";
+    LOG(ERROR) << "domain > 255 octets in «" << mailbox << "»";
+    throw std::invalid_argument("invalid mailbox syntax");
+  }
+
+  std::string dom{results.domain.begin(), results.domain.end()};
+  std::vector<boost::iterator_range<std::string::iterator>> labels;
+  boost::algorithm::split(labels, dom, boost::algorithm::is_any_of("."));
+
+  for (auto label : labels) {
+    if (label.size() > 63) {
+      LOG(ERROR) << "label > 63 octets in «" << mailbox << "»";
+      throw std::invalid_argument("invalid mailbox syntax");
+    }
   }
 
   set_local(results.local);
   set_domain(results.domain);
-
-  // FIXME
-  // Check that each label is limited to between 1 and 63 octets.
 }
 
 size_t Mailbox::length(domain_encoding enc) const
