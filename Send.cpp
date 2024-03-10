@@ -145,16 +145,14 @@ struct atext : sor<ALPHA, DIGIT,
                    chars::non_ascii> {};
 struct atom : plus<atext> {};
 struct dot_string : list<atom, dot> {};
-struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
+struct quoted_string : seq<one<'"'>, plus<qcontentSMTP>, one<'"'>> {};
 struct local_part : sor<dot_string, quoted_string> {};
 struct non_local_part : sor<domain, address_literal> {};
 struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
 struct at_domain : seq<one<'@'>, domain> {};
 
-struct a_d_l : list<at_domain, one<','>> {};
-
-struct path : seq<opt<seq<a_d_l, colon>>, mailbox> {};
+struct path : seq<one<'<'>, mailbox, one<'>'>> {};
 
 struct path_only : seq<path, eof> {};
 
