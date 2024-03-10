@@ -130,8 +130,6 @@ struct address_literal : seq<one<'['>,
 
 struct at_domain : seq<one<'@'>, domain> {};
 
-struct a_d_l : list<at_domain, one<','>> {};
-
 // The qtextSMTP rule explained: it's ASCII...
 // excluding all the control chars below SPACE
 //           34 '"' the double quote
@@ -150,7 +148,7 @@ struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
 
 struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
 
-struct quoted_string : seq<one<'"'>, star<qcontentSMTP>, one<'"'>> {};
+struct quoted_string : seq<one<'"'>, plus<qcontentSMTP>, one<'"'>> {};
 
 // excluded from atext are the “specials”: "()<>[]:;@\\,."
 
@@ -177,7 +175,7 @@ struct non_local_part : sor<domain, address_literal> {};
 
 struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
-struct path : seq<one<'<'>, seq<opt<seq<a_d_l, colon>>, mailbox, one<'>'>>> {};
+struct path : seq<one<'<'>, mailbox, one<'>'>> {};
 
 struct bounce_path : TAO_PEGTL_ISTRING("<>") {};
 
