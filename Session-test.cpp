@@ -37,10 +37,10 @@ struct Session_test {
 
     // bogus
     CHECK(!sess.verify_sender_domain_(
-        Domain("invalid-domain-has-only-one-lable"), error_msg));
+        Domain("invalid-domain-has-only-one-label"), error_msg));
 
     // allow listed
-    CHECK(sess.verify_sender_domain_(Domain("lots.of.lables.digilicious.com"),
+    CHECK(sess.verify_sender_domain_(Domain("lots.of.labels.digilicious.com"),
                                      error_msg));
     CHECK(sess.verify_sender_domain_(Domain("allowlisted.digilicious.com"),
                                      error_msg));
