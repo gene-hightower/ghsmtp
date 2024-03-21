@@ -36,4 +36,5 @@ smtp.pem
 snd
 socks5
 temp_fail
+temp_fail_data
 test-credentials.ipp
