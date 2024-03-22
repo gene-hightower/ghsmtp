@@ -46,10 +46,6 @@ int main(int argc, char* argv[])
   CHECK(Mailbox::validate("x@example.com"));
   CHECK(Mailbox::validate("example-indeed@strange-example.com"));
 
-  // (local domain name with no TLD, although ICANN highly discourages
-  // dotless email addresses)
-  CHECK(Mailbox::validate("admin@mailserver1"));
-
   // (see the List of Internet top-level domains)
   CHECK(Mailbox::validate("example@s.example"));
 
@@ -91,9 +87,33 @@ int main(int argc, char* argv[])
   CHECK(!Mailbox::validate("this\\ still\\\"not\\\\allowed@example.com"));
 
   // (local part is longer than 64 characters)
-  CHECK(!Mailbox::validate_strict_lengths(
-      "1234567890123456789012345678901234567890123456789012345"
-      "678901234+x@example.com"));
+  // Real world local-parts often longer than "offical" limit.
+  // CHECK(!Mailbox::validate(
+  //     "1234567890123456789012345678901234567890123456789012345"
+  //     "678901234+x@example.com"));
+
+  // Not fully qualified.
+  CHECK(!Mailbox::validate("foo@bar"));
+
+  // TLD too short.
+  CHECK(!Mailbox::validate("foo@bar.x"));
+
+  // Label longer than 64 octets.
+  CHECK(!Mailbox::validate(
+      "foo@"
+      "1234567890123456789012345678901234567890123456789012345678901234X."
+      "com"));
+
+  // Total domain length longer than 255 octets.
+  CHECK(!Mailbox::validate(
+      "foo@"
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "1234567890123456789012345678901234567890123456789012345678901234."
+      "com"));
 
   CHECK(Mailbox::validate("gene@digilicious.com"));
   CHECK(Mailbox::validate("gene@[127.0.0.1]"));
@@ -122,7 +142,7 @@ int main(int argc, char* argv[])
   // Email contains dot in the local part, a dot-atom-string.
   CHECK(Mailbox::validate("firstname.lastname@domain.com"));
 
-  // Multiple lables in domain.
+  // Multiple labels in domain.
   CHECK(Mailbox::validate("email@subdomain.domain.com"));
 
   // Plus sign is a valid character.
@@ -177,7 +197,7 @@ int main(int argc, char* argv[])
   CHECK(!Mailbox::validate("email@domain.com (Joe Smith)"));
 
   // Missing top level domain (.com/.net/.org/etc).
-  CHECK(Mailbox::validate("email@domain"));
+  CHECK(!Mailbox::validate("email@domain"));
 
   // Leading dash in front of domain is invalid.
   CHECK(!Mailbox::validate("email@-domain.com"));

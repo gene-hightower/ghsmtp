@@ -10,6 +10,9 @@
 
 #include <glog/logging.h>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
@@ -202,9 +205,10 @@ struct action<non_local_part> {
 
 std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
 {
-  parse_results results;
   if (mailbox.empty())
     return {};
+
+  parse_results  results;
   memory_input<> mbx_in(mailbox, "mailbox");
   if (tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
                                                                 results)) {
@@ -213,28 +217,10 @@ std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
   return {};
 }
 
-bool Mailbox::validate(std::string_view mailbox)
-{
-  parse_results  results;
-  memory_input<> mbx_in(mailbox, "mailbox");
-  return !mailbox.empty() &&
-         tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
-                                                                   results);
-}
-
-bool Mailbox::validate_strict_lengths(std::string_view mailbox)
-{
-  parse_results  results;
-  memory_input<> mbx_in(mailbox, "mailbox");
-  return !mailbox.empty() &&
-         tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
-                                                                   results) &&
-         (results.local.length() <= 64) && (results.domain.length() <= 255);
-}
-
 Mailbox::Mailbox(std::string_view mailbox)
 {
   if (mailbox.empty()) {
+    LOG(ERROR) << "empty mailbox string";
     throw std::invalid_argument("empty mailbox string");
   }
 
@@ -246,29 +232,47 @@ Mailbox::Mailbox(std::string_view mailbox)
     throw std::invalid_argument("invalid mailbox syntax");
   }
 
+  // "Impossible" errors; if the parse succeeded, the types must not
+  // be unknown.
   CHECK(results.local_type != local_types::unknown);
   CHECK(results.domain_type != domain_types::unknown);
 
-  // RFC-5321 section 4.5.3.1.  Size Limits and Minimums
+  // RFC-5321 4.5.3.1.  Size Limits and Minimums
 
-  if (results.local.length() > 64) { // Section 4.5.3.1.1.  Local-part
-    LOG(ERROR) << "local part > 64 octets in «" << mailbox << "»";
-    throw std::invalid_argument("invalid mailbox syntax");
-  }
+  // “To the maximum extent possible, implementation techniques that
+  //  impose no limits on the length of these objects should be used.”
+
+  // In practice, long local-parts are used and work fine. DNS imposes
+  // length limits, so we check those.
+
   if (results.domain.length() > 255) { // Section 4.5.3.1.2.
     // Also RFC 2181 section 11. Name syntax
     LOG(ERROR) << "domain > 255 octets in «" << mailbox << "»";
-    throw std::invalid_argument("invalid mailbox syntax");
+    throw std::invalid_argument("mailbox domain too long");
   }
 
   std::string dom{results.domain.begin(), results.domain.end()};
   std::vector<boost::iterator_range<std::string::iterator>> labels;
   boost::algorithm::split(labels, dom, boost::algorithm::is_any_of("."));
 
-  for (auto label : labels) {
-    if (label.size() > 63) {
-      LOG(ERROR) << "label > 63 octets in «" << mailbox << "»";
-      throw std::invalid_argument("invalid mailbox syntax");
+  // Checks for DNS style domains, not address literals.
+  if (results.domain_type == domain_types::domain) {
+    if (labels.size() < 2) {
+      LOG(ERROR) << "domain not fully qualified in «" << mailbox << "»";
+      throw std::invalid_argument("mailbox domain not fully qualified");
+    }
+
+    if (labels[labels.size() - 1].size() < 2) {
+      LOG(ERROR) << "single octet TLD in «" << mailbox << "»";
+      throw std::invalid_argument("mailbox TLD must be two or more octets");
+    }
+
+    for (auto label : labels) {
+      if (label.size() > 63) {
+        LOG(ERROR) << "label > 63 octets in «" << mailbox << "»";
+        throw std::invalid_argument(
+            "mailbox domain label greater than 63 octets");
+      }
     }
   }
 

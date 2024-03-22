@@ -72,12 +72,20 @@ public:
 
   static std::optional<parse_results> parse(std::string_view mailbox);
 
-  static bool validate(std::string_view mailbox);
-  static bool validate_strict_lengths(std::string_view mailbox);
+  static bool validate(std::string_view mailbox)
+  {
+    try {
+      Mailbox x(mailbox);
+    }
+    catch (...) {
+      return false;
+    }
+    return true;
+  }
 
-private:
-  std::string local_part_;
-  Domain      domain_;
+  private:
+    std::string local_part_;
+    Domain      domain_;
 };
 
 inline std::ostream& operator<<(std::ostream& s, Mailbox const& mb)
