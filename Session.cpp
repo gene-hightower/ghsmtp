@@ -1749,21 +1749,21 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // We don't accept mail /from/ a domain we are expecting to accept
   // mail for on an external network connection.
 
-  if (sock_.them_address_literal() != sock_.us_address_literal()) {
-    if ((accept_domains_.is_open() &&
-         (accept_domains_.contains(sender.domain().ascii()) ||
-          accept_domains_.contains(sender.domain().utf8()))) ||
-        (sender.domain() == server_identity_)) {
+  // if (sock_.them_address_literal() != sock_.us_address_literal()) {
+  //   if ((accept_domains_.is_open() &&
+  //        (accept_domains_.contains(sender.domain().ascii()) ||
+  //         accept_domains_.contains(sender.domain().utf8()))) ||
+  //       (sender.domain() == server_identity_)) {
 
-      // Ease up in test mode.
-      if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
-        return true;
-      }
-      out_() << "550 5.7.1 liar\r\n" << std::flush;
-      error_msg = fmt::format("liar, claimed to be {}", sender.domain().utf8());
-      return false;
-    }
-  }
+  //     // Ease up in test mode.
+  //     if (FLAGS_test_mode || getenv("GHSMTP_TEST_MODE")) {
+  //       return true;
+  //     }
+  //     out_() << "550 5.7.1 liar\r\n" << std::flush;
+  //     error_msg = fmt::format("liar, claimed to be {}",
+  //     sender.domain().utf8()); return false;
+  //   }
+  // }
 
   if (sender.domain().is_address_literal()) {
     if (sender.domain() != sock_.them_address_literal()) {
