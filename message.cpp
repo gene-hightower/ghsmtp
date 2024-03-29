@@ -120,9 +120,9 @@ struct FWS              : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 // *([FWS] VCHAR) *WSP
 struct field_value      : seq<star<seq<opt<FWS>, VUCHAR>>, star<WSP>> {};
 
-struct field            : seq<field_name, one<':'>, field_value, eol> {};
+struct field            : seq<field_name, colon, field_value, eol> {};
 
-struct raw_field        : seq<field_name, one<':'>, field_value, eof> {};
+struct raw_field        : seq<field_name, colon, field_value, eof> {};
 
 struct fields           : star<field> {};
 
@@ -184,7 +184,7 @@ struct encoded_word_book: seq<string<'=', '?'>,
                               encoding, string<'?'>,
                               encoded_text,
                               string<'=', '?'>
-                              > {};
+                             > {};
 
 struct encoded_word     : seq<opt<FWS>, encoded_word_book> {};
 
@@ -207,7 +207,7 @@ struct comment          : seq<one<'('>,
                               star<seq<opt<FWS>, ccontent>>,
                               opt<FWS>,
                               one<')'>
-                              > {};
+                             > {};
 
 struct CFWS             : sor<seq<plus<seq<opt<FWS>, comment>, opt<FWS>>>,
                               FWS> {};
@@ -222,7 +222,7 @@ struct quoted_string    : seq<opt<CFWS>,
                               sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
                               DQUOTE,
                               opt<CFWS>
-                              > {};
+                             > {};
 
 struct atext            : sor<ALPHA, DIGIT,
                               one<'!', '#',
@@ -272,7 +272,9 @@ struct ipv6_address     : sor<seq<                                          rep<
 
 struct ip               : sor<ipv4_address, ipv6_address> {};
 
-struct local_part       : sor<dot_atom, quoted_string> {};
+struct obs_local_part   : seq<word, star<seq<dot, word>>> {};
+
+struct local_part       : sor<quoted_string, dot_atom> {};
 
 struct dtext            : ranges<33, 90, 94, 126> {};
 
@@ -285,11 +287,15 @@ struct domain_literal   : seq<opt<CFWS>,
 
 struct domain           : sor<dot_atom, domain_literal> {};
 
+struct obs_domain       : sor<list<atom, dot>, domain_literal> {};
+
 // This addr_spec should be exactly the same as RFC5321 Mailbox, but it's not.
 
-struct addr_spec        : seq<local_part, one<'@'>, domain> {};
+struct new_addr_spec    : seq<local_part, one<'@'>, domain> {};
 
-struct addr_spec_only   : seq<addr_spec, eof> {};
+struct obs_addr_spec    : seq<obs_local_part, one<'@'>, obs_domain> {};
+
+struct addr_spec        : sor<new_addr_spec, obs_addr_spec> {};
 
 struct result           : sor<TAO_PEGTL_ISTRING("Pass"),
                               TAO_PEGTL_ISTRING("Fail"),
@@ -328,9 +334,20 @@ struct spf_header_only  : seq<spf_header, eof> {};
 
 //.............................................................................
 
-struct display_name     : phrase {};
+struct obs_domain_list : seq<
+                             star<sor<CFWS, one<','>>>, one<'@'>, domain,
+                             star<seq<one<','>, opt<CFWS>, opt<seq<one<'@'>, domain>>>>
+                            > {};
 
-struct angle_addr       : seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>> {};
+struct obs_route        : seq<obs_domain_list, colon> {};
+
+struct obs_angle_addr   : seq<opt<CFWS>, one<'<'>, obs_route, addr_spec, one<'>'>, opt<CFWS>> {};
+
+struct angle_addr       : sor<seq<opt<CFWS>, one<'<'>, addr_spec, one<'>'>, opt<CFWS>>,
+                              obs_angle_addr
+                             > {};
+
+struct display_name     : phrase {};
 
 struct name_addr        : seq<opt<display_name>, angle_addr> {};
 
@@ -338,16 +355,14 @@ struct mailbox          : sor<name_addr, addr_spec> {};
 
 struct obs_mbox_list    : seq<star<seq<opt<CFWS>, one<','>>>,
                               mailbox,
-                              star<one<','>, opt<sor<mailbox, CFWS>>>
-                              > {};
+                              star<seq<one<','>, opt<sor<mailbox, CFWS>>>>
+                             > {};
 
 struct mailbox_list     : sor<list<mailbox, one<','>>,
-                              obs_mbox_list
-                              > {};
+                              obs_mbox_list> {};
 
-// struct from          : seq<TAO_PEGTL_ISTRING("From:"),
-//                            mailbox_list
-//                            > {};
+struct from             : seq<TAO_PEGTL_ISTRING("From"), opt<CFWS>, colon,
+                              mailbox_list> {};
 
 struct mailbox_list_only: seq<mailbox_list, eof> {};
 
@@ -450,7 +465,7 @@ struct property         : sor<special_smtp_verb, keyword> {};
 //              ; were evaluated by the authentication scheme being
 //              ; applied to yield the reported result
 
-struct propspec         : seq<ptype, opt<CFWS>, one<'.'>, opt<CFWS>, property, opt<CFWS>, one<'='>, pvalue> {};
+struct propspec         : seq<ptype, opt<CFWS>, dot, opt<CFWS>, property, opt<CFWS>, one<'='>, pvalue> {};
 
 struct resinfo          : seq<opt<CFWS>, one<';'>, methodspec, opt<seq<CFWS, reasonspec>>,
                               opt<seq<CFWS, plus<propspec>>>
@@ -463,7 +478,7 @@ struct authres_payload  : seq<opt<CFWS>, authserv_id,
                               ar_results,
                               opt<CFWS>> {};
 
-struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results:"),
+struct authres_header_field: seq<TAO_PEGTL_ISTRING("Authentication-Results"), opt<CFWS>, colon,
                                  authres_payload> {};
 
 struct authres_header_field_only: seq<authres_header_field, eof> {};
@@ -643,10 +658,47 @@ bool received_spf_parsed::parse(std::string_view input)
 
 //.............................................................................
 
-// Parse a grammar and extract each addr_spec
-
 template <typename Rule>
-struct mailbox_list_action : nothing<Rule> {
+struct mailbox_list_action : nothing<Rule> {};
+
+template <>
+struct mailbox_list_action<obs_local_part> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    LOG(INFO) << "obs_local_part: " << in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<local_part> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    LOG(INFO) << "local_part: " << in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<domain> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    LOG(INFO) << "domain: " << in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<obs_domain> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    LOG(INFO) << "obs_domain: " << in.string();
+  }
 };
 
 template <>
@@ -655,7 +707,17 @@ struct mailbox_list_action<display_name> {
   static void apply(Input const&                       in,
                     ::message::mailbox_name_addr_list& from_parsed)
   {
-    from_parsed.name = in.string();
+    from_parsed.maybe_name = in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<angle_addr> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    std::swap(from_parsed.name, from_parsed.maybe_name);
   }
 };
 
@@ -667,6 +729,7 @@ struct mailbox_list_action<addr_spec> {
   {
     from_parsed.name_addr_list.push_back({from_parsed.name, in.string()});
     from_parsed.name.clear();
+    from_parsed.maybe_name.clear();
   }
 };
 
@@ -691,7 +754,8 @@ static int result_to_pol(std::string_view result)
 
 static bool is_postmaster(std::string_view from)
 {
-  return from == "<>" || istarts_with(from, "<Postmaster@");
+  return from == "<>" || iequal(from, "<Postmaster>") ||
+         istarts_with(from, "<Postmaster@");
 }
 
 static bool sender_comment(std::string_view comment, std::string_view sender)
@@ -844,6 +908,15 @@ static void spf_result_to_dmarc(OpenDMARC::policy&            dmp,
 
 namespace message {
 
+bool mailbox_list_parse(std::string_view        input,
+                        mailbox_name_addr_list& name_addr_list)
+{
+  name_addr_list = mailbox_name_addr_list{};
+  auto in{memory_input<>(input.data(), input.size(), "mailbox_list_only")};
+  return tao::pegtl::parse<RFC5322::mailbox_list_only,
+                           RFC5322::mailbox_list_action>(in, name_addr_list);
+}
+
 bool authentication_results_parse(std::string_view input,
                                   std::string&     authservid,
                                   std::string&     ar_results)
@@ -932,9 +1005,11 @@ bool authentication(message::parsed& msg,
       if (iequal(env_from.local_part(), "Postmaster") &&
           env_from.domain() == helo_dom) {
         if (validated_doms.count(helo_dom) == 0) {
-          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}", spf_parsed.result);
+          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}",
+                         spf_parsed.result);
           fmt::format_to(std::back_inserter(bfr), " {}", spf_parsed.comment);
-          fmt::format_to(std::back_inserter(bfr), " smtp.helo={}", helo_dom.ascii());
+          fmt::format_to(std::back_inserter(bfr), " smtp.helo={}",
+                         helo_dom.ascii());
           validated_doms.emplace(helo_dom);
 
           if (spf_parsed.kv_map.contains(client_ip)) {
@@ -946,7 +1021,8 @@ bool authentication(message::parsed& msg,
       }
       else {
         if (validated_doms.count(env_from.domain()) == 0) {
-          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}", spf_parsed.result);
+          fmt::format_to(std::back_inserter(bfr), ";\r\n\tspf={}",
+                         spf_parsed.result);
           fmt::format_to(std::back_inserter(bfr), " {}", spf_parsed.comment);
           fmt::format_to(std::back_inserter(bfr), " smtp.mailfrom={}",
                          env_from.as_string(Mailbox::domain_encoding::ascii));
@@ -968,17 +1044,15 @@ bool authentication(message::parsed& msg,
       hdr != end(msg.headers)) {
     auto const from_str = make_string(hdr->value);
 
-    memory_input<> from_in(from_str, "from");
-    if (!parse<RFC5322::mailbox_list_only, RFC5322::mailbox_list_action>(
-            from_in, msg.from_parsed)) {
-      LOG(WARNING) << "failed to parse From:" << from_str;
+    if (!mailbox_list_parse(from_str, msg.from_parsed)) {
+      LOG(WARNING) << "failed to parse «From:" << from_str << "»";
     }
 
     for (auto hdr_next = std::next(hdr); hdr_next != end(msg.headers);
          hdr_next      = std::next(hdr_next)) {
       if (*hdr_next == From) {
-        LOG(WARNING) << "additional RFC5322.From header found: "
-                     << hdr_next->as_string();
+        LOG(WARNING) << "additional RFC5322.From header «"
+                     << hdr_next->as_string() << "»";
       }
     }
   }
@@ -1051,8 +1125,8 @@ bool authentication(message::parsed& msg,
   auto const dmarc_result = (dmarc_passed ? "pass" : "fail");
   LOG(INFO) << "DMARC " << dmarc_result;
 
-  fmt::format_to(std::back_inserter(bfr), ";\r\n\tdmarc={} header.from={}", dmarc_result,
-                 msg.dmarc_from_domain);
+  fmt::format_to(std::back_inserter(bfr), ";\r\n\tdmarc={} header.from={}",
+                 dmarc_result, msg.dmarc_from_domain);
 
   // ARC
 

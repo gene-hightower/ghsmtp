@@ -2,7 +2,7 @@
 
 #include "Now.hpp"
 #include "Pill.hpp"
-#include "Reply.hpp"
+// #include "Reply.hpp"
 #include "esc.hpp"
 #include "osutil.hpp"
 
@@ -17,6 +17,12 @@
 
 #include <iostream>
 
+#include <tao/pegtl.hpp>
+#include <tao/pegtl/contrib/abnf.hpp>
+
+using namespace tao::pegtl;
+using namespace tao::pegtl::abnf;
+
 constexpr char srs_secret[] = "Not a real secret, of course.";
 
 DEFINE_bool(arc, false, "check ARC set");
@@ -24,6 +30,12 @@ DEFINE_bool(dkim, false, "check DKIM sigs");
 DEFINE_bool(print_from, false, "print envelope froms");
 
 DEFINE_string(selector, "ghsmtp", "DKIM selector");
+
+static std::string make_string(std::string_view v)
+{
+  return std::string(v.begin(),
+                     static_cast<size_t>(std::distance(v.begin(), v.end())));
+}
 
 int main(int argc, char* argv[])
 {
@@ -77,7 +89,8 @@ int main(int argc, char* argv[])
   fmt::memory_buffer bfr;
   fmt::format_to(std::back_inserter(bfr), "Message-ID: {}\r\n",
                  mid_str.c_str());
-  fmt::format_to(std::back_inserter(bfr), "From: \"Gene Hightower\" <{}>\r\n",
+  fmt::format_to(std::back_inserter(bfr),
+                 "From: \"Gene (more \\) comments) Hightower\" <{}>\r\n",
                  from.as_string(Mailbox::domain_encoding::utf8));
   fmt::format_to(std::back_inserter(bfr), "To: \"Gene Hightower\" <{}>\r\n",
                  to.as_string(Mailbox::domain_encoding::utf8));
@@ -95,6 +108,7 @@ int main(int argc, char* argv[])
   fmt::format_to(std::back_inserter(bfr), "This is the body of the email.\r\n");
   auto const msg_str = fmt::to_string(bfr);
 
+#if 0
   message::parsed msg;
   bool const      message_parsed = msg.parse(msg_str);
 
@@ -176,6 +190,7 @@ int main(int argc, char* argv[])
     }
     return 0;
   }
+#endif
 
   for (int a = 1; a < argc; ++a) {
     if (!fs::exists(argv[a]))
@@ -184,8 +199,49 @@ int main(int argc, char* argv[])
     file.open(argv[a]);
     message::parsed msg;
     CHECK(msg.parse(std::string_view(file.data(), file.size())));
-    rewrite_from_to(msg, "bounce@digilicious.com", "noreply@digilicious.com",
-                    server_identity.c_str(), selector, key_file);
-    std::cout << msg.as_string();
+
+    message::mailbox_name_addr_list from_parsed;
+    // Should be only one From:
+    if (auto hdr =
+            std::find(begin(msg.headers), end(msg.headers), message::From);
+        hdr != end(msg.headers)) {
+      auto const from_str = make_string(hdr->value);
+
+      LOG(INFO) << "about to parse From:" << from_str;
+      if (message::mailbox_list_parse(from_str, from_parsed)) {
+        LOG(INFO) << "success parsing From:" << from_str;
+      }
+      else {
+        LOG(WARNING) << "failed to parse From:" << from_str;
+      }
+
+      for (auto hdr_next = std::next(hdr); hdr_next != end(msg.headers);
+           hdr_next      = std::next(hdr_next)) {
+        if (*hdr_next == message::From) {
+          LOG(WARNING) << "additional RFC5322.From header found:«"
+                       << hdr_next->as_string() << "»";
+        }
+      }
+    }
+
+    if (from_parsed.name_addr_list.empty()) {
+      LOG(WARNING) << "No address in RFC5322.From header";
+      return false;
+    }
+
+    for (auto const& na : from_parsed.name_addr_list) {
+      auto from_name = na.name;
+      LOG(INFO) << "from_name «" << from_name << "»";
+
+      auto from_addr = na.addr;
+      LOG(INFO) << "from_addr «" << from_addr << "»";
+
+      if (!Mailbox::validate(from_addr)) {
+        LOG(WARNING) << "Mailbox syntax valid for RFC-5322, not for RFC-5321: «"
+                     << from_addr << "»";
+      }
+    }
+
+    // std::cout << msg.as_string();
   }
 }

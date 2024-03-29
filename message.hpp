@@ -64,6 +64,7 @@ struct name_addr {
 
 struct mailbox_name_addr_list {
   std::string            name;
+  std::string            maybe_name;
   std::vector<name_addr> name_addr_list;
 };
 
@@ -104,6 +105,9 @@ struct parsed {
   // Added ARC headers
   std::vector<std::string> arc_hdrs;
 };
+
+bool mailbox_list_parse(std::string_view        input,
+                        mailbox_name_addr_list& name_addr_list);
 
 bool authentication_results_parse(std::string_view input,
                                   std::string&     authservid,
