@@ -295,7 +295,7 @@ struct new_addr_spec    : seq<local_part, one<'@'>, domain> {};
 
 struct obs_addr_spec    : seq<obs_local_part, one<'@'>, obs_domain> {};
 
-struct addr_spec        : sor<new_addr_spec, obs_addr_spec> {};
+struct addr_spec        : sor<obs_addr_spec, new_addr_spec> {};
 
 struct result           : sor<TAO_PEGTL_ISTRING("Pass"),
                               TAO_PEGTL_ISTRING("Fail"),
@@ -662,16 +662,6 @@ template <typename Rule>
 struct mailbox_list_action : nothing<Rule> {};
 
 template <>
-struct mailbox_list_action<obs_local_part> {
-  template <typename Input>
-  static void apply(Input const&                       in,
-                    ::message::mailbox_name_addr_list& from_parsed)
-  {
-    LOG(INFO) << "obs_local_part: " << in.string();
-  }
-};
-
-template <>
 struct mailbox_list_action<local_part> {
   template <typename Input>
   static void apply(Input const&                       in,
@@ -688,6 +678,16 @@ struct mailbox_list_action<domain> {
                     ::message::mailbox_name_addr_list& from_parsed)
   {
     LOG(INFO) << "domain: " << in.string();
+  }
+};
+
+template <>
+struct mailbox_list_action<obs_local_part> {
+  template <typename Input>
+  static void apply(Input const&                       in,
+                    ::message::mailbox_name_addr_list& from_parsed)
+  {
+    LOG(INFO) << "obs_local_part: " << in.string();
   }
 };
 
