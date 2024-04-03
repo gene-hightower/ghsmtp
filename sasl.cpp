@@ -206,7 +206,7 @@ int main()
                       .sun_path = "/var/spool/postfix/private/auth" };
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
-      << "connect to " << addr.sun_path << " failed";
+      << "[sun_path == \"" << addr.sun_path << "\"] failed";
 
   auto ios{boost::iostreams::stream<SockBuffer>{fd, fd}};
 
