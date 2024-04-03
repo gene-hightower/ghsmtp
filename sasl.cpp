@@ -202,14 +202,11 @@ int main()
   auto const fd{socket(AF_UNIX, SOCK_STREAM, 0)};
   PCHECK(fd >= 0) << "socket failed";
 
-  sockaddr_un addr = {.sun_family = AF_UNIX};
-
-  constexpr char socket_path[]{"/var/spool/postfix/private/auth"};
-  static_assert(sizeof(socket_path) <= sizeof(addr.sun_path));
-  strcpy(addr.sun_path, socket_path);
+  sockaddr_un addr = {.sun_family = AF_UNIX,
+                      .sun_path = "/var/spool/postfix/private/auth" };
 
   PCHECK(connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0)
-      << "connect to " << socket_path << " failed";
+      << "connect to " << addr.sun_path << " failed";
 
   auto ios{boost::iostreams::stream<SockBuffer>{fd, fd}};
 
