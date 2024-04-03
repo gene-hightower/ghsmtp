@@ -227,7 +227,7 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  auto const tok{fmt::format("\0{}\0{}", test::username, test::password)};
+  auto const tok{fmt::format(std::string_view("\0{}\0{}", 6), test::username, test::password)};
   auto const init{Base64::enc(tok)};
 
   if (ctx.mechs.find("PLAIN") != end(ctx.mechs)) {
