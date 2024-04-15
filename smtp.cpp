@@ -754,6 +754,9 @@ void install_syscall_filter()
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigreturn), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigreturn failed";
 
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigaction), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigaction failed";
+
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(newfstatat), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add newfstatat failed";
 
