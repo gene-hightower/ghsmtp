@@ -862,6 +862,12 @@ void install_syscall_filter()
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add exit_group failed";
 
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add exit failed";
+
+  // rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(wait4), 0);
+  // CHECK_EQ(rc, 0) << "seccomp_rule_add wait4 failed";
+
   rc = seccomp_load(ctx);
   CHECK_EQ(rc, 0) << "seccomp_load failed";
 
