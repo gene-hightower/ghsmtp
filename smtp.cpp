@@ -870,6 +870,12 @@ void install_syscall_filter()
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(wait4), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add wait4 failed";
 
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sched_yield), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add sched_yield failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(ptrace), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add ptrace failed";
+
   rc = seccomp_load(ctx);
   CHECK_EQ(rc, 0) << "seccomp_load failed";
 
