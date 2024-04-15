@@ -8,6 +8,8 @@ DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
+#include <seccomp.h>
+
 #include <fstream>
 
 #include "Session.hpp"
@@ -362,15 +364,6 @@ struct data_action : nothing<Rule> {
 };
 
 template <>
-struct action<esmtp_keyword> {
-  template <typename Input>
-  static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.param.first = in.string();
-  }
-};
-
-template <>
 struct action<bogus_cmd_short> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
@@ -387,6 +380,15 @@ struct action<bogus_cmd_long> {
   {
     LOG(INFO) << "bogus_cmd_long";
     ctx.session.cmd_unrecognized(in.string());
+  }
+};
+
+template <>
+struct action<esmtp_keyword> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    ctx.param.first = in.string();
   }
 };
 
@@ -418,7 +420,7 @@ struct action<local_part> {
     ctx.mb_loc = in.string();
     // RFC 5321, section 4.5.3.1.1.
     if (ctx.mb_loc.length() > 64) {
-      LOG(WARNING) << "local part too long " << ctx.mb_loc;
+      LOG(WARNING) << "local part length == " << ctx.mb_loc.length();
     }
   }
 };
@@ -732,6 +734,142 @@ void timeout(int signum)
   _Exit(1);
 }
 
+void install_syscall_filter()
+{
+  scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_ERRNO(EPERM)));
+  // scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_LOG));
+
+  auto rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add write failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add read failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add close failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigprocmask), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigprocmask failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigreturn), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigreturn failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(newfstatat), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add newfstatat failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add openat failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(socket), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add socket failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(connect), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add connect failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(poll), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add poll failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add sendto failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add recvfrom failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sigaltstack), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add sigaltstack failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(prctl), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add prctl failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(gettid), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add gettid failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getpid), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add getpid failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(newfstatat), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add newfstatat failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add dup failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mmap), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add mmap failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(munmap), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add munmap failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(pipe2), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add pipe2 failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(readlinkat), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add readlinkat failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(pselect6), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add pselect6 failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(uname), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add uname failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fcntl), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add fcntl failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(unlink), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add unlink failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(symlink), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add symlink failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(madvise), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add madvise failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mprotect), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add mprotect failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(futex), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add futex failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(writev), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add writev failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sysinfo), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add sysinfo failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(brk), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add brk failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getrandom), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add getrandom failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getdents64), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add getdents64 failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(lseek), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add lseek failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(setsockopt), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add setsockopt failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(alarm), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add alarm failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rename), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add rename failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(clock_gettime), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add clock_gettime failed";
+
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add exit_group failed";
+
+  rc = seccomp_load(ctx);
+  CHECK_EQ(rc, 0) << "seccomp_load failed";
+
+  // seccomp_export_pfc(ctx, STDERR_FILENO);
+
+  seccomp_release(ctx);
+}
+
 int main(int argc, char* argv[])
 {
   std::ios::sync_with_stdio(false);
@@ -743,8 +881,7 @@ int main(int argc, char* argv[])
   }
 
   // Set timeout signal handler to limit total run time.
-  struct sigaction sact {
-  };
+  struct sigaction sact {};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
   sact.sa_flags   = 0;
   sact.sa_handler = timeout;
@@ -769,6 +906,8 @@ int main(int argc, char* argv[])
   ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
   ctx->session.greeting();
+
+  install_syscall_filter();
 
   istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
                                  "session"};
