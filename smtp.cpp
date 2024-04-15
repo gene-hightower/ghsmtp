@@ -736,8 +736,8 @@ void timeout(int signum)
 
 void install_syscall_filter()
 {
-  scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_ERRNO(EPERM)));
-  // scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_LOG));
+  // scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_ERRNO(EPERM)));
+  scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_LOG));
 
   auto rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add write failed";
