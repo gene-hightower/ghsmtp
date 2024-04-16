@@ -873,6 +873,9 @@ void install_syscall_filter()
 
   // for sanitize
 
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(clone), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add clone failed";
+
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(wait4), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add wait4 failed";
 
