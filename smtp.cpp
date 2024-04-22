@@ -796,6 +796,9 @@ void install_syscall_filter()
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(newfstatat), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add newfstatat failed";
 
+  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(tgkill), 0);
+  CHECK_EQ(rc, 0) << "seccomp_rule_add tgkill failed";
+
   rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup), 0);
   CHECK_EQ(rc, 0) << "seccomp_rule_add dup failed";
 
