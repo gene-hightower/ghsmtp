@@ -1,5 +1,7 @@
 #include "CDB.hpp"
 
+#include <algorithm> 
+
 #include <glog/logging.h>
 
 #include <fcntl.h>
@@ -47,6 +49,15 @@ std::optional<std::string> CDB::find(std::string_view key)
   }
 
   return {};
+}
+
+// No locale, ASCII only.
+bool CDB::contains_lc(std::string_view key)
+{
+  std::string key_lc{key.begin(), key.end()};
+  std::transform(key_lc.begin(), key_lc.end(), key_lc.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return contains(key_lc);
 }
 
 bool CDB::contains(std::string_view key)

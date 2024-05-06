@@ -23,6 +23,7 @@ public:
   bool                       open(fs::path db);
   std::optional<std::string> find(std::string_view key);
   bool                       contains(std::string_view key);
+  bool                       contains_lc(std::string_view key);
   constexpr bool             is_open() const;
 
 private:

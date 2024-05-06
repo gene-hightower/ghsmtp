@@ -1025,10 +1025,7 @@ void Session::xfer_response_(std::string_view success_msg)
   std::vector<std::string> bad_recipients;
   if (bad_recipients_db.is_open()) {
     for (auto fp : forward_path_) {
-      std::string loc = fp.local_part();
-      std::transform(loc.begin(), loc.end(), loc.begin(),
-                     [](unsigned char c) { return std::tolower(c); });
-      if (bad_recipients_db.contains(loc)) {
+      if (bad_recipients_db.contains_lc(fp.local_part())) {
         bad_recipients.push_back(fp);
         LOG(WARNING) << "bad recipient " << fp;
       }
@@ -1037,10 +1034,7 @@ void Session::xfer_response_(std::string_view success_msg)
   std::vector<std::string> temp_failed;
   if (temp_fail_db.is_open()) {
     for (auto fp : forward_path_) {
-      std::string loc = fp.local_part();
-      std::transform(loc.begin(), loc.end(), loc.begin(),
-                     [](unsigned char c) { return std::tolower(c); });
-      if (temp_fail_db.contains(loc)) {
+      if (temp_fail_db.contains_lc(fp.local_part())) {
         temp_failed.push_back(fp);
         LOG(WARNING) << "temp failed recipient " << fp;
       }
@@ -1060,14 +1054,11 @@ void Session::xfer_response_(std::string_view success_msg)
       // this is the mixed situation
       out_() << "353 per recipient responses follow:\r\n";
       for (auto fp : forward_path_) {
-        std::string loc = fp.local_part();
-        std::transform(loc.begin(), loc.end(), loc.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-        if (bad_recipients_db.is_open() && bad_recipients_db.contains(loc)) {
+        if (bad_recipients_db.is_open() && bad_recipients_db.contains_lc(fp.local_part())) {
           out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
           LOG(INFO) << "bad recipient " << fp;
         }
-        else if (temp_fail_db.is_open() && temp_fail_db.contains(loc)) {
+        else if (temp_fail_db.is_open() && temp_fail_db.contains_lc(fp.local_part())) {
           out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
           LOG(INFO) << "temp fail for " << fp;
         }
@@ -1477,7 +1468,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
                           sock_.them_address_literal());
     // check allow list
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (allow_.contains(client_fcrdns.ascii())) {
+      if (allow_.contains_lc(client_fcrdns.ascii())) {
         LOG(INFO) << "FCrDNS " << client_fcrdns << " allowed";
         fcrdns_allowed_ = true;
         return true;
@@ -1493,7 +1484,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     }
     // check blocklist
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (block_.contains(client_fcrdns.ascii())) {
+      if (block_.contains_lc(client_fcrdns.ascii())) {
         error_msg =
             fmt::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
@@ -2027,13 +2018,8 @@ bool Session::verify_recipient_(Mailbox const& recipient)
   {
     auto bad_recipients_db_name = config_path_ / "bad_recipients";
     CDB  bad_recipients_db;
-
-    std::string loc = recipient.local_part();
-    std::transform(loc.begin(), loc.end(), loc.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-
     if (bad_recipients_db.open(bad_recipients_db_name) &&
-        bad_recipients_db.contains(loc)) {
+        bad_recipients_db.contains_lc(recipient.local_part())) {
       out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
       LOG(WARNING) << "bad recipient " << recipient;
       return false;
