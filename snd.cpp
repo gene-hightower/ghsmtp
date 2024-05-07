@@ -6,6 +6,10 @@ namespace gflags {
 // in case we didn't have one
 }
 
+#include <range/v3/numeric/accumulate.hpp>
+
+namespace rng = ranges;
+
 DEFINE_uint64(reps, 1, "now many duplicate transactions per connection");
 
 // This needs to be at least the length of each string it's trying to match.
@@ -176,7 +180,7 @@ using dot = one<'.'>;
 using colon = one<':'>;
 
 // All 7-bit ASCII except NUL (0), LF (10) and CR (13).
-struct text_ascii : ranges<1, 9, 11, 12, 14, 127> {};
+  struct text_ascii : tao::pegtl::ranges<1, 9, 11, 12, 14, 127> {};
 
 // Short lines of ASCII text.  LF or CRLF line separators.
 struct body_ascii : seq<star<seq<rep_max<998, text_ascii>, eol>>,
@@ -190,7 +194,7 @@ struct body_utf8 : seq<star<seq<rep_max<998, text_utf8>, eol>>,
 
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 
-struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, chars::non_ascii> {};
+  struct qtext : sor<one<33>, tao::pegtl::ranges<35, 91, 93, 126>, chars::non_ascii> {};
 
 struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
 
@@ -208,7 +212,7 @@ struct atext : sor<ALPHA, DIGIT,
                    chars::non_ascii> {};
 
 // ctext is ASCII not '(' or ')' or '\\'
-struct ctext : sor<ranges<33, 39, 42, 91, 93, 126>, chars::non_ascii> {};
+  struct ctext : sor<tao::pegtl::ranges<33, 39, 42, 91, 93, 126>, chars::non_ascii> {};
 
 struct comment;
 
@@ -246,7 +250,7 @@ struct local_part : sor<dot_atom, quoted_string> {};
 
 // from '!' to '~' excluding 91 92 93 '[' '\\' ']'
 
-struct dtext : ranges<33, 90, 94, 126> {};
+  struct dtext : tao::pegtl::ranges<33, 90, 94, 126> {};
 
 struct domain_literal : seq<opt<CFWS>,
                             one<'['>,
@@ -276,12 +280,10 @@ struct display_name_only : seq<display_name, eof> {};
 // struct mailbox : sor<name_addr, addr_spec> {};
 
 template <typename Rule>
-struct inaction : nothing<Rule> {
-};
+struct inaction : nothing<Rule> {};
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<local_part> {
@@ -381,7 +383,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
 
 struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
-struct dcontent : ranges<33, 90, 94, 126> {};
+  struct dcontent : tao::pegtl::ranges<33, 90, 94, 126> {};
 
 struct standardized_tag : ldh_str {};
 
@@ -395,7 +397,7 @@ struct address_literal : seq<one<'['>,
                              one<']'>> {};
 
 
-struct qtextSMTP : sor<ranges<32, 33, 35, 91, 93, 126>, chars::non_ascii> {};
+struct qtextSMTP : sor<tao::pegtl::ranges<32, 33, 35, 91, 93, 126>, chars::non_ascii> {};
 struct graphic : range<32, 126> {};
 struct quoted_pairSMTP : seq<one<'\\'>, graphic> {};
 struct qcontentSMTP : sor<qtextSMTP, quoted_pairSMTP> {};
@@ -473,7 +475,7 @@ struct greeting
 // ehlo-greet     = 1*(%d0-9 / %d11-12 / %d14-127)
 //                    ; string of any characters other than CR or LF
 
-struct ehlo_greet : plus<ranges<0, 9, 11, 12, 14, 127>> {};
+struct ehlo_greet : plus<tao::pegtl::ranges<0, 9, 11, 12, 14, 127>> {};
 
 // ehlo-keyword   = (ALPHA / DIGIT) *(ALPHA / DIGIT / "-")
 //                  ; additional syntax of ehlo-params depends on
@@ -531,12 +533,10 @@ struct auth_login_password
 // clang-format on
 
 template <typename Rule>
-struct inaction : nothing<Rule> {
-};
+struct inaction : nothing<Rule> {};
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<server_id> {
@@ -754,6 +754,7 @@ class Eml {
 public:
   void add_hdr(std::string name, std::string value)
   {
+    assert(!name.starts_with("."s)); // Would mess up "dot" stuffing.
     hdrs_.push_back(std::make_pair(name, value));
   }
 
@@ -1681,15 +1682,19 @@ bool snd(fs::path                    config_path,
   hdr_stream << eml;
   if (!FLAGS_rawmsg)
     hdr_stream << "\r\n";
-  auto const& hdr_str = hdr_stream.str();
+  auto hdr_str = hdr_stream.view();
 
   // In the case of DATA style transfer, this total_size number is an
   // *estimate* only, as line endings may be translated or added
   // during transfer.  In the BDAT case, this number must be exact.
 
-  auto total_size = hdr_str.size();
-  for (auto const& body : bodies)
-    total_size += body.size();
+  auto const total_size = rng::accumulate(
+      bodies, hdr_str.size(),
+      [](size_t s, const content& body) { return s + body.size(); });
+
+  // auto total_size = hdr_str.size();
+  // for (auto const& body : bodies)
+  //   total_size += body.size();
 
   if (ext_size && max_msg_size && (total_size > max_msg_size)) {
     LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
@@ -1922,7 +1927,7 @@ bool snd(fs::path                    config_path,
 
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       if (cnn.reply_code != "354") {
-        LOG(ERROR) << "DATA returned " << cnn.reply_code;
+        LOG(ERROR) << "DATA/BDAT #1 returned " << cnn.reply_code;
         fail(in, cnn);
       }
 
@@ -1931,11 +1936,9 @@ bool snd(fs::path                    config_path,
         cnn.sock.out() << "\r\n";
 
       for (auto const& body : bodies) {
-        auto lineno = 0;
-        auto line{std::string{}};
         auto isbody{imemstream{body.data(), body.size()}};
-        while (std::getline(isbody, line)) {
-          ++lineno;
+        auto line{std::string{}};
+        for (auto lineno = 0; std::getline(isbody, line); ++lineno) {
           if (!cnn.sock.out().good()) {
             cnn.sock.log_stats();
             LOG(FATAL) << "output no good at line " << lineno;
@@ -1946,6 +1949,11 @@ bool snd(fs::path                    config_path,
             cnn.sock.out() << line << '\n';
           }
           else {
+            // "dot" stuffing:
+            if (line.length() && (line.at(0) == '.')) {
+              cnn.sock.out() << '.';
+            }
+
             // This code converts single LF line endings into CRLF.
             // This code does nothing to fix single CR characters not
             // part of a CRLF pair.
@@ -1954,9 +1962,6 @@ bool snd(fs::path                    config_path,
             // the file doesn't already end with one.  This is a
             // requirement of the SMTP DATA protocol.
 
-            if (line.length() && (line.at(0) == '.')) {
-              cnn.sock.out() << '.';
-            }
             cnn.sock.out() << line;
             if (line.length() && line.back() != '\r')
               cnn.sock.out() << '\r';
@@ -1999,12 +2004,12 @@ bool snd(fs::path                    config_path,
       }
       else {
         // last (and useless?) response.
-        LOG(INFO) << "DATA returned " << cnn.reply_code;
+        LOG(INFO) << "DATA/BDAT #2 returned " << cnn.reply_code;
         success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
       }
     }
     else {
-      LOG(INFO) << "DATA returned " << cnn.reply_code;
+      LOG(INFO) << "DATA/BDAT #3 returned " << cnn.reply_code;
       success = cnn.reply_code.length() && cnn.reply_code.at(0) == '2';
     }
 
@@ -2102,7 +2107,12 @@ int main(int argc, char* argv[])
   auto&& [from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
           smtp_to3_mbx] = parse_mailboxes();
 
-  if (to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
+  if (smtp_to_mbx.domain().empty() && smtp_to2_mbx.domain().empty() &&
+      smtp_to3_mbx.domain().empty()) {
+    smtp_to_mbx = to_mbx;
+  }
+
+  if (smtp_to_mbx.domain().empty() && FLAGS_mx_host.empty()) {
     LOG(ERROR) << "don't know who to send this mail to";
     return 0;
   }
@@ -2124,18 +2134,18 @@ int main(int argc, char* argv[])
   auto const port{osutil::get_port(FLAGS_service.c_str(), "tcp")};
 
   auto res{DNS::Resolver{config_path}};
-  auto tlsa_rrs{get_tlsa_rrs(res, to_mbx.domain(), port)};
+  auto tlsa_rrs{get_tlsa_rrs(res, smtp_to_mbx.domain(), port)};
 
   if (FLAGS_pipe) {
     return snd(config_path, STDIN_FILENO, STDOUT_FILENO, sender,
-               to_mbx.domain(), tlsa_rrs, false, from_mbx, to_mbx,
+               smtp_to_mbx.domain(), tlsa_rrs, false, from_mbx, to_mbx,
                smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx, smtp_to3_mbx, bodies)
                ? EXIT_SUCCESS
                : EXIT_FAILURE;
   }
 
   bool       enforce_dane = true;
-  auto const receivers    = get_receivers(res, to_mbx, enforce_dane);
+  auto const receivers    = get_receivers(res, smtp_to_mbx, enforce_dane);
 
   if (receivers.empty()) {
     LOG(INFO) << "no place to send this mail";
@@ -2207,7 +2217,7 @@ int main(int argc, char* argv[])
       // also look at our ID to get SPF records.
     }
 
-    if (to_mbx.domain() == receiver) {
+    if (smtp_to_mbx.domain() == receiver) {
       if (snd(config_path, fd, fd, sender, receiver, tlsa_rrs, enforce_dane,
               from_mbx, to_mbx, smtp_from_mbx, smtp_to_mbx, smtp_to2_mbx,
               smtp_to3_mbx, bodies)) {
