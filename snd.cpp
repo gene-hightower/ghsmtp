@@ -728,7 +728,7 @@ int conn(DNS::Resolver& res, Domain const& node, uint16_t port)
     else {
       addrs = res.get_strings(DNS::RR_type::A, node.ascii());
     }
-    for (auto addr : addrs) {
+    for (auto const& addr : addrs) {
       auto in4{sockaddr_in{}};
       in4.sin_family = AF_INET;
       in4.sin_port   = htons(port);
@@ -962,7 +962,7 @@ void selftest()
       "421 mtaig-maa02.mx.aol.com Service unavailable - try again later\r\n",
   };
 
-  for (auto i : greet_list) {
+  for (auto const& i : greet_list) {
     auto cnn{RFC5321::Connection(0, 1, read_hook)};
     auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::greeting, RFC5321::action /*, tao::pegtl::tracer*/>(
@@ -1015,7 +1015,7 @@ void selftest()
       "250 DSN\r\n",
   };
 
-  for (auto i : ehlo_rsp_list) {
+  for (auto const& i : ehlo_rsp_list) {
     auto cnn{RFC5321::Connection(0, 1, read_hook)};
     auto in{memory_input<>{i, i}};
     if (!parse<RFC5321::ehlo_rsp, RFC5321::action /*, tao::pegtl::tracer*/>(
