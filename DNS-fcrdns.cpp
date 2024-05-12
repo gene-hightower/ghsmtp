@@ -23,8 +23,8 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
   for (auto const& ptr : ptrs) {
     if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
       // The forward part, check each PTR for matching A record.
-      auto const addrs
-          = res.get_strings(RR_type::A, std::get<DNS::RR_PTR>(ptr).str());
+      auto const addrs =
+          res.get_strings(RR_type::A, std::get<DNS::RR_PTR>(ptr).str());
       if (std::find(begin(addrs), end(addrs), addr) != end(addrs)) {
         fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
       }
@@ -39,7 +39,8 @@ std::vector<std::string> fcrdns4(Resolver& res, std::string_view addr)
               return a < b;
             });
 
-  std::unique(begin(fcrdns), end(fcrdns));
+  auto const last = std::unique(fcrdns.begin(), fcrdns.end());
+  fcrdns.erase(last, fcrdns.end());
 
   return fcrdns;
 }
@@ -56,8 +57,8 @@ std::vector<std::string> fcrdns6(Resolver& res, std::string_view addr)
   for (auto const& ptr : ptrs) {
     if (std::holds_alternative<DNS::RR_PTR>(ptr)) {
       // The forward part, check each PTR for matching AAAA record.
-      auto const addrs
-          = res.get_strings(RR_type::AAAA, std::get<DNS::RR_PTR>(ptr).str());
+      auto const addrs =
+          res.get_strings(RR_type::AAAA, std::get<DNS::RR_PTR>(ptr).str());
       if (std::find(begin(addrs), end(addrs), addr) != end(addrs)) {
         fcrdns.push_back(std::get<DNS::RR_PTR>(ptr).str());
       }
