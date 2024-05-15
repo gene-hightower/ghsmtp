@@ -12,8 +12,6 @@
 
 #include <arpa/nameser.h>
 
-#include <experimental/random>
-
 #include <glog/logging.h>
 
 #include "osutil.hpp"
@@ -147,8 +145,9 @@ Resolver::Resolver(fs::path config_path)
   auto tries = countof(Config::nameservers);
 
   if (FLAGS_random_dns_servers) {
-    ns_ = std::experimental::randint(
-        0, static_cast<int>(countof(Config::nameservers) - 1));
+    std::uniform_int_distribution<int> uniform_dist(
+        0, countof(Config::nameservers) - 1);
+    ns_ = uniform_dist(rng_);
   }
   else {
     ns_ = static_cast<int>(countof(Config::nameservers) - 1);
@@ -347,13 +346,7 @@ bool Query::xchg_(Resolver& res, uint16_t id)
 Query::Query(Resolver& res, RR_type type, char const* name)
   : type_(type)
 {
-  static_assert(std::numeric_limits<uint16_t>::min() == 0);
-  static_assert(std::numeric_limits<uint16_t>::max() == 65535);
-
-  uint16_t id =
-      std::experimental::randint(std::numeric_limits<uint16_t>::min(),
-                                 std::numeric_limits<uint16_t>::max());
-
+  uint16_t id  = res.rnd_id();
   uint16_t cls = ns_c_in;
 
   q_ = create_question(name, type, cls, id);

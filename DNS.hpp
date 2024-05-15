@@ -10,11 +10,13 @@
 
 #include <glog/logging.h>
 
+#include "pcg.hpp"
+
 namespace DNS {
 
 class Resolver {
 public:
-  Resolver(Resolver const&) = delete;
+  Resolver(Resolver const&)            = delete;
   Resolver& operator=(Resolver const&) = delete;
 
   Resolver(fs::path config_path);
@@ -33,15 +35,26 @@ public:
 
   message xchg(message const& q);
 
+  uint16_t rnd_id()
+  {
+    static_assert(std::numeric_limits<uint16_t>::min() == 0);
+    static_assert(std::numeric_limits<uint16_t>::max() == 65535);
+    std::uniform_int_distribution<int> uniform_dist(0, 65535);
+    return uniform_dist(rng_);
+  }
+
 private:
   std::unique_ptr<Sock> ns_sock_;
   int                   ns_;
   int                   ns_fd_;
+
+  inline static pcg_extras::seed_seq_from<std::random_device> seed_source_;
+  inline static pcg32 rng_{seed_source_};
 };
 
 class Query {
 public:
-  Query(Query const&) = delete;
+  Query(Query const&)            = delete;
   Query& operator=(Query const&) = delete;
 
   Query(Resolver& res, RR_type type, char const* name);

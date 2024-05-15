@@ -2,28 +2,12 @@
 
 #include <limits>
 
-#if __has_include(<experimental/random>)
-#include <experimental/random>
-#define HAS_RANDINT
-#else
-#include <random>
-#endif
-
-#include <boost/config.hpp>
-
 Pill::Pill()
 {
   using s_t = decltype(s_);
 
-#ifdef HAS_RANDINT
-  auto constexpr min = std::numeric_limits<s_t>::min();
-  auto constexpr max = std::numeric_limits<s_t>::max();
-  s_                 = std::experimental::randint(min, max);
-#else
-  std::random_device                 rd;
   std::uniform_int_distribution<s_t> uni_dist;
-  s_ = uni_dist(rd);
-#endif
+  s_ = uni_dist(rng_);
 
   auto resp{b32_ndigits_};
   b32_str_[resp] = '\0';

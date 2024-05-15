@@ -7,6 +7,8 @@
 #include <ostream>
 #include <string_view>
 
+#include "pcg.hpp"
+
 // A pill is a unit of entropy.
 
 class Pill {
@@ -31,6 +33,9 @@ private:
   {
     return s << p.b32_str_;
   }
+
+  inline static pcg_extras::seed_seq_from<std::random_device> seed_source_;
+  inline static pcg64 rng_{seed_source_};
 };
 
 #endif // PILL_DOT_HPP
