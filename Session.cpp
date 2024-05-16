@@ -752,7 +752,7 @@ static std::string folder(Session::SpamStatus         status,
   };
 
   assignment assignments[] = {
-      {"Emailcore", ".emailcore"},
+      {"emailcore", ".emailcore"},
       {"bootstrappable", ".bootstrappable"},
       {"coreboot.org", ".coreboot"},
       {"dmarc", ".dmarc"},
