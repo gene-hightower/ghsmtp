@@ -776,7 +776,7 @@ static std::string folder(Session::SpamStatus         status,
   };
 
   for (auto ass : assignments) {
-    if (forward_path[0].local_part() == ass.local_part)
+    if (iequal(forward_path[0].local_part(), ass.local_part))
       return std::string(ass.folder);
   }
 
