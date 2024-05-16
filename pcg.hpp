@@ -1,6 +1,8 @@
 #ifndef PCG_DOT_HPP_INCLUDED
 #define PCG_DOT_HPP_INCLUDED
 
+#include <random>
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "pcg_random.hpp"
