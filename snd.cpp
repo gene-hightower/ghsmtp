@@ -1385,8 +1385,8 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   }
 
   // Perfer PLAIN mechanism.
-  if (std::find(begin(auth->second), end(auth->second), "PLAIN") !=
-      end(auth->second)) {
+  if (std::find(cbegin(auth->second), cend(auth->second), "PLAIN") !=
+      cend(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
     auto const tok = fmt::format("\0{}\0{}", FLAGS_username, FLAGS_password);
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok) << "\r\n" << std::flush;
