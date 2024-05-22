@@ -34,8 +34,9 @@ int main(int argc, char const* argv[])
   Domain const poop2{"xn--ls8h.la"};
   CHECK_EQ(poop1, poop2);
 
-  Domain const norm0{"hi⒌com"};
+  Domain const norm0{"hi⒌com"}; // non-ascii "dot" before "com"
   Domain const norm1{"hi5.com"};
+
   CHECK_EQ(norm0, norm1);
 
   CHECK(Domain::validate("hi⒌com"));
