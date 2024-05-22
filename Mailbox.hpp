@@ -60,12 +60,14 @@ public:
   enum class domain_types : uint8_t {
     unknown,
     domain,
-    address_literal,
+    address_literal,         // IP4/IP6 address literal
+    general_address_literal, // some other address literal
   };
 
   struct parse_results {
     std::string_view local;
     std::string_view domain;
+    std::string_view standardized_tag;
     local_types      local_type  = local_types::unknown;
     domain_types     domain_type = domain_types::unknown;
   };

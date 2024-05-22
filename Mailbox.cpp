@@ -176,11 +176,38 @@ struct action<domain> {
 };
 
 template <>
-struct action<address_literal> {
+struct action<IPv4_address_literal> {
   template <typename Input>
   static void apply(Input const& in, Mailbox::parse_results& results)
   {
     results.domain_type = Mailbox::domain_types::address_literal;
+  }
+};
+
+template <>
+struct action<IPv6_address_literal> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::parse_results& results)
+  {
+    results.domain_type = Mailbox::domain_types::address_literal;
+  }
+};
+
+template <>
+struct action<standardized_tag> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::parse_results& results)
+  {
+    results.standardized_tag = make_view(in);
+  }
+};
+
+template <>
+struct action<general_address_literal> {
+  template <typename Input>
+  static void apply(Input const& in, Mailbox::parse_results& results)
+  {
+    results.domain_type = Mailbox::domain_types::general_address_literal;
   }
 };
 
@@ -232,6 +259,12 @@ Mailbox::Mailbox(std::string_view mailbox)
     throw std::invalid_argument("invalid mailbox syntax");
   }
 
+  if (results.domain_type == domain_types::general_address_literal) {
+    LOG(ERROR) << "general address literal in mailbox «" << mailbox << "»";
+    LOG(ERROR) << "unknown tag «" << results.standardized_tag << "»";
+    throw std::invalid_argument("general address literal in mailbox");
+  }
+
   // "Impossible" errors; if the parse succeeded, the types must not
   // be unknown.
   CHECK(results.local_type != local_types::unknown);
@@ -258,7 +291,7 @@ Mailbox::Mailbox(std::string_view mailbox)
   // Checks for DNS style domains, not address literals.
   if (results.domain_type == domain_types::domain) {
     if (labels.size() < 2) {
-      LOG(ERROR) << "domain not fully qualified in «" << mailbox << "»";
+      LOG(ERROR) << "domain must have at least two labels «" << mailbox << "»";
       throw std::invalid_argument("mailbox domain not fully qualified");
     }
 

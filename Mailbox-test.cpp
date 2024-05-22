@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
   CHECK(!Mailbox::validate("email@domain..com"));
 
   // general_address_literal
-  CHECK(Mailbox::validate("email@[x:~Foo_Bar_Baz<\?\?>]"));
+  CHECK(!Mailbox::validate("email@[x:~Foo_Bar_Baz<\?\?>]"));
 
   std::cout << "sizeof(Mailbox) == " << sizeof(Mailbox) << '\n';
 }
