@@ -110,7 +110,7 @@ auto is_address_literal(std::string_view addr) -> bool
 
 auto to_address_literal(std::string_view addr) -> std::string
 {
-  // CHECK(is_address(addr));
+  CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
