@@ -1,3 +1,4 @@
+#define _Bool bool
 #include "OpenDKIM.hpp"
 
 #include "iobuffer.hpp"

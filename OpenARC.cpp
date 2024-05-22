@@ -1,3 +1,4 @@
+#define _Bool bool
 #include "OpenARC.hpp"
 
 #include <regex>

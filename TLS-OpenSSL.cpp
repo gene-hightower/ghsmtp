@@ -851,5 +851,6 @@ void TLS::ssl_error(int n_get_err)
   unsigned long er;
   while (0 != (er = ERR_get_error()))
     LOG(WARNING) << ERR_error_string(er, nullptr);
-  LOG(FATAL) << "fatal OpenSSL error";
+  LOG(WARNING) << "fatal OpenSSL error";
+  exit(1);
 }
