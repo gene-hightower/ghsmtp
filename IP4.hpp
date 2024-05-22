@@ -5,6 +5,8 @@
 #include <string_view>
 #include <vector>
 
+#include <glog/logging.h>
+
 namespace IP4 {
 auto is_private(std::string_view addr) -> bool;
 auto is_address(std::string_view addr) -> bool;
@@ -25,8 +27,8 @@ constexpr auto loopback_literal{"[127.0.0.1]"};
 
 constexpr auto as_address(std::string_view address_literal) -> std::string_view
 {
-  // CHECK(is_address_literal(address_literal));
-  return std::string_view(begin(address_literal) + lit_pfx_sz,
+  CHECK(is_address_literal(address_literal));
+  return std::string_view(cbegin(address_literal) + lit_pfx_sz,
                           size(address_literal) - lit_extra_sz);
 }
 
