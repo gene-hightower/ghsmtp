@@ -1592,14 +1592,20 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
 bool domain_blocked(DNS::Resolver& res, Domain const& identity)
 {
-  Domain     lookup{fmt::format("{}.dbl.spamhaus.org", identity.ascii())};
-  DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
-  if (q.has_record()) {
-    const auto a_strings = q.get_strings();
-    for (auto const& as : a_strings) {
-      if (istarts_with(as, "127.0.1.")) {
-        LOG(INFO) << "Domain " << identity << " blocked by spamhaus, " << as;
-        return true;
+  if (identity.is_address_literal()) {
+    // don't "domain block" address literals
+    return false;
+  }
+  if (!identity.ascii().empty()) {
+    Domain     lookup{fmt::format("{}.dbl.spamhaus.org", identity.ascii())};
+    DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
+    if (q.has_record()) {
+      const auto a_strings = q.get_strings();
+      for (auto const& as : a_strings) {
+        if (istarts_with(as, "127.0.1.")) {
+          LOG(INFO) << "Domain " << identity << " blocked by spamhaus, " << as;
+          return true;
+        }
       }
     }
   }
