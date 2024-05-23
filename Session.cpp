@@ -1700,7 +1700,7 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   if (domain_blocked(res_, client_identity) ||
-      domain_blocked(res_, Domain(tld))) {
+      (tld && domain_blocked(res_, Domain(tld)))) {
     error_msg =
         fmt::format("claimed identity {} blocked", client_identity.ascii());
     out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
