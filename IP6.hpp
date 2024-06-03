@@ -16,10 +16,10 @@ auto to_address_literal(std::string_view addr) -> std::string;
 auto reverse(std::string_view addr) -> std::string;
 
 auto constexpr lit_pfx{"[IPv6:"sv};
-auto constexpr lit_pfx_sz{std::size(lit_pfx)};
+auto constexpr lit_pfx_sz{lit_pfx.size()};
 
 auto constexpr lit_sfx{"]"sv};
-auto constexpr lit_sfx_sz{std::size(lit_sfx)};
+auto constexpr lit_sfx_sz{lit_sfx.size()};
 
 auto constexpr lit_extra_sz{lit_pfx_sz + lit_sfx_sz};
 
