@@ -8,6 +8,8 @@
 #include <glog/logging.h>
 
 namespace IP4 {
+using namespace std::literals::string_view_literals;
+
 auto is_private(std::string_view addr) -> bool;
 auto is_address(std::string_view addr) -> bool;
 auto is_address_literal(std::string_view addr) -> bool;
@@ -15,21 +17,21 @@ auto to_address_literal(std::string_view addr) -> std::string;
 auto reverse(std::string_view addr) -> std::string;
 auto fcrdns(std::string_view addr) -> std::vector<std::string>;
 
-constexpr char lit_pfx[] = "[";
-constexpr auto lit_pfx_sz{sizeof(lit_pfx) - 1};
+auto constexpr lit_pfx{"["sv};
+auto constexpr lit_pfx_sz{std::size(lit_pfx)};
 
-constexpr char lit_sfx[] = "]";
-constexpr auto lit_sfx_sz{sizeof(lit_sfx) - 1};
+auto constexpr lit_sfx{"]"sv};
+auto constexpr lit_sfx_sz{std::size(lit_sfx)};
 
-constexpr auto lit_extra_sz{lit_pfx_sz + lit_sfx_sz};
+auto constexpr lit_extra_sz{lit_pfx_sz + lit_sfx_sz};
 
-constexpr auto loopback_literal{"[127.0.0.1]"};
+auto constexpr loopback_literal{"[127.0.0.1]"sv};
 
 constexpr auto as_address(std::string_view address_literal) -> std::string_view
 {
   CHECK(is_address_literal(address_literal));
-  return std::string_view(cbegin(address_literal) + lit_pfx_sz,
-                          size(address_literal) - lit_extra_sz);
+  return address_literal.substr(lit_pfx_sz,
+                                address_literal.length() - lit_extra_sz);
 }
 
 } // namespace IP4

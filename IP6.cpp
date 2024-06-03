@@ -71,7 +71,7 @@ struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
 
 bool is_private(std::string_view addr)
 {
-  // CHECK(is_address(addr));
+  CHECK(is_address(addr));
   return istarts_with(addr, "fd");
 }
 
@@ -89,7 +89,7 @@ bool is_address_literal(std::string_view addr)
 
 std::string to_address_literal(std::string_view addr)
 {
-  // CHECK(is_address(addr));
+  CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 

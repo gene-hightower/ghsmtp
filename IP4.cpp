@@ -67,7 +67,7 @@ struct action<dec_octet> {
 
 // <https://en.wikipedia.org/wiki/Private_network#Private_IPv4_addresses>
 
-auto is_private(std::string_view addr) -> bool
+bool is_private(std::string_view addr)
 {
   std::vector<std::string> a;
   a.reserve(4);
@@ -96,25 +96,25 @@ auto is_private(std::string_view addr) -> bool
   return (a[0] == "192") && (a[1] == "168");
 }
 
-auto is_address(std::string_view addr) -> bool
+bool is_address(std::string_view addr)
 {
   memory_input<> in{addr.data(), addr.size(), "addr"};
   return parse<ipv4_address>(in);
 }
 
-auto is_address_literal(std::string_view addr) -> bool
+bool is_address_literal(std::string_view addr)
 {
   memory_input<> in{addr.data(), addr.size(), "addr"};
   return parse<ipv4_address_lit>(in);
 }
 
-auto to_address_literal(std::string_view addr) -> std::string
+std::string_view to_address_literal(std::string_view addr)
 {
   CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
-auto reverse(std::string_view addr) -> std::string
+std::string reverse(std::string_view addr)
 {
   std::vector<std::string> a;
   a.reserve(4);
