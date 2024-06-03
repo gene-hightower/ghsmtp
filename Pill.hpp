@@ -20,7 +20,7 @@ public:
 
   std::string_view as_string_view() const
   {
-    return std::string_view{b32_str_, strlen(b32_str_)};
+    return std::string_view{b32_str_, b32_ndigits_};
   }
 
 private:
@@ -31,7 +31,7 @@ private:
 
   friend std::ostream& operator<<(std::ostream& s, Pill const& p)
   {
-    return s << p.b32_str_;
+    return s << p.as_string_view();
   }
 
   inline static pcg_extras::seed_seq_from<std::random_device> seed_source_;
