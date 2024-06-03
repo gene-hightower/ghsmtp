@@ -25,6 +25,7 @@ namespace Config {
 // better with just a little more time.
 
 auto constexpr read_timeout{std::chrono::seconds(7)};
+auto constexpr write_timeout{std::chrono::seconds(1)};
 
 enum class sock_type : bool { stream, dgram };
 
@@ -243,10 +244,13 @@ message Resolver::xchg(message const& q)
   if (Config::nameservers[ns_].typ == Config::sock_type::stream) {
     CHECK_EQ(ns_fd_, -1);
 
-    uint16_t sz = htons(std::size(q));
+    auto const sp = static_cast<std::span<DNS::message::octet const>>(q);
 
+    uint16_t sz = sp.size();
+
+    sz = htons(sz);
     ns_sock_->out().write(reinterpret_cast<char const*>(&sz), sizeof sz);
-    ns_sock_->out().write(reinterpret_cast<char const*>(begin(q)), size(q));
+    ns_sock_->out().write(reinterpret_cast<char const*>(sp.data()), sp.size());
     ns_sock_->out().flush();
 
     sz = 0;
@@ -254,8 +258,8 @@ message Resolver::xchg(message const& q)
     sz = ntohs(sz);
 
     DNS::message::container_t bfr(sz);
-    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
-    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sz));
+    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), bfr.size());
+    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(bfr.size()));
 
     if (!ns_sock_->in()) {
       LOG(WARNING) << "Resolver::xchg was able to read only "
@@ -268,27 +272,37 @@ message Resolver::xchg(message const& q)
   CHECK(Config::nameservers[ns_].typ == Config::sock_type::dgram);
   CHECK_GE(ns_fd_, 0);
 
-  CHECK_EQ(send(ns_fd_, std::begin(q), std::size(q), 0), std::size(q));
+  auto t_o{false};
+
+  auto const sp = static_cast<std::span<DNS::message::octet const>>(q);
+
+  auto const wrlen =
+      POSIX::write(ns_fd_, reinterpret_cast<char const*>(sp.data()), sp.size(),
+                   Config::write_timeout, t_o);
+  if (wrlen != std::streamsize(sp.size())) {
+    LOG(WARNING) << "DNS write failed";
+    return message{0};
+  }
+  if (t_o) {
+    LOG(WARNING) << "DNS write timed out";
+    return message{0};
+  }
 
   DNS::message::container_t bfr(Config::max_udp_sz);
 
   auto constexpr hook{[]() {}};
-  auto       t_o{false};
-  auto const a_buf = reinterpret_cast<char*>(bfr.data());
-  auto const a_buflen = POSIX::read(ns_fd_, a_buf, int(Config::max_udp_sz),
-                                    hook, Config::read_timeout, t_o);
-
-  if (a_buflen < 0) {
+  auto const a_rdlen = POSIX::read(ns_fd_, reinterpret_cast<char*>(bfr.data()),
+                                   bfr.size(), hook, Config::read_timeout, t_o);
+  if (a_rdlen < 0) {
     LOG(WARNING) << "DNS read failed";
     return message{0};
   }
-
   if (t_o) {
     LOG(WARNING) << "DNS read timed out";
     return message{0};
   }
 
-  bfr.resize(a_buflen);
+  bfr.resize(a_rdlen); // down from max_udp_sz
   bfr.shrink_to_fit();
 
   return message{std::move(bfr)};
@@ -314,13 +328,15 @@ bool Query::xchg_(Resolver& res, uint16_t id)
 
     a_ = res.xchg(q_);
 
-    if (!size(a_)) {
+    auto const a_sp = static_cast<std::span<DNS::message::octet const>>(a_);
+
+    if (!a_sp.size()) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "no reply from nameserver";
       return false;
     }
 
-    if (size(a_) < min_message_sz()) {
+    if (a_sp.size() < message::min_sz()) {
       bogus_or_indeterminate_ = true;
       LOG(WARNING) << "packet too small";
       return false;
@@ -354,7 +370,9 @@ Query::Query(Resolver& res, RR_type type, char const* name)
   if (!xchg_(res, id))
     return;
 
-  if (size(a_) < min_message_sz()) {
+  auto const a_sp = static_cast<std::span<DNS::message::octet const>>(a_);
+
+  if (a_sp.size() < message::min_sz()) {
     bogus_or_indeterminate_ = true;
     LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
     return;

@@ -275,9 +275,11 @@ DNS::RR_collection RR_list::get_records() const
           auto const rdf = ldns_rr_rdf(rr, 3);
           CHECK_EQ(ldns_rdf_get_type(rdf), LDNS_RDF_TYPE_HEX);
 
-          ret.emplace_back(DNS::RR_TLSA{usage, selector, matching_type,
-                                        ldns_rdf_data(rdf),
-                                        ldns_rdf_size(rdf)});
+          ret.emplace_back(
+              DNS::RR_TLSA{usage,
+                           selector,
+                           matching_type,
+                           {ldns_rdf_data(rdf), ldns_rdf_size(rdf)}});
           break;
         }
 

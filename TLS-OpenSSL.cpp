@@ -1,6 +1,7 @@
 #include "TLS-OpenSSL.hpp"
 
 #include <iomanip>
+#include <span>
 #include <string>
 
 #include <openssl/err.h>
@@ -43,21 +44,19 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
 // convert binary input into a std::string of hex digits
 
-auto bin2hexstring(uint8_t const* data, size_t length)
+auto bin2hexstring(std::span<unsigned char const> const data) -> std::string
 {
   std::string ret;
-  ret.reserve(2 * length);
+  ret.reserve(2 * data.size());
 
-  for (size_t n = 0u; n < length; ++n) {
-    auto const ch = data[n];
-
+  for (auto const& ch : data) {
     auto const lo = ch & 0xF;
     auto const hi = (ch >> 4) & 0xF;
 
     auto constexpr hex_digits = "0123456789abcdef";
 
-    ret += hex_digits[hi];
-    ret += hex_digits[lo];
+    ret += hex_digits[static_cast<int>(hi)];
+    ret += hex_digits[static_cast<int>(lo)];
   }
 
   return ret;
@@ -358,18 +357,18 @@ bool TLS::starttls_client(fs::path                  config_path,
                                           rp.matching_type(), data.data(), data.size());
 
       if (rc < 0) {
-        auto const cp = bin2hexstring(data.data(), data.size());
+        auto const cp = bin2hexstring(data);
         LOG(ERROR) << "SSL_dane_tlsa_add() failed.";
         LOG(ERROR) << "failed record: " << rp.cert_usage() << " "
                    << rp.selector() << " " << rp.matching_type() << " " << cp;
       }
       else if (rc == 0) {
-        auto const cp = bin2hexstring(data.data(), data.size());
+        auto const cp = bin2hexstring(data);
         LOG(ERROR) << "unusable TLSA record: " << rp.cert_usage() << " "
                    << rp.selector() << " " << rp.matching_type() << " " << cp;
       }
       else {
-        // auto const cp = bin2hexstring(data.data(), data.size());
+        // auto const cp = bin2hexstring(data);
         // LOG(INFO) << "added TLSA record: " << rp.cert_usage() << " "
         //           << rp.selector() << " " << rp.matching_type() << " " << cp;
         ++usable_TLSA_records;
@@ -454,8 +453,8 @@ bool TLS::starttls_client(fs::path                  config_path,
                          &certdata_len);
 
       LOG(INFO) << "DANE TLSA " << unsigned(usage) << " " << unsigned(selector)
-                << " " << unsigned(mtype) << " [" << bin2hexstring(certdata, 6)
-                << "...] "
+                << " " << unsigned(mtype) << " ["
+                << bin2hexstring({certdata, 6}) << "...] "
                 << ((mspki != nullptr) ? "TA public key verified certificate"
                     : depth            ? "matched TA certificate"
                                        : "matched EE certificate")
@@ -720,7 +719,7 @@ bool TLS::starttls_server(fs::path                  config_path,
                            &certdata_len);
 
         LOG(INFO) << "DANE TLSA " << usage << " " << selector << " " << mtype
-                  << " [" << bin2hexstring(certdata, 6) << "...] "
+                  << " [" << bin2hexstring({certdata, 6}) << "...] "
                   << ((mspki != nullptr) ? "TA public key verified certificate"
                       : depth            ? "matched TA certificate"
                                          : "matched EE certificate")

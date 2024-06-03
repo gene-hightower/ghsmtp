@@ -6,12 +6,12 @@
 #include <arpa/nameser.h>
 
 namespace {
-using octet = unsigned char;
+using octet = DNS::message::octet;
 
 octet constexpr lo(uint16_t n) { return octet(n & 0xFF); }
 octet constexpr hi(uint16_t n) { return octet((n >> 8) & 0xFF); }
 
-uint16_t constexpr as_u16(octet hi, octet lo)
+constexpr uint16_t as_u16(octet hi, octet lo)
 {
   return (uint16_t(hi) << 8) + lo;
 }
@@ -238,8 +238,11 @@ auto uztosl(size_t uznum)
 
 int name_length(octet const* encoded, DNS::message const& pkt)
 {
+  auto const sp     = static_cast<std::span<DNS::message::octet const>>(pkt);
+  auto const sp_end = sp.data() + sp.size();
+
   // Allow the caller to pass us buf + len and have us check for it.
-  if (encoded >= end(pkt))
+  if (encoded >= sp_end)
     return -1;
 
   int length = 0;
@@ -251,14 +254,14 @@ int name_length(octet const* encoded, DNS::message const& pkt)
 
     if (top == NS_CMPRSFLGS) {
       // Check the offset and go there.
-      if (encoded + 1 >= end(pkt))
+      if (encoded + 1 >= sp_end)
         return -1;
 
-      auto const offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
-      if (offset >= size(pkt))
+      unsigned const offset = (*encoded & ~NS_CMPRSFLGS) << 8 | *(encoded + 1);
+      if (offset >= sp.size())
         return -1;
 
-      encoded = begin(pkt) + offset;
+      encoded = sp.data() + offset;
 
       ++nindir;
 
@@ -266,12 +269,12 @@ int name_length(octet const* encoded, DNS::message const& pkt)
 
       // If we've seen more indirects than the message length, or over
       // some limit, then there's a loop.
-      if (nindir > size(pkt) || nindir > max_indirs)
+      if (nindir > std::streamsize(sp.size()) || nindir > max_indirs)
         return -1;
     }
     else if (top == 0) {
       auto offset = *encoded;
-      if (encoded + offset + 1 >= end(pkt))
+      if (encoded + offset + 1 >= sp_end)
         return -1;
 
       ++encoded;
@@ -301,6 +304,8 @@ bool expand_name(octet const*        encoded,
                  std::string&        name,
                  int&                enc_len)
 {
+  auto const sp = static_cast<std::span<DNS::message::octet const>>(pkt);
+
   name.clear();
 
   auto indir = false;
@@ -334,7 +339,7 @@ bool expand_name(octet const*        encoded,
         enc_len = uztosl(p + 2 - encoded);
         indir   = true;
       }
-      p = begin(pkt) + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
+      p = sp.data() + ((*p & ~NS_CMPRSFLGS) << 8 | *(p + 1));
     }
     else {
       int len = *p;
@@ -361,9 +366,9 @@ bool expand_name(octet const*        encoded,
 
 // return the length of the encoded name
 
-int name_put(octet* bfr, char const* name)
+int name_put(octet* buf, char const* name)
 {
-  auto q = bfr;
+  auto q = buf;
 
   if ((name[0] == '.') && (name[1] == '\0'))
     name++;
@@ -404,7 +409,7 @@ int name_put(octet* bfr, char const* name)
   // Add the zero-length label at the end.
   *q++ = 0;
 
-  auto const sz = q - bfr;
+  auto const sz = q - buf;
   if (sz > 255) {
     // RFC-1035 Section 2.3.4. Size limits
     LOG(WARNING) << "domain name exceeds 255 octets";
@@ -419,11 +424,11 @@ namespace DNS {
 
 uint16_t message::id() const
 {
-  auto const hdr_p = reinterpret_cast<header const*>(begin());
+  auto const hdr_p = reinterpret_cast<header const*>(buf_.data());
   return hdr_p->id();
 }
 
-size_t min_message_sz() { return sizeof(header); }
+size_t message::min_sz() { return sizeof(header); }
 
 DNS::message
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
@@ -436,9 +441,9 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
                         sizeof(question) +
                         sizeof(edns0_opt_meta_rr); // clang-format on
 
-  DNS::message::container_t bfr(sz_alloc);
+  DNS::message::container_t buf(sz_alloc);
 
-  auto q = bfr.data();
+  auto q = buf.data();
 
   new (q) header(id);
   q += sizeof(header);
@@ -454,13 +459,13 @@ create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id)
   q += sizeof(edns0_opt_meta_rr);
 
   // verify constructed size is less than or equal to allocated size
-  auto const sz = q - bfr.data();
+  auto const sz = q - buf.data();
   CHECK_LE(sz, sz_alloc);
 
-  bfr.resize(sz);
-  bfr.shrink_to_fit();
+  buf.resize(sz);
+  buf.shrink_to_fit();
 
-  return DNS::message{std::move(bfr)};
+  return DNS::message{std::move(buf)};
 }
 
 void check_answer(bool& nx_domain,
@@ -483,7 +488,8 @@ void check_answer(bool& nx_domain,
   // an un-trusted datum from afar.
 
   auto const cls{[type = type, &q]() {
-    auto       q_p     = begin(q);
+    auto const q_sp    = static_cast<std::span<DNS::message::octet const>>(q);
+    auto       q_p     = q_sp.data();
     auto const q_hdr_p = reinterpret_cast<header const*>(q_p);
     CHECK_EQ(q_hdr_p->qdcount(), uint16_t(1));
     q_p += sizeof(header);
@@ -497,7 +503,10 @@ void check_answer(bool& nx_domain,
     return question_p->qclass();
   }()};
 
-  auto const hdr_p = reinterpret_cast<header const*>(begin(a));
+  auto const a_sp     = static_cast<std::span<DNS::message::octet const>>(a);
+  auto const a_sp_end = a_sp.data() + a_sp.size();
+
+  auto const hdr_p = reinterpret_cast<header const*>(a_sp.data());
 
   rcode = hdr_p->rcode();
   switch (rcode) {
@@ -532,7 +541,7 @@ void check_answer(bool& nx_domain,
 
   // p is a pointer that pushes forward in the message as we process
   // each section
-  auto p = begin(a) + sizeof(header);
+  auto p = a_sp.data() + sizeof(header);
 
   { // make sure the question name matches
     std::string qname;
@@ -543,7 +552,7 @@ void check_answer(bool& nx_domain,
       return;
     }
     p += enc_len;
-    if (p >= end(a)) {
+    if (p >= a_sp_end) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message";
       return;
@@ -555,7 +564,7 @@ void check_answer(bool& nx_domain,
     }
   }
 
-  if ((p + sizeof(question)) >= end(a)) {
+  if ((p + sizeof(question)) >= a_sp_end) {
     bogus_or_indeterminate = true;
     LOG(WARNING) << "bad message";
     return;
@@ -582,7 +591,7 @@ void check_answer(bool& nx_domain,
     std::string x;
     auto        enc_len = 0;
     if (!expand_name(p, a, x, enc_len) ||
-        ((p + enc_len + sizeof(rr)) > end(a))) {
+        ((p + enc_len + sizeof(rr)) > a_sp_end)) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message in answer or nameserver section for " << name
                    << '/' << type;
@@ -598,7 +607,7 @@ void check_answer(bool& nx_domain,
     std::string x;
     auto        enc_len = 0;
     if (!expand_name(p, a, x, enc_len) ||
-        ((p + enc_len + sizeof(rr)) > end(a))) {
+        ((p + enc_len + sizeof(rr)) > a_sp_end)) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message in additional section for " << name << '/'
                    << type;
@@ -632,8 +641,8 @@ void check_answer(bool& nx_domain,
     p = rr_p->next_rr_name();
   }
 
-  auto size_check = p - begin(a);
-  if (size_check != size(a)) {
+  unsigned long size_check = p - a_sp.data();
+  if (size_check != a_sp.size()) {
     bogus_or_indeterminate = true;
     LOG(WARNING) << "bad message size for " << name << '/' << type;
     return;
@@ -710,7 +719,7 @@ std::optional<RR> get_TXT(rr const* rr_p, DNS::message const& pkt, bool& err)
       return {};
     }
     str.append(reinterpret_cast<char const*>(p) + 1, *p);
-    p = p + *p + 1;
+    p += *p + 1;
   } while (p < rr_p->next_rr_name());
   return RR_TXT{str};
 }
@@ -746,11 +755,10 @@ std::optional<RR> get_TLSA(rr const* rr_p, DNS::message const& pkt, bool& err)
   uint8_t selector      = *p++;
   uint8_t matching_type = *p++;
 
-  uint8_t const* assoc_data    = p;
-  size_t         assoc_data_sz = rr_p->rdlength() - 3;
+  std::span<DNS::message::octet const> assoc_data{
+      p, static_cast<size_t>(rr_p->rdlength()) - 3};
 
-  return RR_TLSA{cert_usage, selector, matching_type, assoc_data,
-                 assoc_data_sz};
+  return RR_TLSA{cert_usage, selector, matching_type, assoc_data};
 }
 
 std::optional<RR> get_rr(rr const* rr_p, DNS::message const& pkt, bool& err)
@@ -766,7 +774,6 @@ std::optional<RR> get_rr(rr const* rr_p, DNS::message const& pkt, bool& err)
   case DNS::RR_type::AAAA:  return get_AAAA (rr_p, pkt, err);
   case DNS::RR_type::RRSIG: return get_RRSIG(rr_p, pkt, err);
   case DNS::RR_type::TLSA:  return get_TLSA (rr_p, pkt, err);
-  default: break;
   } // clang-format on
 
   LOG(WARNING) << "unsupported RR type " << typ;
@@ -775,11 +782,14 @@ std::optional<RR> get_rr(rr const* rr_p, DNS::message const& pkt, bool& err)
 
 RR_collection get_records(message const& pkt, bool& bogus_or_indeterminate)
 {
+  auto const sp     = static_cast<std::span<DNS::message::octet const>>(pkt);
+  auto const sp_end = sp.data() + sp.size();
+
   RR_collection ret;
 
-  auto const hdr_p = reinterpret_cast<header const*>(begin(pkt));
+  auto const hdr_p = reinterpret_cast<header const*>(sp.data());
 
-  auto p = begin(pkt) + sizeof(header);
+  auto p = sp.data() + sizeof(header);
 
   // skip queries
   for (auto i = 0; i < hdr_p->qdcount(); ++i) {
@@ -798,13 +808,13 @@ RR_collection get_records(message const& pkt, bool& bogus_or_indeterminate)
     auto        enc_len = 0;
     CHECK(expand_name(p, pkt, name, enc_len));
     p += enc_len;
-    if ((p + sizeof(rr)) > end(pkt)) {
+    if ((p + sizeof(rr)) > sp_end) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message";
       return RR_collection{};
     }
     auto rr_p = reinterpret_cast<rr const*>(p);
-    if ((p + rr_p->rdlength()) > end(pkt)) {
+    if ((p + rr_p->rdlength()) > sp_end) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "bad message";
       return RR_collection{};

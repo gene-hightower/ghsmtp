@@ -18,44 +18,33 @@ namespace DNS {
 
 class message {
 public:
-  using octet = unsigned char;
-
+  using octet       = unsigned char;
   using container_t = iobuffer<octet>;
 
   message() = default;
 
   explicit message(container_t::size_type sz)
-    : bfr_(sz)
+    : buf_(sz)
   {
     CHECK_LE(sz, std::numeric_limits<uint16_t>::max());
   }
 
-  explicit message(container_t&& bfr)
-    : bfr_{bfr}
+  explicit message(container_t&& buf)
+    : buf_{buf}
   {
-    CHECK_LE(size(), std::numeric_limits<uint16_t>::max());
+    CHECK_LE(buf.size(), std::numeric_limits<uint16_t>::max());
   }
 
-  uint16_t size() const { return bfr_.size(); }
-
-  // clang-format off
-  auto begin() const { return bfr_.data(); }
-  auto end()   const { return bfr_.data() + bfr_.size(); }
-  // clang-format on
+  operator std::span<octet>() { return {buf_.data(), buf_.size()}; }
+  operator std::span<octet const>() const { return {buf_.data(), buf_.size()}; }
 
   uint16_t id() const;
 
+  static size_t min_sz();
+
 private:
-  container_t bfr_;
+  container_t buf_;
 };
-
-// clang-format off
-inline auto begin(message const& pkt) { return pkt.begin(); }
-inline auto end  (message const& pkt) { return pkt.end(); }
-inline auto size (message const& pkt) { return pkt.size(); }
-// clang-format on
-
-size_t min_message_sz();
 
 DNS::message
 create_question(char const* name, DNS::RR_type type, uint16_t cls, uint16_t id);
