@@ -258,8 +258,8 @@ message Resolver::xchg(message const& q)
     sz = ntohs(sz);
 
     DNS::message::container_t bfr(sz);
-    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), bfr.size());
-    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(bfr.size()));
+    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
+    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sz));
 
     if (!ns_sock_->in()) {
       LOG(WARNING) << "Resolver::xchg was able to read only "
