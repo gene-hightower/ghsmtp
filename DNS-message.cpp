@@ -630,9 +630,15 @@ void check_answer(bool& nx_domain,
       // nameserver records often included with associated address info
       break;
 
+    case ns_t_tlsa:
+      // tlsa records can now be in the additioanl OPT section, as
+      // they are returned from dns.mullvad.net.
+      break;
+
     default:
       LOG(INFO) << "unknown additional record, name == " << name;
-      LOG(INFO) << "rr_p->type()  == " << rr_p->rr_type();
+      LOG(INFO) << "rr_p->type()  == " << rr_p->rr_type() << " ("
+                << RR_type_c_str(rr_p->rr_type()) << ")";
       LOG(INFO) << "rr_p->class() == " << rr_p->rr_class();
       LOG(INFO) << "rr_p->ttl()   == " << rr_p->rr_ttl();
       break;
@@ -774,6 +780,7 @@ std::optional<RR> get_rr(rr const* rr_p, DNS::message const& pkt, bool& err)
   case DNS::RR_type::AAAA:  return get_AAAA (rr_p, pkt, err);
   case DNS::RR_type::RRSIG: return get_RRSIG(rr_p, pkt, err);
   case DNS::RR_type::TLSA:  return get_TLSA (rr_p, pkt, err);
+  default: break;
   } // clang-format on
 
   LOG(WARNING) << "unsupported RR type " << typ;
