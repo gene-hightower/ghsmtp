@@ -631,7 +631,7 @@ void check_answer(bool& nx_domain,
       break;
 
     case ns_t_tlsa:
-      // tlsa records can now be in the additioanl OPT section, as
+      // tlsa records can now be in the additional section, as
       // they are returned from dns.mullvad.net.
       break;
 
