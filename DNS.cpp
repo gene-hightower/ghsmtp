@@ -38,11 +38,11 @@ struct nameserver {
 
 constexpr nameserver nameservers[]{
     {
-        "localhost",
-        "127.0.0.1",
-        "domain",
+        "dns.mullvad.net",
+        "194.242.2.2",
+        "domain-s",
         sock_type::stream,
-    },
+    }
     /*
     {
         "localhost",
