@@ -21,11 +21,9 @@ public:
   auto data() { return buf_.data(); }
   auto data() const { return buf_.data(); }
   auto size() const { return buf_.size(); }
+
   auto resize(size_type sz) { return buf_.resize(sz); }
   void shrink_to_fit() { buf_.shrink_to_fit(); }
-
-  auto begin() const { return buf_.begin(); }
-  auto end() const { return buf_.end(); }
 
   bool operator==(iobuffer const& rhs) const
   {

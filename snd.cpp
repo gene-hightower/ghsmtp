@@ -1049,7 +1049,7 @@ auto get_sender()
 
   if (FLAGS_sender.empty()) {
     FLAGS_sender = FLAGS_client_id;
-  };
+  }
 
   auto const sender{Domain{FLAGS_sender}};
 

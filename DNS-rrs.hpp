@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstring>
 #include <optional>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -158,7 +159,7 @@ public:
 
   sockaddr_in const& addr() const { return addr_; }
   char const*        c_str() const { return str_; }
-  static RR_type     rr_type() { return RR_type::A; }
+  constexpr static RR_type rr_type() { return RR_type::A; }
 
   bool operator==(RR_A const& rhs) const { return strcmp(str_, rhs.str_) == 0; }
   bool operator<(RR_A const& rhs) const { return strcmp(str_, rhs.str_) < 0; }
@@ -179,7 +180,7 @@ public:
 
   std::string const& str() const { return cname_; }
   char const*        c_str() const { return str().c_str(); }
-  static RR_type     rr_type() { return RR_type::CNAME; }
+  constexpr static RR_type rr_type() { return RR_type::CNAME; }
 
   bool operator==(RR_CNAME const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_CNAME const& rhs) const { return str() < rhs.str(); }
@@ -222,7 +223,7 @@ public:
   std::string const& exchange() const { return exchange_; }
   uint16_t           preference() const { return preference_; }
 
-  static RR_type rr_type() { return RR_type::MX; }
+  constexpr static RR_type rr_type() { return RR_type::MX; }
 
   bool operator==(RR_MX const& rhs) const
   {
@@ -230,11 +231,9 @@ public:
   }
   bool operator<(RR_MX const& rhs) const
   {
-    if (preference() < rhs.preference())
-      return true;
     if (preference() == rhs.preference())
       return exchange() < rhs.exchange();
-    return false;
+    return preference() < rhs.preference();
   }
 
 private:
@@ -253,7 +252,7 @@ public:
 
   char const*        c_str() const { return str().c_str(); }
   std::string const& str() const { return txt_data_; }
-  static RR_type     rr_type() { return RR_type::TXT; }
+  constexpr static RR_type rr_type() { return RR_type::TXT; }
 
   bool operator==(RR_TXT const& rhs) const { return str() == rhs.str(); }
   bool operator<(RR_TXT const& rhs) const { return str() < rhs.str(); }
@@ -270,7 +269,7 @@ public:
 
   sockaddr_in6 const& addr() const { return addr_; }
   char const*         c_str() const { return str_; }
-  static RR_type      rr_type() { return RR_type::AAAA; }
+  constexpr static RR_type rr_type() { return RR_type::AAAA; }
 
   bool operator==(RR_AAAA const& rhs) const
   {
@@ -288,35 +287,41 @@ private:
 
 class RR_TLSA {
 public:
-  using octet = unsigned char;
-
+  using octet       = unsigned char;
   using container_t = iobuffer<octet>;
 
-  RR_TLSA(uint8_t        cert_usage,
-          uint8_t        selector,
-          uint8_t        matching_type,
-          uint8_t const* assoc_data,
-          size_t         assoc_data_sz);
+  RR_TLSA(uint8_t                cert_usage,
+          uint8_t                selector,
+          uint8_t                matching_type,
+          std::span<octet const> data);
   unsigned cert_usage() const { return cert_usage_; }
   unsigned selector() const { return selector_; }
   unsigned matching_type() const { return matching_type_; }
 
-  container_t const& assoc_data() const { return assoc_data_; }
+  // container_t const& assoc_data() const { return assoc_data_; }
 
   // doesn't have a string representation
   std::optional<std::string> as_str() const { return {}; }
 
-  static RR_type rr_type() { return RR_type::TLSA; }
+  constexpr static RR_type rr_type() { return RR_type::TLSA; }
+
+  std::span<octet const> assoc_data() const
+  {
+    return {assoc_data_.data(), assoc_data_.size()};
+  }
 
   bool operator==(RR_TLSA const& rhs) const
   {
-    return (cert_usage() == rhs.cert_usage()) && (selector() == rhs.selector())
-           && (matching_type() == rhs.matching_type())
-           && (assoc_data() == rhs.assoc_data());
+    return (cert_usage() == rhs.cert_usage()) &&
+           (selector() == rhs.selector()) &&
+           (matching_type() == rhs.matching_type()) &&
+           (assoc_data_ == rhs.assoc_data_);
   }
   bool operator<(RR_TLSA const& rhs) const
   {
-    return assoc_data() < rhs.assoc_data();
+    if (!(*this == rhs))
+      return assoc_data_ < rhs.assoc_data_;
+    return false;
   }
 
 private:
@@ -326,8 +331,8 @@ private:
   uint8_t     matching_type_;
 };
 
-using RR
-    = std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA, RR_TLSA>;
+using RR =
+    std::variant<RR_A, RR_CNAME, RR_PTR, RR_MX, RR_TXT, RR_AAAA, RR_TLSA>;
 
 using RR_collection = std::vector<RR>;
 

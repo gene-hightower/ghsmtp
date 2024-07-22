@@ -1,7 +1,5 @@
 #include "Pill.hpp"
 
-#include <limits>
-
 Pill::Pill()
 {
   using s_t = decltype(s_);

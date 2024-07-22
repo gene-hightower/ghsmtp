@@ -40,11 +40,12 @@ inline std::ostream& operator<<(std::ostream& os, DNS::RR_TLSA const& rr_tlsa)
   os << "TLSA " << rr_tlsa.cert_usage() << ' ' << rr_tlsa.selector() << ' '
      << rr_tlsa.matching_type() << ' ';
 
-  for (auto const ch : rr_tlsa.assoc_data()) {
+  for (auto const& ch : rr_tlsa.assoc_data()) {
     auto const lo = ch & 0xF;
     auto const hi = (ch >> 4) & 0xF;
 
-    auto constexpr hex_digits = "0123456789abcdef";
+    using namespace std::literals::string_view_literals;
+    auto constexpr hex_digits{"0123456789abcdef"sv};
 
     os << hex_digits[hi] << hex_digits[lo];
   }

@@ -38,9 +38,10 @@ using colon = one<':'>;
 // clang-format off
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<range<'0', '1'>, rep<2, DIGIT>>,
-                       rep_min_max<1, 2, DIGIT>> {};
-
+                       seq<one<'1'>, rep<2, DIGIT>>,
+                       seq<range<'1', '9'>, DIGIT>,
+                       DIGIT
+                      > {};
 struct ipv4_address
   : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
@@ -61,7 +62,7 @@ struct ipv6_address : sor<seq<                                          rep<6, h
                           seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 
 struct ipv6_address_literal
-  : seq<TAO_PEGTL_ISTRING(lit_pfx), ipv6_address, TAO_PEGTL_ISTRING(lit_sfx)> {};
+  : seq<TAO_PEGTL_ISTRING("[IPv6:"), ipv6_address, one<']'>> {};
 
 struct ipv6_address_only : seq<ipv6_address, eof> {};
 struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
@@ -69,31 +70,31 @@ struct ipv6_address_literal_only : seq<ipv6_address_literal, eof> {};
 
 // <https://en.wikipedia.org/wiki/Private_network#Private_IPv6_addresses>
 
-bool is_private(std::string_view addr)
+auto is_private(std::string_view addr) -> bool
 {
-  // CHECK(is_address(addr));
+  CHECK(is_address(addr));
   return istarts_with(addr, "fd");
 }
 
-bool is_address(std::string_view addr)
+auto is_address(std::string_view addr) -> bool
 {
   memory_input<> in{addr.data(), addr.size(), "ip6"};
   return parse<IP6::ipv6_address_only>(in);
 }
 
-bool is_address_literal(std::string_view addr)
+auto is_address_literal(std::string_view addr) -> bool
 {
   memory_input<> in{addr.data(), addr.size(), "ip6"};
   return parse<IP6::ipv6_address_literal_only>(in);
 }
 
-std::string to_address_literal(std::string_view addr)
+auto to_address_literal(std::string_view addr) -> std::string
 {
-  // CHECK(is_address(addr));
+  CHECK(is_address(addr));
   return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
-std::string reverse(std::string_view addr_str)
+auto reverse(std::string_view addr_str) -> std::string
 {
   in6_addr addr{};
 
@@ -113,7 +114,8 @@ std::string reverse(std::string_view addr_str)
     const auto lo = ch & 0xF;
     const auto hi = (ch >> 4) & 0xF;
 
-    constexpr auto hex_digits = "0123456789abcdef";
+    using namespace std::literals::string_view_literals;
+    auto constexpr hex_digits{"0123456789abcdef"sv};
 
     q += hex_digits[lo];
     q += '.';

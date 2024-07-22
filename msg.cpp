@@ -315,9 +315,10 @@ struct phrase : plus<sor<encoded_word, word>> {};
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
                        seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<range<'0', '1'>, rep<2, DIGIT>>,
-                       rep_min_max<1, 2, DIGIT>> {};
-
+                       seq<one<'1'>, rep<2, DIGIT>>,
+                       seq<range<'1', '9'>, DIGIT>,
+                       DIGIT
+                      > {};
 struct ipv4_address
   : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
