@@ -21,7 +21,7 @@
 #include "osutil.hpp"
 
 DEFINE_bool(support_all_tls_versions,
-            false,
+            true,
             "lift restrictions on TLS versions");
 
 // <https://tools.ietf.org/html/rfc7919>
@@ -185,13 +185,13 @@ bool TLS::starttls_client(fs::path                  config_path,
       auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
       std::vector<Domain> cn;
 
-      SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
-
-      // // Allow any old and crufty protocol version.
-      // if (FLAGS_support_all_tls_versions) {
-      //   CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-      //       << "unable to set min proto version";
-      // }
+      // Allow any old and crufty protocol version.
+      if (FLAGS_support_all_tls_versions) {
+        CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+            << "unable to set min proto version";
+        CHECK_GT(SSL_CTX_set_max_proto_version(ctx, 0), 0)
+            << "unable to set max proto version";
+      }
 
       CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
           << "unable to enable DANE on SSL context";
@@ -496,14 +496,15 @@ bool TLS::starttls_server(fs::path                  config_path,
     auto                ctx = CHECK_NOTNULL(SSL_CTX_new(method));
     std::vector<Domain> names;
 
-    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
-    SSL_CTX_clear_options(ctx, SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION);
+    SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF);
 
     // Allow any old and crufty protocol version.
-    // if (FLAGS_support_all_tls_versions) {
-    //   CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
-    //       << "unable to set min proto version";
-    // }
+    if (FLAGS_support_all_tls_versions) {
+      CHECK_GT(SSL_CTX_set_min_proto_version(ctx, 0), 0)
+          << "unable to set min proto version";
+      CHECK_GT(SSL_CTX_set_max_proto_version(ctx, 0), 0)
+          << "unable to set max proto version";
+    }
 
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
         << "unable to enable DANE on SSL context";
@@ -767,8 +768,8 @@ std::streamsize TLS::io_tls_(char const*                          fn,
   ERR_clear_error();
 
   int n_ret;
-  while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n)))
-         < 0) {
+  while ((n_ret = io_fnc(ssl_, static_cast<void*>(s), static_cast<int>(n))) <
+         0) {
     auto const now = std::chrono::system_clock::now();
     if (now > end_time) {
       LOG(WARNING) << fn << " timed out";
@@ -776,8 +777,8 @@ std::streamsize TLS::io_tls_(char const*                          fn,
       return static_cast<std::streamsize>(-1);
     }
 
-    auto const time_left
-        = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - now);
+    auto const time_left =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - now);
 
     int n_get_err;
     switch (n_get_err = SSL_get_error(ssl_, n_ret)) {
@@ -811,21 +812,6 @@ std::streamsize TLS::io_tls_(char const*                          fn,
       [[fallthrough]];
 
     default: ssl_error(n_get_err);
-    }
-  }
-
-  // The strange (and never before seen) case of 0 return.
-  if (0 == n_ret) {
-    int n_get_err;
-    switch (n_get_err = SSL_get_error(ssl_, n_ret)) {
-    case SSL_ERROR_NONE: LOG(INFO) << fn << " returned SSL_ERROR_NONE"; break;
-
-    case SSL_ERROR_ZERO_RETURN:
-      // This is a close, not at all sure this is the right thing to do.
-      LOG(INFO) << fn << " returned SSL_ERROR_ZERO_RETURN";
-      break;
-
-    default: LOG(INFO) << fn << " returned zero"; ssl_error(n_get_err);
     }
   }
 
