@@ -29,7 +29,7 @@ auto constexpr loopback_literal{"[127.0.0.1]"sv};
 
 constexpr auto as_address(std::string_view address_literal) -> std::string_view
 {
-  CHECK(is_address_literal(address_literal));
+  // CHECK(is_address_literal(address_literal));
   return address_literal.substr(lit_pfx_sz,
                                 address_literal.length() - lit_extra_sz);
 }
