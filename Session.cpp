@@ -1773,6 +1773,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   }
 
   if (!verify_sender_domain_(sender.domain(), error_msg)) {
+    LOG(INFO) << "verify sender domain failed: " << error_msg;
     return false;
   }
 
