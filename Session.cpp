@@ -925,20 +925,25 @@ bool Session::data_start()
     /******************************************************************
     <https://tools.ietf.org/html/rfc5321#section-3.3> says:
 
-    The DATA command can fail for only two reasons:
+    The DATA command can fail at only two points in the protocol
+    exchange:
 
-    If there was no MAIL, or no RCPT, command, or all such commands were
-    rejected, the server MAY return a "command out of sequence" (503) or
-    "no valid recipients" (554) reply in response to the DATA command.
+    If there was no MAIL, or no RCPT, command, or all such commands
+    were rejected, the server MAY return a "command out of sequence"
+    (503) or "no valid recipients" (554) reply in response to the DATA
+    command.  If one of those replies (or any other 5yz reply) is
+    received, the client MUST NOT send the message data; more
+    generally, message data MUST NOT be sent unless a 354 reply is
+    received.
 
     However, <https://tools.ietf.org/html/rfc2033#section-4.2> says:
 
-    The additional restriction is that when there have been no successful
-    RCPT commands in the mail transaction, the DATA command MUST fail
-    with a 503 reply code.
+    The additional restriction is that when there have been no
+    successful RCPT commands in the mail transaction, the DATA command
+    MUST fail with a 503 reply code.
 
-    Therefore I will send the reply code that is valid for both, and
-    do the same for the BDAT case.
+    Therefore I will send the reply code (503) that is valid for both,
+    and do the same for the BDAT case.
     *******************************************************************/
 
     out_() << "503 5.5.1 sequence error, expecting RCPT\r\n" << std::flush;
