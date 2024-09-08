@@ -184,13 +184,13 @@ void do_domain(DNS::Resolver& res, char const* dom_cp)
     std::cout << "no MX records\n";
   }
 
-  TLD  tld_db;
-  auto reg_dom{tld_db.get_registered_domain(dom.ascii())};
-  if (reg_dom && dom != reg_dom) {
+  TLD        tld_db;
+  auto const reg_dom{tld_db.get_registered_domain(dom.ascii())};
+  if (reg_dom && dom != Domain{reg_dom}) {
     std::cout << "registered domain is " << reg_dom << '\n';
   }
 
-  auto txts = res.get_strings(DNS::RR_type::TXT, dom.ascii().c_str());
+  auto const txts = res.get_strings(DNS::RR_type::TXT, dom.ascii().c_str());
   for (auto const& txt : txts) {
     std::cout << "TXT " << txt << '\n';
   }

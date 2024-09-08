@@ -3,72 +3,87 @@
 
 #include "IP.hpp"
 
+#include <compare>
 #include <iostream>
 #include <string>
 #include <string_view>
 
 #include "iequal.hpp"
 
+// The 'domain' part of an email address: DNS domain, or IP address, or address
+// literal, or empty.
+
 class Domain {
 public:
   Domain() = default;
 
-  explicit Domain(std::string_view dom) { set(dom); }
+  inline explicit Domain(std::string_view dom);
 
-  Domain& operator=(std::string_view dom)
-  {
-    set(dom);
-    return *this;
-  }
-
-  void set(std::string_view dom);
+  inline static bool
+  validate(std::string_view domain, std::string& msg, Domain& dom);
 
   inline void clear();
 
-  bool empty() const { return ascii_.empty(); }
+  inline bool empty() const;
 
-  inline static std::string_view remove_trailing_dot(std::string_view a);
-  inline static bool             match(std::string_view a, std::string_view b);
+  inline bool operator==(Domain const& rhs) const;
+  inline auto operator<=>(const Domain& rhs) const;
 
-  bool operator==(std::string_view rhs) const { return match(ascii_, rhs); }
-  bool operator!=(std::string_view rhs) const { return !(*this == rhs); }
+  inline bool is_address_literal() const;
+  inline bool is_unicode() const;
 
-  bool operator==(Domain const& rhs) const { return match(ascii_, rhs.ascii_); }
-  bool operator!=(Domain const& rhs) const { return !(*this == rhs); }
-
-  bool is_address_literal() const { return is_address_literal_; }
-  bool is_unicode() const { return utf8() != ascii(); }
-
-  std::string const& ascii() const { return ascii_; }
-  std::string const& utf8() const { return utf8_; }
-
-  static bool validate(std::string_view dom);
+  inline std::string const& ascii() const;
+  inline std::string const& utf8() const;
 
 private:
-  std::string ascii_;
-  std::string utf8_;
+  bool set_(std::string_view dom, bool should_throw, std::string& msg);
+
+  std::string ascii_; // A-labels
+  std::string utf8_;  // U-labels, or empty
 
   bool is_address_literal_{false};
 };
 
-inline void Domain::clear()
+Domain::Domain(std::string_view dom)
+{
+  std::string msg;
+  set_(dom, true /* throw */, msg);
+}
+
+bool Domain::validate(std::string_view domain, std::string& msg, Domain& dom)
+{
+  return dom.set_(domain, false /* don't throw */, msg);
+}
+
+void Domain::clear()
 {
   ascii_.clear();
   utf8_.clear();
   is_address_literal_ = false;
 }
 
-inline std::string_view Domain::remove_trailing_dot(std::string_view a)
+bool Domain::empty() const { return ascii_.empty(); }
+
+bool Domain::operator==(Domain const& rhs) const
 {
-  if (a.length() && (a.back() == '.')) {
-    a.remove_suffix(1);
-  }
-  return a;
+  return ascii_ == rhs.ascii_;
 }
 
-inline bool Domain::match(std::string_view a, std::string_view b)
+auto Domain::operator<=>(const Domain& rhs) const
 {
-  return iequal(remove_trailing_dot(a), remove_trailing_dot(b));
+  return ascii_ <=> rhs.ascii_;
+}
+
+bool Domain::is_address_literal() const { return is_address_literal_; }
+bool Domain::is_unicode() const
+{
+  return (!utf8().empty()) && (utf8() != ascii());
+}
+
+std::string const& Domain::ascii() const { return ascii_; }
+std::string const& Domain::utf8() const
+{
+  return utf8_.empty() ? ascii_ : utf8_;
 }
 
 inline std::ostream& operator<<(std::ostream& os, Domain const& dom)
@@ -76,6 +91,10 @@ inline std::ostream& operator<<(std::ostream& os, Domain const& dom)
   if (dom.is_unicode())
     return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
   return os << dom.ascii();
+}
+
+namespace domain {
+bool is_fully_qualified(Domain const& dom, std::string& msg);
 }
 
 namespace std {

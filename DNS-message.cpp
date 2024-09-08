@@ -557,7 +557,7 @@ void check_answer(bool& nx_domain,
       LOG(WARNING) << "bad message";
       return;
     }
-    if (!Domain::match(qname, name)) {
+    if (!iequal(qname, name)) {
       bogus_or_indeterminate = true;
       LOG(WARNING) << "names don't match, " << qname << " != " << name;
       return;

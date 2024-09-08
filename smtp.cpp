@@ -29,6 +29,8 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
 
+using namespace std::string_literals;
+
 namespace RFC5321 {
 
 struct Ctx {
@@ -418,9 +420,18 @@ struct action<non_local_part> {
   {
     ctx.mb_dom = in.string();
     // RFC 5321, section 4.5.3.1.2.
-    if (ctx.mb_dom.length() > 255) {
+    if (ctx.mb_dom.length() > 253) {
       LOG(WARNING) << "domain name or number too long " << ctx.mb_dom;
     }
+  }
+};
+
+template <>
+struct action<bounce_path> {
+  static void apply0(Ctx& ctx)
+  {
+    ctx.mb_loc.clear();
+    ctx.mb_dom.clear();
   }
 };
 
@@ -459,7 +470,12 @@ template <>
 struct action<mail_from> {
   static void apply0(Ctx& ctx)
   {
-    ctx.session.mail_from(Mailbox{ctx.mb_loc, ctx.mb_dom}, ctx.parameters);
+    Mailbox mbx;
+
+    if (ctx.mb_loc != ""s && ctx.mb_dom != ""s) {
+      mbx = Mailbox{ctx.mb_loc, Domain{ctx.mb_dom}};
+    }
+    ctx.session.mail_from(std::move(mbx), ctx.parameters);
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
@@ -470,7 +486,15 @@ template <>
 struct action<rcpt_to> {
   static void apply0(Ctx& ctx)
   {
-    ctx.session.rcpt_to(Mailbox{ctx.mb_loc, ctx.mb_dom}, ctx.parameters);
+    Mailbox mbx;
+
+    if (ctx.mb_loc == "Postmaster"s) {
+      mbx = Mailbox{"Postmaster"};
+    }
+    else {
+      mbx = Mailbox{ctx.mb_loc, Domain{ctx.mb_dom}};
+    }
+    ctx.session.rcpt_to(std::move(mbx), ctx.parameters);
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();

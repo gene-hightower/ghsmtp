@@ -13,8 +13,13 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
+
+#include "is_ascii.hpp"
 
 namespace RFC3629 {
 // clang-format off
@@ -134,6 +139,7 @@ struct local_part : sor<dot_string, quoted_string> {};
 struct non_local_part : sor<domain, address_literal> {};
 struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 struct mailbox_only : seq<mailbox, eof> {};
+struct dot_string_only : seq<dot_string, eof> {};
 
 // clang-format on
 // Actions
@@ -230,6 +236,9 @@ struct action<non_local_part> {
 };
 } // namespace RFC5321
 
+template <>
+struct fmt::formatter<Mailbox> : ostream_formatter {};
+
 std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
 {
   if (mailbox.empty())
@@ -244,25 +253,77 @@ std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
   return {};
 }
 
-Mailbox::Mailbox(std::string_view mailbox)
+std::string normalize_quoted_string(std::string_view local_part)
 {
+  CHECK_GE(local_part.size(), 2);
+  CHECK_EQ(local_part[0], '"');
+  CHECK_EQ(local_part[local_part.length() - 1], '"');
+
+  // normalize local_part, 1st step is unescape
+  auto const raw = local_part.substr(1, local_part.length() - 2);
+
+  std::string uq;
+  uq.reserve(raw.length());
+  for (auto p = raw.begin(); p != raw.end(); ++p) {
+    if (*p == '\\') {
+      CHECK_NE(p + 1, raw.end());
+      ++p; // past the backslash
+      CHECK_LE(*p, '\x7E');
+    }
+    uq += *p;
+  }
+
+  Mailbox::parse_results results;
+  memory_input<>         loc_in(uq, "local-part");
+  if (tao::pegtl::parse<RFC5321::dot_string_only, RFC5321::action>(loc_in,
+                                                                   results))
+    return uq;
+
+  // If not, (re)escape
+  std::string esc;
+  esc.reserve(local_part.length());
+  esc += '"';
+  for (auto p = uq.begin(); p != uq.end(); ++p) {
+    if (*p == '\\') {
+      esc += "\\\\";
+    }
+    else if (*p == '"') {
+      esc += "\\\"";
+    }
+    else {
+      esc += *p;
+    }
+  }
+  esc += '"';
+  return esc;
+}
+
+bool Mailbox::set_(std::string_view mailbox,
+                   bool             should_throw,
+                   std::string&     msg)
+{
+  msg.clear();
+
+  if (iequal(mailbox, "Postmaster")) {
+    local_part_ = "Postmaster";
+    domain_.clear();
+    return true;
+  }
+
   if (mailbox.empty()) {
-    LOG(ERROR) << "empty mailbox string";
-    throw std::invalid_argument("empty mailbox string");
+    local_part_.clear();
+    domain_.clear();
+    return true;
   }
 
   parse_results  results;
   memory_input<> mbx_in(mailbox, "mailbox");
   if (!tao::pegtl::parse<RFC5321::mailbox_only, RFC5321::action>(mbx_in,
                                                                  results)) {
-    LOG(ERROR) << "invalid mailbox syntax «" << mailbox << "»";
-    throw std::invalid_argument("invalid mailbox syntax");
-  }
-
-  if (results.domain_type == domain_types::general_address_literal) {
-    LOG(ERROR) << "general address literal in mailbox «" << mailbox << "»";
-    LOG(ERROR) << "unknown tag «" << results.standardized_tag << "»";
-    throw std::invalid_argument("general address literal in mailbox");
+    if (should_throw)
+      throw std::invalid_argument("invalid mailbox syntax");
+    msg = fmt::format("invalid mailbox syntax «{}»", mailbox);
+    return false;
   }
 
   // "Impossible" errors; if the parse succeeded, the types must not
@@ -270,82 +331,65 @@ Mailbox::Mailbox(std::string_view mailbox)
   CHECK(results.local_type != local_types::unknown);
   CHECK(results.domain_type != domain_types::unknown);
 
-  // RFC-5321 4.5.3.1.  Size Limits and Minimums
-
-  // “To the maximum extent possible, implementation techniques that
-  //  impose no limits on the length of these objects should be used.”
-
-  // In practice, long local-parts are used and work fine. DNS imposes
-  // length limits, so we check those.
-
-  if (results.domain.length() > 255) { // Section 4.5.3.1.2.
-    // Also RFC 2181 section 11. Name syntax
-    LOG(ERROR) << "domain > 255 octets in «" << mailbox << "»";
-    throw std::invalid_argument("mailbox domain too long");
+  if (results.domain_type == domain_types::general_address_literal) {
+    if (should_throw)
+      throw std::invalid_argument("general address literal in mailbox");
+    msg =
+        fmt::format("general address literal in mailbox «{}», unknown tag «{}»",
+                    mailbox, results.standardized_tag);
+    return false;
   }
 
-  std::string dom{results.domain.begin(), results.domain.end()};
-  std::vector<boost::iterator_range<std::string::iterator>> labels;
-  boost::algorithm::split(labels, dom, boost::algorithm::is_any_of("."));
-
-  // Checks for DNS style domains, not address literals.
-  if (results.domain_type == domain_types::domain) {
-    if (labels.size() < 2) {
-      LOG(ERROR) << "domain must have at least two labels «" << mailbox << "»";
-      throw std::invalid_argument("mailbox domain not fully qualified");
-    }
-
-    if (labels[labels.size() - 1].size() < 2) {
-      LOG(ERROR) << "single octet TLD in «" << mailbox << "»";
-      throw std::invalid_argument("mailbox TLD must be two or more octets");
-    }
-
-    for (auto label : labels) {
-      if (label.size() > 63) {
-        LOG(ERROR) << "label > 63 octets in «" << mailbox << "»";
-        throw std::invalid_argument(
-            "mailbox domain label greater than 63 octets");
-      }
-    }
+  std::string loc_part;
+  if (results.local_type == local_types::quoted_string) {
+    loc_part = normalize_quoted_string(results.local);
+  }
+  else {
+    // plain old Dot-string
+    loc_part = results.local;
   }
 
-  set_local(results.local);
-  set_domain(results.domain);
+  Domain dom;
+  if (!Domain::validate(results.domain, msg, dom)) {
+    if (should_throw)
+      throw std::invalid_argument("invalid domain");
+    return false;
+  }
+
+  std::swap(local_part_, loc_part);
+  std::swap(domain_, dom);
+
+  return true;
 }
 
 size_t Mailbox::length(domain_encoding enc) const
 {
   if (enc == domain_encoding::ascii) {
-    for (auto ch : local_part_) {
-      if (!isascii(static_cast<unsigned char>(ch))) {
-        LOG(WARNING) << "non ascii chars in local part:" << local_part_;
-        // throw std::range_error("non ascii chars in local part of mailbox");
-      }
+    if (!is_ascii(local_part_)) {
+      LOG(ERROR) << "non ascii chars in local part:" << local_part_;
+      throw std::range_error("non ascii chars in local part of mailbox");
     }
   }
-  auto const& d
-      = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
+  auto const& d =
+      (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
   return local_part_.length() + (d.length() ? (d.length() + 1) : 0);
 }
 
 std::string Mailbox::as_string(domain_encoding enc) const
 {
   if (enc == domain_encoding::ascii) {
-    for (auto ch : local_part_) {
-      if (!isascii(static_cast<unsigned char>(ch))) {
-        LOG(WARNING) << "non ascii chars in local part:" << local_part_;
-        // throw std::range_error("non ascii chars in local part of mailbox");
-      }
+    if (!is_ascii(local_part_)) {
+      LOG(ERROR) << "non ascii chars in local part:" << local_part_;
+      throw std::range_error("non ascii chars in local part of mailbox");
     }
   }
   std::string s;
   s.reserve(length(enc));
   s = local_part();
-  auto const& d
-      = (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
+  auto const& d =
+      (enc == domain_encoding::utf8) ? domain().utf8() : domain().ascii();
   if (!d.empty()) {
-    s += '@';
-    s += d;
+    s += '@' + d;
   }
   return s;
 }

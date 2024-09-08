@@ -286,22 +286,16 @@ template <typename Rule>
 struct action : nothing<Rule> {};
 
 template <>
-struct action<local_part> {
+struct action<addr_spec> {
   template <typename Input>
   static void apply(Input const& in, Mailbox& mbx)
   {
-    mbx.set_local(in.string());
+    auto addrspec = in.string();
+    // FIXME: strip comments and unfold
+    mbx = Mailbox{addrspec};
   }
 };
 
-template <>
-struct action<domain> {
-  template <typename Input>
-  static void apply(Input const& in, Mailbox& mbx)
-  {
-    mbx.set_domain(in.string());
-  }
-};
 } // namespace RFC5322
 
 namespace RFC5321 {
@@ -548,20 +542,11 @@ struct action<server_id> {
 };
 
 template <>
-struct action<local_part> {
+struct action<mailbox> {
   template <typename Input>
   static void apply(Input const& in, Mailbox& mbx)
   {
-    mbx.set_local(in.string());
-  }
-};
-
-template <>
-struct action<non_local_part> {
-  template <typename Input>
-  static void apply(Input const& in, Mailbox& mbx)
-  {
-    mbx.set_domain(in.string());
+    mbx = Mailbox{in.string()};
   }
 };
 
@@ -1610,7 +1595,7 @@ bool snd(fs::path                    config_path,
     cnn.sock.out() << "NOOP\r\n" << std::flush;
   }
 
-  if (receiver != cnn.server_id) {
+  if (receiver.ascii() != cnn.server_id) {
     LOG(INFO) << "server identifies as " << cnn.server_id;
   }
 

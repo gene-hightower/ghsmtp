@@ -12,44 +12,34 @@
 class Mailbox {
 public:
   Mailbox() = default;
-  Mailbox(std::string_view mailbox);
-  Mailbox(std::string_view local_part, std::string_view domain)
-  {
-    set_local(local_part);
-    set_domain(domain);
-  }
-  Mailbox(std::string_view local_part, Domain domain)
-  {
-    set_local(local_part);
-    set_domain(domain);
-  }
 
-  void set_local(std::string_view local_part) { local_part_ = local_part; }
-  void set_domain(std::string_view d) { domain_.set(d); }
-  void set_domain(Domain d) { domain_ = d; }
-  void clear()
-  {
-    local_part_.clear();
-    domain_.clear();
-  }
-  std::string const& local_part() const { return local_part_; }
-  Domain const&      domain() const { return domain_; }
+  // Parse the input string against the RFC-5321 Mailbox grammar, normalize any
+  // Unicode, normalize Quoted-string Local-part.
+  inline Mailbox(std::string_view mailbox);
+
+  // Accept the Local-part as already validated via some external check.
+  inline Mailbox(std::string_view local_part, Domain domain);
+
+  inline static bool
+  validate(std::string_view mailbox, std::string& msg, Mailbox& mbx);
+
+  inline void set_local(std::string_view local_part);
+  inline void set_domain(Domain d);
+  inline void clear();
+
+  inline std::string const& local_part() const;
+  inline Domain const&      domain() const;
 
   enum class domain_encoding : bool { ascii, utf8 };
 
   size_t length(domain_encoding enc = domain_encoding::utf8) const;
-
-  bool empty() const { return length() == 0; }
+  inline bool empty() const;
 
   std::string as_string(domain_encoding enc = domain_encoding::utf8) const;
+  inline operator std::string() const;
 
-  operator std::string() const { return as_string(domain_encoding::utf8); }
-
-  bool operator==(Mailbox const& rhs) const
-  {
-    return (local_part_ == rhs.local_part_) && (domain_ == rhs.domain_);
-  }
-  bool operator!=(Mailbox const& rhs) const { return !(*this == rhs); }
+  inline bool operator==(Mailbox const& rhs) const;
+  inline bool operator!=(Mailbox const& rhs) const;
 
   enum class local_types : uint8_t {
     unknown,
@@ -74,21 +64,60 @@ public:
 
   static std::optional<parse_results> parse(std::string_view mailbox);
 
-  static bool validate(std::string_view mailbox)
-  {
-    try {
-      Mailbox x(mailbox);
-    }
-    catch (...) {
-      return false;
-    }
-    return true;
-  }
+private:
+  bool set_(std::string_view mailbox, bool should_throw, std::string& msg);
 
-  private:
-    std::string local_part_;
-    Domain      domain_;
+  std::string local_part_;
+  Domain      domain_;
 };
+
+Mailbox::Mailbox(std::string_view mailbox)
+{
+  std::string msg;
+  set_(mailbox, true /* throw */, msg);
+}
+
+// Accept the inputs as already validated via some external check.
+Mailbox::Mailbox(std::string_view local_part, Domain domain)
+{
+  set_local(local_part);
+  set_domain(domain);
+}
+
+bool Mailbox::validate(std::string_view mailbox, std::string& msg, Mailbox& mbx)
+{
+  return mbx.set_(mailbox, false /* don't throw */, msg);
+}
+
+void Mailbox::set_local(std::string_view local_part)
+{
+  local_part_ = local_part;
+}
+
+void Mailbox::set_domain(Domain d) { domain_ = d; }
+
+void Mailbox::clear()
+{
+  local_part_.clear();
+  domain_.clear();
+}
+
+std::string const& Mailbox::local_part() const { return local_part_; }
+Domain const&      Mailbox::domain() const { return domain_; }
+
+bool Mailbox::empty() const { return length() == 0; }
+
+Mailbox::operator std::string() const
+{
+  return as_string(domain_encoding::utf8);
+}
+
+bool Mailbox::operator==(Mailbox const& rhs) const
+{
+  return (local_part_ == rhs.local_part_) && (domain_ == rhs.domain_);
+}
+
+bool Mailbox::operator!=(Mailbox const& rhs) const { return !(*this == rhs); }
 
 inline std::ostream& operator<<(std::ostream& s, Mailbox const& mb)
 {

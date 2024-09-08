@@ -135,16 +135,17 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
 static int ssl_servername_callback(SSL* s, int* ad, void* arg)
 {
-  auto cert_ctx_ptr
-      = CHECK_NOTNULL(static_cast<std::vector<TLS::per_cert_ctx>*>(arg));
+  auto cert_ctx_ptr =
+      CHECK_NOTNULL(static_cast<std::vector<TLS::per_cert_ctx>*>(arg));
   auto const& cert_ctx = *cert_ctx_ptr;
 
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
     LOG(INFO) << "servername requested " << servername;
+    Domain const sn{servername};
     for (auto const& ctx : cert_ctx) {
-      if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), servername);
+      if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), sn);
           c != end(ctx.cn)) {
         if (size(cert_ctx) > 1)
           SSL_set_SSL_CTX(s, ctx.ctx);
@@ -257,13 +258,13 @@ bool TLS::starttls_client(fs::path                  config_path,
         else if (gen->type == GEN_DNS) {
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-          std::string str(
+          std::string_view str(
               reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
-
-          if (find(begin(cn), end(cn), str) == end(cn)) {
+          Domain const dom{str};
+          if (std::find(begin(cn), end(cn), dom) == end(cn)) {
             // LOG(INFO) << "additional name found " << str;
-            cn.emplace_back(str);
+            cn.emplace_back(dom);
           }
           else {
             // LOG(INFO) << "duplicate name " << str << " ignored";
@@ -292,7 +293,7 @@ bool TLS::starttls_client(fs::path                  config_path,
 
       //.......................................................
 
-      if (std::find(begin(cn), end(cn), client_name) != end(cn)) {
+      if (std::find(begin(cn), end(cn), Domain{client_name}) != end(cn)) {
         // LOG(INFO) << "**** using cert for " << client_name;
         cert_ctx_.emplace_back(ctx, cn);
       }
@@ -606,9 +607,10 @@ bool TLS::starttls_server(fs::path                  config_path,
             reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
-        if (find(begin(names), end(names), str) == end(names)) {
+        Domain const dom{str};
+        if (std::find(begin(names), end(names), dom) == end(names)) {
           // LOG(INFO) << "additional name found " << str;
-          names.emplace_back(str);
+          names.emplace_back(dom);
         }
         else {
           // LOG(INFO) << "duplicate name " << str << " ignored";

@@ -908,7 +908,7 @@ struct action<mailbox> {
   {
     // LOG(INFO) << "mailbox emplace_back(" << ctx.mb_loc << '@' << ctx.mb_dom
     // << ')';
-    ctx.mb_list.emplace_back(ctx.mb_loc, ctx.mb_dom);
+    ctx.mb_list.emplace_back(ctx.mb_loc, Domain{ctx.mb_dom});
   }
 };
 

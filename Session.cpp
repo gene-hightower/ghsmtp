@@ -211,7 +211,7 @@ Session::Session(fs::path                  config_path,
     }
   }
 
-  server_identity_ = [this] {
+  server_identity_ = Domain{[this] {
     auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
     if (id_from_env)
       return std::string{id_from_env};
@@ -232,7 +232,7 @@ Session::Session(fs::path                  config_path,
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
     return ""s;
-  }();
+  }()};
 
   // send_.set_sender(server_identity_);
 
@@ -402,8 +402,10 @@ void Session::check_for_pipeline_error_(std::string_view verb)
   }
 }
 
-void Session::lo_(char const* verb, std::string_view client_identity)
+void Session::lo_(char const* verb, std::string_view client_identity_str)
 {
+  Domain client_identity{client_identity_str};
+
   last_in_group_(verb);
   reset_();
 
@@ -484,15 +486,15 @@ void Session::lo_(char const* verb, std::string_view client_identity)
   if (sock_.has_peername()) {
     if (std::find(begin(client_fcrdns_), end(client_fcrdns_),
                   client_identity_) != end(client_fcrdns_)) {
-      LOG(INFO) << verb << " " << client_identity << " from "
+      LOG(INFO) << verb << " " << client_identity_ << " from "
                 << sock_.them_address_literal();
     }
     else {
-      LOG(INFO) << verb << " " << client_identity << " from " << client_;
+      LOG(INFO) << verb << " " << client_identity_ << " from " << client_;
     }
   }
   else {
-    LOG(INFO) << verb << " " << client_identity;
+    LOG(INFO) << verb << " " << client_identity_;
   }
 }
 
@@ -699,8 +701,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     return {SpamStatus::spam, "SPF failed"};
 
   // These should have already been rejected by verify_client_().
-  if ((reverse_path_.domain() == "localhost.local") ||
-      (reverse_path_.domain() == "localhost"))
+  if ((reverse_path_.domain().ascii() == "localhost.local") ||
+      (reverse_path_.domain().ascii() == "localhost"))
     return {SpamStatus::spam, "bogus reverse_path"};
 
   std::vector<std::string> why_ham;
@@ -1452,7 +1454,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       (sock_.them_address_literal() == IP6::loopback_literal)) {
     LOG(INFO) << "loopback address allowed";
     ip_allowed_ = true;
-    client_fcrdns_.emplace_back("localhost");
+    client_fcrdns_.emplace_back(Domain{"localhost"});
     client_ = fmt::format("localhost {}", sock_.them_address_literal());
     return true;
   }
@@ -1642,9 +1644,10 @@ bool Session::verify_client_(Domain const& client_identity,
   }
 
   // Bogus clients claim to be us or some local host.
-  if (sock_.has_peername() && ((client_identity == server_identity_) ||
-                               (client_identity == "localhost") ||
-                               (client_identity == "localhost.localdomain"))) {
+  if (sock_.has_peername() &&
+      ((client_identity == server_identity_) ||
+       (client_identity.ascii() == "localhost") ||
+       (client_identity.ascii() == "localhost.localdomain"))) {
 
     if ((sock_.them_address_literal() == IP4::loopback_literal) ||
         (sock_.them_address_literal() == IP6::loopback_literal)) {
@@ -1770,7 +1773,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   // }
 
   if (sender.domain().is_address_literal()) {
-    if (sender.domain() != sock_.them_address_literal()) {
+    if (sender.domain().ascii() != sock_.them_address_literal()) {
       LOG(WARNING) << "sender domain " << sender.domain() << " does not match "
                    << sock_.them_address_literal();
     }
@@ -1837,12 +1840,11 @@ bool Session::verify_sender_domain_(Domain const& sender,
 void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
-    auto const ip_addr = "127.0.0.1"; // use localhost for local socket
-    spf_received_      = fmt::format(
-             "Received-SPF: pass ({}: allow-listed) client-ip={}; "
-                  "envelope-from={}; helo={};",
-             server_id_(), ip_addr, sender.as_string(), client_identity_.ascii());
-    spf_sender_domain_ = "localhost";
+    spf_received_      = fmt::format("Received-SPF: pass ({}: allow-listed) "
+                                          "client-ip={}; envelope-from={}; helo={};",
+                                     server_id_(), "127.0.0.1", sender.as_string(),
+                                     client_identity_.ascii());
+    spf_sender_domain_ = Domain{"localhost"};
     return;
   }
 
@@ -1868,7 +1870,7 @@ void Session::do_spf_check_(Mailbox const& sender)
   auto const spf_res{SPF::Response{spf_request}};
   spf_result_        = spf_res.result();
   spf_received_      = spf_res.received_spf();
-  spf_sender_domain_ = spf_request.get_sender_dom();
+  spf_sender_domain_ = Domain{spf_request.get_sender_dom()};
 
   LOG(INFO) << "spf_received_ == " << spf_received_;
 
@@ -1974,14 +1976,14 @@ bool Session::verify_rcpt_params_(parameters_t const& parameters)
 // check recipient from RFC5321 RCPT TO:
 bool Session::verify_recipient_(Mailbox const& recipient)
 {
-  if ((recipient.local_part() == "Postmaster") && (recipient.domain() == "")) {
+  if (recipient == Mailbox{"Postmaster"}) {
     LOG(INFO) << "magic Postmaster address";
     return true;
   }
 
   auto const accepted_domain{[this, &recipient] {
     if (recipient.domain().is_address_literal()) {
-      if (recipient.domain() != sock_.us_address_literal()) {
+      if (recipient.domain().ascii() != sock_.us_address_literal()) {
         LOG(WARNING) << "recipient.domain address " << recipient.domain()
                      << " does not match ours " << sock_.us_address_literal();
         /*
@@ -2000,7 +2002,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
     else {
       // If we have no list of domains to accept, at least take our own.
-      if (recipient.domain() == server_id_()) {
+      if (recipient.domain().ascii() == server_id_()) {
         return true;
       }
     }

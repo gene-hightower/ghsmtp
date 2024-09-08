@@ -4,27 +4,29 @@
 
 #include <glog/logging.h>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
+template <>
+struct fmt::formatter<Domain> : ostream_formatter {};
+
+using namespace std::string_literals;
+
 int main(int argc, char const* argv[])
 {
-  std::string const d{"example.com."};
+  std::string msg;
 
-  CHECK(Domain::match(d, "EXAMPLE.COM"));
-  CHECK(Domain::match(d, "example.com."));
+  auto const raw_ips = "123.123.123.123";
+  auto const add_lit = "[123.123.123.123]";
+  CHECK_EQ(Domain{raw_ips}, Domain{add_lit});
 
-  CHECK(!Domain::match(d, "example.co"));
-  CHECK(!Domain::match(d, "example.com.."));
-  CHECK(!Domain::match(d, ""));
-  CHECK(!Domain::match(d, "."));
+  Domain d0{"EXAMPLE.COM"};
+  Domain d1{"example.com."};
+  CHECK_EQ(d0, d1);
 
-  std::string const d3{""};
-
-  CHECK(Domain::match(d3, ""));
-  CHECK(Domain::match(d3, "."));
-
-  CHECK(!Domain::match(d3, "example.com"));
-
-  Domain const dom{"example.com"};
-  CHECK_EQ(dom, Domain("EXAMPLE.COM"));
+  Domain const d3{""};
+  Domain const d4{"."};
+  CHECK_EQ(d3, d4);
 
   Domain const dom2{"黒川.日本"};
   Domain const dom3{"xn--5rtw95l.xn--wgv71a"};
@@ -36,22 +38,80 @@ int main(int argc, char const* argv[])
 
   Domain const norm0{"hi⒌com"}; // non-ascii "dot" before "com"
   Domain const norm1{"hi5.com"};
-
   CHECK_EQ(norm0, norm1);
 
-  CHECK(Domain::validate("hi⒌com"));
-  CHECK(Domain::validate("hi5.com"));
+  Domain dom;
+  CHECK(Domain::validate("hi⒌com", msg, dom));
+  CHECK(Domain::validate("hi5.com", msg, dom));
 
-  // FIXME
-  // CHECK(!Domain::validate("$?%^&*("));
+  CHECK(!Domain::validate("$?%^&*(", msg, dom));
+  CHECK_EQ(msg, "failed to parse domain «$?%^&*(»"s);
+
+  CHECK(!Domain::validate("email@123.123.123.123", msg, dom));
+  CHECK_EQ(msg, "failed to parse domain «email@123.123.123.123»"s);
+
+  CHECK(!Domain::validate("email@[123.123.123.123]", msg, dom));
+  CHECK_EQ(msg, "failed to parse domain «email@[123.123.123.123]»"s);
+
+  auto constexpr long_dom =
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+  CHECK(Domain::validate(long_dom, msg, dom)) << msg;
+
+  CHECK(!Domain::validate(
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.com",
+      msg, dom));
+  CHECK_EQ(msg,
+           "domain name "
+           "«xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+           "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+           "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+           "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.com» "
+           "too long");
+
+  CHECK(!Domain::validate(
+      "a.b.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "com",
+      msg, dom));
+  CHECK_EQ(
+      msg,
+      "domain label «xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx» too long"s);
+
+  CHECK(!Domain::validate(
+      "💩.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.com",
+      msg, dom));
+  CHECK_EQ(
+      msg,
+      "domain label «💩.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.com» too long"s);
+
+  CHECK(!Domain::validate(
+      "💩."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      msg, dom));
+  CHECK_EQ(
+      msg,
+      "domain name «"
+      "💩."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx."
+      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx» too long"s);
 
   try {
     Domain const junk{"$?%^&*("};
     // idn2 allows this
-    // LOG(FATAL) << "should have thrown";
+    LOG(FATAL) << "should have thrown";
   }
   catch (std::exception const& ex) {
-    std::cout << ex.what() << '\n';
+    CHECK_EQ(0, strcmp(ex.what(), "failed to parse domain"));
   }
 
   try {
@@ -70,8 +130,18 @@ int main(int argc, char const* argv[])
     LOG(FATAL) << "should not throw " << ex.what();
   }
 
+  CHECK_EQ(Domain{"127.0.0.1"}, Domain{"[127.0.0.1]"});
+
   Domain const mixed_case{"ExAmPle.COM"};
   CHECK_EQ(mixed_case.ascii(), "example.com");
+
+  CHECK(domain::is_fully_qualified(Domain{"foo.bar"}, msg));
+
+  CHECK(!domain::is_fully_qualified(Domain{"foo.b"}, msg));
+  CHECK_EQ(msg, "TLD «b» must be two or more octets");
+
+  CHECK(!domain::is_fully_qualified(Domain{"foo"}, msg));
+  CHECK_EQ(msg, "domain «foo» must have two or more labels");
 
   for (auto arg{1}; arg < argc; ++arg) {
     Domain const a{argv[arg]};

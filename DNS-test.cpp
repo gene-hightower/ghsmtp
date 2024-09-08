@@ -28,7 +28,7 @@ int main(int argc, char const* argv[])
     char const*  name;
   };
 
-  lkp lookups[] {
+  lkp lookups[]{
       {DNS::RR_type::A, "amazon.com"},
       {DNS::RR_type::A, "dee.test.digilicious.com"},
       {DNS::RR_type::A, "does-not-exist.test.digilicious.com"},
@@ -51,13 +51,12 @@ int main(int argc, char const* argv[])
     DNS::Query      q(res, lookup.typ, lookup.name);
     DNS_ldns::Query q_ldns(res_ldns, lookup.typ, lookup.name);
 
-    CHECK_EQ(q.nx_domain(), q_ldns.nx_domain()) <<
-      lookup.name;
-      
-    CHECK_EQ(q.bogus_or_indeterminate(), q_ldns.bogus_or_indeterminate());
+    CHECK_EQ(q.nx_domain(), q_ldns.nx_domain()) << lookup.name;
 
-    CHECK_EQ(q.authentic_data(), q_ldns.authentic_data()) <<
-      lookup.name;
+    CHECK_EQ(q.bogus_or_indeterminate(), q_ldns.bogus_or_indeterminate())
+        << lookup.name;
+
+    CHECK_EQ(q.authentic_data(), q_ldns.authentic_data()) << lookup.name;
 
     auto rrs{q.get_records()};
     auto rrs_ldns{q_ldns.get_records()};
@@ -67,8 +66,8 @@ int main(int argc, char const* argv[])
     std::sort(begin(rrs), end(rrs));
     std::sort(begin(rrs_ldns), end(rrs_ldns));
 
-    auto [rr, rr_ldns]
-        = std::mismatch(begin(rrs), end(rrs), begin(rrs_ldns), end(rrs_ldns));
+    auto [rr, rr_ldns] =
+        std::mismatch(begin(rrs), end(rrs), begin(rrs_ldns), end(rrs_ldns));
     if (rr != end(rrs)) {
       LOG(FATAL) << *rr << " != " << *rr_ldns;
     }
@@ -97,15 +96,14 @@ int main(int argc, char const* argv[])
 
   auto const fcrdnses4{fcrdns4(res, "1.1.1.1")};
   CHECK_EQ(fcrdnses4.size(), 1);
-  CHECK(Domain::match(fcrdnses4.front(), "one.one.one.one"))
+  CHECK_EQ(fcrdnses4.front(), "one.one.one.one")
       << "no match for " << fcrdnses4.front();
 
   auto const fcrdnses6{fcrdns6(res, "2606:4700:4700::1111")};
   CHECK_EQ(fcrdnses6.size(), 1);
-  CHECK(Domain::match(fcrdnses6.front(), "one.one.one.one"))
+  CHECK_EQ(fcrdnses6.front(), "one.one.one.one")
       << "no match for " << fcrdnses6.front();
 
   auto const quad9{fcrdns4(res, "9.9.9.9")};
-  CHECK(Domain::match(quad9.front(), "dns9.quad9.net"))
-      << "no match for " << quad9.front();
+  CHECK_EQ(quad9.front(), "dns9.quad9.net") << "no match for " << quad9.front();
 }
