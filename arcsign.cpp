@@ -79,7 +79,7 @@ bool arc_sign(message::parsed& msg,
       std::string authservid;
       if (message::authentication_results_parse(hdr.as_view(), authservid,
                                                 ar_results)) {
-        if (Domain::match(authservid, sender))
+        if (iequal(authservid, sender))
           break;
         LOG(INFO) << "ignoring AR: " << hdr.as_string();
       }
