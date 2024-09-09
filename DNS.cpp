@@ -24,7 +24,7 @@ namespace Config {
 // in front of stubby with DNSSEC checking and all that seems to work
 // better with just a little more time.
 
-auto constexpr read_timeout{std::chrono::seconds(7)};
+auto constexpr read_timeout{std::chrono::seconds(11)};
 auto constexpr write_timeout{std::chrono::seconds(1)};
 
 enum class sock_type : bool { stream, dgram };
@@ -38,18 +38,12 @@ struct nameserver {
 
 constexpr nameserver nameservers[]{
     {
-        "dns.mullvad.net",
-        "194.242.2.2",
-        "domain-s",
-        sock_type::stream,
-    }
-    /*
-    {
         "localhost",
-        "::1",
+        "127.0.0.1",
         "domain",
         sock_type::stream,
     },
+    /*
     {
         "one.one.one.one",
         "1.1.1.1",
