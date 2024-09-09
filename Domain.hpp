@@ -27,7 +27,7 @@ public:
   inline bool empty() const;
 
   inline bool operator==(Domain const& rhs) const;
-  inline auto operator<=>(const Domain& rhs) const;
+  inline auto operator<=>(Domain const& rhs) const;
 
   inline bool is_address_literal() const;
   inline bool is_unicode() const;
