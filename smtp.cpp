@@ -408,7 +408,8 @@ struct action<local_part> {
     ctx.mb_loc = in.string();
     // RFC 5321, section 4.5.3.1.1.
     if (ctx.mb_loc.length() > 64) {
-      LOG(WARNING) << "local part length == " << ctx.mb_loc.length();
+      LOG(INFO) << "local part «" << ctx.mb_loc
+                << "» length == " << ctx.mb_loc.length();
     }
   }
 };
@@ -421,7 +422,7 @@ struct action<non_local_part> {
     ctx.mb_dom = in.string();
     // RFC 5321, section 4.5.3.1.2.
     if (ctx.mb_dom.length() > 253) {
-      LOG(WARNING) << "domain name or number too long " << ctx.mb_dom;
+      LOG(WARNING) << "domain name too long " << ctx.mb_dom;
     }
   }
 };
