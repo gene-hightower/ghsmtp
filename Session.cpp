@@ -697,13 +697,17 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  if (spf_result_ == SPF::Result::FAIL && !ip_allowed_)
+  if (spf_result_ == SPF::Result::FAIL && !ip_allowed_) {
+    LOG(INFO) << "spam since SPF failed";
     return {SpamStatus::spam, "SPF failed"};
+  }
 
   // These should have already been rejected by verify_client_().
   if ((reverse_path_.domain().ascii() == "localhost.local") ||
-      (reverse_path_.domain().ascii() == "localhost"))
+      (reverse_path_.domain().ascii() == "localhost")) {
+    LOG(INFO) << "spam since reverse path is localhost";
     return {SpamStatus::spam, "bogus reverse_path"};
+  }
 
   std::vector<std::string> why_ham;
 
@@ -724,10 +728,17 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
       }
     }
   }
+  else {
+    LOG(INFO) << "not ham since SPF not PASS";
+  }
 
-  if (fcrdns_allowed_)
+  if (fcrdns_allowed_) {
     why_ham.emplace_back(
         fmt::format("FCrDNS (or it's registered domain) is allowed"));
+  }
+  else {
+    LOG(INFO) << "not ham since fcrdns not allowed";
+  }
 
   if (!why_ham.empty())
     return {SpamStatus::ham,
