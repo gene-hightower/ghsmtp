@@ -6,4 +6,4 @@
 	url = https://github.com/taocpp/PEGTL.git
 [submodule "cppcodec"]
 	path = cppcodec
-	url = https://github.com/tplgy/cppcodec.git
+	url = https://github.com/gene-hightower/cppcodec.git
