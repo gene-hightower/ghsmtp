@@ -1742,6 +1742,7 @@ bool snd(fs::path                    config_path,
     LOG(INFO) << "C: RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">";
     cnn.sock.out() << "RCPT TO:<" << smtp_to_mbx.as_string(enc) << ">\r\n";
     if (!ext_pipelining) {
+      cnn.sock.out() << std::flush;
       // check RCPT TO #1
       CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
       rcpt_to_ok = cnn.reply_code.at(0) == '2';
@@ -1751,6 +1752,7 @@ bool snd(fs::path                    config_path,
       LOG(INFO) << "C: RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">";
       cnn.sock.out() << "RCPT TO:<" << smtp_to2_mbx.as_string(enc) << ">\r\n";
       if (!ext_pipelining) {
+        cnn.sock.out() << std::flush;
         // check RCPT TO #2
         CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
         rcpt_to2_ok = cnn.reply_code.at(0) == '2';
@@ -1761,6 +1763,7 @@ bool snd(fs::path                    config_path,
       LOG(INFO) << "C: RCPT TO:<" << smtp_to3_mbx.as_string(enc) << ">";
       cnn.sock.out() << "RCPT TO:<" << smtp_to3_mbx.as_string(enc) << ">\r\n";
       if (!ext_pipelining) {
+        cnn.sock.out() << std::flush;
         // check RCPT TO #3
         CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
         rcpt_to3_ok = cnn.reply_code.at(0) == '2';
