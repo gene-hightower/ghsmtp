@@ -21,9 +21,11 @@ dns_tool
 fail_554
 folders
 forward
+fuzz/
 ghsmtp.private
 ghsmtp.txt
 ip-block
+logs/
 mail.*
 mkm
 msg
