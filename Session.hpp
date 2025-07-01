@@ -15,7 +15,7 @@
 #include "SPF.hpp"
 #include "Sock.hpp"
 #include "TLD.hpp"
-#include "message.hpp"
+// #include "message.hpp"
 
 namespace Config {
 constexpr size_t kibibyte             = 1024;
