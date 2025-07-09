@@ -52,13 +52,11 @@ struct Ctx {
 
 #include "UTF8.hpp"
 
-// clang-format off
-
 struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
 
-using dot = one<'.'>;
+using dot   = one<'.'>;
 using colon = one<':'>;
-using dash = one<'-'>;
+using dash  = one<'-'>;
 
 struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
 
@@ -93,6 +91,7 @@ struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {};
 
 struct dcolon : two<':'> {};
 
+// clang-format off
 struct IPv6address : sor<seq<                                          rep<6, h16, colon>, ls32>,
                          seq<                                  dcolon, rep<5, h16, colon>, ls32>,
                          seq<opt<h16                        >, dcolon, rep<4, h16, colon>, ls32>, 
@@ -102,6 +101,7 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<4, colon, h16>>, dcolon,                     ls32>,
                          seq<opt<h16, rep_opt<5, colon, h16>>, dcolon,                      h16>,
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
+// clang-format on
 
 struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
 
@@ -341,11 +341,8 @@ struct any_cmd : seq<sor<bogus_cmd_short,
 
 struct grammar : plus<any_cmd> {};
 
-// clang-format on
-
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <typename Rule>
 struct data_action : nothing<Rule> {
