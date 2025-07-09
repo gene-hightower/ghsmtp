@@ -1364,22 +1364,61 @@ void Session::error(std::string_view log_msg)
   LOG(WARNING) << log_msg;
 }
 
+std::string_view remove_crlf(std::string_view str)
+{
+  if (str.ends_with("\r\n")) {
+    return str.substr(0, str.length() - 2);
+  }
+  return str;
+}
+
 void Session::cmd_unrecognized(std::string_view cmd)
 {
-  auto const escaped{esc(cmd)};
-  LOG(WARNING) << "command unrecognized: \"" << escaped << "\"";
+  constexpr std::string_view helo{"HELO "};
+  constexpr std::string_view ehlo{"EHLO "};
+  constexpr std::string_view mail_from{"MAIL FROM:"};
+  constexpr std::string_view rcpt_to{"RCPT TO:"};
+
+  if (cmd.length() < 6) {
+    auto const escaped{esc(cmd)};
+    LOG(WARNING) << "command unrecognized (line too short): \"" << escaped
+                 << "\"";
+    out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"";
+  }
+  else if (cmd.length() > 1000) {
+    auto const escaped{esc(cmd).substr(0, 100)};
+    LOG(WARNING) << "command unrecognized (line too long): \"" << escaped
+                 << "\"...";
+    out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"...";
+  }
+  else if (istarts_with(cmd, helo) || istarts_with(cmd, ehlo)) {
+    auto const escaped_dom{esc(remove_crlf(cmd.substr(ehlo.size())))};
+    LOG(WARNING) << "invalid domain: " << escaped_dom;
+    out_() << "554 5.7.1 bad HELO/EHLO domain: " << escaped_dom;
+  }
+  else if (istarts_with(cmd, mail_from)) {
+    auto const escaped_addr{esc(remove_crlf(cmd.substr(mail_from.size())))};
+    LOG(WARNING) << "invalid MAIL FROM address: " << escaped_addr;
+    out_() << "501 5.1.7 bad sender address: " << escaped_addr;
+  }
+  else if (istarts_with(cmd, rcpt_to)) {
+    auto const escaped_addr{esc(remove_crlf(cmd.substr(rcpt_to.size())))};
+    LOG(WARNING) << "invalid RCPT TO address: " << escaped_addr;
+    out_() << "501 5.1.3 bad recipient address: " << escaped_addr;
+  }
+  else {
+    auto const escaped{esc(cmd)};
+    LOG(WARNING) << "command unrecognized: \"" << escaped << "\"";
+    out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"";
+  }
 
   if (++n_unrecognized_cmds_ >= Config::max_unrecognized_cmds) {
-    out_() << "500 5.5.1 command unrecognized: \"" << escaped
-           << "\" exceeds limit\r\n"
-           << std::flush;
-    LOG(WARNING) << n_unrecognized_cmds_
-                 << " unrecognized commands is too many";
+    out_() << ", failure count exceeds limit\r\n" << std::flush;
+    LOG(ERROR) << n_unrecognized_cmds_ << " unrecognized commands is too many";
     exit_();
   }
 
-  out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"\r\n"
-         << std::flush;
+  out_() << "\r\n" << std::flush;
 }
 
 void Session::bare_lf()

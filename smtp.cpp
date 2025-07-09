@@ -8,6 +8,10 @@ DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
+constexpr auto smtp_max_line_length = 1000;
+constexpr auto smtp_max_str_length =
+    smtp_max_line_length - 2; // length of line without CRLF
+
 #include <seccomp.h>
 
 #include <fstream>
@@ -103,7 +107,12 @@ struct IPv6address : sor<seq<                                          rep<6, h1
                          seq<opt<h16, rep_opt<6, colon, h16>>, dcolon                          >> {};
 // clang-format on
 
-struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("IPv6:"), IPv6address> {};
+struct IPv6_address_literal : seq<TAO_PEGTL_ISTRING("I"),
+                                  TAO_PEGTL_ISTRING("P"),
+                                  TAO_PEGTL_ISTRING("v"),
+                                  one<'6'>,
+                                  one<':'>,
+                                  IPv6address> {};
 
 struct dcontent : ranges<33, 90, 94, 126> {};
 
@@ -167,11 +176,22 @@ struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
 struct path : seq<one<'<'>, mailbox, one<'>'>> {};
 
-struct bounce_path : TAO_PEGTL_ISTRING("<>") {};
+struct bounce_path : seq<one<'<'>, one<'>'>> {};
 
 struct reverse_path : sor<path, bounce_path> {};
 
-struct magic_postmaster : TAO_PEGTL_ISTRING("<Postmaster>") {};
+struct magic_postmaster : seq<one<'<'>,
+                              TAO_PEGTL_ISTRING("P"),
+                              TAO_PEGTL_ISTRING("o"),
+                              TAO_PEGTL_ISTRING("s"),
+                              TAO_PEGTL_ISTRING("t"),
+                              TAO_PEGTL_ISTRING("m"),
+                              TAO_PEGTL_ISTRING("a"),
+                              TAO_PEGTL_ISTRING("s"),
+                              TAO_PEGTL_ISTRING("t"),
+                              TAO_PEGTL_ISTRING("e"),
+                              TAO_PEGTL_ISTRING("r"),
+                              one<'>'>> {};
 
 struct forward_path : sor<path, magic_postmaster> {};
 
@@ -198,18 +218,28 @@ struct ehlo : seq<TAO_PEGTL_ISTRING("EHLO"),
                   CRLF> {};
 
 struct mail_from : seq<TAO_PEGTL_ISTRING("MAIL"),
-                       TAO_PEGTL_ISTRING(" FROM:"),
+                       seq<one<' '>,
+                           TAO_PEGTL_ISTRING("F"),
+                           TAO_PEGTL_ISTRING("R"),
+                           TAO_PEGTL_ISTRING("O"),
+                           TAO_PEGTL_ISTRING("M"),
+                           one<':'>>,
                        opt<SP>, // common enough error, we'll allow it
                        reverse_path,
                        opt<seq<SP, mail_parameters>>,
                        CRLF> {};
 
+// clang-format off
 struct rcpt_to : seq<TAO_PEGTL_ISTRING("RCPT"),
-                     TAO_PEGTL_ISTRING(" TO:"),
-                     opt<SP>, // common error
+                       seq<one<' '>,
+                           TAO_PEGTL_ISTRING("T"),
+                           TAO_PEGTL_ISTRING("O"),
+                           one<':'>>,
+                     opt<SP>, // common enough error, we'll allow it
                      forward_path,
                      opt<seq<SP, rcpt_parameters>>,
                      CRLF> {};
+// clang-format on
 
 struct chunk_size : plus<DIGIT> {};
 
@@ -236,9 +266,12 @@ struct data_also_not_end : seq<LF, dot, CRLF> {};
 
 
 // RFC 5321 text line length section 4.5.3.1.6.
-struct data_plain : seq<rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
+struct data_plain
+  : seq<rep_min_max<1, smtp_max_str_length, not_one<'\r', '\n'>>, CRLF> {};
 
-struct data_dot : seq<one<'.'>, rep_min_max<1, 998, not_one<'\r', '\n'>>, CRLF> {};
+struct data_dot : seq<one<'.'>,
+                      rep_min_max<1, smtp_max_str_length, not_one<'\r', '\n'>>,
+                      CRLF> {};
 
 struct data_long : seq<star<not_one<'\r', '\n'>>, CRLF> {};
 
@@ -262,8 +295,12 @@ struct vrfy : seq<TAO_PEGTL_ISTRING("VRFY"), opt<seq<SP, string>>, CRLF> {};
 
 struct help : seq<TAO_PEGTL_ISTRING("HELP"), opt<seq<SP, string>>, CRLF> {};
 
-struct starttls
-    : seq<TAO_PEGTL_ISTRING("STAR"), TAO_PEGTL_ISTRING("TTLS"), CRLF> {};
+struct starttls : seq<TAO_PEGTL_ISTRING("STAR"),
+                      seq<TAO_PEGTL_ISTRING("T"),
+                          TAO_PEGTL_ISTRING("T"),
+                          TAO_PEGTL_ISTRING("L"),
+                          TAO_PEGTL_ISTRING("S")>,
+                      CRLF> {};
 
 struct quit : seq<TAO_PEGTL_ISTRING("QUIT"), CRLF> {};
 
@@ -276,9 +313,8 @@ struct base64_char : sor<ALPHA, DIGIT, one<'+', '/'>> {};
 
 // base64-terminal = (2base64-char "==") / (3base64-char "=")
 
-struct base64_terminal : sor<seq<rep<2, base64_char>, TAO_PEGTL_ISTRING("==")>,
-                             seq<rep<3, base64_char>, one<'='>>
-                             > {};
+struct base64_terminal : sor<seq<rep<2, base64_char>, one<'='>, one<'='>>,
+                             seq<rep<3, base64_char>, one<'='>>> {};
 
 // base64          = base64-terminal /
 //                   ( 1*(4base64-char) [base64-terminal] )
@@ -314,28 +350,41 @@ struct auth : seq<TAO_PEGTL_ISTRING("AUTH"), SP, sasl_mech,
                   // star<CRLF, opt<base64>>,
                   // opt<seq<CRLF, cancel_response>>,
                   CRLF> {};
-// bad commands:
+
+// Bad commands; the short one is to matched first, and the long one
+// last, after all valid command have been tried.
 
 struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
-struct bogus_cmd_long : seq<rep_min_max<4, 1000, not_one<'\r', '\n'>>, CRLF> {};
+struct bogus_cmd_long
+  : seq<rep_min_max<4, smtp_max_line_length, not_one<'\r', '\n'>>, CRLF> {};
 
-// commands in size order
+// Command matches after bogus_cmd_short can assume to have 4 or more
+// chars before the CRLF, so can use TAO_PEGTL_ISTRING<"XXXX"> in the
+// initial seq.  Command order in this list doesn't matter beyond all
+// valid command after bogus short and before bogus last.
 
 struct any_cmd : seq<sor<bogus_cmd_short,
-                         data,
-                         quit,
-                         rset,
-                         noop,
-                         vrfy,
-                         help,
+
                          helo,
                          ehlo,
+
+                         starttls,
+
+                         auth,
+                         help,
+                         noop,
+                         quit,
+                         rset,
+                         vrfy,
+
+                         data,
+
                          bdat,
                          bdat_last,
-                         starttls,
-                         rcpt_to,
+
                          mail_from,
-                         auth,
+                         rcpt_to,
+
                          bogus_cmd_long>,
                      discard> {};
 
@@ -620,7 +669,7 @@ struct data_action<data_long> {
     auto const len{end(in) - begin(in)};
     if (len)
       ctx.session.msg_write(begin(in), len);
-    if (len > 1000) {
+    if (len > smtp_max_line_length) {
       LOG(WARNING) << "line too long at " << len << " octets";
     }
   }
