@@ -742,9 +742,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
   }
 
   if (!why_ham.empty())
-    return {SpamStatus::ham,
-            fmt::format("{}", fmt::join(std::begin(why_ham), std::end(why_ham),
-                                        ", and "))};
+    return {SpamStatus::ham, fmt::format("{}", fmt::join(why_ham, ", and "))};
 
   return {SpamStatus::spam, "it's not ham"};
 }
