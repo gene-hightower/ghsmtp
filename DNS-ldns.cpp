@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <iomanip>
 
-#include <cstdbool> // needs to be above ldns includes
 #include <ldns/ldns.h>
 #include <ldns/packet.h>
 #include <ldns/rr.h>
