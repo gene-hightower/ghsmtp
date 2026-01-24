@@ -14,8 +14,7 @@ Magic::~Magic() { magic_close(magic_); }
 
 std::string Magic::buffer(std::string_view bfr) const
 {
-  auto const data = reinterpret_cast<void const*>(bfr.data());
-  return CHECK_NOTNULL(magic_buffer(magic_, data, bfr.size()));
+  return CHECK_NOTNULL(magic_buffer(magic_, reinterpret_cast<void const*>(bfr.data()), bfr.size()));
 }
 
 std::string Magic::file(char const* path) const
