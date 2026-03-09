@@ -10,7 +10,6 @@ LDLIBS += \
 	-lfmt \
 	-lgflags \
 	-lmagic \
-	-lopenarc \
 	-lopendmarc \
 	-lpsl \
 	-lresolv \
@@ -81,7 +80,6 @@ smtp_STEMS := smtp \
 	IP6 \
 	Mailbox \
 	MessageStore \
-	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
 	POSIX \
@@ -183,7 +181,6 @@ Session-test_STEMS := \
 	IP6 \
 	Mailbox \
 	MessageStore \
-	OpenARC \
 	OpenDKIM \
 	OpenDMARC \
 	POSIX \
