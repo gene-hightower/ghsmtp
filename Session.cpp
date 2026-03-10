@@ -227,7 +227,7 @@ Session::Session(fs::path                  config_path,
     }
 
     auto const us_c_str = sock_.us_c_str();
-    if (us_c_str && !IP::is_private(us_c_str)) {
+    if (us_c_str && us_c_str[0] && !IP::is_private(us_c_str)) {
       return IP::to_address_literal(us_c_str);
     }
 
