@@ -15,6 +15,7 @@
 #include <idn2.h>
 #include <uninorm.h>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include <tao/pegtl.hpp>
