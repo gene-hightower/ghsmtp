@@ -157,7 +157,7 @@ char const* uribls[]{
 };
 */
 
-constexpr auto greeting_wait              = std::chrono::seconds{6};
+constexpr auto greeting_wait              = std::chrono::seconds{1};
 constexpr int  max_recipients_per_message = 100;
 constexpr int  max_unrecognized_cmds      = 20;
 
@@ -783,6 +783,7 @@ static std::string folder(Session::SpamStatus         status,
       {"postmaster-rua", ".INBOX.rua"},
       {"quic=ietf.org", ".INBOX.quic"},
       {"shadowserver-reports@digilicious.com", ".INBOX.shadowserver"},
+      {"shadowserver.org", ".Shadowserver"},
       {"theatlantic.com", ""},
       {"time-nutz", ".time-nutz"},
       {"zfsonlinux.topicbox.com", ".INBOX.zfs"},
