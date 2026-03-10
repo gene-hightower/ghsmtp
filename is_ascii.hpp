@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <string_view>
 
+#undef isascii
+
 constexpr bool isascii(auto c) noexcept
 {
   return (static_cast<unsigned char>(c) & 0x80) == 0;
