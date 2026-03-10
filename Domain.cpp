@@ -35,13 +35,13 @@ namespace RFC5321 {
 using dot  = one<'.'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
+struct u_let_dig : sor<ALPHA, DIGIT, one<'_'>, UTF8_non_ascii> {};
 
 struct u_ldh_tail : star<sor<seq<plus<dash>, u_let_dig>, u_let_dig>> {};
 
 struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
-struct let_dig : sor<ALPHA, DIGIT> {};
+struct let_dig : sor<ALPHA, DIGIT, one<'_'>> {};
 
 struct ldh_tail : star<sor<seq<plus<dash>, let_dig>, let_dig>> {};
 

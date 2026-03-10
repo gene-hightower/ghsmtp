@@ -4,8 +4,9 @@
 // Allocator adaptor that interposes construct() calls to convert
 // value initialization into default initialization.
 
-// <https://en.cppreference.com/w/cpp/container/vector/resize>
+// This is Casey's allocator adaptor from SO. See:
 // <https://stackoverflow.com/a/21028912/273767>
+// <https://en.cppreference.com/w/cpp/container/vector/resize>
 
 #include <memory>
 
@@ -16,8 +17,8 @@ class default_init_allocator : public A {
 public:
   template <typename U>
   struct rebind {
-    using other
-        = default_init_allocator<U, typename a_t::template rebind_alloc<U>>;
+    using other =
+        default_init_allocator<U, typename a_t::template rebind_alloc<U>>;
   };
 
   using A::A;
