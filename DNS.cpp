@@ -12,6 +12,7 @@
 
 #include <arpa/nameser.h>
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "osutil.hpp"
