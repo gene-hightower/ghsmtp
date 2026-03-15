@@ -597,6 +597,16 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (!verify_recipient_(forward_path))
     return;
 
+  // V6 spam...
+  if (IP6::is_address(sock_.them_c_str()) &&
+      forward_path.local_part() == "gene") {
+    std::string error_msg = fmt::format("rejecting spammy message from {}",
+                                        client_fcrdns_[0].ascii());
+    LOG(WARNING) << error_msg;
+    out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
+    return;
+  }
+
   if (!smtputf8_ && !is_ascii(forward_path.local_part())) {
     LOG(WARNING) << "non ascii forward_path \"" << forward_path
                  << "\" without SMTPUTF8 paramater";
