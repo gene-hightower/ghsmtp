@@ -182,8 +182,8 @@ DEFINE_bool(use_prdr, true, "support PRDR extension");
 DEFINE_bool(use_smtputf8, true, "support SMTPUTF8 extension, RFC 6531");
 
 boost::xpressive::mark_tag     secs_(1);
-boost::xpressive::sregex const all_rex = boost::xpressive::icase("wait-all-") >>
-                                         (secs_ = +boost::xpressive::_d);
+boost::xpressive::sregex const all_rex =
+    boost::xpressive::icase("wait-all-") >> (secs_ = +boost::xpressive::_d);
 
 Session::Session(fs::path                  config_path,
                  std::function<void(void)> read_hook,
@@ -1083,11 +1083,13 @@ void Session::xfer_response_(std::string_view success_msg)
       // this is the mixed situation
       out_() << "353 per recipient responses follow:\r\n";
       for (auto fp : forward_path_) {
-        if (bad_recipients_db.is_open() && bad_recipients_db.contains_lc(fp.local_part())) {
+        if (bad_recipients_db.is_open() &&
+            bad_recipients_db.contains_lc(fp.local_part())) {
           out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
           LOG(INFO) << "bad recipient " << fp;
         }
-        else if (temp_fail_db.is_open() && temp_fail_db.contains_lc(fp.local_part())) {
+        else if (temp_fail_db.is_open() &&
+                 temp_fail_db.contains_lc(fp.local_part())) {
           out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
           LOG(INFO) << "temp fail for " << fp;
         }
@@ -1900,10 +1902,10 @@ bool Session::verify_sender_domain_(Domain const& sender,
 void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
-    spf_received_      = fmt::format("Received-SPF: pass ({}: allow-listed) "
-                                          "client-ip={}; envelope-from={}; helo={};",
-                                     server_id_(), "127.0.0.1", sender.as_string(),
-                                     client_identity_.ascii());
+    spf_received_ = fmt::format("Received-SPF: pass ({}: allow-listed) "
+                                "client-ip={}; envelope-from={}; helo={};",
+                                server_id_(), "127.0.0.1", sender.as_string(),
+                                client_identity_.ascii());
     spf_sender_domain_ = Domain{"localhost"};
     return;
   }
