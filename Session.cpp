@@ -599,7 +599,9 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   // V6 spam...
   if (IP6::is_address(sock_.them_c_str()) &&
-      forward_path.local_part() == "gene") {
+      (forward_path.local_part() == "gene") &&
+      (iends_with(reverse_path_.domain().ascii(), ".firebaseapp.com") ||
+       iends_with(reverse_path_.domain().ascii(), ".microsoft.com"))) {
     std::string error_msg = fmt::format("rejecting spammy message from {}",
                                         client_fcrdns_[0].ascii());
     LOG(WARNING) << error_msg;
