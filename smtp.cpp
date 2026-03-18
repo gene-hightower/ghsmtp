@@ -8,6 +8,9 @@ DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
+DEFINE_bool(close_stderr, false, "close stderr");
+DEFINE_bool(seccomp, false, "use seccomp");
+
 constexpr auto smtp_max_line_length = 1000;
 constexpr auto smtp_max_str_length =
     smtp_max_line_length - 2; // length of line without CRLF
@@ -963,6 +966,11 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
+  if (FLAGS_close_stderr) {
+    close(2);
+    LOG(INFO) << "closed stderr";
+  }
+
   // Set timeout signal handler to limit total run time.
   struct sigaction sact {};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
@@ -990,7 +998,8 @@ int main(int argc, char* argv[])
 
   ctx->session.greeting();
 
-  install_syscall_filter();
+  if (FLAGS_seccomp)
+    install_syscall_filter();
 
   istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
                                  "session"};
