@@ -103,9 +103,7 @@ constexpr char const* RR_type_c_str(RR_type type)
 }
 
 constexpr char const* RR_type_c_str(uint16_t rcode)
-{
-  return RR_type_c_str(static_cast<RR_type>(rcode));
-}
+{ return RR_type_c_str(static_cast<RR_type>(rcode)); }
 
 constexpr char const* rcode_c_str(uint16_t rcode)
 {
@@ -157,8 +155,8 @@ public:
 
   std::optional<std::string> as_str() const { return std::string{str_}; }
 
-  sockaddr_in const& addr() const { return addr_; }
-  char const*        c_str() const { return str_; }
+  sockaddr_in const&       addr() const { return addr_; }
+  char const*              c_str() const { return str_; }
   constexpr static RR_type rr_type() { return RR_type::A; }
 
   bool operator==(RR_A const& rhs) const { return strcmp(str_, rhs.str_) == 0; }
@@ -178,8 +176,8 @@ public:
 
   std::optional<std::string> as_str() const { return str(); }
 
-  std::string const& str() const { return cname_; }
-  char const*        c_str() const { return str().c_str(); }
+  std::string const&       str() const { return cname_; }
+  char const*              c_str() const { return str().c_str(); }
   constexpr static RR_type rr_type() { return RR_type::CNAME; }
 
   bool operator==(RR_CNAME const& rhs) const { return str() == rhs.str(); }
@@ -250,8 +248,8 @@ public:
 
   std::optional<std::string> as_str() const { return str(); }
 
-  char const*        c_str() const { return str().c_str(); }
-  std::string const& str() const { return txt_data_; }
+  char const*              c_str() const { return str().c_str(); }
+  std::string const&       str() const { return txt_data_; }
   constexpr static RR_type rr_type() { return RR_type::TXT; }
 
   bool operator==(RR_TXT const& rhs) const { return str() == rhs.str(); }
@@ -267,18 +265,14 @@ public:
 
   std::optional<std::string> as_str() const { return std::string{c_str()}; }
 
-  sockaddr_in6 const& addr() const { return addr_; }
-  char const*         c_str() const { return str_; }
+  sockaddr_in6 const&      addr() const { return addr_; }
+  char const*              c_str() const { return str_; }
   constexpr static RR_type rr_type() { return RR_type::AAAA; }
 
   bool operator==(RR_AAAA const& rhs) const
-  {
-    return strcmp(c_str(), rhs.c_str()) == 0;
-  }
+  { return strcmp(c_str(), rhs.c_str()) == 0; }
   bool operator<(RR_AAAA const& rhs) const
-  {
-    return strcmp(c_str(), rhs.c_str()) < 0;
-  }
+  { return strcmp(c_str(), rhs.c_str()) < 0; }
 
 private:
   sockaddr_in6 addr_;
@@ -306,9 +300,7 @@ public:
   constexpr static RR_type rr_type() { return RR_type::TLSA; }
 
   std::span<octet const> assoc_data() const
-  {
-    return {assoc_data_.data(), assoc_data_.size()};
-  }
+  { return {assoc_data_.data(), assoc_data_.size()}; }
 
   bool operator==(RR_TLSA const& rhs) const
   {
