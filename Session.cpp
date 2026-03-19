@@ -205,7 +205,6 @@ Session::Session(fs::path                  config_path,
   block_.open(block_db_name);
   // forward_.open(forward_db_name);
 
-  LOG(INFO) << "sock_.us_c_str() == '" << sock_.us_c_str() << "'";
   if (strlen(sock_.us_c_str()) && !IP::is_private(sock_.us_c_str())) {
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
     for (auto const& fcr : fcrdns) {
