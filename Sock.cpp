@@ -1,11 +1,11 @@
-#include <gflags/gflags.h>
-namespace gflags {
-}
-
 #include "Sock.hpp"
 
 #include "IP4.hpp"
 #include "IP6.hpp"
+
+#include <gflags/gflags.h>
+namespace gflags {
+}
 
 DEFINE_string(remote_addr, "", "set remote peername address");
 
