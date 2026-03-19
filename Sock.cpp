@@ -3,7 +3,6 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 DEFINE_string(remote_addr, "", "set remote peername address");
