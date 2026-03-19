@@ -96,7 +96,18 @@ Sock::Sock(int                       fd_in,
         LOG(ERROR) << "getenv(\"REMOTE_ADDR\") == '" << peername << "'";
       }
       LOG(ERROR) << "--remote_addr         == '" << FLAGS_remote_addr << "'";
-      LOG(ERROR) << "Unrecognized remote peer address '" << them_addr_str_ << "'";
+      LOG(ERROR) << "Unrecognized remote peer address '" << them_addr_str_
+                 << "'";
+    }
+    if (IP4::is_address(them_addr_str_)) {
+      CHECK_EQ(inet_pton(AF_INET, them_addr_str_,
+                         reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
+               1);
+    }
+    else if (IP6::is_address(them_addr_str_)) {
+      CHECK_EQ(inet_pton(AF_INET6, them_addr_str_,
+                         reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
+               1);
     }
   }
   else {
