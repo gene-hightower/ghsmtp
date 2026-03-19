@@ -91,7 +91,12 @@ Sock::Sock(int                       fd_in,
       strncpy(them_addr_str_, addr.data(), addr.length());
     }
     else {
-      LOG(ERROR) << "Unrecognized remote peer address " << them_addr_str_;
+      auto peername = getenv("REMOTE_ADDR");
+      if (peername != nullptr) {
+        LOG(ERROR) << "getenv(\"REMOTE_ADDR\") == '" << peername << "'";
+      }
+      LOG(ERROR) << "--remote_addr         == '" << FLAGS_remote_addr << "'";
+      LOG(ERROR) << "Unrecognized remote peer address '" << them_addr_str_ << "'";
     }
   }
   else {
