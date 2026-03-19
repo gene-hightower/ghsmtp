@@ -103,11 +103,16 @@ Sock::Sock(int                       fd_in,
       CHECK_EQ(inet_pton(AF_INET, them_addr_str_,
                          reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
                1);
+      them_addr_len_ = sizeof(sockaddr_in);
     }
     else if (IP6::is_address(them_addr_str_)) {
       CHECK_EQ(inet_pton(AF_INET6, them_addr_str_,
                          reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
                1);
+      them_addr_len_ = sizeof(sockaddr_in6);
+    } else {
+      them_addr_len_ = 0;
+      LOG(INFO) << "them_addr_str_ is empty";
     }
   }
   else {
