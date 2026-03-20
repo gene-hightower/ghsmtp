@@ -966,10 +966,8 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  if (FLAGS_close_stderr) {
+  if (FLAGS_close_stderr)
     close(2);
-    LOG(INFO) << "closed stderr";
-  }
 
   // Set timeout signal handler to limit total run time.
   struct sigaction sact {};
@@ -985,6 +983,9 @@ int main(int argc, char* argv[])
   }
 
   google::InitGoogleLogging(argv[0]);
+
+  if (FLAGS_close_stderr)
+    LOG(INFO) << "closed stderr";
 
   std::unique_ptr<RFC5321::Ctx> ctx;
 
