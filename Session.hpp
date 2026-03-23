@@ -127,7 +127,7 @@ private:
   //   return forward_path_.empty() && !fwd_path_.empty();
   // }
 
-  void exit_() __attribute__((noreturn));
+  void exit_() const __attribute__((noreturn));
 
 private:
   fs::path      config_path_;

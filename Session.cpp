@@ -256,12 +256,13 @@ void Session::max_msg_size(size_t max)
 void Session::bad_host_(char const* msg) const
 {
   if (sock_.has_peername()) {
+    LOG(WARNING) << "bad host [" << sock_.them_c_str() << "] " << msg;
     // On my systems, this pattern triggers a fail2ban rule that
     // blocks connections from this IP address on port 25 for a few
     // days.  See <https://www.fail2ban.org/> for more info.
     syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(), msg);
   }
-  std::exit(EXIT_SUCCESS);
+  exit_();
 }
 
 void Session::reset_()
@@ -1482,7 +1483,7 @@ void Session::starttls()
   }
 }
 
-void Session::exit_()
+void Session::exit_() const
 {
   // sock_.log_totals();
 
