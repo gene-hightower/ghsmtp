@@ -39,64 +39,51 @@ struct nameserver {
 
 constexpr nameserver nameservers[]{
     {
-        "one.one.one.one",
-        "1.1.1.1",
+        "unfiltered.joindns4.eu",
+        "86.54.11.100",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "unfiltered.joindns4.eu",
+        "86.54.11.200",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "unfiltered.joindns4.eu",
+        "2a13:1001::86:54:11:100",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "unfiltered.joindns4.eu",
+        "2a13:1001::86:54:11:200",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "wikimedia-dns.org",
+        "185.71.138.138",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "wikimedia-dns.org",
+        "2001:67c:930::1",
         "domain-s",
         sock_type::stream,
     },
     /*
     {
-        "one.one.one.one",
-        "1.1.1.1",
+        "dns9.quad9.net",
+        "9.9.9.9",
         "domain-s",
         sock_type::stream,
     },
     {
-        "one.one.one.one",
-        "1.1.1.1",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "8.8.8.8",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "8.8.4.4",
-        "domain",
-        sock_type::dgram,
-    },
-
-    {
-        "dns.google",
-        "2001:4860:4860::8888",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "2001:4860:4860::8844",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "1.0.0.1",
-        "domain-s",
-        sock_type::stream,
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "2606:4700:4700::1111",
-        "domain-s",
-        sock_type::stream,
-    },
-    {
-        "1dot1dot1dot1.cloudflare-dns.com",
-        "2606:4700:4700::1001",
+        "dns.quad9.net",
+        "2620:fe::fe",
         "domain-s",
         sock_type::stream,
     },
@@ -125,14 +112,70 @@ constexpr nameserver nameservers[]{
         sock_type::stream,
     },
     */
+    /*
+    {
+        "one.one.one.one",
+        "1.1.1.1",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "one.one.one.one",
+        "1.1.1.1",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "1.0.0.1",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1111",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "1dot1dot1dot1.cloudflare-dns.com",
+        "2606:4700:4700::1001",
+        "domain-s",
+        sock_type::stream,
+    },
+    */
+    /*
+    {
+        "dns.google",
+        "8.8.8.8",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "dns.google",
+        "8.8.4.4",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "dns.google",
+        "2001:4860:4860::8888",
+        "domain",
+        sock_type::dgram,
+    },
+    {
+        "dns.google",
+        "2001:4860:4860::8844",
+        "domain",
+        sock_type::dgram,
+    },
+    */
 };
 } // namespace Config
 
 template <typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept
-{
-  return N;
-}
+{ return N; }
 
 namespace DNS {
 
