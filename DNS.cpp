@@ -39,6 +39,13 @@ struct nameserver {
 
 constexpr nameserver nameservers[]{
     {
+        "dns9.quad9.net",
+        "9.9.9.9",
+        "domain",
+        sock_type::stream,
+    },
+  /*
+    {
         "unfiltered.joindns4.eu",
         "86.54.11.100",
         "domain-s",
@@ -74,6 +81,7 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
+    */
     /*
     {
         "dns9.quad9.net",
