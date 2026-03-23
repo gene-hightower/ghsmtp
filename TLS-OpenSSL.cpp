@@ -301,7 +301,8 @@ bool TLS::starttls_client(fs::path                  config_path,
   }
 
   if (cert_ctx_.empty()) {
-    LOG(INFO) << "no cert found for client " << client_name;
+    if (client_name)
+      LOG(INFO) << "no cert found for client " << client_name;
 
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
     CHECK_GT(SSL_CTX_dane_enable(ctx), 0)
