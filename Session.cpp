@@ -1740,8 +1740,8 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg =
-        fmt::format("claimed bogus identity {}", client_identity.ascii());
+    error_msg = fmt::format("claimed bogus HELO/EHLO identity \"{}\"",
+                            client_identity.ascii());
     out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1753,7 +1753,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (lookup_domain(block_, client_identity)) {
     error_msg =
-        fmt::format("claimed blocked identity {}", client_identity.ascii());
+        fmt::format("claimed blocked identity \"{}\"", client_identity.ascii());
     out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
@@ -1766,8 +1766,8 @@ bool Session::verify_client_(Domain const& client_identity,
     // return true;
   }
   else if (block_.contains(tld)) {
-    error_msg =
-        fmt::format("claimed identity has blocked registered domain {}", tld);
+    error_msg = fmt::format(
+        "claimed identity has blocked registered domain \"{}\"", tld);
     out_() << "550 4.7.1 blocked registered domain\r\n" << std::flush;
     return false;
   }
@@ -1775,7 +1775,7 @@ bool Session::verify_client_(Domain const& client_identity,
   if (domain_blocked(res_, client_identity) ||
       (tld && domain_blocked(res_, Domain(tld)))) {
     error_msg =
-        fmt::format("claimed identity {} blocked", client_identity.ascii());
+        fmt::format("claimed identity \"{}\" blocked", client_identity.ascii());
     out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
