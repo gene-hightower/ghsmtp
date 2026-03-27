@@ -69,13 +69,11 @@ std::streamsize POSIX::read(int                       fd,
       switch (errno) {
       case EINTR: break; // try read again
 
-      case ECONNRESET:
-        LOG(WARNING) << "read(2) raised ECONNRESET";
-        return -1;
+      case ECONNRESET: LOG(WARNING) << "read(2) raised ECONNRESET"; return -1;
 
       default:
         PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
-            << "error from read(2)";
+            << "error from read(2), fd == " << fd << ", " << n << " bytes";
       }
     }
     else if (n_ret >= 0) {
@@ -113,18 +111,17 @@ std::streamsize POSIX::write(int                       fd,
       switch (errno) {
       case EINTR: break; // try write again
 
-      case ECONNRESET:
-        LOG(WARNING) << "write(2) raised ECONNRESET";
-        return -1;
+      case ECONNRESET: LOG(WARNING) << "write(2) raised ECONNRESET"; return -1;
 
       default:
         PCHECK((errno == EWOULDBLOCK) || (errno == EAGAIN))
-            << "error from write(2)";
+            << "error from write(2), fd == " << fd << ", " << n << " bytes";
       }
     }
     else if (n_ret == 0) {
       LOG(WARNING) << "zero write";
-    } else {
+    }
+    else {
       s += n_ret;
       written += n_ret;
     }
