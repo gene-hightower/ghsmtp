@@ -8,14 +8,22 @@ DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
-DEFINE_bool(close_stderr, false, "close stderr");
+DEFINE_bool(close_stderr, false, "ignored");
+DEFINE_bool(server, false, "server");
 DEFINE_bool(seccomp, false, "use seccomp");
 
 constexpr auto smtp_max_line_length = 1000;
 constexpr auto smtp_max_str_length =
     smtp_max_line_length - 2; // length of line without CRLF
 
+#include <netdb.h>
+#include <pwd.h>
 #include <seccomp.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 
 #include <fstream>
 
@@ -32,6 +40,15 @@ constexpr auto smtp_max_str_length =
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
+
+// Process exit codes
+enum {
+  RET_NOERROR = 0,
+  RET_EXCPETION,
+  RET_MAXED_OUT, // Too much data
+  RET_SMTP_SYNTAX_ERROR,
+  RET_TIME_OUT
+};
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -83,14 +100,13 @@ struct sub_domain : u_label {};
 
 struct domain : list_tail<sub_domain, dot> {};
 
-struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
-                       seq<one<'2'>, range<'0','4'>, DIGIT>,
+struct dec_octet : sor<seq<string<'2', '5'>, range<'0', '5'>>,
+                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
                        seq<one<'1'>, rep<2, DIGIT>>,
                        seq<range<'1', '9'>, DIGIT>,
-                       DIGIT
-                      > {};
+                       DIGIT> {};
 struct IPv4_address_literal
-    : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
+  : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
 struct h16 : rep_min_max<1, 4, HEXDIG> {};
 
@@ -121,7 +137,8 @@ struct dcontent : ranges<33, 90, 94, 126> {};
 
 struct standardized_tag : ldh_str {};
 
-struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {};
+struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {
+};
 
 // See rfc 5321 Section 4.1.3
 struct address_literal : seq<one<'['>,
@@ -154,6 +171,7 @@ struct quoted_string : seq<one<'"'>, plus<qcontentSMTP>, one<'"'>> {};
 
 // excluded from atext are the “specials”: "()<>[]:;@\\,."
 
+// clang-format off
 struct atext : sor<ALPHA, DIGIT,
                    one<'!', '#',
                        '$', '%',
@@ -166,6 +184,7 @@ struct atext : sor<ALPHA, DIGIT,
                        '|', '}',
                        '~'>,
                    UTF8_non_ascii> {};
+// clang-format on
 
 struct atom : plus<atext> {};
 
@@ -200,7 +219,8 @@ struct forward_path : sor<path, magic_postmaster> {};
 
 struct esmtp_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
 
-struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {};
+struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {
+};
 
 struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {};
 
@@ -210,15 +230,11 @@ struct rcpt_parameters : list<esmtp_param, SP> {};
 
 struct string : sor<quoted_string, atom> {};
 
-struct helo : seq<TAO_PEGTL_ISTRING("HELO"),
-                  SP,
-                  sor<domain, address_literal>,
-                  CRLF> {};
+struct helo
+  : seq<TAO_PEGTL_ISTRING("HELO"), SP, sor<domain, address_literal>, CRLF> {};
 
-struct ehlo : seq<TAO_PEGTL_ISTRING("EHLO"),
-                  SP,
-                  sor<domain, address_literal>,
-                  CRLF> {};
+struct ehlo
+  : seq<TAO_PEGTL_ISTRING("EHLO"), SP, sor<domain, address_literal>, CRLF> {};
 
 struct mail_from : seq<TAO_PEGTL_ISTRING("MAIL"),
                        seq<one<' '>,
@@ -250,7 +266,8 @@ struct last : TAO_PEGTL_ISTRING("LAST") {};
 
 struct bdat : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, CRLF> {};
 
-struct bdat_last : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, SP, last, CRLF> {};
+struct bdat_last
+  : seq<TAO_PEGTL_ISTRING("BDAT"), SP, chunk_size, SP, last, CRLF> {};
 
 struct data : seq<TAO_PEGTL_ISTRING("DATA"), CRLF> {};
 
@@ -266,7 +283,6 @@ struct data_blank : CRLF {};
 struct data_not_end : seq<dot, LF> {};
 
 struct data_also_not_end : seq<LF, dot, CRLF> {};
-
 
 // RFC 5321 text line length section 4.5.3.1.6.
 struct data_plain
@@ -322,10 +338,9 @@ struct base64_terminal : sor<seq<rep<2, base64_char>, one<'='>, one<'='>>,
 // base64          = base64-terminal /
 //                   ( 1*(4base64-char) [base64-terminal] )
 
-struct base64 : sor<base64_terminal,
-                    seq<plus<rep<4, base64_char>>,
-                        opt<base64_terminal>>
-                    > {};
+struct base64
+  : sor<base64_terminal, seq<plus<rep<4, base64_char>>, opt<base64_terminal>>> {
+};
 
 // initial-response= base64 / "="
 
@@ -337,7 +352,7 @@ struct cancel_response : one<'*'> {};
 
 struct UPPER_ALPHA : range<'A', 'Z'> {};
 
-using HYPHEN = one<'-'>;
+using HYPHEN     = one<'-'>;
 using UNDERSCORE = one<'_'>;
 
 struct mech_char : sor<UPPER_ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
@@ -348,7 +363,9 @@ struct sasl_mech : rep_min_max<1, 20, mech_char> {};
 //                   CRLF
 //                   ;; <sasl-mech> is defined in RFC 4422
 
-struct auth : seq<TAO_PEGTL_ISTRING("AUTH"), SP, sasl_mech,
+struct auth : seq<TAO_PEGTL_ISTRING("AUTH"),
+                  SP,
+                  sasl_mech,
                   opt<seq<SP, initial_response>>,
                   // star<CRLF, opt<base64>>,
                   // opt<seq<CRLF, cancel_response>>,
@@ -397,8 +414,7 @@ template <typename Rule>
 struct action : nothing<Rule> {};
 
 template <typename Rule>
-struct data_action : nothing<Rule> {
-};
+struct data_action : nothing<Rule> {};
 
 template <>
 struct action<bogus_cmd_short> {
@@ -615,18 +631,12 @@ void bdat_act(Ctx& ctx, bool last)
 
 template <>
 struct action<bdat> {
-  static void apply0(Ctx& ctx)
-  {
-    bdat_act(ctx, false);
-  }
+  static void apply0(Ctx& ctx) { bdat_act(ctx, false); }
 };
 
 template <>
 struct action<bdat_last> {
-  static void apply0(Ctx& ctx)
-  {
-    bdat_act(ctx, true);
-  }
+  static void apply0(Ctx& ctx) { bdat_act(ctx, true); }
 };
 
 template <>
@@ -956,45 +966,22 @@ void install_syscall_filter()
   seccomp_release(ctx);
 }
 
-int main(int argc, char* argv[])
+static volatile bool sig_quit{false};
+void                 sigquit(int signum) { sig_quit = true; }
+
+int client()
 {
-  std::ios::sync_with_stdio(false);
-
-  { // Need to work with either namespace.
-    using namespace gflags;
-    using namespace google;
-    ParseCommandLineFlags(&argc, &argv, true);
-  }
-
-  if (FLAGS_close_stderr)
-    close(2);
-
   // Set timeout signal handler to limit total run time.
-  struct sigaction sact {};
+  struct sigaction sact{};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
   sact.sa_flags   = 0;
   sact.sa_handler = timeout;
   PCHECK(sigaction(SIGALRM, &sact, nullptr) == 0);
 
-  auto const log_dir{getenv("GOOGLE_LOG_DIR")};
-  if (log_dir) {
-    error_code ec;
-    fs::create_directories(log_dir, ec);
-  }
-
-  google::InitGoogleLogging(argv[0]);
-
-  if (FLAGS_close_stderr)
-    LOG(INFO) << "closed stderr";
+  auto const config_path = osutil::get_config_dir();
 
   std::unique_ptr<RFC5321::Ctx> ctx;
-
-  // Don't wait for STARTTLS to fail if no cert.
-  auto const config_path = osutil::get_config_dir();
-  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
-  CHECK_GE(certs.size(), 1) << "no certs found";
-
-  auto const read_hook{[&ctx]() { ctx->session.flush(); }};
+  auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
   ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
   ctx->session.greeting();
@@ -1005,23 +992,395 @@ int main(int argc, char* argv[])
   istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
                                  "session"};
 
-  int ret = 0;
+  int ret = RET_NOERROR;
   try {
-    ret = !parse<RFC5321::grammar, RFC5321::action>(in, *ctx);
+    if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx))
+      ret = RET_SMTP_SYNTAX_ERROR;
   }
   catch (std::exception const& e) {
     LOG(WARNING) << e.what();
+    ret = RET_EXCPETION;
   }
 
   if (ctx->session.maxed_out()) {
     ctx->session.max_out();
+    ret = RET_MAXED_OUT;
   }
   else if (ctx->session.timed_out()) {
     ctx->session.time_out();
+    ret = RET_TIME_OUT;
   }
   // else {
   //   ctx->session.error("session end without QUIT command from client");
   // }
 
   return ret;
+}
+
+struct service {
+  int fd = -1;
+  int type;
+
+  socklen_t ctrl_addr_size = 0;
+  union {
+    struct sockaddr         addr;
+    struct sockaddr_in      addr_in;
+    struct sockaddr_in6     addr_in6;
+    struct sockaddr_storage addr_storage;
+  } ctrl;
+  std::string ctrl_address;
+
+  std::string host;
+  std::string port;
+
+  std::string canonname;
+  int         family;
+  int         socktype;
+  int         protocol;
+};
+
+std::vector<service> services;
+
+struct server {
+  service* service_ptr;
+
+  socklen_t remote_addr_size = 0;
+  union {
+    struct sockaddr         addr;
+    struct sockaddr_in      addr_in;
+    struct sockaddr_in6     addr_in6;
+    struct sockaddr_storage addr_storage;
+  } remote;
+  std::string remote_string;
+};
+
+/*volatile*/ std::unordered_map<pid_t, server> servers;
+
+int wait_any(int* wstat)
+{
+  pid_t r;
+
+  do
+    r = waitpid(-1, wstat, WNOHANG);
+  while ((r == -1) && (errno == EINTR));
+
+  return r;
+}
+
+void sigchild(int signum)
+{
+  pid_t pid;
+  int   status;
+  int   save_errno = errno;
+
+  for (;;) {
+    LOG(INFO) << "sigchild, about to waitpid";
+    google::FlushLogFiles(google::INFO);
+
+    pid = wait_any(&status);
+    LOG(INFO) << "waitpid returned " << pid;
+
+    if (pid == -1)
+      LOG(INFO) << strerror(errno);
+
+    google::FlushLogFiles(google::INFO);
+
+    if (pid <= 0)
+      break;
+
+    try {
+      /*volatile auto& server = servers.at(pid); */
+
+      if (WIFEXITED(status) && WEXITSTATUS(status))
+        LOG(INFO) << pid << ": exit status " << std::hex << WEXITSTATUS(status);
+      else if (WIFSIGNALED(status))
+        LOG(INFO) << pid << ": exit signal " << std::hex << WTERMSIG(status);
+      else
+        LOG(INFO) << pid << ": not status or signal";
+
+      google::FlushLogFiles(google::INFO);
+
+      servers.erase(pid);
+    }
+    catch (const std::out_of_range& ex) {
+      LOG(ERROR) << "not watching pid == " << pid;
+    }
+  }
+  errno = save_errno;
+}
+
+int server()
+{
+  LOG(INFO) << "running server";
+
+  struct sigaction sact{};
+  PCHECK(sigemptyset(&sact.sa_mask) == 0);
+
+  sact.sa_handler = sigquit;
+  PCHECK(sigaction(SIGQUIT, &sact, nullptr) == 0);
+
+  sact.sa_handler = sigchild;
+  PCHECK(sigaction(SIGCHLD, &sact, nullptr) == 0);
+
+  char const* host = getenv("GHSMTP_SERVER_ID");
+  if (host == nullptr) {
+    static utsname un;
+    PCHECK(uname(&un) == 0);
+    host = un.nodename;
+  }
+  auto const port = "smtp-tor";
+
+  fd_set allsock;
+  FD_ZERO(&allsock);
+  int maxsock = -1;
+
+  struct addrinfo hints{};
+  hints.ai_family   = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags    = AI_PASSIVE | AI_CANONNAME;
+
+  struct addrinfo* result{nullptr};
+  int              s = getaddrinfo(host, port, &hints, &result);
+  CHECK_EQ(s, 0) << "getaddrinfo: " << gai_strerror(s);
+  for (auto rp = result; rp != nullptr; rp = rp->ai_next) {
+    services.emplace_back();
+
+    services.back().canonname = result->ai_canonname; // grab from 1st result
+    services.back().family = rp->ai_family;
+    services.back().socktype = rp->ai_socktype;
+    services.back().protocol = rp->ai_protocol;
+
+    memcpy(&services.back().ctrl.addr_storage, rp->ai_addr, rp->ai_addrlen);
+    services.back().ctrl_addr_size = rp->ai_addrlen;
+
+    switch (rp->ai_addrlen) {
+    case sizeof(struct sockaddr_in): {
+      char str[INET_ADDRSTRLEN]{};
+      services.back().type = AF_INET;
+      PCHECK(inet_ntop(AF_INET, rp->ai_addr, str, sizeof(str)));
+      services.back().ctrl_address = str;
+      break;
+    }
+    case sizeof(struct sockaddr_in6): {
+      char str[INET6_ADDRSTRLEN]{};
+      services.back().type = AF_INET6;
+      PCHECK(inet_ntop(AF_INET6, rp->ai_addr, str, sizeof(str)));
+      services.back().ctrl_address = str;
+      break;
+    }
+    default: LOG(FATAL) << "Unknown addrlen " << rp->ai_addrlen;
+    }
+    services.back().fd = socket(services.back().type, SOCK_STREAM, 0);
+    PCHECK(services.back().fd) << "Can't open server listening socket";
+
+    int on = 1;
+    // PCHECK(setsockopt(services.back().fd, SOL_SOCKET, SO_DEBUG, &on,
+    //                sizeof(on)) >= 0);
+    PCHECK(setsockopt(services.back().fd, SOL_SOCKET, SO_REUSEADDR, &on,
+                      sizeof(on)) >= 0);
+
+    int r = bind(services.back().fd, &services.back().ctrl.addr,
+                 services.back().ctrl_addr_size);
+    PCHECK(r == 0) << "bind failed fd=" << services.back().fd << " "
+                   << services.back().canonname << " "
+                   << services.back().ctrl_address;
+
+    PCHECK(listen(services.back().fd, 10) == 0);
+
+    FD_SET(services.back().fd, &allsock);
+    LOG(INFO) << "added " << services.back().fd << " to listen set "
+              << services.back().canonname << " " << services.back().ctrl_address;
+
+    maxsock = std::max(services.back().fd, maxsock);
+  }
+  freeaddrinfo(result);
+
+  if (maxsock < 0) {
+    LOG(INFO) << "no sockets to listen on";
+    return 0;
+  }
+  LOG(INFO) << "maxsock == " << maxsock;
+
+  while (!sig_quit) {
+    LOG(INFO) << "waiting for connections…";
+    google::FlushLogFiles(google::INFO);
+
+    auto readable     = allsock;
+    auto ready_fd_cnt = select(maxsock + 1, &readable, NULL, NULL, NULL);
+
+    if (ready_fd_cnt < 0) {
+      if (errno != EINTR) {
+        auto const errmsg = std::strerror(errno);
+        LOG(ERROR) << "select: " << errmsg;
+        sleep(1);
+      }
+      continue;
+    }
+    LOG(INFO) << "select() returned " << ready_fd_cnt << " ready fds";
+
+    for (auto service : services) {
+      if (service.fd == -1 || !FD_ISSET(service.fd, &readable))
+        continue;
+
+      LOG(INFO) << "ready fd=" << service.fd;
+
+      int ctrl        = service.fd;
+      int accepted_fd = -1;
+
+      struct server srv;
+      srv.service_ptr = &service;
+
+      ctrl = accepted_fd =
+          accept(service.fd, &srv.remote.addr, &srv.remote_addr_size);
+      if (ctrl < 0) {
+        PCHECK(errno == EINTR) << "accept for " << service.fd;
+        continue;
+      }
+
+      switch (srv.remote_addr_size) {
+      case sizeof(struct sockaddr_in): {
+        char str[INET_ADDRSTRLEN];
+        CHECK_EQ(service.type, AF_INET);
+        PCHECK(inet_ntop(AF_INET, &srv.remote.addr_in, str, sizeof(str)));
+        srv.remote_string = str;
+        break;
+      }
+      case sizeof(struct sockaddr_in6): {
+        char str[INET6_ADDRSTRLEN];
+        CHECK_EQ(service.type, AF_INET6);
+        PCHECK(inet_ntop(AF_INET6, &srv.remote.addr_in6, str, sizeof(str)));
+        srv.remote_string = str;
+        break;
+      }
+      default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
+      }
+      LOG(INFO) << "accepted " << ctrl << " for " << srv.remote_string;
+
+      LOG(INFO) << "about to fork";
+      google::FlushLogFiles(google::INFO);
+
+      int pid = fork();
+
+      LOG(INFO) << "pid == " << pid;
+      google::FlushLogFiles(google::INFO);
+
+      if (pid < 0) { // fork error
+        auto const errmsg = std::strerror(errno);
+        LOG(ERROR) << "fork: " << errmsg;
+        sleep(1);
+        close(accepted_fd);
+        continue; // check next con
+      }
+
+      if (pid > 0) { // parent
+        servers[pid] = srv;
+
+        LOG(INFO) << "new server pid " << pid;
+
+        continue; // check next srv
+      }
+
+      CHECK_EQ(pid, 0); // child
+      setsid();
+
+      // Drop root
+      char const* user{getenv("USER")};
+      if (user == nullptr)
+        user = "gene";
+
+      uid_t ruid, euid, suid;
+      gid_t rgid, egid, sgid;
+
+      PCHECK(getresuid(&ruid, &euid, &suid) == 0);
+      PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
+
+      LOG(INFO) << "getresuid(" << ruid << ", " << euid << ", " << suid << ")";
+      LOG(INFO) << "getresgid(" << rgid << ", " << egid << ", " << sgid << ")";
+
+      struct passwd* pwd = getpwnam(user);
+      PCHECK(pwd != nullptr) << "no such user " << user;
+
+      if (pwd->pw_uid != euid) {
+        LOG(INFO) << "switching to user " << pwd->pw_name;
+        LOG(INFO) << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid;
+
+        PCHECK(setgid(pwd->pw_gid)) << "setgid(" << pwd->pw_gid << ")";
+        PCHECK(setuid(pwd->pw_uid)) << "setuid(" << pwd->pw_uid << ")";
+
+        PCHECK(getresuid(&ruid, &euid, &suid) == 0);
+        PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
+
+        LOG(INFO) << "getresuid(" << ruid << ", " << euid << ", " << suid
+                  << ")";
+        LOG(INFO) << "getresgid(" << rgid << ", " << egid << ", " << sgid
+                  << ")";
+      }
+
+      // We can leave STDERR_FILENO alone.
+      if (ctrl != STDIN_FILENO) {
+        PCHECK(dup2(ctrl, STDIN_FILENO) == STDIN_FILENO);
+      }
+      PCHECK(dup2(STDIN_FILENO, STDOUT_FILENO) == STDOUT_FILENO);
+      LOG(INFO) << "moved ctrl:" << ctrl << " to fd 0,1";
+
+      for (auto service : services) {
+        PCHECK(close(service.fd) == 0);
+        service.fd = -1;
+      }
+
+      return client();
+    }
+  }
+
+  LOG(INFO) << "quitting";
+
+  for (auto service : services) {
+    PCHECK(close(service.fd) == 0);
+    service.fd = -1;
+  }
+
+  for (auto n = 0; servers.size(); ++n) {
+    LOG(WARNING) << (n ? "still " : "") << "waiting for " << servers.size()
+                 << " running servers";
+
+    sleep(n);
+
+    if (n > 5) {
+      for (auto const& [pid, srv] : servers) {
+        LOG(WARNING) << "killing pid " << pid;
+        kill(pid, SIGKILL);
+      }
+    }
+  }
+
+  return 0;
+}
+
+int main(int argc, char* argv[])
+{
+  std::ios::sync_with_stdio(false);
+
+  { // Need to work with either namespace.
+    using namespace gflags;
+    using namespace google;
+    ParseCommandLineFlags(&argc, &argv, true);
+  }
+
+  auto const log_dir{getenv("GOOGLE_LOG_DIR")};
+  if (log_dir) {
+    error_code ec;
+    fs::create_directories(log_dir, ec);
+  }
+
+  google::InitGoogleLogging(argv[0]);
+
+  // Don't wait for STARTTLS to fail if no cert.
+  auto const config_path = osutil::get_config_dir();
+  auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
+  CHECK_GE(certs.size(), 1) << "no certs found";
+
+  if (FLAGS_server)
+    return server();
+  else
+    return client();
 }
