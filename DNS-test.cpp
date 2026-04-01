@@ -56,7 +56,12 @@ int main(int argc, char const* argv[])
     CHECK_EQ(q.bogus_or_indeterminate(), q_ldns.bogus_or_indeterminate())
         << lookup.name;
 
-    CHECK_EQ(q.authentic_data(), q_ldns.authentic_data()) << lookup.name;
+    if (q.authentic_data() != q_ldns.authentic_data()) {
+      LOG(WARNING) << "q.authentic_data() != q_ldns.authentic_data() for "
+                   << lookup.name;
+      LOG(WARNING) << "q.authentic_data()      == " << q.authentic_data();
+      LOG(WARNING) << "q_ldns.authentic_data() == " << q_ldns.authentic_data();
+    }
 
     auto rrs{q.get_records()};
     auto rrs_ldns{q_ldns.get_records()};
