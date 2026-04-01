@@ -83,6 +83,6 @@ std::vector<std::string> fcrdns(Resolver& res, std::string_view addr)
     return fcrdns4(res, addr);
   if (IP6::is_address(addr))
     return fcrdns6(res, addr);
-  LOG(FATAL) << "not a valid IP address " << addr;
+  LOG(FATAL) << "not a valid IP address '" << addr << "'";
 }
 } // namespace DNS
