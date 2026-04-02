@@ -12,6 +12,8 @@ DEFINE_bool(close_stderr, false, "ignored");
 DEFINE_bool(server, false, "server");
 DEFINE_bool(seccomp, false, "use seccomp");
 
+DEFINE_string(service, "smtp", "service name");
+
 constexpr auto smtp_max_line_length = 1000;
 constexpr auto smtp_max_str_length =
     smtp_max_line_length - 2; // length of line without CRLF
@@ -1155,7 +1157,7 @@ int server()
     PCHECK(uname(&un) == 0);
     host = un.nodename;
   }
-  auto const port = "smtp-tor";
+  auto const port = FLAGS_service.c_str();
 
   fd_set allsock;
   FD_ZERO(&allsock);
