@@ -1019,7 +1019,6 @@ int client()
 
 struct service {
   int fd = -1;
-  int type;
 
   socklen_t ctrl_addr_size = 0;
   union {
@@ -1109,6 +1108,34 @@ void sigchild(int signum)
   errno = save_errno;
 }
 
+char const* fam_to_str(int fam)
+{
+  switch (fam) {
+  case AF_INET: return "AF_INET";
+  case AF_INET6: return "AF_INET6";
+  }
+  return "AF_?unknown?";
+}
+
+char const* typ_to_str(int typ)
+{
+  switch (typ) {
+  case SOCK_STREAM: return "SOCK_STREAM";
+  case SOCK_DGRAM: return "SOCK_DGRAM";
+  }
+  return "SOCK_?unknown?";
+}
+
+char const* pro_to_str(int pro)
+{
+  switch (pro) {
+  case IPPROTO_IP: return "IPPROTO_IP";
+  case IPPROTO_TCP: return "IPPROTO_TCP";
+  case IPPROTO_UDP: return "IPPROTO_UDP";
+  }
+  return "IPPROTO_?unknown?";
+}
+
 int server()
 {
   LOG(INFO) << "running server";
@@ -1142,35 +1169,63 @@ int server()
   struct addrinfo* result{nullptr};
   int              s = getaddrinfo(host, port, &hints, &result);
   CHECK_EQ(s, 0) << "getaddrinfo: " << gai_strerror(s);
+
   for (auto rp = result; rp != nullptr; rp = rp->ai_next) {
     services.emplace_back();
-
+    services.back().host      = host;                 // same for all
+    services.back().port      = port;                 // same for all
     services.back().canonname = result->ai_canonname; // grab from 1st result
-    services.back().family = rp->ai_family;
-    services.back().socktype = rp->ai_socktype;
-    services.back().protocol = rp->ai_protocol;
+    services.back().family    = rp->ai_family;
+    services.back().socktype  = rp->ai_socktype;
+    services.back().protocol  = rp->ai_protocol;
 
-    memcpy(&services.back().ctrl.addr_storage, rp->ai_addr, rp->ai_addrlen);
+    memcpy(&services.back().ctrl.addr, rp->ai_addr, rp->ai_addrlen);
     services.back().ctrl_addr_size = rp->ai_addrlen;
+
+    CHECK_EQ(rp->ai_socktype, SOCK_STREAM);
+    CHECK_EQ(rp->ai_socktype, hints.ai_socktype);
 
     switch (rp->ai_addrlen) {
     case sizeof(struct sockaddr_in): {
       char str[INET_ADDRSTRLEN]{};
-      services.back().type = AF_INET;
-      PCHECK(inet_ntop(AF_INET, rp->ai_addr, str, sizeof(str)));
+      CHECK_EQ(rp->ai_family, AF_INET);
+      struct sockaddr_in* sin =
+          reinterpret_cast<struct sockaddr_in*>(rp->ai_addr);
+      PCHECK(inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)));
       services.back().ctrl_address = str;
       break;
     }
     case sizeof(struct sockaddr_in6): {
       char str[INET6_ADDRSTRLEN]{};
-      services.back().type = AF_INET6;
-      PCHECK(inet_ntop(AF_INET6, rp->ai_addr, str, sizeof(str)));
+      CHECK_EQ(rp->ai_family, AF_INET6);
+      struct sockaddr_in6* sin =
+          reinterpret_cast<struct sockaddr_in6*>(rp->ai_addr);
+      PCHECK(inet_ntop(AF_INET6, &sin->sin6_addr, str, sizeof(str)));
       services.back().ctrl_address = str;
       break;
     }
     default: LOG(FATAL) << "Unknown addrlen " << rp->ai_addrlen;
     }
-    services.back().fd = socket(services.back().type, SOCK_STREAM, 0);
+
+    LOG(INFO) << "services.back().ctrl_address == "
+              << services.back().ctrl_address;
+
+    LOG(INFO) << "services.back().host         == " << services.back().host;
+    LOG(INFO) << "services.back().port         == " << services.back().port;
+
+    LOG(INFO) << "services.back().canonname    == "
+              << services.back().canonname;
+
+    LOG(INFO) << "services.back().family       == "
+              << fam_to_str(services.back().family);
+    LOG(INFO) << "services.back().socktype     == "
+              << typ_to_str(services.back().socktype);
+    LOG(INFO) << "services.back().protocol     == "
+              << pro_to_str(services.back().protocol);
+
+    services.back().fd =
+        socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+
     PCHECK(services.back().fd) << "Can't open server listening socket";
 
     int on = 1;
@@ -1189,7 +1244,8 @@ int server()
 
     FD_SET(services.back().fd, &allsock);
     LOG(INFO) << "added " << services.back().fd << " to listen set "
-              << services.back().canonname << " " << services.back().ctrl_address;
+              << services.back().canonname << " "
+              << services.back().ctrl_address;
 
     maxsock = std::max(services.back().fd, maxsock);
   }
@@ -1224,15 +1280,13 @@ int server()
 
       LOG(INFO) << "ready fd=" << service.fd;
 
-      int ctrl        = service.fd;
       int accepted_fd = -1;
 
       struct server srv;
       srv.service_ptr = &service;
 
-      ctrl = accepted_fd =
-          accept(service.fd, &srv.remote.addr, &srv.remote_addr_size);
-      if (ctrl < 0) {
+      accepted_fd = accept(service.fd, &srv.remote.addr, &srv.remote_addr_size);
+      if (accepted_fd < 0) {
         PCHECK(errno == EINTR) << "accept for " << service.fd;
         continue;
       }
@@ -1240,21 +1294,21 @@ int server()
       switch (srv.remote_addr_size) {
       case sizeof(struct sockaddr_in): {
         char str[INET_ADDRSTRLEN];
-        CHECK_EQ(service.type, AF_INET);
+        CHECK_EQ(service.family, AF_INET);
         PCHECK(inet_ntop(AF_INET, &srv.remote.addr_in, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
       case sizeof(struct sockaddr_in6): {
         char str[INET6_ADDRSTRLEN];
-        CHECK_EQ(service.type, AF_INET6);
+        CHECK_EQ(service.family, AF_INET6);
         PCHECK(inet_ntop(AF_INET6, &srv.remote.addr_in6, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
-      LOG(INFO) << "accepted " << ctrl << " for " << srv.remote_string;
+      LOG(INFO) << "accepted " << accepted_fd << " for " << srv.remote_string;
 
       LOG(INFO) << "about to fork";
       google::FlushLogFiles(google::INFO);
@@ -1277,7 +1331,8 @@ int server()
 
         LOG(INFO) << "new server pid " << pid;
 
-        continue; // check next srv
+        close(accepted_fd); // We passed this to our child.
+        continue;           // check next srv
       }
 
       CHECK_EQ(pid, 0); // child
@@ -1317,11 +1372,11 @@ int server()
       }
 
       // We can leave STDERR_FILENO alone.
-      if (ctrl != STDIN_FILENO) {
-        PCHECK(dup2(ctrl, STDIN_FILENO) == STDIN_FILENO);
+      if (accepted_fd != STDIN_FILENO) {
+        PCHECK(dup2(accepted_fd, STDIN_FILENO) == STDIN_FILENO);
       }
       PCHECK(dup2(STDIN_FILENO, STDOUT_FILENO) == STDOUT_FILENO);
-      LOG(INFO) << "moved ctrl:" << ctrl << " to fd 0,1";
+      LOG(INFO) << "moved fd:" << accepted_fd << " to fd 0,1";
 
       for (auto service : services) {
         PCHECK(close(service.fd) == 0);
