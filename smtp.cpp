@@ -1092,7 +1092,7 @@ void sigchild(int signum)
     try {
       /*volatile auto& server = servers.at(pid); */
 
-      if (WIFEXITED(status) && WEXITSTATUS(status))
+      if (WIFEXITED(status))
         LOG(INFO) << pid << ": exit status " << std::hex << WEXITSTATUS(status);
       else if (WIFSIGNALED(status))
         LOG(INFO) << pid << ": exit signal " << std::hex << WTERMSIG(status);
@@ -1361,8 +1361,8 @@ int server()
         LOG(INFO) << "switching to user " << pwd->pw_name;
         LOG(INFO) << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid;
 
-        PCHECK(setgid(pwd->pw_gid)) << "setgid(" << pwd->pw_gid << ")";
-        PCHECK(setuid(pwd->pw_uid)) << "setuid(" << pwd->pw_uid << ")";
+        PCHECK(setgid(pwd->pw_gid) == 0) << "setgid(" << pwd->pw_gid << ")";
+        PCHECK(setuid(pwd->pw_uid) == 0) << "setuid(" << pwd->pw_uid << ")";
 
         PCHECK(getresuid(&ruid, &euid, &suid) == 0);
         PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
