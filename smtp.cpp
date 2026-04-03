@@ -1196,9 +1196,9 @@ int server()
     case sizeof(struct sockaddr_in6): {
       char str[INET6_ADDRSTRLEN]{};
       CHECK_EQ(rp->ai_family, AF_INET6);
-      struct sockaddr_in6* sin =
+      struct sockaddr_in6* sin6 =
           reinterpret_cast<struct sockaddr_in6*>(rp->ai_addr);
-      PCHECK(inet_ntop(AF_INET6, &sin->sin6_addr, str, sizeof(str)));
+      PCHECK(inet_ntop(AF_INET6, &sin6->sin6_addr, str, sizeof(str)));
       services.back().ctrl_address = str;
       break;
     }
@@ -1293,14 +1293,18 @@ int server()
       case sizeof(struct sockaddr_in): {
         char str[INET_ADDRSTRLEN];
         CHECK_EQ(service.family, AF_INET);
-        PCHECK(inet_ntop(AF_INET, &srv.remote.addr_in, str, sizeof(str)));
+        struct sockaddr_in* sin =
+          reinterpret_cast<struct sockaddr_in*>(&srv.remote.addr);
+        PCHECK(inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
       case sizeof(struct sockaddr_in6): {
         char str[INET6_ADDRSTRLEN];
         CHECK_EQ(service.family, AF_INET6);
-        PCHECK(inet_ntop(AF_INET6, &srv.remote.addr_in6, str, sizeof(str)));
+        struct sockaddr_in6* sin6 =
+            reinterpret_cast<struct sockaddr_in6*>(&srv.remote.addr);
+        PCHECK(inet_ntop(AF_INET, &sin6->sin6_addr, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
