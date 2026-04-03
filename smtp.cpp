@@ -1241,9 +1241,9 @@ int server()
     PCHECK(listen(services.back().fd, 10) == 0);
 
     FD_SET(services.back().fd, &allsock);
-    LOG(INFO) << "added " << services.back().fd << " to listen set "
-              << services.back().canonname << " "
-              << services.back().ctrl_address;
+    LOG(INFO) << "added " << services.back().fd
+              << " to listen set: " << services.back().canonname << " ["
+              << services.back().ctrl_address << "]";
 
     maxsock = std::max(services.back().fd, maxsock);
   }
@@ -1283,6 +1283,7 @@ int server()
       struct server srv;
       srv.service_ptr = &service;
 
+      srv.remote_addr_size = sizeof(srv.remote.addr);
       accepted_fd = accept(service.fd, &srv.remote.addr, &srv.remote_addr_size);
       if (accepted_fd < 0) {
         PCHECK(errno == EINTR) << "accept for " << service.fd;
@@ -1294,7 +1295,7 @@ int server()
         char str[INET_ADDRSTRLEN];
         CHECK_EQ(service.family, AF_INET);
         struct sockaddr_in* sin =
-          reinterpret_cast<struct sockaddr_in*>(&srv.remote.addr);
+            reinterpret_cast<struct sockaddr_in*>(&srv.remote.addr);
         PCHECK(inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)));
         srv.remote_string = str;
         break;
