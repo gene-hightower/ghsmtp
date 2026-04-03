@@ -3,12 +3,6 @@
 #include "IP4.hpp"
 #include "IP6.hpp"
 
-#include <gflags/gflags.h>
-namespace gflags {
-}
-
-DEFINE_string(remote_addr, "", "set remote peername address");
-
 static bool is_ipv4_mapped_ipv6_addresses(in6_addr const& sa)
 {
   // clang-format off
@@ -62,90 +56,37 @@ Sock::Sock(int                       fd_in,
 
   // Get the remote IP address as "them".
 
-  if ((!FLAGS_remote_addr.empty()) || (getenv("REMOTE_ADDR") != nullptr)) {
-    if (!FLAGS_remote_addr.empty()) {
-      CHECK_LT(FLAGS_remote_addr.length(), sizeof(them_addr_str_));
-      strcpy(them_addr_str_, FLAGS_remote_addr.c_str());
-    }
-    else {
-      auto peername = getenv("REMOTE_ADDR");
-      CHECK_NOTNULL(peername);
-      CHECK_LT(strlen(peername), sizeof(them_addr_str_));
-      strcpy(them_addr_str_, peername);
-    }
-
-    if (IP4::is_address(them_addr_str_)) {
-      them_address_literal_ = IP4::to_address_literal(them_addr_str_);
-    }
-    else if (IP4::is_address_literal(them_addr_str_)) {
-      them_address_literal_ = std::string(them_addr_str_);
-      auto addr             = IP4::as_address(them_address_literal_);
-      strncpy(them_addr_str_, addr.data(), addr.length());
-    }
-    else if (IP6::is_address(them_addr_str_)) {
-      them_address_literal_ = IP6::to_address_literal(them_addr_str_);
-    }
-    else if (IP6::is_address_literal(them_addr_str_)) {
-      them_address_literal_ = std::string(them_addr_str_);
-      auto addr             = IP6::as_address(them_address_literal_);
-      strncpy(them_addr_str_, addr.data(), addr.length());
-    }
-    else {
-      auto peername = getenv("REMOTE_ADDR");
-      if (peername != nullptr) {
-        LOG(ERROR) << "getenv(\"REMOTE_ADDR\") == '" << peername << "'";
-      }
-      LOG(ERROR) << "--remote_addr         == '" << FLAGS_remote_addr << "'";
-      LOG(ERROR) << "Unrecognized remote peer address '" << them_addr_str_
-                 << "'";
-    }
-    if (IP4::is_address(them_addr_str_)) {
-      CHECK_EQ(inet_pton(AF_INET, them_addr_str_,
-                         reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
-               1);
-      them_addr_len_ = sizeof(sockaddr_in);
-    }
-    else if (IP6::is_address(them_addr_str_)) {
-      CHECK_EQ(inet_pton(AF_INET6, them_addr_str_,
-                         reinterpret_cast<void*>(&them_addr_.addr_in.sin_addr)),
-               1);
-      them_addr_len_ = sizeof(sockaddr_in6);
-    } else {
-      them_addr_len_ = 0;
-      LOG(INFO) << "them_addr_str_ is empty";
+  if (-1 == getpeername(fd_out, &them_addr_.addr, &them_addr_len_)) {
+    // Ignore ENOTSOCK errors from getpeername, useful for testing.
+    PLOG_IF(WARNING, ENOTSOCK != errno) << "getpeername failed";
+    if (errno == ENOTCONN) { // Transport endpoint is not connected
+      // It's a socket, but not connected
+      throw std::runtime_error("getpeername failed, endpoint is not connected");
     }
   }
   else {
-    if (-1 == getpeername(fd_out, &them_addr_.addr, &them_addr_len_)) {
-      // Ignore ENOTSOCK errors from getpeername, useful for testing.
-      PLOG_IF(WARNING, ENOTSOCK != errno) << "getpeername failed";
-    }
-    else {
-      switch (them_addr_len_) {
-      case sizeof(sockaddr_in):
-        PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in.sin_addr, them_addr_str_,
-                         sizeof them_addr_str_) != nullptr);
+    switch (them_addr_len_) {
+    case sizeof(sockaddr_in):
+      PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in.sin_addr, them_addr_str_,
+                       sizeof them_addr_str_) != nullptr);
+      them_address_literal_ = IP4::to_address_literal(them_addr_str_);
+      break;
+    case sizeof(sockaddr_in6):
+      if (is_ipv4_mapped_ipv6_addresses(them_addr_.addr_in6.sin6_addr)) {
+        PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in6.sin6_addr.s6_addr[12],
+                         them_addr_str_, sizeof them_addr_str_) != nullptr);
         them_address_literal_ = IP4::to_address_literal(them_addr_str_);
-        break;
-
-      case sizeof(sockaddr_in6):
-        if (is_ipv4_mapped_ipv6_addresses(them_addr_.addr_in6.sin6_addr)) {
-          PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in6.sin6_addr.s6_addr[12],
-                           them_addr_str_, sizeof them_addr_str_) != nullptr);
-          them_address_literal_ = IP4::to_address_literal(them_addr_str_);
-          // LOG(INFO) << "IPv4 disguised as IPv6: " << them_addr_str_;
-        }
-        else {
-          PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr,
-                           them_addr_str_, sizeof them_addr_str_) != nullptr);
-          them_address_literal_ = IP6::to_address_literal(them_addr_str_);
-        }
-        break;
-
-      default:
-        LOG(FATAL) << "bogus address length (" << them_addr_len_
-                   << ") returned from getpeername";
+        // LOG(INFO) << "IPv4 disguised as IPv6: " << them_addr_str_;
       }
+      else {
+        PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr,
+                         them_addr_str_, sizeof them_addr_str_) != nullptr);
+        them_address_literal_ = IP6::to_address_literal(them_addr_str_);
+      }
+      break;
+    default:
+      LOG(FATAL) << "bogus address length (" << them_addr_len_
+                 << ") returned from getpeername";
     }
   }
 }
