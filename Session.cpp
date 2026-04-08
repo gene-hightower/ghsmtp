@@ -1905,10 +1905,10 @@ bool Session::verify_sender_domain_(Domain const& sender,
 void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
-    spf_received_ = fmt::format("Received-SPF: pass ({}: allow-listed) "
-                                "client-ip={}; envelope-from={}; helo={};",
-                                server_id_(), "127.0.0.1", sender.as_string(),
-                                client_identity_.ascii());
+    spf_received_      = fmt::format("Received-SPF: pass ({}: allow-listed) "
+                                          "client-ip={}; envelope-from={}; helo={};",
+                                     server_id_(), "127.0.0.1", sender.as_string(),
+                                     client_identity_.ascii());
     spf_sender_domain_ = Domain{"localhost"};
     return;
   }
