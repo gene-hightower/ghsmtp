@@ -9,8 +9,7 @@ DEFINE_uint64(data_bfr_size, 64 * 1024, "data parser buffer size");
 DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 DEFINE_bool(close_stderr, false, "ignored");
-DEFINE_bool(server, false, "server");
-DEFINE_bool(seccomp, false, "use seccomp");
+DEFINE_bool(server, false, "listen and accept");
 
 DEFINE_string(bind, "bind", "bind address");
 DEFINE_string(service, "smtp", "service name");
@@ -21,14 +20,12 @@ constexpr auto smtp_max_str_length =
 
 #include <netdb.h>
 #include <pwd.h>
-#include <seccomp.h>
+#include <signal.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
-
-#include <fstream>
 
 #include "Session.hpp"
 #include "esc.hpp"
@@ -37,20 +34,22 @@ constexpr auto smtp_max_str_length =
 #include "osutil.hpp"
 
 #include <cstdlib>
+#include <fstream>
 #include <memory>
-
-#include <signal.h>
+#include <stdexcept>
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
 // Process exit codes
 enum {
-  RET_NOERROR = 0,
-  RET_EXCPETION,
-  RET_MAXED_OUT, // Too much data
-  RET_SMTP_SYNTAX_ERROR,
-  RET_TIME_OUT
+  EXIT_NOERROR = EXIT_SUCCESS,
+  EXIT_        = 32,      // Sort all the others past this one.
+  EXIT_EXCPETION,         // Unknown exception.
+  EXIT_MAXED_OUT,         // Too much data.
+  EXIT_SMTP_SYNTAX_ERROR, // Some protocol parser error.
+  EXIT_TIME_OUT,          // Too much time overall.
+  EXIT_IO_TIME_OUT        // Too much time waiting for read or write.
 };
 
 using namespace tao::pegtl;
@@ -804,175 +803,15 @@ void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
   write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
-  _Exit(1);
-}
-
-void install_syscall_filter()
-{
-  /// scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_ERRNO(EPERM)));
-  scmp_filter_ctx ctx = CHECK_NOTNULL(seccomp_init(SCMP_ACT_LOG));
-
-  auto rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add write failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add read failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add close failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigprocmask), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigprocmask failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigreturn), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigreturn failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rt_sigaction), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add rt_sigaction failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add fstat failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(openat), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add openat failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(socket), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add socket failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(connect), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add connect failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(poll), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add poll failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add sendto failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add recvfrom failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sigaltstack), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add sigaltstack failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(prctl), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add prctl failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(gettid), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add gettid failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getpid), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add getpid failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getppid), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add getppid failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(newfstatat), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add newfstatat failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(tgkill), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add tgkill failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(dup), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add dup failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mmap), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add mmap failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(munmap), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add munmap failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(pipe2), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add pipe2 failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(readlinkat), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add readlinkat failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(pselect6), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add pselect6 failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(uname), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add uname failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fcntl), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add fcntl failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(unlink), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add unlink failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(symlink), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add symlink failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(madvise), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add madvise failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mprotect), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add mprotect failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(futex), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add futex failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(writev), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add writev failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sysinfo), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add sysinfo failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(brk), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add brk failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getrandom), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add getrandom failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getdents64), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add getdents64 failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(lseek), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add lseek failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(setsockopt), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add setsockopt failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(alarm), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add alarm failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(rename), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add rename failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(clock_gettime), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add clock_gettime failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit_group), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add exit_group failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(exit), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add exit failed";
-
-  // for sanitize
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(clone), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add clone failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(wait4), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add wait4 failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sched_yield), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add sched_yield failed";
-
-  rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(ptrace), 0);
-  CHECK_EQ(rc, 0) << "seccomp_rule_add ptrace failed";
-
-  rc = seccomp_load(ctx);
-  CHECK_EQ(rc, 0) << "seccomp_load failed";
-
-  // seccomp_export_pfc(ctx, STDERR_FILENO);
-
-  seccomp_release(ctx);
+  _Exit(EXIT_TIME_OUT);
 }
 
 static volatile bool sig_quit{false};
 void                 sigquit(int signum) { sig_quit = true; }
 
-int client()
+// Process an SMTP session from a connecting client.
+
+int session()
 {
   // Set timeout signal handler to limit total run time.
   struct sigaction sact{};
@@ -983,35 +822,37 @@ int client()
 
   auto const config_path = osutil::get_config_dir();
 
+  int ret = EXIT_NOERROR;
+
   std::unique_ptr<RFC5321::Ctx> ctx;
-  auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
-  ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
-
-  ctx->session.greeting();
-
-  if (FLAGS_seccomp)
-    install_syscall_filter();
-
-  istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
-                                 "session"};
-
-  int ret = RET_NOERROR;
   try {
+    auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
+    ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
+
+    ctx->session.greeting();
+
+    istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
+                                   "session"};
+
     if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx))
-      ret = RET_SMTP_SYNTAX_ERROR;
+      ret = EXIT_SMTP_SYNTAX_ERROR;
+  }
+  catch (std::runtime_error const& e) {
+    LOG(WARNING) << e.what();
+    ret = EXIT_EXCPETION;
   }
   catch (std::exception const& e) {
     LOG(WARNING) << e.what();
-    ret = RET_EXCPETION;
+    ret = EXIT_EXCPETION;
   }
 
   if (ctx->session.maxed_out()) {
     ctx->session.max_out();
-    ret = RET_MAXED_OUT;
+    ret = EXIT_MAXED_OUT;
   }
   else if (ctx->session.timed_out()) {
     ctx->session.time_out();
-    ret = RET_TIME_OUT;
+    ret = EXIT_TIME_OUT;
   }
   // else {
   //   ctx->session.error("session end without QUIT command from client");
@@ -1138,6 +979,8 @@ char const* pro_to_str(int pro)
   }
   return "IPPROTO_?unknown?";
 }
+
+// Listen and accept client connections, then fork a session manager.
 
 int server()
 {
@@ -1318,9 +1161,6 @@ int server()
 
       int pid = fork();
 
-      LOG(INFO) << "pid == " << pid;
-      google::FlushLogFiles(google::INFO);
-
       if (pid < 0) { // fork error
         auto const errmsg = std::strerror(errno);
         LOG(ERROR) << "fork: " << errmsg;
@@ -1332,7 +1172,7 @@ int server()
       if (pid > 0) { // parent
         servers[pid] = srv;
 
-        LOG(INFO) << "new server pid " << pid;
+        LOG(INFO) << "new session pid " << pid;
 
         close(accepted_fd); // We passed this to our child.
         continue;           // check next srv
@@ -1352,26 +1192,15 @@ int server()
       PCHECK(getresuid(&ruid, &euid, &suid) == 0);
       PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
 
-      LOG(INFO) << "getresuid(" << ruid << ", " << euid << ", " << suid << ")";
-      LOG(INFO) << "getresgid(" << rgid << ", " << egid << ", " << sgid << ")";
-
       struct passwd* pwd = getpwnam(user);
       PCHECK(pwd != nullptr) << "no such user " << user;
 
       if (pwd->pw_uid != euid) {
-        LOG(INFO) << "switching to user " << pwd->pw_name;
-        LOG(INFO) << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid;
+        // LOG(INFO) << "switching to user " << pwd->pw_name
+        // << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid;
 
         PCHECK(setgid(pwd->pw_gid) == 0) << "setgid(" << pwd->pw_gid << ")";
         PCHECK(setuid(pwd->pw_uid) == 0) << "setuid(" << pwd->pw_uid << ")";
-
-        PCHECK(getresuid(&ruid, &euid, &suid) == 0);
-        PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
-
-        LOG(INFO) << "getresuid(" << ruid << ", " << euid << ", " << suid
-                  << ")";
-        LOG(INFO) << "getresgid(" << rgid << ", " << egid << ", " << sgid
-                  << ")";
       }
 
       // We can leave STDERR_FILENO alone.
@@ -1379,14 +1208,21 @@ int server()
         PCHECK(dup2(accepted_fd, STDIN_FILENO) == STDIN_FILENO);
       }
       PCHECK(dup2(STDIN_FILENO, STDOUT_FILENO) == STDOUT_FILENO);
-      LOG(INFO) << "moved fd:" << accepted_fd << " to fd 0,1";
 
       for (auto service : services) {
         PCHECK(close(service.fd) == 0);
         service.fd = -1;
       }
 
-      return client();
+      try {
+        return session();
+      }
+      catch (std::exception const& ex) {
+        LOG(FATAL) << ex.what();
+      }
+      catch (...) {
+        LOG(FATAL) << "Unknown excpetion";
+      }
     }
   }
 
@@ -1440,5 +1276,5 @@ int main(int argc, char* argv[])
   if (FLAGS_server)
     return server();
   else
-    return client();
+    return session();
 }

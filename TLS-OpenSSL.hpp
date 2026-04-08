@@ -20,7 +20,7 @@ auto constexpr key_ext    = ".key";
 
 class TLS {
 public:
-  TLS(TLS const&) = delete;
+  TLS(TLS const&)            = delete;
   TLS& operator=(const TLS&) = delete;
 
   explicit TLS(std::function<void(void)> read_hook);
@@ -33,6 +33,7 @@ public:
                        char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
                        bool                      enforce_dane,
+                       bool                      log_cert_info,
                        std::chrono::milliseconds timeout);
   bool starttls_server(fs::path                  config_path,
                        int                       fd_in,

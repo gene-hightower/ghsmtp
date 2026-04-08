@@ -18,14 +18,12 @@
 #include "osutil.hpp"
 
 DEFINE_bool(log_dns_data, false, "log all DNS TCP protocol data");
-DEFINE_bool(random_dns_servers, false, "Pick starting DNS server at random");
+DEFINE_bool(random_dns_servers, true, "Pick starting DNS server at random");
 
 namespace Config {
-// The default timeout in glibc is 5 seconds.  My setup with unbound
-// in front of stubby with DNSSEC checking and all that seems to work
-// better with just a little more time.
+// The default timeout in glibc is 5 seconds.
 
-auto constexpr read_timeout{std::chrono::seconds(11)};
+auto constexpr read_timeout{std::chrono::seconds(5)};
 auto constexpr write_timeout{std::chrono::seconds(1)};
 
 enum class sock_type : bool { stream, dgram };
@@ -38,6 +36,7 @@ struct nameserver {
 };
 
 constexpr nameserver nameservers[]{
+    // V4
     {
         "unfiltered.joindns4.eu",
         "86.54.11.100",
@@ -50,6 +49,19 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
+    {
+        "wikimedia-dns.org",
+        "185.71.138.138",
+        "domain-s",
+        sock_type::stream,
+    },
+    {
+        "dns9.quad9.net",
+        "9.9.9.9",
+        "domain-s",
+        sock_type::stream,
+    },
+    // V6
     {
         "unfiltered.joindns4.eu",
         "2a13:1001::86:54:11:100",
@@ -64,20 +76,7 @@ constexpr nameserver nameservers[]{
     },
     {
         "wikimedia-dns.org",
-        "185.71.138.138",
-        "domain-s",
-        sock_type::stream,
-    },
-    {
-        "wikimedia-dns.org",
         "2001:67c:930::1",
-        "domain-s",
-        sock_type::stream,
-    },
-    /*
-    {
-        "dns9.quad9.net",
-        "9.9.9.9",
         "domain-s",
         sock_type::stream,
     },
@@ -87,12 +86,7 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
-    {
-        "dns9.quad9.net",
-        "9.9.9.9",
-        "domain-s",
-        sock_type::stream,
-    },
+    /*
     {
         "dns10.quad9.net",
         "9.9.9.10",
@@ -144,38 +138,14 @@ constexpr nameserver nameservers[]{
         sock_type::stream,
     },
     */
-    /*
-    {
-        "dns.google",
-        "8.8.8.8",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "8.8.4.4",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "2001:4860:4860::8888",
-        "domain",
-        sock_type::dgram,
-    },
-    {
-        "dns.google",
-        "2001:4860:4860::8844",
-        "domain",
-        sock_type::dgram,
-    },
-    */
 };
 } // namespace Config
 
 template <typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept
-{ return N; }
+{
+  return N;
+}
 
 namespace DNS {
 
@@ -259,8 +229,13 @@ Resolver::Resolver(fs::path config_path)
       if (port != 53) {
         DNS::RR_collection tlsa_rrs; // empty FIXME!
         ns_sock_->starttls_client(config_path, nullptr, nameserver.host,
-                                  tlsa_rrs, false);
+                                  tlsa_rrs, false, false);
         if (ns_sock_->verified()) {
+          if (ns_sock_->verified_peername() != nameserver.host) {
+            LOG(WARNING) << "nameserver " << nameserver.host
+                         << " reports verified peername "
+                         << ns_sock_->verified_peername();
+          }
           ns_fd_ = -1;
           return;
         }

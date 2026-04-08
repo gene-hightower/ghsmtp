@@ -73,16 +73,14 @@ Sock::Sock(int                       fd_in,
       break;
     case sizeof(sockaddr_in6):
       if (is_ipv4_mapped_ipv6_addresses(them_addr_.addr_in6.sin6_addr)) {
+        char them_addr[INET_ADDRSTRLEN]{'\0'};
         PCHECK(inet_ntop(AF_INET, &them_addr_.addr_in6.sin6_addr.s6_addr[12],
-                         them_addr_str_, sizeof them_addr_str_) != nullptr);
-        them_address_literal_ = IP4::to_address_literal(them_addr_str_);
-        // LOG(INFO) << "IPv4 disguised as IPv6: " << them_addr_str_;
+                         them_addr, sizeof them_addr) != nullptr);
+        LOG(INFO) << "IPv4 address disguised as IPv6: " << them_addr;
       }
-      else {
-        PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr,
-                         them_addr_str_, sizeof them_addr_str_) != nullptr);
-        them_address_literal_ = IP6::to_address_literal(them_addr_str_);
-      }
+      PCHECK(inet_ntop(AF_INET6, &them_addr_.addr_in6.sin6_addr, them_addr_str_,
+                       sizeof them_addr_str_) != nullptr);
+      them_address_literal_ = IP6::to_address_literal(them_addr_str_);
       break;
     default:
       LOG(FATAL) << "bogus address length (" << them_addr_len_

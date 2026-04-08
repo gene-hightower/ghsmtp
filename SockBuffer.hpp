@@ -31,8 +31,8 @@ public:
       std::function<void(void)> read_hook     = []() {},
       std::chrono::milliseconds read_timeout  = Config::default_read_timeout,
       std::chrono::milliseconds write_timeout = Config::default_write_timeout,
-      std::chrono::milliseconds starttls_timeout
-      = Config::default_starttls_timeout);
+      std::chrono::milliseconds starttls_timeout =
+          Config::default_starttls_timeout);
 
   SockBuffer& operator=(const SockBuffer&) = delete;
   SockBuffer(SockBuffer const& that);
@@ -63,15 +63,20 @@ public:
                        char const*               client_name,
                        char const*               server_name,
                        DNS::RR_collection const& tlsa_rrs,
-                       bool                      enforce_dane)
+                       bool                      enforce_dane,
+                       bool                      log_cert_info)
   {
     return tls_active_ = tls_.starttls_client(
                config_path, fd_in_, fd_out_, client_name, server_name, tlsa_rrs,
-               enforce_dane, starttls_timeout_);
+               enforce_dane, log_cert_info, starttls_timeout_);
   }
   bool        tls() const { return tls_active_; }
   std::string tls_info() const { return tls() ? tls_.info() : ""; }
-  bool        verified() const { return tls_.verified(); };
+  bool        verified() const { return tls() ? tls_.verified() : false; };
+  std::string verified_peername()
+  {
+    return tls() ? tls_.verified_peername() : "";
+  };
 
   void set_max_read(std::streamsize max)
   {

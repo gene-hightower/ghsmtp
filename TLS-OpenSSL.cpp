@@ -79,10 +79,10 @@ TLS::~TLS()
   }
 }
 
-struct session_context {
-};
+struct session_context {};
 
-static int session_context_index = -1;
+static int  session_context_index = -1;
+static bool gbl_log_cert_info     = true;
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 {
@@ -111,22 +111,26 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
     X509_STORE_CTX_set_error(ctx, err);
   }
   if (!preverify_ok) {
-    LOG(INFO) << "verify error:num=" << err << ':'
-              << X509_verify_cert_error_string(err) << ": depth=" << depth
-              << ':' << buf;
+    if (gbl_log_cert_info)
+      LOG(INFO) << "verify error:num=" << err << ':'
+                << X509_verify_cert_error_string(err) << ": depth=" << depth
+                << ':' << buf;
   }
   else {
-    LOG(INFO) << "preverify_ok; depth=" << depth << " subject_name=«" << buf
-              << "»";
+    if (gbl_log_cert_info)
+      LOG(INFO) << "preverify_ok; depth=" << depth << " subject_name=«" << buf
+                << "»";
   }
 
   if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
     if (cert) {
       X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
-      LOG(INFO) << "issuer=" << buf;
+      if (gbl_log_cert_info)
+        LOG(INFO) << "issuer=" << buf;
     }
     else {
-      LOG(INFO) << "issuer=<unknown>";
+      if (gbl_log_cert_info)
+        LOG(INFO) << "issuer=<unknown>";
     }
   }
 
@@ -142,7 +146,8 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
-    LOG(INFO) << "servername requested " << servername;
+    if (gbl_log_cert_info)
+      LOG(INFO) << "servername requested " << servername;
     Domain const sn{servername};
     for (auto const& ctx : cert_ctx) {
       if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), sn);
@@ -152,7 +157,8 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
         return SSL_TLSEXT_ERR_OK;
       }
     }
-    LOG(INFO) << "no cert found for server " << servername;
+    if (gbl_log_cert_info)
+      LOG(INFO) << "no cert found for server " << servername;
     return SSL_TLSEXT_ERR_ALERT_WARNING;
   }
 
@@ -167,8 +173,12 @@ bool TLS::starttls_client(fs::path                  config_path,
                           char const*               server_name,
                           DNS::RR_collection const& tlsa_rrs,
                           bool                      enforce_dane,
+                          bool                      log_cert_info,
                           std::chrono::milliseconds timeout)
 {
+  auto orig_gbl_log_cert_info = gbl_log_cert_info;
+  gbl_log_cert_info = log_cert_info;
+
   SSL_load_error_strings();
   SSL_library_init();
 
@@ -235,7 +245,8 @@ bool TLS::starttls_client(fs::path                  config_path,
         auto         e   = X509_NAME_get_entry(subj, lastpos);
         ASN1_STRING* d   = X509_NAME_ENTRY_get_data(e);
         auto         str = ASN1_STRING_get0_data(d);
-        // LOG(INFO) << "client cert found for " << str;
+        if (log_cert_info)
+          LOG(INFO) << "client cert found for " << str;
         cn.emplace_back(reinterpret_cast<const char*>(str));
       }
 
@@ -253,7 +264,8 @@ bool TLS::starttls_client(fs::path                  config_path,
               reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
 
-          LOG(INFO) << "email or uri alt name " << str;
+          if (log_cert_info)
+            LOG(INFO) << "email or uri alt name " << str;
         }
         else if (gen->type == GEN_DNS) {
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
@@ -263,11 +275,13 @@ bool TLS::starttls_client(fs::path                  config_path,
               ASN1_STRING_length(asn1_str));
           Domain const dom{str};
           if (std::find(begin(cn), end(cn), dom) == end(cn)) {
-            // LOG(INFO) << "additional name found " << str;
+            if (log_cert_info)
+              LOG(INFO) << "additional name found " << str;
             cn.emplace_back(dom);
           }
           else {
-            // LOG(INFO) << "duplicate name " << str << " ignored";
+            if (log_cert_info)
+              LOG(INFO) << "duplicate name " << str << " ignored";
           }
         }
         else if (gen->type == GEN_IPADD) {
@@ -275,7 +289,8 @@ bool TLS::starttls_client(fs::path                  config_path,
           if (gen->d.ip->length == 4) {
             auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
                                         p[1], p[2], p[3]);
-            LOG(INFO) << "alt name IP4 address " << ip;
+            if (log_cert_info)
+              LOG(INFO) << "alt name IP4 address " << ip;
           }
           else if (gen->d.ip->length == 16) {
             LOG(ERROR) << "IPv6 not implemented";
@@ -294,14 +309,15 @@ bool TLS::starttls_client(fs::path                  config_path,
       //.......................................................
 
       if (std::find(begin(cn), end(cn), Domain{client_name}) != end(cn)) {
-        // LOG(INFO) << "**** using cert for " << client_name;
+        if (log_cert_info)
+          LOG(INFO) << "**** using cert for " << client_name;
         cert_ctx_.emplace_back(ctx, cn);
       }
     }
   }
 
   if (cert_ctx_.empty()) {
-    if (client_name)
+    if (client_name && log_cert_info)
       LOG(INFO) << "no cert found for client " << client_name;
 
     auto ctx = CHECK_NOTNULL(SSL_CTX_new(method));
@@ -314,8 +330,8 @@ bool TLS::starttls_client(fs::path                  config_path,
     SSL_CTX_set_verify_depth(ctx, Config::cert_verify_depth + 1);
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE,
                        verify_callback);
-
-    LOG(INFO) << "**** using no client cert";
+    if (log_cert_info)
+      LOG(INFO) << "**** using no client cert";
 
     std::vector<Domain> cn;
     cert_ctx_.emplace_back(ctx, cn);
@@ -331,7 +347,8 @@ bool TLS::starttls_client(fs::path                  config_path,
   if (tlsa_rrs.size()) {
     CHECK_GE(SSL_dane_enable(ssl_, server_name), 0)
         << "SSL_dane_enable() failed";
-    LOG(INFO) << "SSL_dane_enable(ssl_, " << server_name << ")";
+    if (log_cert_info)
+      LOG(INFO) << "SSL_dane_enable(ssl_, " << server_name << ")";
   }
   else {
     CHECK_EQ(SSL_set1_host(ssl_, server_name), 1);
@@ -430,17 +447,20 @@ bool TLS::starttls_client(fs::path                  config_path,
   }
 
   if (SSL_get_verify_result(ssl_) == X509_V_OK) {
-    LOG(INFO) << "server certificate verified";
+    if (log_cert_info)
+      LOG(INFO) << "server certificate verified";
     verified_ = true;
 
     char const* const peername = SSL_get0_peername(ssl_);
     if (peername != nullptr) {
       // Name checks were in scope and matched the peername
       verified_peername_ = peername;
-      LOG(INFO) << "verified peername: " << peername;
+      if (log_cert_info)
+        LOG(INFO) << "verified peername: " << peername;
     }
     else {
-      LOG(INFO) << "no verified peername";
+      if (log_cert_info)
+        LOG(INFO) << "no verified peername";
     }
 
     EVP_PKEY* mspki = nullptr;
@@ -454,16 +474,18 @@ bool TLS::starttls_client(fs::path                  config_path,
       SSL_get0_dane_tlsa(ssl_, &usage, &selector, &mtype, &certdata,
                          &certdata_len);
 
-      LOG(INFO) << "DANE TLSA " << unsigned(usage) << " " << unsigned(selector)
-                << " " << unsigned(mtype) << " ["
-                << bin2hexstring({certdata, 6}) << "...] "
-                << ((mspki != nullptr) ? "TA public key verified certificate"
-                    : depth            ? "matched TA certificate"
-                                       : "matched EE certificate")
-                << " at depth " << depth;
+      if (log_cert_info)
+        LOG(INFO) << "DANE TLSA " << unsigned(usage) << " "
+                  << unsigned(selector) << " " << unsigned(mtype) << " ["
+                  << bin2hexstring({certdata, 6}) << "...] "
+                  << ((mspki != nullptr) ? "TA public key verified certificate"
+                      : depth            ? "matched TA certificate"
+                                         : "matched EE certificate")
+                  << " at depth " << depth;
     }
     else if (usable_TLSA_records && enforce_dane) {
       LOG(WARNING) << "enforcing DANE; failing starttls";
+      gbl_log_cert_info = orig_gbl_log_cert_info;
       return false;
     }
   }
@@ -471,6 +493,7 @@ bool TLS::starttls_client(fs::path                  config_path,
     LOG(WARNING) << "server certificate failed to verify";
   }
 
+  gbl_log_cert_info = orig_gbl_log_cert_info;
   return true;
 }
 
@@ -599,7 +622,7 @@ bool TLS::starttls_server(fs::path                  config_path,
             reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
-        LOG(INFO) << "email or uri alt name " << str;
+        // LOG(INFO) << "email or uri alt name " << str;
       }
       else if (gen->type == GEN_DNS) {
         ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
@@ -622,7 +645,7 @@ bool TLS::starttls_server(fs::path                  config_path,
         if (gen->d.ip->length == 4) {
           auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
                                       p[1], p[2], p[3]);
-          LOG(INFO) << "alt name IP4 address " << ip;
+          // LOG(INFO) << "alt name IP4 address " << ip;
           names.emplace_back(ip);
         }
         else if (gen->d.ip->length == 16) {

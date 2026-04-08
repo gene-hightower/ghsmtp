@@ -1573,7 +1573,8 @@ bool snd(fs::path                    config_path,
 
     LOG(INFO) << "cnn.sock.starttls_client(\"" << receiver.ascii() << "\");";
     cnn.sock.starttls_client(config_path, sender.ascii().c_str(),
-                             receiver.ascii().c_str(), tlsa_rrs, enforce_dane);
+                             receiver.ascii().c_str(), tlsa_rrs, enforce_dane,
+                             true);
 
     LOG(INFO) << "TLS: " << cnn.sock.tls_info();
 
