@@ -79,10 +79,11 @@ TLS::~TLS()
   }
 }
 
-struct session_context {};
+struct session_context {
+  bool log_cert_info = true;
+};
 
-static int  session_context_index = -1;
-static bool gbl_log_cert_info     = true;
+thread_local int session_context_index = -1;
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 {
@@ -92,13 +93,13 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
 
   auto err = X509_STORE_CTX_get_error(ctx);
 
-  // auto const ssl = reinterpret_cast<SSL*>(
-  //   X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
+  auto const ssl = reinterpret_cast<SSL*>(
+      X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
 
   CHECK_GE(session_context_index, 0);
 
-  // auto unused = reinterpret_cast<session_context*>(SSL_get_ex_data(ssl,
-  // session_context_index));
+  auto context = reinterpret_cast<session_context*>(
+      SSL_get_ex_data(ssl, session_context_index));
 
   auto const depth = X509_STORE_CTX_get_error_depth(ctx);
 
@@ -111,13 +112,13 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
     X509_STORE_CTX_set_error(ctx, err);
   }
   if (!preverify_ok) {
-    if (gbl_log_cert_info)
+    if (context->log_cert_info)
       LOG(INFO) << "verify error:num=" << err << ':'
                 << X509_verify_cert_error_string(err) << ": depth=" << depth
                 << ':' << buf;
   }
   else {
-    if (gbl_log_cert_info)
+    if (context->log_cert_info)
       LOG(INFO) << "preverify_ok; depth=" << depth << " subject_name=«" << buf
                 << "»";
   }
@@ -125,11 +126,11 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX* ctx)
   if (!preverify_ok && (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)) {
     if (cert) {
       X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
-      if (gbl_log_cert_info)
+      if (context->log_cert_info)
         LOG(INFO) << "issuer=" << buf;
     }
     else {
-      if (gbl_log_cert_info)
+      if (context->log_cert_info)
         LOG(INFO) << "issuer=<unknown>";
     }
   }
@@ -146,8 +147,7 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   auto const servername = SSL_get_servername(s, TLSEXT_NAMETYPE_host_name);
 
   if (servername && *servername) {
-    if (gbl_log_cert_info)
-      LOG(INFO) << "servername requested " << servername;
+    // LOG(INFO) << "servername requested " << servername;
     Domain const sn{servername};
     for (auto const& ctx : cert_ctx) {
       if (auto const& c = std::find(begin(ctx.cn), end(ctx.cn), sn);
@@ -157,8 +157,7 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
         return SSL_TLSEXT_ERR_OK;
       }
     }
-    if (gbl_log_cert_info)
-      LOG(INFO) << "no cert found for server " << servername;
+    // LOG(INFO) << "no cert found for server " << servername;
     return SSL_TLSEXT_ERR_ALERT_WARNING;
   }
 
@@ -176,9 +175,6 @@ bool TLS::starttls_client(fs::path                  config_path,
                           bool                      log_cert_info,
                           std::chrono::milliseconds timeout)
 {
-  auto orig_gbl_log_cert_info = gbl_log_cert_info;
-  gbl_log_cert_info = log_cert_info;
-
   SSL_load_error_strings();
   SSL_library_init();
 
@@ -408,6 +404,7 @@ bool TLS::starttls_client(fs::path                  config_path,
         SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
   session_context context;
+  context.log_cert_info = log_cert_info;
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   auto const start = std::chrono::system_clock::now();
@@ -485,7 +482,6 @@ bool TLS::starttls_client(fs::path                  config_path,
     }
     else if (usable_TLSA_records && enforce_dane) {
       LOG(WARNING) << "enforcing DANE; failing starttls";
-      gbl_log_cert_info = orig_gbl_log_cert_info;
       return false;
     }
   }
@@ -493,7 +489,6 @@ bool TLS::starttls_client(fs::path                  config_path,
     LOG(WARNING) << "server certificate failed to verify";
   }
 
-  gbl_log_cert_info = orig_gbl_log_cert_info;
   return true;
 }
 
@@ -680,6 +675,7 @@ bool TLS::starttls_server(fs::path                  config_path,
         SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
   session_context context;
+  context.log_cert_info = true;
   SSL_set_ex_data(ssl_, session_context_index, &context);
 
   auto const start = std::chrono::system_clock::now();
