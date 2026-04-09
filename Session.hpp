@@ -47,7 +47,7 @@ public:
     return lo_("HELO", client_identity);
   }
   bool mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
-  bool rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
+  void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
   bool msg_new();
   bool msg_write(char const* s, std::streamsize count);
@@ -126,7 +126,7 @@ private:
                                    std::string&     error_msg);
   void do_spf_check_(Mailbox const& sender);
   bool verify_from_params_(parameters_t const& parameters);
-  bool verify_rcpt_params_(parameters_t const& parameters);
+  void verify_rcpt_params_(parameters_t const& parameters);
 
   // bool is_forwarding_() const
   // {
