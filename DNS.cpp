@@ -61,7 +61,7 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
-    // V6
+    /* V6
     {
         "unfiltered.joindns4.eu",
         "2a13:1001::86:54:11:100",
@@ -86,6 +86,7 @@ constexpr nameserver nameservers[]{
         "domain-s",
         sock_type::stream,
     },
+    */
     /*
     {
         "dns10.quad9.net",
