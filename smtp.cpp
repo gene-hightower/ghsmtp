@@ -45,15 +45,17 @@ constexpr auto smtp_max_str_length =
 // Process exit codes
 enum {
   EXIT_NOERROR = EXIT_SUCCESS,
-  EXIT_        = 32,      // Sort all the others past this one.
-  EXIT_AUTH_FAIL,         // We don't support AUTH.
-  EXIT_BARE_LF,           // Hard fail on bare '\n'.
-  EXIT_EXCPETION,         // Unknown exception.
-  EXIT_MAXED_OUT,         // Too much data.
-  EXIT_SMTP_SYNTAX_ERROR, // Some protocol parser error.
-  EXIT_TIME_OUT,          // Too much time overall.
-  EXIT_TOO_MANY_BAD_CMDS, // Eventually we cut them off.
-  EXIT_IO_TIME_OUT        // Too much time waiting for read or write.
+  EXIT_        = 32,      // sort all the others past this one
+  EXIT_AUTH_FAIL,         // we don't support AUTH
+  EXIT_BAD_LO,            // error from helo/ehlo
+  EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
+  EXIT_BARE_LF,           // hard fail on bare '\n'
+  EXIT_EXCPETION,         // unknown exception
+  EXIT_MAXED_OUT,         // too much data
+  EXIT_SMTP_SYNTAX_ERROR, // some protocol parser error
+  EXIT_TIME_OUT,          // too much time overall
+  EXIT_TOO_MANY_BAD_CMDS, // eventually, we cut them off
+  EXIT_IO_TIME_OUT        // too much time waiting for read or write
 };
 
 [[noreturn]] void smtp_exit(int ret)
@@ -538,7 +540,9 @@ struct action<helo> {
   {
     auto const b = begin(in) + 5; // +5 for the length of "HELO "
     auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
-    ctx.session.helo(std::string_view(b, e - b));
+    if (!ctx.session.helo(std::string_view(b, e - b))) {
+      smtp_exit(EXIT_BAD_LO);
+    }
   }
 };
 
@@ -549,7 +553,9 @@ struct action<ehlo> {
   {
     auto const b = begin(in) + 5; // +5 for the length of "EHLO "
     auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
-    ctx.session.ehlo(std::string_view(b, e - b));
+    if (!ctx.session.ehlo(std::string_view(b, e - b))) {
+      smtp_exit(EXIT_BAD_LO);
+    }
   }
 };
 
@@ -562,7 +568,9 @@ struct action<mail_from> {
     if (ctx.mb_loc != ""s && ctx.mb_dom != ""s) {
       mbx = Mailbox{ctx.mb_loc, Domain{ctx.mb_dom}};
     }
-    ctx.session.mail_from(std::move(mbx), ctx.parameters);
+    if (!ctx.session.mail_from(std::move(mbx), ctx.parameters)) {
+      smtp_exit(EXIT_BAD_MAIL_FROM);
+    }
     ctx.mb_loc.clear();
     ctx.mb_dom.clear();
     ctx.parameters.clear();
@@ -931,9 +939,9 @@ static auto const max_connections = 2;
 
 struct connection {
   int ncurrent = 0;
-  int ntotal = 0;
+  int ntotal   = 0;
   int attempts = 0;
-  int nerrors = 0;
+  int nerrors  = 0;
 };
 
 std::unordered_map<std::string, connection> connections;
@@ -971,7 +979,7 @@ void sigchild(int signum)
       break;
 
     try {
-      auto srv = servers.at(pid);
+      auto  srv        = servers.at(pid);
       auto& connection = connections[srv.remote_string];
 
       // srv.service_ptr
@@ -1210,15 +1218,18 @@ int server()
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
 
-      LOG(INFO) << "accepted (fd=" << accepted_fd << ") for " << srv.remote_string;
+      LOG(INFO) << "accepted (fd=" << accepted_fd << ") for "
+                << srv.remote_string;
       LOG(INFO) << "attempt " << ++connections[srv.remote_string].attempts;
 
       if (connections[srv.remote_string].ncurrent++ >= max_connections) {
         connections[srv.remote_string].ncurrent--;
-        char const too_many[] = "421 4.3.0 Too many concurrent connections, try again later.\r\n";
+        char const too_many[] =
+            "421 4.3.0 Too many concurrent connections, try again later.\r\n";
         write(accepted_fd, too_many, sizeof(too_many));
         close(accepted_fd);
-        LOG(INFO) << "too many concurrent connections from " << srv.remote_string;
+        LOG(INFO) << "too many concurrent connections from "
+                  << srv.remote_string;
         continue;
       }
 

@@ -573,7 +573,7 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   return true;
 }
 
-bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
+void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   check_for_pipeline_error_("RCPT TO");
 
@@ -582,33 +582,32 @@ bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return true;
+    return;
   case xact_step::mail:
     out_() << "503 5.5.1 sequence error, expecting MAIL\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return true;
+    return;
   case xact_step::rcpt:
   case xact_step::data: break;
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting BDAT\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return true;
+    return;
   case xact_step::rset:
     out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return true;
+    return;
   }
 
   // Parameter errors are all non-fatal.
 
-  if (!verify_rcpt_params_(parameters))
-    return true;
+  verify_rcpt_params_(parameters);
 
   if (!verify_recipient_(forward_path))
-    return true;
+    return;
 
   // V6 spam...
   if (IP6::is_address(sock_.them_c_str()) &&
@@ -619,7 +618,7 @@ bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
                                         client_fcrdns_[0].ascii());
     LOG(WARNING) << error_msg;
     out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
-    return true;
+    return;
   }
 
   if (!smtputf8_ && !is_ascii(forward_path.local_part())) {
@@ -630,7 +629,7 @@ bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (forward_path_.size() >= Config::max_recipients_per_message) {
     out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
     LOG(WARNING) << "too many recipients <" << forward_path << ">";
-    return true;
+    return;
   }
   // no check for dups, postfix doesn't
   forward_path_.emplace_back(std::move(forward_path));
@@ -643,8 +642,6 @@ bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   out_() << "250 2.1.5 RCPT TO OK\r\n";
 
   state_ = xact_step::data;
-
-  return true;
 }
 
 // The headers Return-Path:, Received-SPF:, and Received: are returned
@@ -2019,7 +2016,7 @@ bool Session::verify_from_params_(parameters_t const& parameters)
   return true;
 }
 
-bool Session::verify_rcpt_params_(parameters_t const& parameters)
+void Session::verify_rcpt_params_(parameters_t const& parameters)
 {
   // Take a look at the optional parameters:
   for (auto const& [name, value] : parameters) {
@@ -2032,8 +2029,6 @@ bool Session::verify_rcpt_params_(parameters_t const& parameters)
                    << value;
     }
   }
-
-  return true;
 }
 
 // check recipient from RFC5321 RCPT TO:
@@ -2049,9 +2044,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
       if (recipient.domain().ascii() != sock_.us_address_literal()) {
         LOG(WARNING) << "recipient.domain address " << recipient.domain()
                      << " does not match ours " << sock_.us_address_literal();
-        /*
-            return false;
-        */
+        return false;
       }
       return true;
     }
