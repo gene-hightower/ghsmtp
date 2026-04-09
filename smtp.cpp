@@ -927,6 +927,17 @@ struct server {
 
 std::unordered_map<pid_t, server> servers;
 
+static auto const max_connections = 2;
+
+struct connection {
+  int ncurrent = 0;
+  int ntotal = 0;
+  int attempts = 0;
+  int nerrors = 0;
+};
+
+std::unordered_map<std::string, connection> connections;
+
 int wait_any(int* wstat)
 {
   pid_t r;
@@ -961,19 +972,26 @@ void sigchild(int signum)
 
     try {
       auto srv = servers.at(pid);
+      auto& connection = connections[srv.remote_string];
+
       // srv.service_ptr
       if (WIFEXITED(status)) {
         auto exit_status = WEXITSTATUS(status);
-        // LOG(INFO) << pid << ": exit status " << std::hex <<
-        // WEXITSTATUS(status);
+        LOG(INFO) << pid << ": exit status " << std::hex << exit_status;
+        if (exit_status != 0) {
+          connection.nerrors++;
+        }
       }
       else if (WIFSIGNALED(status)) {
         auto exit_signal = WTERMSIG(status);
-        // LOG(INFO) << pid << ": exit signal " << std::hex << WTERMSIG(status);
+        LOG(INFO) << pid << ": exit signal " << std::hex << exit_signal;
       }
       else {
-        LOG(INFO) << pid << ": not status or signal";
+        LOG(ERROR) << pid << ": not status or signal";
       }
+
+      connection.ncurrent--;
+      connection.ntotal++;
 
       google::FlushLogFiles(google::INFO);
 
@@ -1192,7 +1210,17 @@ int server()
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
 
-      LOG(INFO) << "accepted " << accepted_fd << " for " << srv.remote_string;
+      LOG(INFO) << "accepted (fd=" << accepted_fd << ") for " << srv.remote_string;
+      LOG(INFO) << "attempt " << ++connections[srv.remote_string].attempts;
+
+      if (connections[srv.remote_string].ncurrent++ >= max_connections) {
+        connections[srv.remote_string].ncurrent--;
+        char const too_many[] = "421 4.3.0 Too many concurrent connections, try again later.\r\n";
+        write(accepted_fd, too_many, sizeof(too_many));
+        close(accepted_fd);
+        LOG(INFO) << "too many concurrent connections from " << srv.remote_string;
+        continue;
+      }
 
       LOG(INFO) << "about to fork";
       google::FlushLogFiles(google::INFO);
@@ -1275,6 +1303,14 @@ int server()
   for (auto service : services) {
     PCHECK(close(service.fd) == 0);
     service.fd = -1;
+  }
+
+  for (auto const& [addr, conn] : connections) {
+    LOG(INFO) << addr;
+    LOG(INFO) << " current: " << conn.ncurrent;
+    LOG(INFO) << "   total: " << conn.ntotal;
+    LOG(INFO) << "attempts: " << conn.attempts;
+    LOG(INFO) << "  errors: " << conn.nerrors;
   }
 
   for (auto n = 0; servers.size(); ++n) {
