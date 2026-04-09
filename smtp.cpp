@@ -11,13 +11,14 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 DEFINE_bool(close_stderr, false, "ignored");
 DEFINE_bool(server, false, "listen and accept");
 
-DEFINE_string(bind, "bind", "bind address");
+DEFINE_string(bind, "localhost", "bind address");
 DEFINE_string(service, "smtp", "service name");
 
 constexpr auto smtp_max_line_length = 1000;
 constexpr auto smtp_max_str_length =
     smtp_max_line_length - 2; // length of line without CRLF
 
+#include <grp.h>
 #include <netdb.h>
 #include <pwd.h>
 #include <signal.h>
@@ -55,7 +56,7 @@ enum {
   EXIT_IO_TIME_OUT        // Too much time waiting for read or write.
 };
 
-void exit(int ret)
+[[noreturn]] void smtp_exit(int ret)
 {
   timespec time_used{};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
@@ -439,7 +440,7 @@ struct action<bogus_cmd_short> {
   {
     LOG(INFO) << "bogus_cmd_short";
     if (!ctx.session.cmd_unrecognized(in.string())) {
-      exit(EXIT_TOO_MANY_BAD_CMDS);
+      smtp_exit(EXIT_TOO_MANY_BAD_CMDS);
     }
   }
 };
@@ -451,7 +452,7 @@ struct action<bogus_cmd_long> {
   {
     LOG(INFO) << "bogus_cmd_long";
     if (!ctx.session.cmd_unrecognized(in.string())) {
-      exit(EXIT_TOO_MANY_BAD_CMDS);
+      smtp_exit(EXIT_TOO_MANY_BAD_CMDS);
     }
   }
 };
@@ -713,7 +714,7 @@ struct data_action<data_not_end> {
   static void apply0(Ctx& ctx)
   {
     ctx.session.bare_lf();
-    exit(EXIT_BARE_LF);
+    smtp_exit(EXIT_BARE_LF);
   }
 };
 
@@ -722,7 +723,7 @@ struct data_action<data_also_not_end> {
   static void apply0(Ctx& ctx)
   {
     ctx.session.bare_lf();
-    exit(EXIT_BARE_LF);
+    smtp_exit(EXIT_BARE_LF);
   }
 };
 
@@ -809,29 +810,28 @@ struct action<starttls> {
 
 template <>
 struct action<quit> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  [[noreturn]] static void apply0(Ctx& ctx)
   {
     ctx.session.quit();
-    exit(EXIT_SUCCESS);
+    smtp_exit(EXIT_SUCCESS);
   }
 };
 
 template <>
 struct action<auth> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  [[noreturn]] static void apply0(Ctx& ctx)
   {
     ctx.session.auth();
-    exit(EXIT_AUTH_FAIL);
+    smtp_exit(EXIT_AUTH_FAIL);
   }
 };
 } // namespace RFC5321
 
-void timeout(int signum) __attribute__((noreturn));
-void timeout(int signum)
+[[noreturn]] void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
   write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
-  exit(EXIT_TIME_OUT);
+  smtp_exit(EXIT_TIME_OUT);
 }
 
 static volatile bool sig_quit{false};
@@ -925,7 +925,7 @@ struct server {
   std::string remote_string;
 };
 
-/*volatile*/ std::unordered_map<pid_t, server> servers;
+std::unordered_map<pid_t, server> servers;
 
 int wait_any(int* wstat)
 {
@@ -945,13 +945,13 @@ void sigchild(int signum)
   int   save_errno = errno;
 
   for (;;) {
-    LOG(INFO) << "sigchild, about to waitpid";
+    // LOG(INFO) << "sigchild, about to waitpid";
     google::FlushLogFiles(google::INFO);
 
     pid = wait_any(&status);
-    LOG(INFO) << "waitpid returned " << pid;
+    // LOG(INFO) << "waitpid returned " << pid;
 
-    if (pid == -1)
+    if ((pid == -1) && (errno != ECHILD))
       LOG(INFO) << strerror(errno);
 
     google::FlushLogFiles(google::INFO);
@@ -960,14 +960,20 @@ void sigchild(int signum)
       break;
 
     try {
-      /*volatile auto& server = servers.at(pid); */
-
-      if (WIFEXITED(status))
-        LOG(INFO) << pid << ": exit status " << std::hex << WEXITSTATUS(status);
-      else if (WIFSIGNALED(status))
-        LOG(INFO) << pid << ": exit signal " << std::hex << WTERMSIG(status);
-      else
+      auto srv = servers.at(pid);
+      // srv.service_ptr
+      if (WIFEXITED(status)) {
+        auto exit_status = WEXITSTATUS(status);
+        // LOG(INFO) << pid << ": exit status " << std::hex <<
+        // WEXITSTATUS(status);
+      }
+      else if (WIFSIGNALED(status)) {
+        auto exit_signal = WTERMSIG(status);
+        // LOG(INFO) << pid << ": exit signal " << std::hex << WTERMSIG(status);
+      }
+      else {
         LOG(INFO) << pid << ": not status or signal";
+      }
 
       google::FlushLogFiles(google::INFO);
 
@@ -1012,13 +1018,14 @@ char const* pro_to_str(int pro)
 
 int server()
 {
-  LOG(INFO) << "running server";
+  // LOG(INFO) << "running server";
 
   struct sigaction sact{};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
 
   sact.sa_handler = sigquit;
   PCHECK(sigaction(SIGQUIT, &sact, nullptr) == 0);
+  PCHECK(sigaction(SIGINT, &sact, nullptr) == 0);
 
   sact.sa_handler = sigchild;
   PCHECK(sigaction(SIGCHLD, &sact, nullptr) == 0);
@@ -1076,6 +1083,7 @@ int server()
     default: LOG(FATAL) << "Unknown addrlen " << rp->ai_addrlen;
     }
 
+    /*
     LOG(INFO) << "services.back().ctrl_address == "
               << services.back().ctrl_address;
 
@@ -1091,6 +1099,7 @@ int server()
               << typ_to_str(services.back().socktype);
     LOG(INFO) << "services.back().protocol     == "
               << pro_to_str(services.back().protocol);
+    */
 
     services.back().fd =
         socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
@@ -1112,9 +1121,9 @@ int server()
     PCHECK(listen(services.back().fd, 10) == 0);
 
     FD_SET(services.back().fd, &allsock);
-    LOG(INFO) << "added " << services.back().fd
-              << " to listen set: " << services.back().canonname << " ["
-              << services.back().ctrl_address << "]";
+    LOG(INFO) << "listening (fd=" << services.back().fd << ") on "
+              << services.back().canonname << " ["
+              << services.back().ctrl_address << "]:" << services.back().port;
 
     maxsock = std::max(services.back().fd, maxsock);
   }
@@ -1124,10 +1133,10 @@ int server()
     LOG(INFO) << "no sockets to listen on";
     return 0;
   }
-  LOG(INFO) << "maxsock == " << maxsock;
+  // LOG(INFO) << "maxsock == " << maxsock;
 
   while (!sig_quit) {
-    LOG(INFO) << "waiting for connections…";
+    LOG(INFO) << "server waiting for connections…";
     google::FlushLogFiles(google::INFO);
 
     auto readable     = allsock;
@@ -1141,20 +1150,20 @@ int server()
       }
       continue;
     }
-    LOG(INFO) << "select() returned " << ready_fd_cnt << " ready fds";
+    // LOG(INFO) << "select() returned " << ready_fd_cnt << " ready fds";
 
     for (auto service : services) {
       if (service.fd == -1 || !FD_ISSET(service.fd, &readable))
         continue;
 
-      LOG(INFO) << "ready fd=" << service.fd;
+      // LOG(INFO) << "ready fd=" << service.fd;
 
       int accepted_fd = -1;
 
       struct server srv;
       srv.service_ptr = &service;
 
-      srv.remote_addr_size = sizeof(srv.remote.addr);
+      srv.remote_addr_size = sizeof(srv.remote.addr_storage);
       accepted_fd = accept(service.fd, &srv.remote.addr, &srv.remote_addr_size);
       if (accepted_fd < 0) {
         PCHECK(errno == EINTR) << "accept for " << service.fd;
@@ -1167,7 +1176,7 @@ int server()
         CHECK_EQ(service.family, AF_INET);
         struct sockaddr_in* sin =
             reinterpret_cast<struct sockaddr_in*>(&srv.remote.addr);
-        PCHECK(inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)));
+        PCHECK(inet_ntop(service.family, &sin->sin_addr, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
@@ -1176,12 +1185,13 @@ int server()
         CHECK_EQ(service.family, AF_INET6);
         struct sockaddr_in6* sin6 =
             reinterpret_cast<struct sockaddr_in6*>(&srv.remote.addr);
-        PCHECK(inet_ntop(AF_INET, &sin6->sin6_addr, str, sizeof(str)));
+        PCHECK(inet_ntop(service.family, &sin6->sin6_addr, str, sizeof(str)));
         srv.remote_string = str;
         break;
       }
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
+
       LOG(INFO) << "accepted " << accepted_fd << " for " << srv.remote_string;
 
       LOG(INFO) << "about to fork";
@@ -1215,10 +1225,16 @@ int server()
         user = "gene";
 
       uid_t ruid, euid, suid;
-      gid_t rgid, egid, sgid;
-
       PCHECK(getresuid(&ruid, &euid, &suid) == 0);
-      PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
+
+      // gid_t rgid, egid, sgid;
+      // PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
+
+      if (ruid == 0) {
+        // run by root, ensure groups vector gets trashed
+        gid_t gid = getgid();
+        setgroups(1, &gid);
+      }
 
       struct passwd* pwd = getpwnam(user);
       PCHECK(pwd != nullptr) << "no such user " << user;
