@@ -37,11 +37,17 @@ public:
       int                       fd_in     = STDIN_FILENO,
       int                       fd_out    = STDOUT_FILENO);
 
-  void greeting();
-  void ehlo(std::string_view client_identity) { lo_("EHLO", client_identity); }
-  void helo(std::string_view client_identity) { lo_("HELO", client_identity); }
-  void mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
-  void rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
+  bool greeting();
+  bool ehlo(std::string_view client_identity)
+  {
+    return lo_("EHLO", client_identity);
+  }
+  bool helo(std::string_view client_identity)
+  {
+    return lo_("HELO", client_identity);
+  }
+  bool mail_from(Mailbox&& reverse_path, parameters_t const& parameters);
+  bool rcpt_to(Mailbox&& forward_path, parameters_t const& parameters);
 
   bool msg_new();
   bool msg_write(char const* s, std::streamsize count);
@@ -61,14 +67,14 @@ public:
   void noop(std::string_view str);
   void vrfy(std::string_view str);
   void help(std::string_view str);
-  void quit() __attribute__((noreturn));
-  void auth() __attribute__((noreturn));
+  void quit();
+  void auth();
   void error(std::string_view log_msg);
-  void cmd_unrecognized(std::string_view log_msg);
-  void bare_lf() __attribute__((noreturn));
+  bool cmd_unrecognized(std::string_view log_msg);
+  void bare_lf();
 
-  void max_out() __attribute__((noreturn));
-  void time_out() __attribute__((noreturn));
+  void max_out();
+  void time_out();
   void starttls();
 
   bool          maxed_out() { return sock_.maxed_out(); }
@@ -94,9 +100,9 @@ private:
   std::string added_headers_(MessageStore const& msg);
 
   std::ostream& out_() { return sock_.out(); }
-  void          lo_(char const* verb, std::string_view client_identity);
+  bool          lo_(char const* verb, std::string_view client_identity);
 
-  void bad_host_(char const* msg) const __attribute__((noreturn));
+  void bad_host_(char const* msg) const;
 
   std::string const& server_id_() const { return server_identity_.ascii(); }
 
@@ -126,8 +132,6 @@ private:
   // {
   //   return forward_path_.empty() && !fwd_path_.empty();
   // }
-
-  void exit_() const __attribute__((noreturn));
 
 private:
   fs::path      config_path_;

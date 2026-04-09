@@ -45,12 +45,26 @@ constexpr auto smtp_max_str_length =
 enum {
   EXIT_NOERROR = EXIT_SUCCESS,
   EXIT_        = 32,      // Sort all the others past this one.
+  EXIT_AUTH_FAIL,         // We don't support AUTH.
+  EXIT_BARE_LF,           // Hard fail on bare '\n'.
   EXIT_EXCPETION,         // Unknown exception.
   EXIT_MAXED_OUT,         // Too much data.
   EXIT_SMTP_SYNTAX_ERROR, // Some protocol parser error.
   EXIT_TIME_OUT,          // Too much time overall.
+  EXIT_TOO_MANY_BAD_CMDS, // Eventually we cut them off.
   EXIT_IO_TIME_OUT        // Too much time waiting for read or write.
 };
+
+void exit(int ret)
+{
+  timespec time_used{};
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
+
+  LOG(INFO) << "CPU time " << time_used.tv_sec << "." << std::setw(9)
+            << std::setfill('0') << time_used.tv_nsec << " seconds";
+
+  std::exit(ret);
+}
 
 using namespace tao::pegtl;
 using namespace tao::pegtl::abnf;
@@ -424,7 +438,9 @@ struct action<bogus_cmd_short> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(INFO) << "bogus_cmd_short";
-    ctx.session.cmd_unrecognized(in.string());
+    if (!ctx.session.cmd_unrecognized(in.string())) {
+      exit(EXIT_TOO_MANY_BAD_CMDS);
+    }
   }
 };
 
@@ -434,7 +450,9 @@ struct action<bogus_cmd_long> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(INFO) << "bogus_cmd_long";
-    ctx.session.cmd_unrecognized(in.string());
+    if (!ctx.session.cmd_unrecognized(in.string())) {
+      exit(EXIT_TOO_MANY_BAD_CMDS);
+    }
   }
 };
 
@@ -692,17 +710,19 @@ struct data_action<data_long> {
 
 template <>
 struct data_action<data_not_end> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  static void apply0(Ctx& ctx)
   {
     ctx.session.bare_lf();
+    exit(EXIT_BARE_LF);
   }
 };
 
 template <>
 struct data_action<data_also_not_end> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  static void apply0(Ctx& ctx)
   {
     ctx.session.bare_lf();
+    exit(EXIT_BARE_LF);
   }
 };
 
@@ -789,12 +809,20 @@ struct action<starttls> {
 
 template <>
 struct action<quit> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.quit(); }
+  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  {
+    ctx.session.quit();
+    exit(EXIT_SUCCESS);
+  }
 };
 
 template <>
 struct action<auth> {
-  static void apply0(Ctx& ctx) __attribute__((noreturn)) { ctx.session.auth(); }
+  static void apply0(Ctx& ctx) __attribute__((noreturn))
+  {
+    ctx.session.auth();
+    exit(EXIT_AUTH_FAIL);
+  }
 };
 } // namespace RFC5321
 
@@ -803,7 +831,7 @@ void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
   write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
-  _Exit(EXIT_TIME_OUT);
+  exit(EXIT_TIME_OUT);
 }
 
 static volatile bool sig_quit{false};
@@ -826,7 +854,7 @@ int session()
 
   std::unique_ptr<RFC5321::Ctx> ctx;
   try {
-    auto const                    read_hook{[&ctx]() { ctx->session.flush(); }};
+    auto const read_hook{[&ctx]() { ctx->session.flush(); }};
     ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
     ctx->session.greeting();

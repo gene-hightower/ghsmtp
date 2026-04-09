@@ -256,13 +256,13 @@ void Session::max_msg_size(size_t max)
 void Session::bad_host_(char const* msg) const
 {
   if (sock_.has_peername()) {
-    LOG(WARNING) << "bad host [" << sock_.them_c_str() << "] " << msg;
+    LOG(ERROR) << "bad host [" << sock_.them_c_str() << "] " << msg;
     // On my systems, this pattern triggers a fail2ban rule that
     // blocks connections from this IP address on port 25 for a few
     // days.  See <https://www.fail2ban.org/> for more info.
-    syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(), msg);
+    // syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
+    // msg);
   }
-  exit_();
 }
 
 void Session::reset_()
@@ -296,7 +296,7 @@ void Session::reset_()
 // Return codes from connection establishment are 220 or 554, according
 // to RFC 5321.  That's it.
 
-void Session::greeting()
+bool Session::greeting()
 {
   CHECK(state_ == xact_step::helo);
 
@@ -307,6 +307,7 @@ void Session::greeting()
     if (!verify_ip_address_(error_msg)) {
       LOG(INFO) << error_msg;
       bad_host_(error_msg.c_str());
+      return false;
     }
 
     /******************************************************************
@@ -342,6 +343,7 @@ void Session::greeting()
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         LOG(INFO) << "input before any greeting from " << client_;
         bad_host_("input before any greeting");
+        return false;
       }
       // Give a half greeting and wait again.
       out_() << "220-" << server_id_() << " ESMTP slowstart - ghsmtp\r\n"
@@ -350,6 +352,7 @@ void Session::greeting()
         out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
         LOG(INFO) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
+        return false;
       }
       /*
         <https://www.rfc-editor.org/rfc/rfc5321#section-4.2>
@@ -384,6 +387,8 @@ void Session::greeting()
   if ((!FLAGS_immortal) && (getenv("GHSMTP_IMMORTAL") == nullptr)) {
     alarm(2 * 60); // initial alarm
   }
+
+  return true;
 }
 
 void Session::flush() { out_() << std::flush; }
@@ -404,7 +409,7 @@ void Session::check_for_pipeline_error_(std::string_view verb)
   }
 }
 
-void Session::lo_(char const* verb, std::string_view client_identity_str)
+bool Session::lo_(char const* verb, std::string_view client_identity_str)
 {
   Domain client_identity{client_identity_str};
 
@@ -418,6 +423,7 @@ void Session::lo_(char const* verb, std::string_view client_identity_str)
     if (!verify_client_(client_identity_, error_msg)) {
       LOG(INFO) << "client identity blocked: " << error_msg;
       bad_host_(error_msg.c_str());
+      return false;
     }
   }
 
@@ -498,9 +504,11 @@ void Session::lo_(char const* verb, std::string_view client_identity_str)
   else {
     LOG(INFO) << verb << " " << client_identity_;
   }
+
+  return true;
 }
 
-void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
+bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 {
   check_for_pipeline_error_("MAIL FROM");
 
@@ -509,28 +517,28 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'MAIL FROM' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::mail: break;
   case xact_step::rcpt:
     out_() << "503 5.5.1 sequence error, expecting RCPT\r\n" << std::flush;
     LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::data:
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting DATA/BDAT\r\n" << std::flush;
     LOG(WARNING) << "nested MAIL command"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::rset:
     out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   }
 
   if (!verify_from_params_(parameters)) {
-    return;
+    return true;
   }
 
   if (!smtputf8_ && !is_ascii(reverse_path.local_part())) {
@@ -542,6 +550,7 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   if (!verify_sender_(reverse_path, error_msg)) {
     LOG(INFO) << "verify sender failed: " << error_msg;
     bad_host_(error_msg.c_str());
+    return false;
   }
 
   reverse_path_ = std::move(reverse_path);
@@ -561,9 +570,10 @@ void Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
 
   state_ = xact_step::rcpt;
+  return true;
 }
 
-void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
+bool Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 {
   check_for_pipeline_error_("RCPT TO");
 
@@ -572,31 +582,33 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
     out_() << "503 5.5.1 sequence error, expecting HELO/EHLO\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before HELO/EHLO"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::mail:
     out_() << "503 5.5.1 sequence error, expecting MAIL\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' before 'MAIL FROM'"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::rcpt:
   case xact_step::data: break;
   case xact_step::bdat:
     out_() << "503 5.5.1 sequence error, expecting BDAT\r\n" << std::flush;
     LOG(WARNING) << "'RCPT TO' during BDAT transfer"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   case xact_step::rset:
     out_() << "503 5.5.1 sequence error, expecting RSET\r\n" << std::flush;
     LOG(WARNING) << "error state must be cleared with a RSET"
                  << (sock_.has_peername() ? " from " : "") << client_;
-    return;
+    return true;
   }
 
+  // Parameter errors are all non-fatal.
+
   if (!verify_rcpt_params_(parameters))
-    return;
+    return true;
 
   if (!verify_recipient_(forward_path))
-    return;
+    return true;
 
   // V6 spam...
   if (IP6::is_address(sock_.them_c_str()) &&
@@ -607,7 +619,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
                                         client_fcrdns_[0].ascii());
     LOG(WARNING) << error_msg;
     out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
-    return;
+    return true;
   }
 
   if (!smtputf8_ && !is_ascii(forward_path.local_part())) {
@@ -618,7 +630,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (forward_path_.size() >= Config::max_recipients_per_message) {
     out_() << "452 4.5.3 too many recipients\r\n" << std::flush;
     LOG(WARNING) << "too many recipients <" << forward_path << ">";
-    return;
+    return true;
   }
   // no check for dups, postfix doesn't
   forward_path_.emplace_back(std::move(forward_path));
@@ -631,6 +643,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   out_() << "250 2.1.5 RCPT TO OK\r\n";
 
   state_ = xact_step::data;
+
+  return true;
 }
 
 // The headers Return-Path:, Received-SPF:, and Received: are returned
@@ -1362,14 +1376,12 @@ void Session::quit()
   // last_in_group_("QUIT");
   out_() << "221 2.0.0 closing connection\r\n" << std::flush;
   LOG(INFO) << "QUIT";
-  exit_();
 }
 
 void Session::auth()
 {
   out_() << "454 4.7.0 authentication failure\r\n" << std::flush;
   LOG(INFO) << "AUTH";
-  bad_host_("auth");
 }
 
 void Session::error(std::string_view log_msg)
@@ -1386,7 +1398,7 @@ std::string_view remove_crlf(std::string_view str)
   return str;
 }
 
-void Session::cmd_unrecognized(std::string_view cmd)
+bool Session::cmd_unrecognized(std::string_view cmd)
 {
   constexpr std::string_view helo{"HELO "};
   constexpr std::string_view ehlo{"EHLO "};
@@ -1429,10 +1441,12 @@ void Session::cmd_unrecognized(std::string_view cmd)
   if (++n_unrecognized_cmds_ >= Config::max_unrecognized_cmds) {
     out_() << ", failure count exceeds limit\r\n" << std::flush;
     LOG(ERROR) << n_unrecognized_cmds_ << " unrecognized commands is too many";
-    exit_();
+    return false;
   }
 
   out_() << "\r\n" << std::flush;
+
+  return true;
 }
 
 void Session::bare_lf()
@@ -1440,14 +1454,12 @@ void Session::bare_lf()
   // Error code used by Office 365.
   out_() << "554 5.6.11 bare LF\r\n" << std::flush;
   LOG(WARNING) << "bare LF";
-  exit_();
 }
 
 void Session::max_out()
 {
   out_() << "552 5.3.4 message size limit exceeded\r\n" << std::flush;
   LOG(WARNING) << "message size maxed out";
-  exit_();
 }
 
 void Session::time_out()
@@ -1455,7 +1467,6 @@ void Session::time_out()
   out_() << "421 4.4.2 time-out\r\n" << std::flush;
   LOG(WARNING) << "time-out" << (sock_.has_peername() ? " from " : "")
                << client_;
-  exit_();
 }
 
 void Session::starttls()
@@ -1481,19 +1492,6 @@ void Session::starttls()
       LOG(INFO) << "failed STARTTLS";
     }
   }
-}
-
-void Session::exit_() const
-{
-  // sock_.log_totals();
-
-  timespec time_used{};
-  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
-
-  LOG(INFO) << "CPU time " << time_used.tv_sec << "." << std::setw(9)
-            << std::setfill('0') << time_used.tv_nsec << " seconds";
-
-  std::exit(EXIT_SUCCESS);
 }
 
 /////////////////////////////////////////////////////////////////////////////
