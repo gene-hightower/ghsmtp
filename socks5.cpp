@@ -291,8 +291,8 @@ int main(int argc, char* argv[])
 
   LOG(INFO) << "starting TLS";
 
-  sock.starttls_client(config_dir, nullptr, domain, tlsa_rrs,
-                       !tlsa_rrs.empty(), true);
+  sock.tls_client(config_dir, nullptr, domain, tlsa_rrs, !tlsa_rrs.empty(),
+                  true);
 
   sock.out() << "GET / HTTP/1.1" CRLF "Host: " << domain << CRLF CRLF
              << std::flush;

@@ -26,19 +26,19 @@ public:
   explicit TLS(std::function<void(void)> read_hook);
   ~TLS();
 
-  bool starttls_client(fs::path                  config_path,
-                       int                       fd_in,
-                       int                       fd_out,
-                       char const*               client_name,
-                       char const*               server_name,
-                       DNS::RR_collection const& tlsa_rrs,
-                       bool                      enforce_dane,
-                       bool                      log_cert_info,
-                       std::chrono::milliseconds timeout);
-  bool starttls_server(fs::path                  config_path,
-                       int                       fd_in,
-                       int                       fd_out,
-                       std::chrono::milliseconds timeout);
+  bool tls_client(fs::path                  config_path,
+                  int                       fd_in,
+                  int                       fd_out,
+                  char const*               client_name,
+                  char const*               server_name,
+                  DNS::RR_collection const& tlsa_rrs,
+                  bool                      enforce_dane,
+                  bool                      log_cert_info,
+                  std::chrono::milliseconds timeout);
+  bool tls_server(fs::path                  config_path,
+                  int                       fd_in,
+                  int                       fd_out,
+                  std::chrono::milliseconds timeout);
 
   bool pending() const { return SSL_pending(ssl_) > 0; }
 

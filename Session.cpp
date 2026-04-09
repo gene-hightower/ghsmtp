@@ -1472,7 +1472,7 @@ void Session::starttls()
   }
   else {
     out_() << "220 2.0.0 STARTTLS OK\r\n" << std::flush;
-    if (sock_.starttls_server(config_path_)) {
+    if (sock_.tls_server(config_path_)) {
       reset_();
       max_msg_size(Config::max_msg_size_bro);
       LOG(INFO) << "STARTTLS " << sock_.tls_info();

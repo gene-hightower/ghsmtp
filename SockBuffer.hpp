@@ -54,19 +54,19 @@ public:
   std::streamsize read(char* s, std::streamsize n);
   std::streamsize write(const char* s, std::streamsize n);
 
-  bool starttls_server(fs::path config_path)
+  bool tls_server(fs::path config_path)
   {
-    return tls_active_ = tls_.starttls_server(config_path, fd_in_, fd_out_,
-                                              starttls_timeout_);
+    return tls_active_ =
+               tls_.tls_server(config_path, fd_in_, fd_out_, starttls_timeout_);
   }
-  bool starttls_client(fs::path                  config_path,
-                       char const*               client_name,
-                       char const*               server_name,
-                       DNS::RR_collection const& tlsa_rrs,
-                       bool                      enforce_dane,
-                       bool                      log_cert_info)
+  bool tls_client(fs::path                  config_path,
+                  char const*               client_name,
+                  char const*               server_name,
+                  DNS::RR_collection const& tlsa_rrs,
+                  bool                      enforce_dane,
+                  bool                      log_cert_info)
   {
-    return tls_active_ = tls_.starttls_client(
+    return tls_active_ = tls_.tls_client(
                config_path, fd_in_, fd_out_, client_name, server_name, tlsa_rrs,
                enforce_dane, log_cert_info, starttls_timeout_);
   }

@@ -228,7 +228,7 @@ Resolver::Resolver(fs::path config_path)
 
       if (port != 53) {
         DNS::RR_collection tlsa_rrs; // empty FIXME!
-        ns_sock_->starttls_client(config_path, nullptr, nameserver.host,
+        ns_sock_->tls_client(config_path, nullptr, nameserver.host,
                                   tlsa_rrs, false, false);
         if (ns_sock_->verified()) {
           if (ns_sock_->verified_peername() != nameserver.host) {

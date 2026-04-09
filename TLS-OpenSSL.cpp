@@ -165,15 +165,15 @@ static int ssl_servername_callback(SSL* s, int* ad, void* arg)
   return SSL_TLSEXT_ERR_OK;
 }
 
-bool TLS::starttls_client(fs::path                  config_path,
-                          int                       fd_in,
-                          int                       fd_out,
-                          char const*               client_name,
-                          char const*               server_name,
-                          DNS::RR_collection const& tlsa_rrs,
-                          bool                      enforce_dane,
-                          bool                      log_cert_info,
-                          std::chrono::milliseconds timeout)
+bool TLS::tls_client(fs::path                  config_path,
+                     int                       fd_in,
+                     int                       fd_out,
+                     char const*               client_name,
+                     char const*               server_name,
+                     DNS::RR_collection const& tlsa_rrs,
+                     bool                      enforce_dane,
+                     bool                      log_cert_info,
+                     std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
   SSL_library_init();
@@ -492,10 +492,10 @@ bool TLS::starttls_client(fs::path                  config_path,
   return true;
 }
 
-bool TLS::starttls_server(fs::path                  config_path,
-                          int                       fd_in,
-                          int                       fd_out,
-                          std::chrono::milliseconds timeout)
+bool TLS::tls_server(fs::path                  config_path,
+                     int                       fd_in,
+                     int                       fd_out,
+                     std::chrono::milliseconds timeout)
 {
   SSL_load_error_strings();
   SSL_library_init();
@@ -687,7 +687,7 @@ bool TLS::starttls_server(fs::path                  config_path,
 
     auto const now = std::chrono::system_clock::now();
 
-    CHECK(now < (start + timeout)) << "starttls timed out";
+    CHECK(now < (start + timeout)) << "tls timed out";
 
     auto const time_left =
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -697,13 +697,13 @@ bool TLS::starttls_server(fs::path                  config_path,
     switch (n_get_err = SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
       CHECK(POSIX::input_ready(fd_in, time_left))
-          << "starttls timed out on input_ready";
+          << "tls timed out on input_ready";
       ERR_clear_error();
       continue; // try SSL_accept again
 
     case SSL_ERROR_WANT_WRITE:
       CHECK(POSIX::output_ready(fd_out, time_left))
-          << "starttls timed out on output_ready";
+          << "tls timed out on output_ready";
       ERR_clear_error();
       continue; // try SSL_accept again
 

@@ -44,19 +44,19 @@ public:
   std::istream& in() { return iostream_; }
   std::ostream& out() { return iostream_; }
 
-  bool starttls_server(fs::path config_path)
+  bool tls_server(fs::path config_path)
   {
-    return iostream_->starttls_server(config_path);
+    return iostream_->tls_server(config_path);
   }
-  bool starttls_client(fs::path                  config_path,
-                       char const*               client_name,
-                       char const*               server_name,
-                       DNS::RR_collection const& tlsa_rrs,
-                       bool                      enforce_dane,
-                       bool                      log_cert_info)
+  bool tls_client(fs::path                  config_path,
+                  char const*               client_name,
+                  char const*               server_name,
+                  DNS::RR_collection const& tlsa_rrs,
+                  bool                      enforce_dane,
+                  bool                      log_cert_info)
   {
-    return iostream_->starttls_client(config_path, client_name, server_name,
-                                      tlsa_rrs, enforce_dane, log_cert_info);
+    return iostream_->tls_client(config_path, client_name, server_name,
+                                 tlsa_rrs, enforce_dane, log_cert_info);
   }
   bool        tls() { return iostream_->tls(); }
   std::string tls_info() { return iostream_->tls_info(); }

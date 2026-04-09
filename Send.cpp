@@ -255,12 +255,10 @@ struct auth_login_password
 // clang-format on
 
 template <typename Rule>
-struct inaction : nothing<Rule> {
-};
+struct inaction : nothing<Rule> {};
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<server_id> {
@@ -578,8 +576,8 @@ open_session(DNS::Resolver& res,
     }
 
     DNS::RR_collection tlsa_rrs; // FIXME
-    if (!conn->sock.starttls_client(config_path, sender.ascii().c_str(),
-                                    mx.ascii().c_str(), tlsa_rrs, false)) {
+    if (!conn->sock.tls_client(config_path, sender.ascii().c_str(),
+                               mx.ascii().c_str(), tlsa_rrs, false)) {
       LOG(WARNING) << "failed to STARTTLS";
       close(fd);
       return {};
