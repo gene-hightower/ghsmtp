@@ -872,6 +872,17 @@ int session()
 
     if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx))
       ret = EXIT_SMTP_SYNTAX_ERROR;
+    else if (ctx->session.maxed_out()) {
+      ctx->session.max_out();
+      ret = EXIT_MAXED_OUT;
+    }
+    else if (ctx->session.timed_out()) {
+      ctx->session.time_out();
+      ret = EXIT_TIME_OUT;
+    }
+    // else {
+    //   ctx->session.error("session end without QUIT command from client");
+    // }
   }
   catch (std::runtime_error const& e) {
     LOG(WARNING) << e.what();
@@ -882,17 +893,6 @@ int session()
     ret = EXIT_EXCPETION;
   }
 
-  if (ctx->session.maxed_out()) {
-    ctx->session.max_out();
-    ret = EXIT_MAXED_OUT;
-  }
-  else if (ctx->session.timed_out()) {
-    ctx->session.time_out();
-    ret = EXIT_TIME_OUT;
-  }
-  // else {
-  //   ctx->session.error("session end without QUIT command from client");
-  // }
 
   return ret;
 }
