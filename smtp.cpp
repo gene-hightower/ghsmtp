@@ -538,6 +538,7 @@ struct action<helo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
+    CHECK_GT(end(in) - begin(in), 5);
     auto const b = begin(in) + 5; // +5 for the length of "HELO "
     auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
     if (!ctx.session.helo(std::string_view(b, e - b))) {
@@ -551,6 +552,7 @@ struct action<ehlo> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
+    CHECK_GT(end(in) - begin(in), 5);
     auto const b = begin(in) + 5; // +5 for the length of "EHLO "
     auto const e = std::find(b, end(in) - 2, ' '); // -2 for the CRLF
     if (!ctx.session.ehlo(std::string_view(b, e - b))) {
@@ -773,6 +775,7 @@ struct action<rset> {
 template <typename Input>
 std::string_view get_string_view(Input const& in)
 {
+  CHECK_GT(end(in) - begin(in), 4);
   auto const b   = begin(in) + 4;
   auto const len = end(in) - b;
   auto       str = std::string_view(b, len);
@@ -892,7 +895,6 @@ int session()
     LOG(WARNING) << e.what();
     ret = EXIT_EXCPETION;
   }
-
 
   return ret;
 }
