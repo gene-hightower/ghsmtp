@@ -157,14 +157,14 @@ char const* uribls[]{
 };
 */
 
-constexpr auto greeting_wait              = std::chrono::seconds{1};
+constexpr auto greeting_wait              = std::chrono::seconds(1);
 constexpr int  max_recipients_per_message = 100;
 constexpr int  max_unrecognized_cmds      = 20;
 
 // Read timeout value gleaned from RFC-1123 section 5.3.2 and RFC-5321
 // section 4.5.3.2.7.
-constexpr auto read_timeout  = std::chrono::minutes{5};
-constexpr auto write_timeout = std::chrono::seconds{30};
+constexpr auto read_timeout  = std::chrono::minutes(5);
+constexpr auto write_timeout = std::chrono::seconds(30);
 } // namespace Config
 
 DEFINE_bool(immortal, false, "don't set process timout");
@@ -212,12 +212,12 @@ Session::Session(fs::path                  config_path,
     }
   }
 
-  server_identity_ = Domain{[this] {
-    auto const id_from_env{getenv("GHSMTP_SERVER_ID")};
+  server_identity_ = Domain([this] {
+    auto const id_from_env = getenv("GHSMTP_SERVER_ID");
     if (id_from_env)
-      return std::string{id_from_env};
+      return std::string(id_from_env);
 
-    auto const hostname{osutil::get_hostname()};
+    auto const hostname = osutil::get_hostname();
     if (hostname.find('.') != std::string::npos)
       return hostname;
 
@@ -233,7 +233,7 @@ Session::Session(fs::path                  config_path,
 
     LOG(FATAL) << "can't determine my server ID, set GHSMTP_SERVER_ID maybe";
     return ""s;
-  }()};
+  }());
 
   // send_.set_sender(server_identity_);
 
@@ -411,7 +411,7 @@ void Session::check_for_pipeline_error_(std::string_view verb)
 
 bool Session::lo_(char const* verb, std::string_view client_identity_str)
 {
-  Domain client_identity{client_identity_str};
+  Domain client_identity(client_identity_str);
 
   last_in_group_(verb);
   reset_();
@@ -695,7 +695,7 @@ std::string Session::added_headers_(MessageStore const& msg)
     // for (auto i = 1u; i < forward_path_.size(); ++i)
     //   fmt::format_to(headers, ",\r\n\t   <{}>", forward_path_[i]);
   }
-  std::string const tls_info{sock_.tls_info()};
+  std::string const tls_info = sock_.tls_info();
   if (tls_info.length()) {
     fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
   }
@@ -746,7 +746,8 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
                                        spf_sender_domain_.utf8()));
     }
     else {
-      auto tld_dom{tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
+      auto const tld_dom =
+          tld_db_.get_registered_domain(spf_sender_domain_.ascii());
       if (tld_dom && allow_.contains(tld_dom)) {
         why_ham.emplace_back(fmt::format(
             "SPF sender registered domain ({}) is allowed", tld_dom));
@@ -850,7 +851,7 @@ bool Session::msg_new()
   try {
     msg_->open(server_id_(), FLAGS_max_write,
                folder(status, forward_path_, reverse_path_));
-    auto const hdrs{added_headers_(*(msg_.get()))};
+    auto const hdrs = added_headers_(*(msg_.get()));
     msg_->write(hdrs);
 
     // fmt::memory_buffer spam_status;
@@ -1397,40 +1398,40 @@ std::string_view remove_crlf(std::string_view str)
 
 bool Session::cmd_unrecognized(std::string_view cmd)
 {
-  constexpr std::string_view helo{"HELO "};
-  constexpr std::string_view ehlo{"EHLO "};
-  constexpr std::string_view mail_from{"MAIL FROM:"};
-  constexpr std::string_view rcpt_to{"RCPT TO:"};
+  constexpr std::string_view helo("HELO ");
+  constexpr std::string_view ehlo("EHLO ");
+  constexpr std::string_view mail_from("MAIL FROM:");
+  constexpr std::string_view rcpt_to("RCPT TO:");
 
   if (cmd.length() < 6) {
-    auto const escaped{esc(cmd)};
+    auto const escaped = esc(cmd);
     LOG(WARNING) << "command unrecognized (line too short): \"" << escaped
                  << "\"";
     out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"";
   }
   else if (cmd.length() > 1000) {
-    auto const escaped{esc(cmd).substr(0, 100)};
+    auto const escaped = esc(cmd).substr(0, 100);
     LOG(WARNING) << "command unrecognized (line too long): \"" << escaped
                  << "\"...";
     out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"...";
   }
   else if (istarts_with(cmd, helo) || istarts_with(cmd, ehlo)) {
-    auto const escaped_dom{esc(remove_crlf(cmd.substr(ehlo.size())))};
+    auto const escaped_dom = esc(remove_crlf(cmd.substr(ehlo.size())));
     LOG(WARNING) << "invalid domain: " << escaped_dom;
     out_() << "554 5.7.1 bad HELO/EHLO domain: " << escaped_dom;
   }
   else if (istarts_with(cmd, mail_from)) {
-    auto const escaped_addr{esc(remove_crlf(cmd.substr(mail_from.size())))};
+    auto const escaped_addr = esc(remove_crlf(cmd.substr(mail_from.size())));
     LOG(WARNING) << "invalid MAIL FROM address: " << escaped_addr;
     out_() << "501 5.1.7 bad sender address: " << escaped_addr;
   }
   else if (istarts_with(cmd, rcpt_to)) {
-    auto const escaped_addr{esc(remove_crlf(cmd.substr(rcpt_to.size())))};
+    auto const escaped_addr = esc(remove_crlf(cmd.substr(rcpt_to.size())));
     LOG(WARNING) << "invalid RCPT TO address: " << escaped_addr;
     out_() << "501 5.1.3 bad recipient address: " << escaped_addr;
   }
   else {
-    auto const escaped{esc(cmd)};
+    auto const escaped = esc(cmd);
     LOG(WARNING) << "command unrecognized: \"" << escaped << "\"";
     out_() << "500 5.5.1 command unrecognized: \"" << escaped << "\"";
   }
@@ -1541,7 +1542,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         fcrdns_allowed_ = true;
         return true;
       }
-      auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
+      auto const tld = tld_db_.get_registered_domain(client_fcrdns.ascii());
       if (tld) {
         if (allow_.contains(tld)) {
           LOG(INFO) << "FCrDNS registered domain " << tld << " allowed";
@@ -1559,7 +1560,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         return false;
       }
 
-      auto const tld{tld_db_.get_registered_domain(client_fcrdns.ascii())};
+      auto const tld = tld_db_.get_registered_domain(client_fcrdns.ascii());
       if (tld) {
         if (block_.contains(tld)) {
           error_msg = fmt::format(
@@ -1576,7 +1577,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if (IP4::is_address(sock_.them_c_str())) {
 
-    auto const reversed{IP4::reverse(sock_.them_c_str())};
+    auto const reversed = IP4::reverse(sock_.them_c_str());
 
     /*
     // Check with allow list.
@@ -1664,7 +1665,7 @@ bool domain_blocked(DNS::Resolver& res, Domain const& identity)
     return false;
   }
   if (!identity.ascii().empty()) {
-    Domain     lookup{fmt::format("{}.dbl.spamhaus.org", identity.ascii())};
+    Domain     lookup(fmt::format("{}.dbl.spamhaus.org", identity.ascii()));
     DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
     if (q.has_record()) {
       const auto a_strings = q.get_strings();
@@ -1753,7 +1754,7 @@ bool Session::verify_client_(Domain const& client_identity,
     return false;
   }
 
-  auto const tld{tld_db_.get_registered_domain(client_identity.ascii())};
+  auto const tld = tld_db_.get_registered_domain(client_identity.ascii());
   if (!tld) {
     // Sometimes we may want to look at mail from misconfigured
     // sending systems.
@@ -1790,7 +1791,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
 {
   do_spf_check_(sender);
 
-  std::string const sender_str{sender};
+  std::string const sender_str = sender;
 
   if (sender.empty()) {
     // MAIL FROM:<>
@@ -1883,8 +1884,8 @@ bool Session::verify_sender_domain_(Domain const& sender,
       return true;
     }
 
-    auto const reg_dom{
-        tld_db_.get_registered_domain(spf_sender_domain_.ascii())};
+    auto const reg_dom =
+        tld_db_.get_registered_domain(spf_sender_domain_.ascii());
     if (reg_dom) {
       if (allow_.contains(reg_dom)) {
         LOG(INFO) << "sender registered domain \"" << reg_dom << "\" allowed";
@@ -1904,12 +1905,12 @@ void Session::do_spf_check_(Mailbox const& sender)
                                           "client-ip={}; envelope-from={}; helo={};",
                                      server_id_(), "127.0.0.1", sender.as_string(),
                                      client_identity_.ascii());
-    spf_sender_domain_ = Domain{"localhost"};
+    spf_sender_domain_ = Domain("localhost");
     return;
   }
 
-  auto const spf_srv     = SPF::Server{server_id_().c_str()};
-  auto       spf_request = SPF::Request{spf_srv};
+  auto const spf_srv     = SPF::Server(server_id_().c_str());
+  auto       spf_request = SPF::Request(spf_srv);
 
   if (IP4::is_address(sock_.them_c_str())) {
     spf_request.set_ipv4_str(sock_.them_c_str());
@@ -1922,15 +1923,15 @@ void Session::do_spf_check_(Mailbox const& sender)
                << sock_.them_c_str();
   }
 
-  auto const from{static_cast<std::string>(sender)};
+  auto const from = static_cast<std::string>(sender);
 
   spf_request.set_env_from(from.c_str());
   spf_request.set_helo_dom(client_identity_.ascii().c_str());
 
-  auto const spf_res{SPF::Response{spf_request}};
+  auto const spf_res = SPF::Response(spf_request);
   spf_result_        = spf_res.result();
   spf_received_      = spf_res.received_spf();
-  spf_sender_domain_ = Domain{spf_request.get_sender_dom()};
+  spf_sender_domain_ = Domain(spf_request.get_sender_dom());
 
   LOG(INFO) << "spf_received_ == " << spf_received_;
 
@@ -2039,7 +2040,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return true;
   }
 
-  auto const accepted_domain{[this, &recipient] {
+  auto const accepted_domain = [this, &recipient] {
     if (recipient.domain().is_address_literal()) {
       if (recipient.domain().ascii() != sock_.us_address_literal()) {
         LOG(WARNING) << "recipient.domain address " << recipient.domain()
@@ -2064,7 +2065,7 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     }
 
     return false;
-  }()};
+  }();
 
   if (!accepted_domain) {
     out_() << "550 5.7.1 relay access denied\r\n" << std::flush;
