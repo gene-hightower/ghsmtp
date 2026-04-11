@@ -44,8 +44,7 @@ constexpr auto smtp_max_str_length =
 
 // Process exit codes
 enum {
-  EXIT_NOERROR = EXIT_SUCCESS,
-  EXIT_        = 32,      // sort all the others past this one
+  EXIT_ = 32,             // sort all the others past this one
   EXIT_AUTH_FAIL,         // we don't support AUTH
   EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
@@ -55,11 +54,13 @@ enum {
   EXIT_SMTP_SYNTAX_ERROR, // some protocol parser error
   EXIT_TIME_OUT,          // too much time overall
   EXIT_TOO_MANY_BAD_CMDS, // eventually, we cut them off
-  EXIT_IO_TIME_OUT        // too much time waiting for read or write
+  EXIT_IO_TIME_OUT,       // too much time waiting for read or write
 };
 
 [[noreturn]] void smtp_exit(int ret)
 {
+  CHECK_GE(ret, 0);
+  CHECK_LE(ret, 0xff); // on unixen
   timespec time_used{};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &time_used);
 
@@ -586,10 +587,10 @@ struct action<rcpt_to> {
     Mailbox mbx;
 
     if (ctx.mb_loc == "Postmaster"s) {
-      mbx = Mailbox{"Postmaster"};
+      mbx = Mailbox("Postmaster");
     }
     else {
-      mbx = Mailbox{ctx.mb_loc, Domain{ctx.mb_dom}};
+      mbx = Mailbox(ctx.mb_loc, Domain(ctx.mb_dom));
     }
     ctx.session.rcpt_to(std::move(mbx), ctx.parameters);
     ctx.mb_loc.clear();
@@ -616,11 +617,11 @@ void bdat_act(Ctx& ctx, bool last)
 
   auto to_xfer = ctx.chunk_size;
 
-  auto const bfr_size{std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size))};
+  auto const bfr_size(std::min(to_xfer, std::streamsize(FLAGS_max_xfer_size)));
   iobuffer<char> bfr(bfr_size);
 
   while (to_xfer) {
-    auto const xfer_sz{std::min(to_xfer, bfr_size)};
+    auto const xfer_sz(std::min(to_xfer, bfr_size));
 
     ctx.session.in().read(bfr.data(), xfer_sz);
     if (!ctx.session.in()) {
@@ -689,7 +690,7 @@ struct data_action<data_plain> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const len{end(in) - begin(in)};
+    auto const len(end(in) - begin(in));
     ctx.session.msg_write(begin(in), len);
   }
 };
@@ -699,7 +700,7 @@ struct data_action<data_dot> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    auto const len{end(in) - begin(in) - 1};
+    auto const len(end(in) - begin(in) - 1);
     ctx.session.msg_write(begin(in) + 1, len);
   }
 };
@@ -710,7 +711,7 @@ struct data_action<data_long> {
   static void apply(Input const& in, Ctx& ctx)
   {
     LOG(WARNING) << "garbage in data stream: \"" << esc(in.string()) << "\"";
-    auto const len{end(in) - begin(in)};
+    auto const len(end(in) - begin(in));
     if (len)
       ctx.session.msg_write(begin(in), len);
     if (len > smtp_max_line_length) {
@@ -845,8 +846,9 @@ struct action<auth> {
   smtp_exit(EXIT_TIME_OUT);
 }
 
-static volatile bool sig_quit{false};
-void                 sigquit(int signum) { sig_quit = true; }
+static volatile bool sig_quit = false;
+
+void sigquit(int signum) { sig_quit = true; }
 
 // Process an SMTP session from a connecting client.
 
@@ -861,7 +863,7 @@ int session()
 
   auto const config_path = osutil::get_config_dir();
 
-  int ret = EXIT_NOERROR;
+  int ret = EXIT_SUCCESS;
 
   std::unique_ptr<RFC5321::Ctx> ctx;
   try {
@@ -870,8 +872,8 @@ int session()
 
     ctx->session.greeting();
 
-    istream_input<eol::crlf, 1> in{ctx->session.in(), FLAGS_cmd_bfr_size,
-                                   "session"};
+    istream_input<eol::crlf, 1> in(ctx->session.in(), FLAGS_cmd_bfr_size,
+                                   "session");
 
     if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx))
       ret = EXIT_SMTP_SYNTAX_ERROR;
@@ -923,7 +925,7 @@ struct service {
 std::vector<service> services;
 
 struct server {
-  service* service_ptr;
+  service* service_ptr = nullptr;
 
   socklen_t remote_addr_size = 0;
   union {
@@ -1070,8 +1072,8 @@ int server()
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags    = AI_PASSIVE | AI_CANONNAME;
 
-  struct addrinfo* result{nullptr};
-  int              s = getaddrinfo(host, port, &hints, &result);
+  struct addrinfo* result = nullptr;
+  int              s      = getaddrinfo(host, port, &hints, &result);
   CHECK_EQ(s, 0) << "getaddrinfo: " << gai_strerror(s);
 
   for (auto rp = result; rp != nullptr; rp = rp->ai_next) {
@@ -1261,10 +1263,6 @@ int server()
       setsid();
 
       // Drop root
-      char const* user{getenv("USER")};
-      if (user == nullptr)
-        user = "gene";
-
       uid_t ruid, euid, suid;
       PCHECK(getresuid(&ruid, &euid, &suid) == 0);
 
@@ -1277,6 +1275,9 @@ int server()
         setgroups(1, &gid);
       }
 
+      char const* user = getenv("USER");
+      if (user == nullptr)
+        user = "gene";
       struct passwd* pwd = getpwnam(user);
       PCHECK(pwd != nullptr) << "no such user " << user;
 
@@ -1353,7 +1354,7 @@ int main(int argc, char* argv[])
     ParseCommandLineFlags(&argc, &argv, true);
   }
 
-  auto const log_dir{getenv("GOOGLE_LOG_DIR")};
+  auto const log_dir(getenv("GOOGLE_LOG_DIR"));
   if (log_dir) {
     error_code ec;
     fs::create_directories(log_dir, ec);
