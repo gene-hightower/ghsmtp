@@ -67,6 +67,8 @@ int main(int argc, char const* argv[])
                                          "ip=10.1.1.1&receiver=Example.com : "
                                          "Reason: mechanism"));
 
+  /* Not using IPv6 on digilicious.com for now.
+
   SPF::Request req3{srv};
   req3.set_ipv6_str("2600:1700:c281:3070::49");
   req3.set_helo_dom("digilicious.com");
@@ -84,4 +86,5 @@ int main(int argc, char const* argv[])
             "designates 2600:1700:c281:3070::49 as permitted sender) "
             "client-ip=2600:1700:c281:3070::49; "
             "envelope-from=postmaster@digilicious.com; helo=digilicious.com;"));
+  */
 }
