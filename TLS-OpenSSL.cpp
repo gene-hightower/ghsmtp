@@ -645,10 +645,10 @@ bool TLS::tls_server(fs::path                  config_path,
         }
         else if (gen->d.ip->length == 16) {
           // FIXME!
-          LOG(ERROR) << "IPv6 not implemented";
+          LOG(FATAL) << "IPv6 not implemented";
         }
         else {
-          LOG(ERROR) << "unknown IP type";
+          LOG(FATAL) << "unknown IP type";
         }
       }
       else {
