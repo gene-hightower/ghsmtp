@@ -257,9 +257,6 @@ void Session::bad_host_(char const* msg) const
 {
   if (sock_.has_peername()) {
     LOG(ERROR) << "bad host [" << sock_.them_c_str() << "] " << msg;
-    // On my systems, this pattern triggers a fail2ban rule that
-    // blocks connections from this IP address on port 25 for a few
-    // days.  See <https://www.fail2ban.org/> for more info.
     // syslog(LOG_MAIL | LOG_WARNING, "bad host [%s] %s", sock_.them_c_str(),
     // msg);
   }
@@ -1738,7 +1735,7 @@ bool Session::verify_client_(Domain const& client_identity,
   if (labels.size() < 2) {
     error_msg = fmt::format("claimed bogus HELO/EHLO identity \"{}\"",
                             client_identity.ascii());
-    out_() << "550 4.7.1 bogus identity\r\n" << std::flush;
+    out_() << "550 5.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
     // // sending systems.
@@ -1750,7 +1747,7 @@ bool Session::verify_client_(Domain const& client_identity,
   if (lookup_domain(block_, client_identity)) {
     error_msg =
         fmt::format("claimed blocked identity \"{}\"", client_identity.ascii());
-    out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
+    out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
 
@@ -1764,7 +1761,7 @@ bool Session::verify_client_(Domain const& client_identity,
   else if (block_.contains(tld)) {
     error_msg = fmt::format(
         "claimed identity has blocked registered domain \"{}\"", tld);
-    out_() << "550 4.7.1 blocked registered domain\r\n" << std::flush;
+    out_() << "550 5.7.1 blocked registered domain\r\n" << std::flush;
     return false;
   }
 
@@ -1772,7 +1769,7 @@ bool Session::verify_client_(Domain const& client_identity,
       (tld && domain_blocked(res_, Domain(tld)))) {
     error_msg =
         fmt::format("claimed identity \"{}\" blocked", client_identity.ascii());
-    out_() << "550 4.7.1 blocked identity\r\n" << std::flush;
+    out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
 
