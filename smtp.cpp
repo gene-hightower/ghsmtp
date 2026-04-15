@@ -39,6 +39,10 @@ constexpr auto smtp_max_str_length =
 #include <memory>
 #include <stdexcept>
 
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
+
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
@@ -946,17 +950,33 @@ struct server {
 std::unordered_map<pid_t, server> servers;
 
 static uint64_t constexpr max_connections = 2;
-static uint64_t constexpr max_rate        = 10;
-static time_t constexpr rate_window       = 60; // One minute.
+
+// static uint64_t constexpr max_rate  = 10;
+// static time_t constexpr rate_window = 60; // One minute.
+
+struct counter_def {
+  uint64_t max;
+  time_t   window;
+};
+
+static counter_def rate_counters[]{
+    {10, 60},             // per minute
+    {100, 60 * 60},       // per hour
+    {1000, 24 * 60 * 60}, // per day
+};
+
+struct counter {
+  uint64_t count = 0;
+  time_t   start = 0;
+};
 
 struct connection {
   uint64_t ncurrent = 0;
   uint64_t ntotal   = 0;
   uint64_t attempts = 0;
   uint64_t nerrors  = 0;
-  uint64_t rate     = 0;
-  time_t   start    = 0;
-  bool     tainted  = false;
+  counter  rates[std::size(rate_counters)];
+  bool     tainted = false;
 };
 
 std::unordered_map<std::string, connection> connections;
@@ -1251,26 +1271,33 @@ int server()
 
       auto const now = time(nullptr);
 
-      if (connection.start == time_t{0}) {
-        connection.start = now;
-      }
-
       ++connection.attempts;
 
-      if (connection.start + rate_window < now) {
-        connection.rate  = 1;
-        connection.start = now;
-      }
-      else {
-        if (++connection.rate >= max_rate) {
-          char const too_many[] =
-              "421 4.3.0 Too many recent connections, try again later.\r\n";
-          write(accepted_fd, too_many, sizeof(too_many));
-          close(accepted_fd);
-          LOG(INFO) << "too many recent connections from " << srv.remote_string;
-          continue;
+      bool limited = false;
+      for (auto rate_num = 0uz; rate_num < std::size(connection.rates);
+           ++rate_num) {
+        auto& rate = connection.rates[rate_num];
+        if ((rate.start == time_t{0}) ||
+            (rate.start + rate_counters[rate_num].window < now)) {
+          rate.count = 1;
+          rate.start = now;
+        }
+        else if (!limited && ++rate.count >= rate_counters[rate_num].max) {
+          std::string msg =
+              fmt::format("Too many connections {} within {} seconds.",
+                          rate.count, rate_counters[rate_num].window);
+          std::string error_str =
+              fmt::format("421 4.3.0 {} Try again later.\r\n", msg);
+          (void)write(accepted_fd, error_str.data(), error_str.size());
+          (void)close(accepted_fd);
+          LOG(INFO) << msg;
+          --rate.count;
+          limited = true;
+          break;
         }
       }
+      if (limited)
+        continue;
 
       if (++connection.ncurrent >= max_connections) {
         connection.ncurrent--;
@@ -1376,18 +1403,25 @@ int server()
   }
 
   for (auto const& [addr, conn] : connections) {
-    auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
-    char start_time_buf[bfr_sz];
-    CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
-                      gmtime(&conn.start)),
-             sizeof(start_time_buf) - 1);
-    LOG(INFO) << addr;
-    LOG(INFO) << " current: " << conn.ncurrent;
-    LOG(INFO) << "   total: " << conn.ntotal;
-    LOG(INFO) << "attempts: " << conn.attempts;
-    LOG(INFO) << "  errors: " << conn.nerrors;
-    LOG(INFO) << "    rate: " << conn.rate;
-    LOG(INFO) << "   since: " << start_time_buf;
+    LOG(INFO) << "\n" << addr;
+    LOG(INFO) << "  current: " << conn.ncurrent;
+    LOG(INFO) << "    total: " << conn.ntotal;
+    LOG(INFO) << " attempts: " << conn.attempts;
+    LOG(INFO) << "   errors: " << conn.nerrors;
+
+    for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
+      auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
+      char start_time_buf[bfr_sz];
+      CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
+                        gmtime(&conn.rates[rate_num].start)),
+               sizeof(start_time_buf) - 1);
+
+      LOG(INFO) << "     rate: " << conn.rates[rate_num].count;
+      LOG(INFO) << "   of max: " << rate_counters[rate_num].max;
+      LOG(INFO) << "    since: " << start_time_buf;
+      LOG(INFO) << "in window: " << rate_counters[rate_num].window;
+    }
+
     LOG(INFO) << " tainted: " << conn.tainted;
   }
 
