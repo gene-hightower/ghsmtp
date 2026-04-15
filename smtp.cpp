@@ -44,9 +44,8 @@ constexpr auto smtp_max_str_length =
 
 // Process exit codes
 enum {
-  EXIT_ = 32,     // sort all the others past this one
-  EXIT_AUTH_FAIL, // we don't support AUTH
-
+  EXIT_ = 32,             // sort all the others past this one
+  EXIT_AUTH_FAIL,         // we don't support AUTH
   EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_GREETING,      //
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
@@ -1007,7 +1006,7 @@ void sigchild(int signum)
         }
 
         // Any of these cases taint the sender.
-        switch (status) {
+        switch (exit_status) {
         case EXIT_BAD_GREETING:  // Input before greeting, or dnsbl.
         case EXIT_BAD_LO:        // Claimed identity is blocked.
         case EXIT_BAD_MAIL_FROM: // Sender blocked.
