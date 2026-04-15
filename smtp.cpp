@@ -44,9 +44,11 @@ constexpr auto smtp_max_str_length =
 
 // Process exit codes
 enum {
-  EXIT_ = 32,             // sort all the others past this one
-  EXIT_AUTH_FAIL,         // we don't support AUTH
+  EXIT_ = 32,     // sort all the others past this one
+  EXIT_AUTH_FAIL, // we don't support AUTH
+
   EXIT_BAD_LO,            // error from helo/ehlo
+  EXIT_BAD_GREETING,      //
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
   EXIT_BARE_LF,           // hard fail on bare '\n'
   EXIT_EXCPETION,         // unknown exception
@@ -863,27 +865,28 @@ int session()
 
   auto const config_path = osutil::get_config_dir();
 
-  int ret = EXIT_SUCCESS;
-
   std::unique_ptr<RFC5321::Ctx> ctx;
   try {
     auto const read_hook{[&ctx]() { ctx->session.flush(); }};
     ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
-    ctx->session.greeting();
+    if (!ctx->session.greeting()) {
+      return EXIT_BAD_GREETING;
+    }
 
     istream_input<eol::crlf, 1> in(ctx->session.in(), FLAGS_cmd_bfr_size,
                                    "session");
 
-    if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx))
-      ret = EXIT_SMTP_SYNTAX_ERROR;
+    if (!parse<RFC5321::grammar, RFC5321::action>(in, *ctx)) {
+      return EXIT_SMTP_SYNTAX_ERROR;
+    }
     else if (ctx->session.maxed_out()) {
       ctx->session.max_out();
-      ret = EXIT_MAXED_OUT;
+      return EXIT_MAXED_OUT;
     }
     else if (ctx->session.timed_out()) {
       ctx->session.time_out();
-      ret = EXIT_TIME_OUT;
+      return EXIT_TIME_OUT;
     }
     // else {
     //   ctx->session.error("session end without QUIT command from client");
@@ -891,14 +894,18 @@ int session()
   }
   catch (std::runtime_error const& e) {
     LOG(WARNING) << e.what();
-    ret = EXIT_EXCPETION;
+    return EXIT_EXCPETION;
   }
   catch (std::exception const& e) {
     LOG(WARNING) << e.what();
-    ret = EXIT_EXCPETION;
+    return EXIT_EXCPETION;
+  }
+  catch (...) {
+    LOG(WARNING) << "unknown exception";
+    return EXIT_EXCPETION;
   }
 
-  return ret;
+  return EXIT_SUCCESS;
 }
 
 struct service {
@@ -939,13 +946,18 @@ struct server {
 
 std::unordered_map<pid_t, server> servers;
 
-static auto const max_connections = 2;
+static uint64_t constexpr max_connections = 2;
+static uint64_t constexpr max_rate        = 10;
+static time_t constexpr rate_window       = 60; // One minute.
 
 struct connection {
-  int ncurrent = 0;
-  int ntotal   = 0;
-  int attempts = 0;
-  int nerrors  = 0;
+  uint64_t ncurrent = 0;
+  uint64_t ntotal   = 0;
+  uint64_t attempts = 0;
+  uint64_t nerrors  = 0;
+  uint64_t rate     = 0;
+  time_t   start    = 0;
+  bool     tainted  = false;
 };
 
 std::unordered_map<std::string, connection> connections;
@@ -977,7 +989,7 @@ void sigchild(int signum)
     if ((pid == -1) && (errno != ECHILD))
       LOG(INFO) << strerror(errno);
 
-    google::FlushLogFiles(google::INFO);
+    // google::FlushLogFiles(google::INFO);
 
     if (pid <= 0)
       break;
@@ -989,17 +1001,28 @@ void sigchild(int signum)
       // srv.service_ptr
       if (WIFEXITED(status)) {
         auto exit_status = WEXITSTATUS(status);
-        LOG(INFO) << pid << ": exit status " << std::hex << exit_status;
+        LOG(INFO) << "pid == " << pid << " status " << exit_status;
         if (exit_status != 0) {
           connection.nerrors++;
+        }
+
+        // Any of these cases taint the sender.
+        switch (status) {
+        case EXIT_BAD_GREETING:  // Input before greeting, or dnsbl.
+        case EXIT_BAD_LO:        // Claimed identity is blocked.
+        case EXIT_BAD_MAIL_FROM: // Sender blocked.
+          connection.tainted = true;
+          break;
         }
       }
       else if (WIFSIGNALED(status)) {
         auto exit_signal = WTERMSIG(status);
-        LOG(INFO) << pid << ": exit signal " << std::hex << exit_signal;
+        LOG(INFO) << "pid == " << pid << " signal " << exit_signal;
+        connection.nerrors++; // signals count as errors
       }
       else {
-        LOG(ERROR) << pid << ": not status or signal";
+        LOG(ERROR) << "pid == " << pid << ": not status or signal";
+        connection.nerrors++; // whatever this is, counts as an error
       }
 
       connection.ncurrent--;
@@ -1166,8 +1189,8 @@ int server()
   // LOG(INFO) << "maxsock == " << maxsock;
 
   while (!sig_quit) {
-    LOG(INFO) << "server waiting for connections…";
-    google::FlushLogFiles(google::INFO);
+    // LOG(INFO) << "server waiting for connections…";
+    // google::FlushLogFiles(google::INFO);
 
     auto readable     = allsock;
     auto ready_fd_cnt = select(maxsock + 1, &readable, NULL, NULL, NULL);
@@ -1222,12 +1245,36 @@ int server()
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
 
-      LOG(INFO) << "accepted (fd=" << accepted_fd << ") for "
-                << srv.remote_string;
-      LOG(INFO) << "attempt " << ++connections[srv.remote_string].attempts;
+      // LOG(INFO) << "accepted (fd=" << accepted_fd << ") for "
+      // << srv.remote_string;
+      /* LOG(INFO) << "attempt " << */
+      auto& connection = connections[srv.remote_string];
 
-      if (connections[srv.remote_string].ncurrent++ >= max_connections) {
-        connections[srv.remote_string].ncurrent--;
+      auto const now = time(nullptr);
+
+      if (connection.start == time_t{0}) {
+        connection.start = now;
+      }
+
+      ++connection.attempts;
+
+      if (connection.start + rate_window < now) {
+        connection.rate  = 1;
+        connection.start = now;
+      }
+      else {
+        if (++connection.rate >= max_rate) {
+          char const too_many[] =
+              "421 4.3.0 Too many recent connections, try again later.\r\n";
+          write(accepted_fd, too_many, sizeof(too_many));
+          close(accepted_fd);
+          LOG(INFO) << "too many recent connections from " << srv.remote_string;
+          continue;
+        }
+      }
+
+      if (++connection.ncurrent >= max_connections) {
+        connection.ncurrent--;
         char const too_many[] =
             "421 4.3.0 Too many concurrent connections, try again later.\r\n";
         write(accepted_fd, too_many, sizeof(too_many));
@@ -1237,8 +1284,16 @@ int server()
         continue;
       }
 
-      LOG(INFO) << "about to fork";
-      google::FlushLogFiles(google::INFO);
+      if (connection.tainted) {
+        char const msg[] = "550 5.7.1 sender blocked\r\n";
+        write(accepted_fd, msg, sizeof(msg));
+        close(accepted_fd);
+        LOG(INFO) << "tainted sender " << srv.remote_string;
+        continue;
+      }
+
+      // LOG(INFO) << "about to fork";
+      // google::FlushLogFiles(google::INFO);
 
       int pid = fork();
 
@@ -1253,7 +1308,8 @@ int server()
       if (pid > 0) { // parent
         servers[pid] = srv;
 
-        LOG(INFO) << "new session pid " << pid;
+        LOG(INFO) << "pid == " << pid << " for " << srv.remote_string
+                  << " accepted fd == " << accepted_fd;
 
         close(accepted_fd); // We passed this to our child.
         continue;           // check next srv
@@ -1320,11 +1376,18 @@ int server()
   }
 
   for (auto const& [addr, conn] : connections) {
+    auto constexpr bfr_sz sizeof "2099-99-99T99:99:99Z";
+    char buf[bfr_sz];
+    CHECK_EQ(strftime(buf, sizeof buf, "%FT%TZ", gmtime(&conn.start)),
+             sizeof(buf) - 1);
     LOG(INFO) << addr;
     LOG(INFO) << " current: " << conn.ncurrent;
     LOG(INFO) << "   total: " << conn.ntotal;
     LOG(INFO) << "attempts: " << conn.attempts;
     LOG(INFO) << "  errors: " << conn.nerrors;
+    LOG(INFO) << "    rate: " << conn.rate;
+    LOG(INFO) << "   since: " << conn.buf;
+    LOG(INFO) << " tainted: " << conn.tainted;
   }
 
   for (auto n = 0; servers.size(); ++n) {
