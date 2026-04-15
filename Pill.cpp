@@ -1,11 +1,14 @@
 #include "Pill.hpp"
 
+#include <random>
+
 Pill::Pill()
 {
-  using s_t = decltype(s_);
+  std::random_device rd;
 
-  std::uniform_int_distribution<s_t> uni_dist;
-  s_ = uni_dist(rng_);
+  auto uni_dist = std::uniform_int_distribution<decltype(s_)>();
+
+  s_ = uni_dist(rd);
 
   auto resp{b32_ndigits_};
   b32_str_[resp] = '\0';
