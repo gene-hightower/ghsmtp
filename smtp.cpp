@@ -1376,17 +1376,18 @@ int server()
   }
 
   for (auto const& [addr, conn] : connections) {
-    auto constexpr bfr_sz sizeof "2099-99-99T99:99:99Z";
-    char buf[bfr_sz];
-    CHECK_EQ(strftime(buf, sizeof buf, "%FT%TZ", gmtime(&conn.start)),
-             sizeof(buf) - 1);
+    auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
+    char start_time_buf[bfr_sz];
+    CHECK_EQ(
+        strftime(buf, sizeof start_time_buf, "%FT%TZ", gmtime(&conn.start)),
+        sizeof(start_time_buf) - 1);
     LOG(INFO) << addr;
     LOG(INFO) << " current: " << conn.ncurrent;
     LOG(INFO) << "   total: " << conn.ntotal;
     LOG(INFO) << "attempts: " << conn.attempts;
     LOG(INFO) << "  errors: " << conn.nerrors;
     LOG(INFO) << "    rate: " << conn.rate;
-    LOG(INFO) << "   since: " << conn.buf;
+    LOG(INFO) << "   since: " << start_time_buf;
     LOG(INFO) << " tainted: " << conn.tainted;
   }
 
