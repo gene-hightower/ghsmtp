@@ -2,6 +2,7 @@
 #define DNS_DOT_HPP
 
 #include <memory>
+#include <random>
 
 #include "DNS-message.hpp"
 #include "DNS-rrs.hpp"
@@ -9,8 +10,6 @@
 #include "iobuffer.hpp"
 
 #include <glog/logging.h>
-
-#include "pcg.hpp"
 
 namespace DNS {
 
@@ -47,9 +46,7 @@ private:
   std::unique_ptr<Sock> ns_sock_;
   int                   ns_;
   int                   ns_fd_;
-
-  inline static pcg_extras::seed_seq_from<std::random_device> seed_source_;
-  inline static pcg32 rng_{seed_source_};
+  std::random_device    rng_;
 };
 
 class Query {
