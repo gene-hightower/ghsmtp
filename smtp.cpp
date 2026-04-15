@@ -1284,6 +1284,7 @@ int server()
       }
 
       if (connection.tainted) {
+        connection.ncurrent--;
         char const msg[] = "550 5.7.1 sender blocked\r\n";
         write(accepted_fd, msg, sizeof(msg));
         close(accepted_fd);
