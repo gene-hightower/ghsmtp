@@ -185,7 +185,7 @@ bool TLS::tls_client(fs::path                  config_path,
   if (client_name) {
     auto const certs = osutil::list_directory(config_path, Config::cert_fn_re);
 
-    CHECK_GE(certs.size(), 1) << "no client cert(s) found";
+    CHECK_GE(certs.size(), 1z) << "no client cert(s) found";
 
     for (auto const& cert : certs) {
 
