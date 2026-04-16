@@ -1110,27 +1110,31 @@ char const* pro_to_str(int pro)
 void log_stats()
 {
   for (auto const& [addr, conn] : connections) {
-    LOG(INFO) << "\n"
-              << addr << " ===================="
-              << "\n  current: " << conn.ncurrent
-              << "\n    total: " << conn.ntotal
-              << "\n attempts: " << conn.attempts
-              << "\n   errors: " << conn.nerrors
-              << "\n tainted: " << conn.tainted;
-
+    std::string report;
+    fmt::format_to(std::back_inserter(report),
+                   "\n==== {:15} ===="
+                   "\n  current: {}"
+                   "\n    total: {}"
+                   "\n attempts: {}"
+                   "\n   errors: {}"
+                   "\n  tainted: {}",
+                   addr, conn.ncurrent, conn.ntotal, conn.attempts,
+                   conn.nerrors, conn.tainted);
     for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
       auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
       char start_time_buf[bfr_sz];
       CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
                         gmtime(&conn.rates[rate_num].start)),
                sizeof(start_time_buf) - 1);
-      LOG(INFO) << "\n"
-                << rate_counters[rate_num].window
-                << " sec window ===================="
-                << "\n    count: " << conn.rates[rate_num].count
-                << "\n   of max: " << rate_counters[rate_num].max
-                << "\n    since: " << start_time_buf;
+      fmt::format_to(std::back_inserter(report),
+                     "\n==== {} sec window ===="
+                     "\n    count: {}"
+                     "\n      max: {}"
+                     "\n    since: {}",
+                     rate_counters[rate_num].window, conn.rates[rate_num].count,
+                     rate_counters[rate_num].max, start_time_buf);
     }
+    LOG(INFO) << report;
   }
 }
 
