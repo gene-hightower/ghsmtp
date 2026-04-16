@@ -424,14 +424,18 @@ bool TLS::tls_client(fs::path                  config_path,
     int n_get_err;
     switch (n_get_err = SSL_get_error(ssl_, rc)) {
     case SSL_ERROR_WANT_READ:
-      CHECK(POSIX::input_ready(fd_in, time_left))
-          << "starttls timed out on input_ready";
+      if (!POSIX::input_ready(fd_in, time_left)) {
+        LOG(ERROR) << "starttls timed out on input_ready";
+        return false;
+      }
       ERR_clear_error();
       continue; // try SSL_accept again
 
     case SSL_ERROR_WANT_WRITE:
-      CHECK(POSIX::output_ready(fd_out, time_left))
-          << "starttls timed out on output_ready";
+      if (!POSIX::output_ready(fd_out, time_left)) {
+        LOG(ERROR) << "starttls timed out on output_ready";
+        return false;
+      }
       ERR_clear_error();
       continue; // try SSL_accept again
 
@@ -439,7 +443,7 @@ bool TLS::tls_client(fs::path                  config_path,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default: ssl_error(n_get_err);
+    default: ssl_report_error(n_get_err); return false;
     }
   }
 
@@ -711,7 +715,7 @@ bool TLS::tls_server(fs::path                  config_path,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default: ssl_error(n_get_err);
+    default: ssl_report_error(n_get_err); return false;
     }
   }
 
@@ -833,14 +837,14 @@ std::streamsize TLS::io_tls_(char const*                          fn,
       LOG(WARNING) << "errno == " << errno << ": " << strerror(errno);
       [[fallthrough]];
 
-    default: ssl_error(n_get_err);
+    default: ssl_report_error(n_get_err); return false;
     }
   }
 
   return static_cast<std::streamsize>(n_ret);
 }
 
-void TLS::ssl_error(int n_get_err)
+void TLS::ssl_report_error(int n_get_err)
 {
   LOG(WARNING) << "n_get_err == " << n_get_err;
   switch (n_get_err) {
@@ -859,5 +863,4 @@ void TLS::ssl_error(int n_get_err)
   while (0 != (er = ERR_get_error()))
     LOG(WARNING) << ERR_error_string(er, nullptr);
   LOG(WARNING) << "fatal OpenSSL error";
-  exit(1);
 }

@@ -80,7 +80,7 @@ private:
                           std::chrono::milliseconds            wait,
                           bool&                                t_o);
 
-  static void ssl_error(int n_err) __attribute__((noreturn));
+  static void ssl_report_error(int n_err);
 
 private:
   SSL* ssl_{nullptr};
