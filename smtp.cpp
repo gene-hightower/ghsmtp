@@ -996,7 +996,9 @@ struct connection {
   uint64_t attempts = 0;
   uint64_t nerrors  = 0;
   counter  rates[std::size(rate_counters)];
-  bool     tainted = false;
+  time_t   last_rejected = 0;
+  time_t   tainted_at    = 0;
+  bool     tainted       = false;
 };
 
 std::unordered_map<std::string, connection> connections;
@@ -1051,7 +1053,8 @@ void sigchild(int signum)
         case EXIT_BAD_GREETING:  // Input before greeting, or dnsbl.
         case EXIT_BAD_LO:        // Claimed identity is blocked.
         case EXIT_BAD_MAIL_FROM: // Sender blocked.
-          connection.tainted = true;
+          connection.tainted    = true;
+          connection.tainted_at = time(nullptr);
           break;
         }
       }
@@ -1109,30 +1112,37 @@ char const* pro_to_str(int pro)
 
 void log_stats()
 {
+  auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
+  char time_buf[bfr_sz];
+
   for (auto const& [addr, conn] : connections) {
     std::string report;
+
     fmt::format_to(std::back_inserter(report),
                    "\n==== {:15} ===="
                    "\n  current: {}"
                    "\n    total: {}"
                    "\n attempts: {}"
-                   "\n   errors: {}"
-                   "\n  tainted: {}",
+                   "\n   errors: {}",
                    addr, conn.ncurrent, conn.ntotal, conn.attempts,
-                   conn.nerrors, conn.tainted);
+                   conn.nerrors);
+    if (conn.tainted) {
+      CHECK_EQ(strftime(time_buf, sizeof time_buf, "%FT%TZ",
+                        gmtime(&conn.tainted_at)),
+               sizeof(time_buf) - 1);
+      fmt::format_to(std::back_inserter(report), "\n  tainted at {}", time_buf);
+    }
     for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
-      auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
-      char start_time_buf[bfr_sz];
-      CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
+      CHECK_EQ(strftime(time_buf, sizeof time_buf, "%FT%TZ",
                         gmtime(&conn.rates[rate_num].start)),
-               sizeof(start_time_buf) - 1);
+               sizeof(time_buf) - 1);
       fmt::format_to(std::back_inserter(report),
                      "\n---- {} sec window ----"
                      "\n    count: {}"
                      "\n      max: {}"
                      "\n    since: {}",
                      rate_counters[rate_num].window, conn.rates[rate_num].count,
-                     rate_counters[rate_num].max, start_time_buf);
+                     rate_counters[rate_num].max, time_buf);
     }
     fmt::format_to(std::back_inserter(report),
                    "\n==============================");
@@ -1322,6 +1332,7 @@ int server()
           rate.start = now;
         }
         else if (!limited && ++rate.count >= rate_counters[rate_num].max) {
+          connection.last_rejected = now;
           std::string msg =
               fmt::format("Too many connections {} within {} seconds.",
                           rate.count, rate_counters[rate_num].window);
@@ -1340,6 +1351,7 @@ int server()
 
       if (++connection.ncurrent >= max_connections) {
         connection.ncurrent--;
+        connection.last_rejected = time(nullptr);
         char const too_many[] =
             "421 4.3.0 Too many concurrent connections, try again later.\r\n";
         (void)write(accepted_fd, too_many, sizeof(too_many));
@@ -1351,7 +1363,8 @@ int server()
 
       if (connection.tainted) {
         connection.ncurrent--;
-        char const msg[] = "550 5.7.1 sender blocked\r\n";
+        connection.last_rejected = time(nullptr);
+        char const msg[]         = "550 5.7.1 sender blocked\r\n";
         (void)write(accepted_fd, msg, sizeof(msg));
         PCHECK(close(accepted_fd) == 0);
         LOG(INFO) << "tainted sender " << srv.remote_string;
