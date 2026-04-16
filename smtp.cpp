@@ -1127,13 +1127,15 @@ void log_stats()
                         gmtime(&conn.rates[rate_num].start)),
                sizeof(start_time_buf) - 1);
       fmt::format_to(std::back_inserter(report),
-                     "\n==== {} sec window ===="
+                     "\n---- {} sec window ----"
                      "\n    count: {}"
                      "\n      max: {}"
                      "\n    since: {}",
                      rate_counters[rate_num].window, conn.rates[rate_num].count,
                      rate_counters[rate_num].max, start_time_buf);
     }
+    fmt::format_to(std::back_inserter(report),
+                   "\n==============================");
     LOG(INFO) << report;
   }
 }
