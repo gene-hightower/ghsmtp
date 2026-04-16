@@ -229,8 +229,12 @@ Resolver::Resolver(fs::path config_path)
 
       if (port != 53) {
         DNS::RR_collection tlsa_rrs; // empty FIXME!
-        ns_sock_->tls_client(config_path, nullptr, nameserver.host,
-                                  tlsa_rrs, false, false);
+        if (!ns_sock_->tls_client(config_path, nullptr, nameserver.host,
+                                  tlsa_rrs, false, false)) {
+          LOG(WARNING) << "TLS client failed for nameserver " << nameserver.host
+                       << " [" << nameserver.addr << "]:" << nameserver.port;
+          continue;
+        }
         if (ns_sock_->verified()) {
           if (ns_sock_->verified_peername() != nameserver.host) {
             LOG(WARNING) << "nameserver " << nameserver.host
