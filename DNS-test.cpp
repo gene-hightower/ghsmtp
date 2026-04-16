@@ -93,6 +93,9 @@ void do_lookup_result(lkp_result const& lookup)
 
 int main(int argc, char const* argv[])
 {
+  std::cout << "sizeof(Resolver)         == " << sizeof(DNS::Resolver) << '\n';
+  std::cout << "sizeof(Query)            == " << sizeof(DNS::Query) << '\n';
+
   auto const config_path = osutil::get_config_dir();
 
   lkp lookups[]{
