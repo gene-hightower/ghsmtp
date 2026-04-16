@@ -62,6 +62,25 @@ enum {
   EXIT_IO_TIME_OUT,       // too much time waiting for read or write
 };
 
+std::string exit_as_text(int ret)
+{
+  switch (ret) { // clang-format off
+  case EXIT_SUCCESS:           return "SUCCESS";
+  case EXIT_AUTH_FAIL:         return "AUTH_FAIL";
+  case EXIT_BAD_LO:            return "BAD_LO";
+  case EXIT_BAD_GREETING:      return "BAD_GREETING";
+  case EXIT_BAD_MAIL_FROM:     return "BAD_MAIL_FROM";
+  case EXIT_BARE_LF:           return "BARE_LF";
+  case EXIT_EXCPETION:         return "EXCPETION";
+  case EXIT_MAXED_OUT:         return "MAXED_OUT";
+  case EXIT_SMTP_SYNTAX_ERROR: return "SMTP_SYNTAX_ERROR";
+  case EXIT_TIME_OUT:          return "TIME_OUT";
+  case EXIT_TOO_MANY_BAD_CMDS: return "TOO_MANY_BAD_CMDS";
+  case EXIT_IO_TIME_OUT:       return "IO_TIME_OUT";
+  } // clang-format on
+  return fmt::format("{}", ret);
+}
+
 [[noreturn]] void smtp_exit(int ret)
 {
   CHECK_GE(ret, 0);
@@ -1023,7 +1042,8 @@ void sigchild(int signum)
       // srv.service_ptr
       if (WIFEXITED(status)) {
         auto exit_status = WEXITSTATUS(status);
-        LOG(INFO) << "pid == " << pid << " status " << exit_status;
+        LOG(INFO) << "pid == " << pid << " status "
+                  << exit_as_text(exit_status);
         if (exit_status != 0) {
           connection.nerrors++;
         }
