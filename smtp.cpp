@@ -1112,11 +1112,11 @@ char const* pro_to_str(int pro)
 void log_stats()
 {
   for (auto const& [addr, conn] : connections) {
-    LOG(INFO) << "\n" << addr;
-    LOG(INFO) << "  current: " << conn.ncurrent;
-    LOG(INFO) << "    total: " << conn.ntotal;
-    LOG(INFO) << " attempts: " << conn.attempts;
-    LOG(INFO) << "   errors: " << conn.nerrors;
+    LOG(INFO) << "\n"
+              << addr << " ====================\n"
+              << "  current: " << conn.ncurrent << "    total: " << conn.ntotal
+              << " attempts: " << conn.attempts << "   errors: " << conn.nerrors
+              << " tainted: " << conn.tainted;
 
     for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
       auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
@@ -1124,14 +1124,13 @@ void log_stats()
       CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
                         gmtime(&conn.rates[rate_num].start)),
                sizeof(start_time_buf) - 1);
-
-      LOG(INFO) << "     rate: " << conn.rates[rate_num].count;
-      LOG(INFO) << "   of max: " << rate_counters[rate_num].max;
-      LOG(INFO) << "    since: " << start_time_buf;
-      LOG(INFO) << "in window: " << rate_counters[rate_num].window;
+      LOG(INFO) << "\n"
+                << rate_counters[rate_num].window
+                << " sec window ====================\n"
+                << "    count: " << conn.rates[rate_num].count
+                << "   of max: " << rate_counters[rate_num].max
+                << "    since: " << start_time_buf;
     }
-
-    LOG(INFO) << " tainted: " << conn.tainted;
   }
 }
 
