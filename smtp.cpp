@@ -10,6 +10,7 @@ DEFINE_uint64(max_xfer_size, 64 * 1024, "maximum BDAT transfer size");
 
 DEFINE_bool(close_stderr, false, "ignored");
 DEFINE_bool(server, false, "listen and accept");
+DEFINE_bool(soc_debug, false, "socket debug flag");
 
 DEFINE_string(bind, "localhost", "bind address");
 DEFINE_string(service, "smtp", "service name");
@@ -971,17 +972,14 @@ struct server {
 
 std::unordered_map<pid_t, server> servers;
 
-static uint64_t constexpr max_connections = 2;
-
-// static uint64_t constexpr max_rate  = 10;
-// static time_t constexpr rate_window = 60; // One minute.
+static constexpr uint64_t max_connections = 2;
 
 struct counter_def {
   uint64_t max;
   time_t   window;
 };
 
-static counter_def rate_counters[]{
+static constexpr counter_def rate_counters[]{
     {10, 60},             // per minute
     {100, 60 * 60},       // per hour
     {1000, 24 * 60 * 60}, // per day
@@ -1113,10 +1111,12 @@ void log_stats()
 {
   for (auto const& [addr, conn] : connections) {
     LOG(INFO) << "\n"
-              << addr << " ====================\n"
-              << "  current: " << conn.ncurrent << "    total: " << conn.ntotal
-              << " attempts: " << conn.attempts << "   errors: " << conn.nerrors
-              << " tainted: " << conn.tainted;
+              << addr << " ===================="
+              << "\n  current: " << conn.ncurrent
+              << "\n    total: " << conn.ntotal
+              << "\n attempts: " << conn.attempts
+              << "\n   errors: " << conn.nerrors
+              << "\n tainted: " << conn.tainted;
 
     for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
       auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
@@ -1126,10 +1126,10 @@ void log_stats()
                sizeof(start_time_buf) - 1);
       LOG(INFO) << "\n"
                 << rate_counters[rate_num].window
-                << " sec window ====================\n"
-                << "    count: " << conn.rates[rate_num].count
-                << "   of max: " << rate_counters[rate_num].max
-                << "    since: " << start_time_buf;
+                << " sec window ===================="
+                << "\n    count: " << conn.rates[rate_num].count
+                << "\n   of max: " << rate_counters[rate_num].max
+                << "\n    since: " << start_time_buf;
     }
   }
 }
@@ -1206,32 +1206,15 @@ int server()
     default: LOG(FATAL) << "Unknown addrlen " << rp->ai_addrlen;
     }
 
-    /*
-    LOG(INFO) << "services.back().ctrl_address == "
-              << services.back().ctrl_address;
-
-    LOG(INFO) << "services.back().host         == " << services.back().host;
-    LOG(INFO) << "services.back().port         == " << services.back().port;
-
-    LOG(INFO) << "services.back().canonname    == "
-              << services.back().canonname;
-
-    LOG(INFO) << "services.back().family       == "
-              << fam_to_str(services.back().family);
-    LOG(INFO) << "services.back().socktype     == "
-              << typ_to_str(services.back().socktype);
-    LOG(INFO) << "services.back().protocol     == "
-              << pro_to_str(services.back().protocol);
-    */
-
     services.back().fd =
         socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 
     PCHECK(services.back().fd) << "Can't open server listening socket";
 
     int on = 1;
-    // PCHECK(setsockopt(services.back().fd, SOL_SOCKET, SO_DEBUG, &on,
-    //                sizeof(on)) >= 0);
+    if (FLAGS_soc_debug)
+      PCHECK(setsockopt(services.back().fd, SOL_SOCKET, SO_DEBUG, &on,
+                        sizeof(on)) >= 0);
     PCHECK(setsockopt(services.back().fd, SOL_SOCKET, SO_REUSEADDR, &on,
                       sizeof(on)) >= 0);
 
@@ -1256,7 +1239,6 @@ int server()
     LOG(INFO) << "no sockets to listen on";
     return 0;
   }
-  // LOG(INFO) << "maxsock == " << maxsock;
 
   while (!sig_quit) {
     // LOG(INFO) << "server waiting for connections…";
@@ -1283,8 +1265,6 @@ int server()
     for (auto service : services) {
       if (service.fd == -1 || !FD_ISSET(service.fd, &readable))
         continue;
-
-      // LOG(INFO) << "ready fd=" << service.fd;
 
       int accepted_fd = -1;
 
@@ -1442,6 +1422,12 @@ int server()
   }
 
   LOG(INFO) << "quitting";
+
+  try {
+    auto const config_path = osutil::get_config_dir();
+  }
+  catch (...) {
+  }
 
   for (auto service : services) {
     PCHECK(close(service.fd) == 0);
