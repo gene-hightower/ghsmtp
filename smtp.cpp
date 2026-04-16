@@ -847,12 +847,15 @@ struct action<auth> {
 [[noreturn]] void timeout(int signum)
 {
   const char errmsg[] = "421 4.4.2 time-out\r\n";
-  write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
+  (void)write(STDOUT_FILENO, errmsg, sizeof errmsg - 1);
+  (void)close(STDOUT_FILENO);
   smtp_exit(EXIT_TIME_OUT);
 }
 
+static volatile bool sig_hup  = false;
 static volatile bool sig_quit = false;
 
+void sighup(int signum) { sig_hup = true; }
 void sigquit(int signum) { sig_quit = true; }
 
 // Process an SMTP session from a connecting client.
@@ -1086,6 +1089,32 @@ char const* pro_to_str(int pro)
   return "IPPROTO_?unknown?";
 }
 
+void log_stats()
+{
+  for (auto const& [addr, conn] : connections) {
+    LOG(INFO) << "\n" << addr;
+    LOG(INFO) << "  current: " << conn.ncurrent;
+    LOG(INFO) << "    total: " << conn.ntotal;
+    LOG(INFO) << " attempts: " << conn.attempts;
+    LOG(INFO) << "   errors: " << conn.nerrors;
+
+    for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
+      auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
+      char start_time_buf[bfr_sz];
+      CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
+                        gmtime(&conn.rates[rate_num].start)),
+               sizeof(start_time_buf) - 1);
+
+      LOG(INFO) << "     rate: " << conn.rates[rate_num].count;
+      LOG(INFO) << "   of max: " << rate_counters[rate_num].max;
+      LOG(INFO) << "    since: " << start_time_buf;
+      LOG(INFO) << "in window: " << rate_counters[rate_num].window;
+    }
+
+    LOG(INFO) << " tainted: " << conn.tainted;
+  }
+}
+
 // Listen and accept client connections, then fork a session manager.
 
 int server()
@@ -1094,6 +1123,9 @@ int server()
 
   struct sigaction sact{};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
+
+  sact.sa_handler = sighup;
+  PCHECK(sigaction(SIGHUP, &sact, nullptr) == 0);
 
   sact.sa_handler = sigquit;
   PCHECK(sigaction(SIGQUIT, &sact, nullptr) == 0);
@@ -1211,6 +1243,11 @@ int server()
     // LOG(INFO) << "server waiting for connections…";
     // google::FlushLogFiles(google::INFO);
 
+    if (sig_hup) {
+      log_stats();
+      sig_hup = false;
+    }
+
     auto readable     = allsock;
     auto ready_fd_cnt = select(maxsock + 1, &readable, NULL, NULL, NULL);
 
@@ -1218,7 +1255,7 @@ int server()
       if (errno != EINTR) {
         auto const errmsg = std::strerror(errno);
         LOG(ERROR) << "select: " << errmsg;
-        sleep(1);
+        (void)sleep(1);
       }
       continue;
     }
@@ -1264,9 +1301,6 @@ int server()
       default: LOG(FATAL) << "Unknown addrlen " << srv.remote_addr_size;
       }
 
-      // LOG(INFO) << "accepted (fd=" << accepted_fd << ") for "
-      // << srv.remote_string;
-      /* LOG(INFO) << "attempt " << */
       auto& connection = connections[srv.remote_string];
 
       auto const now = time(nullptr);
@@ -1289,7 +1323,7 @@ int server()
           std::string error_str =
               fmt::format("421 4.3.0 {} Try again later.\r\n", msg);
           (void)write(accepted_fd, error_str.data(), error_str.size());
-          (void)close(accepted_fd);
+          PCHECK(close(accepted_fd) == 0);
           LOG(INFO) << msg;
           --rate.count;
           limited = true;
@@ -1303,8 +1337,8 @@ int server()
         connection.ncurrent--;
         char const too_many[] =
             "421 4.3.0 Too many concurrent connections, try again later.\r\n";
-        write(accepted_fd, too_many, sizeof(too_many));
-        close(accepted_fd);
+        (void)write(accepted_fd, too_many, sizeof(too_many));
+        PCHECK(close(accepted_fd) == 0);
         LOG(INFO) << "too many concurrent connections from "
                   << srv.remote_string;
         continue;
@@ -1313,8 +1347,8 @@ int server()
       if (connection.tainted) {
         connection.ncurrent--;
         char const msg[] = "550 5.7.1 sender blocked\r\n";
-        write(accepted_fd, msg, sizeof(msg));
-        close(accepted_fd);
+        (void)write(accepted_fd, msg, sizeof(msg));
+        PCHECK(close(accepted_fd) == 0);
         LOG(INFO) << "tainted sender " << srv.remote_string;
         continue;
       }
@@ -1325,25 +1359,18 @@ int server()
       int pid = fork();
 
       if (pid < 0) { // fork error
-        auto const errmsg = std::strerror(errno);
-        LOG(ERROR) << "fork: " << errmsg;
-        sleep(1);
-        close(accepted_fd);
-        continue; // check next con
+        LOG(FATAL) << "fork: " << std::strerror(errno);
       }
 
       if (pid > 0) { // parent
         servers[pid] = srv;
-
-        LOG(INFO) << "pid == " << pid << " for " << srv.remote_string
-                  << " accepted fd == " << accepted_fd;
-
-        close(accepted_fd); // We passed this to our child.
-        continue;           // check next srv
+        LOG(INFO) << fmt::format("pid == {} for {:15}", pid, srv.remote_string);
+        PCHECK(close(accepted_fd) == 0); // We passed this to our child.
+        continue;                        // Check next srv…
       }
 
       CHECK_EQ(pid, 0); // child
-      setsid();
+      PCHECK(setsid() != -1);
 
       // Drop root
       uid_t ruid, euid, suid;
@@ -1402,34 +1429,13 @@ int server()
     service.fd = -1;
   }
 
-  for (auto const& [addr, conn] : connections) {
-    LOG(INFO) << "\n" << addr;
-    LOG(INFO) << "  current: " << conn.ncurrent;
-    LOG(INFO) << "    total: " << conn.ntotal;
-    LOG(INFO) << " attempts: " << conn.attempts;
-    LOG(INFO) << "   errors: " << conn.nerrors;
-
-    for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
-      auto constexpr bfr_sz = sizeof("2099-99-99T99:99:99Z");
-      char start_time_buf[bfr_sz];
-      CHECK_EQ(strftime(start_time_buf, sizeof start_time_buf, "%FT%TZ",
-                        gmtime(&conn.rates[rate_num].start)),
-               sizeof(start_time_buf) - 1);
-
-      LOG(INFO) << "     rate: " << conn.rates[rate_num].count;
-      LOG(INFO) << "   of max: " << rate_counters[rate_num].max;
-      LOG(INFO) << "    since: " << start_time_buf;
-      LOG(INFO) << "in window: " << rate_counters[rate_num].window;
-    }
-
-    LOG(INFO) << " tainted: " << conn.tainted;
-  }
+  log_stats();
 
   for (auto n = 0; servers.size(); ++n) {
     LOG(WARNING) << (n ? "still " : "") << "waiting for " << servers.size()
                  << " running servers";
 
-    sleep(n);
+    (void)sleep(n & 3);
 
     if (n > 5) {
       for (auto const& [pid, srv] : servers) {
