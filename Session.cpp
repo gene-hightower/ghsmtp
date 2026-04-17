@@ -1444,6 +1444,17 @@ bool Session::cmd_unrecognized(std::string_view cmd)
   return true;
 }
 
+bool Session::random_garbage(std::string_view garbage)
+{
+  auto const escaped = esc(garbage.substr(0, 50)); // show just the start
+  LOG(WARNING) << garbage.size() << " bytes of random garbage, starts with: \""
+               << escaped << "\"";
+  out_() << "500 5.5.1 command unrecognized, starts with: \"" << escaped
+         << "\"\r\n"
+         << std::flush;
+  return false;
+}
+
 void Session::bare_lf()
 {
   // Error code used by Office 365.

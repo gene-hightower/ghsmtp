@@ -71,6 +71,7 @@ public:
   void auth();
   void error(std::string_view log_msg);
   bool cmd_unrecognized(std::string_view log_msg);
+  bool random_garbage(std::string_view log_msg);
   void bare_lf();
 
   void max_out();

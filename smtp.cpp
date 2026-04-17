@@ -51,16 +51,17 @@ constexpr auto smtp_max_str_length =
 enum {
   EXIT_ = 32,             // sort all the others past this one
   EXIT_AUTH_FAIL,         // we don't support AUTH
-  EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_GREETING,      //
+  EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
   EXIT_BARE_LF,           // hard fail on bare '\n'
   EXIT_EXCPETION,         // unknown exception
+  EXIT_IO_TIME_OUT,       // too much time waiting for read or write
   EXIT_MAXED_OUT,         // too much data
+  EXIT_RANDOM_GARBAGE,    // not even a text line ending in CRLF
   EXIT_SMTP_SYNTAX_ERROR, // some protocol parser error
   EXIT_TIME_OUT,          // too much time overall
   EXIT_TOO_MANY_BAD_CMDS, // eventually, we cut them off
-  EXIT_IO_TIME_OUT,       // too much time waiting for read or write
 };
 
 std::string exit_as_text(int ret)
@@ -68,16 +69,17 @@ std::string exit_as_text(int ret)
   switch (ret) { // clang-format off
   case EXIT_SUCCESS:           return "SUCCESS";
   case EXIT_AUTH_FAIL:         return "AUTH_FAIL";
-  case EXIT_BAD_LO:            return "BAD_LO";
   case EXIT_BAD_GREETING:      return "BAD_GREETING";
+  case EXIT_BAD_LO:            return "BAD_LO";
   case EXIT_BAD_MAIL_FROM:     return "BAD_MAIL_FROM";
   case EXIT_BARE_LF:           return "BARE_LF";
   case EXIT_EXCPETION:         return "EXCPETION";
+  case EXIT_IO_TIME_OUT:       return "IO_TIME_OUT";
   case EXIT_MAXED_OUT:         return "MAXED_OUT";
+  case EXIT_RANDOM_GARBAGE:    return "RANDOM_GARBAGE";
   case EXIT_SMTP_SYNTAX_ERROR: return "SMTP_SYNTAX_ERROR";
   case EXIT_TIME_OUT:          return "TIME_OUT";
   case EXIT_TOO_MANY_BAD_CMDS: return "TOO_MANY_BAD_CMDS";
-  case EXIT_IO_TIME_OUT:       return "IO_TIME_OUT";
   } // clang-format on
   return fmt::format("{}", ret);
 }
@@ -421,7 +423,8 @@ struct auth : seq<TAO_PEGTL_ISTRING("AUTH"),
 
 struct bogus_cmd_short : seq<rep_min_max<0, 3, not_one<'\r', '\n'>>, CRLF> {};
 struct bogus_cmd_long
-  : seq<rep_min_max<4, smtp_max_line_length, not_one<'\r', '\n'>>, CRLF> {};
+  : seq<rep_min_max<4, smtp_max_str_length, not_one<'\r', '\n'>>, CRLF> {};
+struct random_garbage : rep_min_max<0, smtp_max_line_length, any> {};
 
 // Command matches after bogus_cmd_short can assume to have 4 or more
 // chars before the CRLF, so can use TAO_PEGTL_ISTRING<"XXXX"> in the
@@ -450,7 +453,9 @@ struct any_cmd : seq<sor<bogus_cmd_short,
                          mail_from,
                          rcpt_to,
 
-                         bogus_cmd_long>,
+                         bogus_cmd_long,
+
+                         random_garbage>,
                      discard> {};
 
 struct grammar : plus<any_cmd> {};
@@ -481,6 +486,18 @@ struct action<bogus_cmd_long> {
     LOG(INFO) << "bogus_cmd_long";
     if (!ctx.session.cmd_unrecognized(in.string())) {
       smtp_exit(EXIT_TOO_MANY_BAD_CMDS);
+    }
+  }
+};
+
+template <>
+struct action<random_garbage> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    LOG(INFO) << "random_garbage";
+    if (!ctx.session.random_garbage(in.string())) {
+      smtp_exit(EXIT_RANDOM_GARBAGE);
     }
   }
 };
