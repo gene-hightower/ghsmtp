@@ -171,7 +171,7 @@ private:
   CDB block_;
 
   // Forwards
-  CDB forward_;
+  // CDB forward_;
 
   size_t max_msg_size_;
 
