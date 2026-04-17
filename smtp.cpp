@@ -1322,6 +1322,15 @@ int server()
 
       ++connection.attempts;
 
+      if (connection.tainted) {
+        connection.last_rejected = time(nullptr);
+        char const msg[]         = "550 5.7.1 sender blocked\r\n";
+        (void)write(accepted_fd, msg, sizeof(msg));
+        PCHECK(close(accepted_fd) == 0);
+        LOG(INFO) << "tainted sender " << srv.remote_string;
+        continue;
+      }
+
       bool limited = false;
       for (auto rate_num = 0uz; rate_num < std::size(connection.rates);
            ++rate_num) {
@@ -1358,16 +1367,6 @@ int server()
         PCHECK(close(accepted_fd) == 0);
         LOG(INFO) << "too many concurrent connections from "
                   << srv.remote_string;
-        continue;
-      }
-
-      if (connection.tainted) {
-        connection.ncurrent--;
-        connection.last_rejected = time(nullptr);
-        char const msg[]         = "550 5.7.1 sender blocked\r\n";
-        (void)write(accepted_fd, msg, sizeof(msg));
-        PCHECK(close(accepted_fd) == 0);
-        LOG(INFO) << "tainted sender " << srv.remote_string;
         continue;
       }
 
