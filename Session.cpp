@@ -343,16 +343,15 @@ bool Session::greeting()
     // Wait a bit of time for pre-greeting traffic.
     if (!(ip_allowed_ || fcrdns_allowed_)) {
       if (sock_.input_ready(Config::greeting_wait)) {
-        out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
+        out_() << "550 5.7.1 not accepting network messages\r\n" << std::flush;
         LOG(INFO) << "input before any greeting from " << client_;
         bad_host_("input before any greeting");
         return false;
       }
       // Give a half greeting and wait again.
-      out_() << "220-" << server_id_() << " ESMTP slowstart - ghsmtp\r\n"
-             << std::flush;
+      out_() << "220-" << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
       if (sock_.input_ready(Config::greeting_wait)) {
-        out_() << "421 4.3.2 not accepting network messages\r\n" << std::flush;
+        out_() << "550 5.7.1 not accepting network messages\r\n" << std::flush;
         LOG(INFO) << "input before full greeting from " << client_;
         bad_host_("input before full greeting");
         return false;
@@ -374,17 +373,10 @@ bool Session::greeting()
         out_() << "220\r\n" << std::flush;
 
       */
-      out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
     }
-    else {
-      out_() << "220 " << server_id_() << " ESMTP faststart - ghsmtp\r\n"
-             << std::flush;
-    }
-  }
-  else {
-    out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
   }
 
+  out_() << "220 " << server_id_() << " ESMTP - ghsmtp\r\n" << std::flush;
   LOG(INFO) << "connect from " << client_;
 
   if ((!FLAGS_immortal) && (getenv("GHSMTP_IMMORTAL") == nullptr)) {
@@ -1420,17 +1412,21 @@ bool Session::cmd_unrecognized(std::string_view cmd)
   }
   else if (istarts_with(cmd, helo) || istarts_with(cmd, ehlo)) {
     auto const escaped_dom = esc(remove_crlf(cmd.substr(ehlo.size())));
-    LOG(WARNING) << "invalid domain: " << escaped_dom;
+    LOG(WARNING) << "HELO/EHLO with invalid domain: \"" << escaped_dom << "\"";
     out_() << "554 5.7.1 bad HELO/EHLO domain: " << escaped_dom;
+  }
+  else if (istarts_with(cmd, "HELO") || istarts_with(cmd, "EHLO")) {
+    LOG(WARNING) << "HELO/EHLO with no domain";
+    out_() << "554 5.7.1 bare HELO/EHLO with no domain";
   }
   else if (istarts_with(cmd, mail_from)) {
     auto const escaped_addr = esc(remove_crlf(cmd.substr(mail_from.size())));
-    LOG(WARNING) << "invalid MAIL FROM address: " << escaped_addr;
+    LOG(WARNING) << "invalid MAIL FROM address: \"" << escaped_addr << "\"";
     out_() << "501 5.1.7 bad sender address: " << escaped_addr;
   }
   else if (istarts_with(cmd, rcpt_to)) {
     auto const escaped_addr = esc(remove_crlf(cmd.substr(rcpt_to.size())));
-    LOG(WARNING) << "invalid RCPT TO address: " << escaped_addr;
+    LOG(WARNING) << "invalid RCPT TO address: \"" << escaped_addr << "\"";
     out_() << "501 5.1.3 bad recipient address: " << escaped_addr;
   }
   else {
