@@ -293,20 +293,26 @@ void Session::reset_()
 // Return codes from connection establishment are 220 or 554, according
 // to RFC 5321.  That's it.
 
-bool Session::greeting()
+bool Session::pre_greeting()
 {
   CHECK(state_ == xact_step::helo);
 
   if (sock_.has_peername()) {
-    close(2); // if we're a networked program, never send to stderr
-
     std::string error_msg;
     if (!verify_ip_address_(error_msg)) {
       LOG(INFO) << error_msg;
       bad_host_(error_msg.c_str());
       return false;
     }
+  }
+  return true;
+}
 
+bool Session::greeting()
+{
+  CHECK(state_ == xact_step::helo);
+
+  if (sock_.has_peername()) {
     /******************************************************************
     <https://tools.ietf.org/html/rfc5321#section-4.3.1> says:
 

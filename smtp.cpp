@@ -47,11 +47,12 @@ constexpr auto smtp_max_str_length =
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/abnf.hpp>
 
-// Process exit codes
+// Process exit codes, the EXIT_BAD_xxx codes taint the sender.
 enum {
   EXIT_ = 32,             // sort all the others past this one
   EXIT_AUTH_FAIL,         // we don't support AUTH
-  EXIT_BAD_GREETING,      // the EXIT_BAD_xxx codes taint the sender
+  EXIT_BAD_GREETING,      // pre-greeting traffic
+  EXIT_BAD_IP_ADDRESS,    // failed at connect, DNSBL
   EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
   EXIT_BARE_LF,           // hard fail on bare '\n'
@@ -68,9 +69,9 @@ enum {
 std::string exit_as_text(int ret)
 {
   switch (ret) { // clang-format off
-  case EXIT_SUCCESS:           return "SUCCESS";
   case EXIT_AUTH_FAIL:         return "AUTH_FAIL";
   case EXIT_BAD_GREETING:      return "BAD_GREETING";
+  case EXIT_BAD_IP_ADDRESS:    return "BAD_IP_ADDRESS";
   case EXIT_BAD_LO:            return "BAD_LO";
   case EXIT_BAD_MAIL_FROM:     return "BAD_MAIL_FROM";
   case EXIT_BARE_LF:           return "BARE_LF";
@@ -80,6 +81,7 @@ std::string exit_as_text(int ret)
   case EXIT_NO_DATA:           return "NO_DATA";
   case EXIT_RANDOM_GARBAGE:    return "RANDOM_GARBAGE";
   case EXIT_SMTP_SYNTAX_ERROR: return "SMTP_SYNTAX_ERROR";
+  case EXIT_SUCCESS:           return "SUCCESS";
   case EXIT_TIME_OUT:          return "TIME_OUT";
   case EXIT_TOO_MANY_BAD_CMDS: return "TOO_MANY_BAD_CMDS";
   } // clang-format on
@@ -918,9 +920,11 @@ int session()
     auto const read_hook{[&ctx]() { ctx->session.flush(); }};
     ctx = std::make_unique<RFC5321::Ctx>(config_path, read_hook);
 
-    if (!ctx->session.greeting()) {
+    if (!ctx->session.pre_greeting())
+      return EXIT_BAD_IP_ADDRESS;
+
+    if (!ctx->session.greeting())
       return EXIT_BAD_GREETING;
-    }
 
     istream_input<eol::crlf, 1> in(ctx->session.in(), FLAGS_cmd_bfr_size,
                                    "session");
@@ -1072,9 +1076,10 @@ void sigchild(int signum)
 
         // Any of these cases taint the sender.
         switch (exit_status) {
-        case EXIT_BAD_GREETING:  // Input before greeting, or dnsbl.
-        case EXIT_BAD_LO:        // Claimed identity is blocked.
-        case EXIT_BAD_MAIL_FROM: // Sender blocked.
+        case EXIT_BAD_GREETING:   // Input before greeting, or dnsbl.
+        case EXIT_BAD_IP_ADDRESS: // DNSBL
+        case EXIT_BAD_LO:         // Claimed identity is blocked.
+        case EXIT_BAD_MAIL_FROM:  // Sender blocked.
           connection.tainted    = true;
           connection.tainted_at = time(nullptr);
           break;

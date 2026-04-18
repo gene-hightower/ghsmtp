@@ -37,6 +37,7 @@ public:
       int                       fd_in     = STDIN_FILENO,
       int                       fd_out    = STDOUT_FILENO);
 
+  bool pre_greeting();
   bool greeting();
   bool ehlo(std::string_view client_identity)
   {
