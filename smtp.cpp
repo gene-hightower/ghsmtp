@@ -51,13 +51,14 @@ constexpr auto smtp_max_str_length =
 enum {
   EXIT_ = 32,             // sort all the others past this one
   EXIT_AUTH_FAIL,         // we don't support AUTH
-  EXIT_BAD_GREETING,      //
+  EXIT_BAD_GREETING,      // the EXIT_BAD_xxx codes taint the sender
   EXIT_BAD_LO,            // error from helo/ehlo
   EXIT_BAD_MAIL_FROM,     // verify_sender_ returned false
   EXIT_BARE_LF,           // hard fail on bare '\n'
   EXIT_EXCPETION,         // unknown exception
   EXIT_IO_TIME_OUT,       // too much time waiting for read or write
   EXIT_MAXED_OUT,         // too much data
+  EXIT_NO_DATA,           // zero length random garbage
   EXIT_RANDOM_GARBAGE,    // not even a text line ending in CRLF
   EXIT_SMTP_SYNTAX_ERROR, // some protocol parser error
   EXIT_TIME_OUT,          // too much time overall
@@ -76,6 +77,7 @@ std::string exit_as_text(int ret)
   case EXIT_EXCPETION:         return "EXCPETION";
   case EXIT_IO_TIME_OUT:       return "IO_TIME_OUT";
   case EXIT_MAXED_OUT:         return "MAXED_OUT";
+  case EXIT_NO_DATA:           return "NO_DATA";
   case EXIT_RANDOM_GARBAGE:    return "RANDOM_GARBAGE";
   case EXIT_SMTP_SYNTAX_ERROR: return "SMTP_SYNTAX_ERROR";
   case EXIT_TIME_OUT:          return "TIME_OUT";
@@ -495,10 +497,13 @@ struct action<random_garbage> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
   {
-    LOG(INFO) << "random_garbage";
-    if (!ctx.session.random_garbage(in.string())) {
-      smtp_exit(EXIT_RANDOM_GARBAGE);
+    if (in.string().size()) {
+      if (!ctx.session.random_garbage(in.string())) {
+        LOG(INFO) << "random_garbage";
+        smtp_exit(EXIT_RANDOM_GARBAGE);
+      }
     }
+    smtp_exit(EXIT_NO_DATA);
   }
 };
 

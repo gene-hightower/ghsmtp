@@ -1446,12 +1446,15 @@ bool Session::cmd_unrecognized(std::string_view cmd)
 
 bool Session::random_garbage(std::string_view garbage)
 {
-  auto const escaped = esc(garbage.substr(0, 50)); // show just the start
-  LOG(WARNING) << garbage.size() << " bytes of random garbage, starts with: \""
-               << escaped << "\"";
-  out_() << "500 5.5.1 command unrecognized, starts with: \"" << escaped
-         << "\"\r\n"
-         << std::flush;
+  if (garbage.size()) {
+    auto const escaped = esc(garbage.substr(0, 50)); // show just the start
+    LOG(WARNING) << garbage.size()
+                 << " bytes of random garbage, starts with: \"" << escaped
+                 << "\"";
+    out_() << "500 5.5.1 command unrecognized, starts with: \"" << escaped
+           << "\"\r\n"
+           << std::flush;
+  }
   return false;
 }
 
