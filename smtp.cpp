@@ -29,6 +29,7 @@ constexpr auto smtp_max_str_length =
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
+#include "CDB.hpp"
 #include "Session.hpp"
 #include "esc.hpp"
 #include "fs.hpp"
@@ -1183,6 +1184,11 @@ int server()
 {
   // LOG(INFO) << "running server";
 
+  CDB ip_block;
+  if (!ip_block.open(osutil::get_config_dir() / "ip-block")) {
+    LOG(INFO) << "can't open ip-block list";
+  }
+
   struct sigaction sact{};
   PCHECK(sigemptyset(&sact.sa_mask) == 0);
 
@@ -1358,6 +1364,16 @@ int server()
         continue;
       }
 
+      if (ip_block.is_open() && ip_block.contains(srv.remote_string.c_str())) {
+        connection.tainted    = true;
+        connection.tainted_at = time(nullptr);
+        char const msg[]      = "554 5.7.1 sender IP on static block list\r\n";
+        (void)write(accepted_fd, msg, sizeof(msg));
+        PCHECK(close(accepted_fd) == 0);
+        LOG(INFO) << "blocked sender " << srv.remote_string;
+        continue;
+      }
+
       bool limited = false;
       for (auto rate_num = 0uz; rate_num < std::size(connection.rates);
            ++rate_num) {
@@ -1388,9 +1404,9 @@ int server()
       if (++connection.ncurrent >= max_connections) {
         connection.ncurrent--;
         connection.last_rejected = time(nullptr);
-        char const too_many[] =
+        char const msg[] =
             "421 4.3.0 Too many concurrent connections, try again later.\r\n";
-        (void)write(accepted_fd, too_many, sizeof(too_many));
+        (void)write(accepted_fd, msg, sizeof(msg));
         PCHECK(close(accepted_fd) == 0);
         LOG(INFO) << "too many concurrent connections from "
                   << srv.remote_string;

@@ -36,17 +36,20 @@ public:
 
   uint16_t rnd_id()
   {
+    std::random_device rng;
     static_assert(std::numeric_limits<uint16_t>::min() == 0);
     static_assert(std::numeric_limits<uint16_t>::max() == 65535);
     std::uniform_int_distribution<int> uniform_dist(0, 65535);
-    return uniform_dist(rng_);
+    return uniform_dist(rng);
   }
+
+  void pick_a_server();
 
 private:
   std::unique_ptr<Sock> ns_sock_;
   int                   ns_;
-  int                   ns_fd_;
-  std::random_device    rng_;
+  int                   ns_fd_ = -1;
+  fs::path              config_path_;
 };
 
 class Query {

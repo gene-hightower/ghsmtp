@@ -151,13 +151,20 @@ constexpr std::size_t countof(T const (&)[N]) noexcept
 namespace DNS {
 
 Resolver::Resolver(fs::path config_path)
+  : config_path_(config_path)
+{
+  pick_a_server();
+}
+
+void Resolver::pick_a_server()
 {
   auto tries = countof(Config::nameservers);
 
   if (FLAGS_random_dns_servers) {
+    std::random_device                 rng;
     std::uniform_int_distribution<int> uniform_dist(
         0, countof(Config::nameservers) - 1);
-    ns_ = uniform_dist(rng_);
+    ns_ = uniform_dist(rng);
   }
   else {
     ns_ = static_cast<int>(countof(Config::nameservers) - 1);
@@ -170,12 +177,15 @@ Resolver::Resolver(fs::path config_path)
       ns_ = 0;
 
     auto const& nameserver = Config::nameservers[ns_];
-    auto typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
-                                                             : SOCK_DGRAM;
-
+    auto     typ = (nameserver.typ == Config::sock_type::stream) ? SOCK_STREAM
+                                                                 : SOCK_DGRAM;
     uint16_t port =
         osutil::get_port(nameserver.port, (typ == SOCK_STREAM) ? "tcp" : "udp");
-    ns_fd_ = -1;
+
+    if (ns_fd_ != -1) {
+      (void)close(ns_fd_);
+      ns_fd_ = -1;
+    }
 
     if (IP4::is_address(nameserver.addr)) {
       ns_fd_ = socket(AF_INET, typ, 0);
@@ -219,6 +229,7 @@ Resolver::Resolver(fs::path config_path)
     POSIX::set_nonblocking(ns_fd_);
 
     if (nameserver.typ == Config::sock_type::stream) {
+
       ns_sock_ = std::make_unique<Sock>(ns_fd_, ns_fd_);
       if (FLAGS_log_dns_data) {
         ns_sock_->log_data_on();
@@ -228,8 +239,8 @@ Resolver::Resolver(fs::path config_path)
       }
 
       if (port != 53) {
-        DNS::RR_collection tlsa_rrs; // empty FIXME!
-        if (!ns_sock_->tls_client(config_path, nullptr, nameserver.host,
+        DNS::RR_collection tlsa_rrs; // FIXME! Can't do DANE to DNS server.
+        if (!ns_sock_->tls_client(config_path_, nullptr, nameserver.host,
                                   tlsa_rrs, false, false)) {
           LOG(WARNING) << "TLS client failed for nameserver " << nameserver.host
                        << " [" << nameserver.addr << "]:" << nameserver.port;
@@ -341,7 +352,6 @@ std::vector<std::string> Resolver::get_strings(RR_type typ, char const* name)
 bool Query::xchg_(Resolver& res, uint16_t id)
 {
   auto tries = 3;
-
   while (tries) {
 
     a_ = res.xchg(q_);
@@ -385,24 +395,35 @@ Query::Query(Resolver& res, RR_type type, char const* name)
 
   q_ = create_question(name, type, cls, id);
 
-  if (!xchg_(res, id))
-    return;
+  auto tries = 3;
+  while (tries) {
 
-  auto const a_sp = static_cast<std::span<DNS::message::octet const>>(a_);
+    if (xchg_(res, id)) {
+      auto const a_sp = static_cast<std::span<DNS::message::octet const>>(a_);
 
-  if (a_sp.size() < message::min_sz()) {
-    bogus_or_indeterminate_ = true;
-    LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
-    return;
-  }
+      if (a_sp.size() < message::min_sz()) {
+        bogus_or_indeterminate_ = true;
+        LOG(INFO) << "bad (or no) reply for " << name << '/' << type;
+        return;
+      }
 
-  check_answer(nx_domain_, bogus_or_indeterminate_, rcode_, extended_rcode_,
-               truncation_, authentic_data_, has_record_, q_, a_, type, name);
+      check_answer(nx_domain_, bogus_or_indeterminate_, rcode_, extended_rcode_,
+                   truncation_, authentic_data_, has_record_, q_, a_, type,
+                   name);
 
-  if (truncation_) {
-    // if UDP, retry with TCP
-    bogus_or_indeterminate_ = true;
-    LOG(INFO) << "truncated answer for " << name << '/' << type;
+      if (truncation_) {
+        // if UDP, retry with TCP
+        bogus_or_indeterminate_ = true;
+        LOG(INFO) << "truncated answer for " << name << '/' << type;
+      }
+
+      break;
+    }
+
+    LOG(INFO) << "xchg with DNS server failed, trying another server";
+    res.pick_a_server();
+
+    --tries;
   }
 }
 
