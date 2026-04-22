@@ -1559,6 +1559,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
         fcrdns_allowed_ = true;
         return true;
       }
+      LOG(INFO) << "FCrDNS " << client_fcrdns << " not on allowed list";
       auto const tld = tld_db_.get_registered_domain(client_fcrdns.ascii());
       if (tld) {
         if (allow_.contains(tld)) {
@@ -1566,6 +1567,8 @@ bool Session::verify_ip_address_(std::string& error_msg)
           fcrdns_allowed_ = true;
           return true;
         }
+        LOG(INFO) << "FCrDNS registered domain " << tld
+                  << " not on allowed list";
       }
     }
     // check blocklist
