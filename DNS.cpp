@@ -160,6 +160,13 @@ void Resolver::pick_a_server()
 {
   auto tries = countof(Config::nameservers);
 
+  if (ns_ != -1) {
+    auto const& nameserver = Config::nameservers[ns_];
+    PLOG(INFO) << "xchg failed with " << nameserver.host << '['
+               << nameserver.addr << "]:" << nameserver.port
+               << " trying another server";
+  }
+
   if (FLAGS_random_dns_servers) {
     std::random_device                 rng;
     std::uniform_int_distribution<int> uniform_dist(
@@ -420,7 +427,6 @@ Query::Query(Resolver& res, RR_type type, char const* name)
       break;
     }
 
-    LOG(INFO) << "xchg with DNS server failed, trying another server";
     res.pick_a_server();
 
     --tries;
