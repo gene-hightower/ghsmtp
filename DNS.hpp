@@ -47,7 +47,7 @@ public:
 
 private:
   std::unique_ptr<Sock> ns_sock_;
-  int                   ns_;
+  int                   ns_ = -1;
   int                   ns_fd_ = -1;
   fs::path              config_path_;
 };
