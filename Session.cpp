@@ -89,6 +89,10 @@ char const* bls[]{
     "sbl-xbl.spamhaus.org",
 };
 
+/* Choice of sbl-xbl is the same as Zen but without the “Policy Block List”
+ * (PBL) since I'm okay with accepting mail from broadband or dial-up customers.
+ */
+
 /*** Last octet from A record returned by blocklists ***
 
 <https://www.spamhaus.org/faq/section/DNSBL%20Usage#200>
