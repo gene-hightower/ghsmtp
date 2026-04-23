@@ -162,9 +162,9 @@ void Resolver::pick_a_server()
 
   if (ns_ != -1) {
     auto const& nameserver = Config::nameservers[ns_];
-    PLOG(INFO) << "xchg failed with " << nameserver.host << '['
-               << nameserver.addr << "]:" << nameserver.port
-               << " trying another server";
+    LOG(INFO) << "xchg failed with " << nameserver.host << '['
+              << nameserver.addr << "]:" << nameserver.port
+              << " trying another server";
   }
 
   if (FLAGS_random_dns_servers) {
@@ -269,6 +269,8 @@ void Resolver::pick_a_server()
       ns_fd_ = -1;
     }
 
+    LOG(INFO) << "selected DNS server " << nameserver.host << '['
+              << nameserver.addr << "]:" << nameserver.port;
     return;
   }
 
