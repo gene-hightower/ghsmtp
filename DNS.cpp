@@ -162,9 +162,9 @@ void Resolver::pick_a_server()
 
   if (ns_ != -1) {
     auto const& nameserver = Config::nameservers[ns_];
-    PLOG(INFO) << "xchg failed with " << nameserver.host << '['
-               << nameserver.addr << "]:" << nameserver.port
-               << " trying another server";
+    LOG(INFO) << "xchg failed with " << nameserver.host << '['
+              << nameserver.addr << "]:" << nameserver.port
+              << " trying another server";
   }
 
   if (FLAGS_random_dns_servers) {
@@ -260,15 +260,20 @@ void Resolver::pick_a_server()
                          << ns_sock_->verified_peername();
           }
           ns_fd_ = -1;
+          LOG(INFO) << "using verified DNS server " << nameserver.host << '['
+                    << nameserver.addr << "]:" << nameserver.port;
           return;
         }
+        LOG(WARNING) << "not using unverified DNS server " << nameserver.host
+                     << '[' << nameserver.addr << "]:" << nameserver.port;
         close(ns_fd_);
         ns_fd_ = -1;
         continue;
       }
       ns_fd_ = -1;
     }
-
+    LOG(INFO) << "using DNS server " << nameserver.host << '['
+              << nameserver.addr << "]:" << nameserver.port;
     return;
   }
 
@@ -298,8 +303,10 @@ message Resolver::xchg(message const& q)
     CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sz));
 
     if (!ns_sock_->in()) {
-      LOG(WARNING) << "Resolver::xchg was able to read only "
-                   << ns_sock_->in().gcount() << " octets";
+      auto const actual_size = ns_sock_->in().gcount();
+      LOG(WARNING) << "Resolver::xchg was able to read only " << actual_size
+                   << " octets";
+      bfr.resize(actual_size);
     }
 
     return message{std::move(bfr)};
