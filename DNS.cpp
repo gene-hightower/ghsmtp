@@ -293,24 +293,20 @@ message Resolver::xchg(message const& q)
 
     sz = 0;
     ns_sock_->in().read(reinterpret_cast<char*>(&sz), sizeof sz);
-    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sizeof(sz)));
+    sz = ntohs(sz);
+
+    DNS::message::container_t bfr(sz);
+    ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
+    CHECK_EQ(ns_sock_->in().gcount(), std::streamsize(sz));
+
     if (!ns_sock_->in()) {
-      LOG(WARNING) << "Resolver::xchg was able to read only "
-                   << ns_sock_->in().gcount() << " octets";
-      return message{0};
+      auto const actual_size = ns_sock_->in().gcount();
+      LOG(WARNING) << "Resolver::xchg was able to read only " << actual_size
+                   << " octets";
+      bfr.resize(actual_size);
     }
-    else {
-      sz = ntohs(sz);
-      DNS::message::container_t bfr(sz);
-      ns_sock_->in().read(reinterpret_cast<char*>(bfr.data()), sz);
-      if (!ns_sock_->in()) {
-        auto const actual_size = ns_sock_->in().gcount();
-        LOG(WARNING) << "Resolver::xchg was able to read only " << actual_size
-                     << " octets";
-        bfr.resize(actual_size);
-      }
-      return message{std::move(bfr)};
-    }
+
+    return message{std::move(bfr)};
   }
 
   CHECK(Config::nameservers[ns_].typ == Config::sock_type::dgram);
