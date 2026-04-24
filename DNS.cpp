@@ -260,16 +260,19 @@ void Resolver::pick_a_server()
                          << ns_sock_->verified_peername();
           }
           ns_fd_ = -1;
+          LOG(INFO) << "using verified DNS server " << nameserver.host << '['
+                    << nameserver.addr << "]:" << nameserver.port;
           return;
         }
+        LOG(WARNING) << "not using unverified DNS server " << nameserver.host
+                     << '[' << nameserver.addr << "]:" << nameserver.port;
         close(ns_fd_);
         ns_fd_ = -1;
         continue;
       }
       ns_fd_ = -1;
     }
-
-    LOG(INFO) << "selected DNS server " << nameserver.host << '['
+    LOG(INFO) << "using DNS server " << nameserver.host << '['
               << nameserver.addr << "]:" << nameserver.port;
     return;
   }
