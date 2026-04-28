@@ -210,6 +210,7 @@ Session::Session(fs::path                  config_path,
   // forward_.open(forward_db_name);
 
   if (strlen(sock_.us_c_str()) && !IP::is_private(sock_.us_c_str())) {
+    server_fcrdns_.clear();
     auto fcrdns = DNS::fcrdns(res_, sock_.us_c_str());
     for (auto const& fcr : fcrdns) {
       server_fcrdns_.emplace_back(fcr);
@@ -410,6 +411,8 @@ void Session::check_for_pipeline_error_(std::string_view verb)
 
 bool Session::lo_(char const* verb, std::string_view client_identity_str)
 {
+  // Should never throw here, as client_identity_str has been matched by the
+  // parser.
   Domain client_identity(client_identity_str);
 
   last_in_group_(verb);
@@ -491,8 +494,10 @@ bool Session::lo_(char const* verb, std::string_view client_identity_str)
   out_() << std::flush;
 
   if (sock_.has_peername()) {
+    // If the client_identity_ matches a FCrDNS name…
     if (std::find(begin(client_fcrdns_), end(client_fcrdns_),
                   client_identity_) != end(client_fcrdns_)) {
+      // …then the full client_ string is a little redundant.
       LOG(INFO) << verb << " " << client_identity_ << " from "
                 << sock_.them_address_literal();
     }
@@ -677,12 +682,12 @@ std::string Session::added_headers_(MessageStore const& msg)
   // Received:
   // <https://tools.ietf.org/html/rfc5321#section-4.4>
   fmt::format_to(std::back_inserter(headers), "Received: from {}",
-                 client_identity_.utf8());
+                 client_identity_.ascii());
   if (sock_.has_peername()) {
     fmt::format_to(std::back_inserter(headers), " ({})", client_);
   }
   fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
-                 server_identity_.utf8(), protocol, msg.id().as_string_view());
+                 server_identity_.ascii(), protocol, msg.id().as_string_view());
   if (forward_path_.size()) {
     fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
                    forward_path_[0].as_string());
@@ -1516,6 +1521,19 @@ void Session::starttls()
 
 bool Session::verify_ip_address_(std::string& error_msg)
 {
+  client_fcrdns_.clear();
+  auto const fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
+  for (auto const& fcr : fcrdns) {
+    client_fcrdns_.emplace_back(fcr);
+  }
+  if (!client_fcrdns_.empty()) {
+    client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
+                          sock_.them_address_literal());
+  }
+  else {
+    client_ = sock_.them_address_literal();
+  }
+
   auto ip_block_db_name = config_path_ / "ip-block";
   CDB  ip_block;
   if (ip_block.open(ip_block_db_name) &&
@@ -1526,32 +1544,20 @@ bool Session::verify_ip_address_(std::string& error_msg)
     return false;
   }
 
-  client_fcrdns_.clear();
-
   if ((sock_.them_address_literal() == IP4::loopback_literal) ||
       (sock_.them_address_literal() == IP6::loopback_literal)) {
     LOG(INFO) << "loopback address allowed";
     ip_allowed_ = true;
-    client_fcrdns_.emplace_back(Domain{"localhost"});
-    client_ = fmt::format("localhost {}", sock_.them_address_literal());
     return true;
-  }
-
-  auto const fcrdns = DNS::fcrdns(res_, sock_.them_c_str());
-  for (auto const& fcr : fcrdns) {
-    client_fcrdns_.emplace_back(fcr);
   }
 
   if (IP::is_private(sock_.them_address_literal())) {
     LOG(INFO) << "private address allowed";
     ip_allowed_ = true;
-    client_     = sock_.them_address_literal();
     return true;
   }
 
   if (!client_fcrdns_.empty()) {
-    client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
-                          sock_.them_address_literal());
     // check allow list
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (allow_.contains_lc(client_fcrdns.ascii())) {
@@ -1590,9 +1596,6 @@ bool Session::verify_ip_address_(std::string& error_msg)
         }
       }
     }
-  }
-  else {
-    client_ = fmt::format("{}", sock_.them_address_literal());
   }
 
   if (IP4::is_address(sock_.them_c_str())) {
@@ -1671,10 +1674,10 @@ bool Session::verify_ip_address_(std::string& error_msg)
         }
       }
     }
-    // LOG(INFO) << "IP address " << sock_.them_c_str() << " cleared by dnsbls";
+    LOG(INFO) << "IP address " << sock_.them_c_str() << " not on any dnsbls";
   }
 
-  LOG(INFO) << "IP address okay";
+  // LOG(INFO) << "IP address okay";
   return true;
 }
 
@@ -1705,16 +1708,18 @@ bool Session::verify_client_(Domain const& client_identity,
                              std::string&  error_msg)
 {
   if (!client_fcrdns_.empty()) {
+    // If the HELO ident is one of the FCrDNS names…
     if (auto id = std::find(begin(client_fcrdns_), end(client_fcrdns_),
                             client_identity);
         id != end(client_fcrdns_)) {
-      // If the HELO ident is one of the FCrDNS names...
+      // …and that one isn't first in the list…
       if (id != begin(client_fcrdns_)) {
-        // ...then rotate that one to the front of the list
+        // …then rotate that one to the front of the list.
         std::rotate(begin(client_fcrdns_), id, id + 1);
       }
       client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
                             sock_.them_address_literal());
+      // Client's claimed identity matches FCrDNS.
       return true;
     }
     LOG(INFO) << "claimed identity " << client_identity
@@ -1756,8 +1761,9 @@ bool Session::verify_client_(Domain const& client_identity,
   boost::algorithm::split(labels, client_identity.ascii(),
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
-    error_msg = fmt::format("claimed bogus HELO/EHLO identity \"{}\"",
-                            client_identity.ascii());
+    error_msg =
+        fmt::format("claimed HELO/EHLO identity \"{}\" not fully qualified",
+                    client_identity.ascii());
     out_() << "550 5.7.1 bogus identity\r\n" << std::flush;
     return false;
     // // Sometimes we may want to look at mail from non conforming
@@ -1769,7 +1775,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (lookup_domain(block_, client_identity)) {
     error_msg =
-        fmt::format("claimed blocked identity \"{}\"", client_identity.ascii());
+        fmt::format("claimed identity \"{}\" blocked", client_identity.ascii());
     out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
@@ -1783,21 +1789,22 @@ bool Session::verify_client_(Domain const& client_identity,
   }
   else if (block_.contains(tld)) {
     error_msg = fmt::format(
-        "claimed identity has blocked registered domain \"{}\"", tld);
+        "claimed identity registered domain \"{}\" is blocked", tld);
     out_() << "550 5.7.1 blocked registered domain\r\n" << std::flush;
     return false;
   }
 
   if (domain_blocked(res_, client_identity) ||
       (tld && domain_blocked(res_, Domain(tld)))) {
-    error_msg =
-        fmt::format("claimed identity \"{}\" blocked", client_identity.ascii());
+    error_msg = fmt::format("claimed identity \"{}\" blocked by rbl",
+                            client_identity.ascii());
     out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
 
-  DNS::Query q(res_, DNS::RR_type::A, client_identity.ascii());
-  if (!q.has_record()) {
+  DNS::Query q_a(res_, DNS::RR_type::A, client_identity.ascii());
+  DNS::Query q_aaaa(res_, DNS::RR_type::AAAA, client_identity.ascii());
+  if (!(q_a.has_record() || q_aaaa.has_record())) {
     LOG(WARNING) << "claimed identity " << client_identity.ascii()
                  << " not DNS resolvable";
   }
