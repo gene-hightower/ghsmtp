@@ -1573,8 +1573,7 @@ bool snd(fs::path                    config_path,
 
     LOG(INFO) << "cnn.sock.tls_client(\"" << receiver.ascii() << "\");";
     cnn.sock.tls_client(config_path, sender.ascii().c_str(),
-                             receiver.ascii().c_str(), tlsa_rrs, enforce_dane,
-                             true);
+                        receiver.ascii().c_str(), tlsa_rrs, enforce_dane, true);
 
     LOG(INFO) << "TLS: " << cnn.sock.tls_info();
 
@@ -1653,72 +1652,6 @@ bool snd(fs::path                    config_path,
   std::string to =
       to_mbx.empty() ? smtp_to_mbx.as_string(enc) : to_mbx.as_string(enc);
 
-  auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
-
-  if (FLAGS_use_dkim) {
-    auto const dom = Mailbox(from).domain().ascii();
-    sign_eml(eml, dom.c_str(), bodies);
-  }
-  else if (FLAGS_bogus_dkim) {
-    eml.add_hdr("DKIM-Signature", "");
-  }
-
-  // Get the header as one big string
-  std::ostringstream hdr_stream;
-  hdr_stream << eml;
-  if (!FLAGS_rawmsg)
-    hdr_stream << "\r\n";
-  auto hdr_str = hdr_stream.view();
-
-  // In the case of DATA style transfer, this total_size number is an
-  // *estimate* only, as line endings may be translated or added
-  // during transfer.  In the BDAT case, this number must be exact.
-
-  auto const total_size = rng::accumulate(
-      bodies, hdr_str.size(),
-      [](size_t s, const content& body) { return s + body.size(); });
-
-  // auto total_size = hdr_str.size();
-  // for (auto const& body : bodies)
-  //   total_size += body.size();
-
-  if (ext_size && max_msg_size && (total_size > max_msg_size)) {
-    LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
-               << max_msg_size;
-    LOG(INFO) << "C: QUIT";
-    cnn.sock.out() << "QUIT\r\n" << std::flush;
-    CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
-    exit(EXIT_FAILURE);
-  }
-
-  std::ostringstream param_stream;
-  if (FLAGS_huge_size && ext_size) {
-    // Claim some huge size.
-    param_stream << " SIZE=" << std::numeric_limits<std::streamsize>::max();
-  }
-  else if (ext_size) {
-    param_stream << " SIZE=" << total_size;
-  }
-
-  if (ext_binarymime) {
-    param_stream << " BODY=BINARYMIME";
-  }
-  else if (ext_8bitmime) {
-    param_stream << " BODY=8BITMIME";
-  }
-
-  if (ext_prdr && (!smtp_to2_mbx.empty() || !smtp_to3_mbx.empty())) {
-    param_stream << " PRDR";
-  }
-
-  if (ext_deliverby) {
-    param_stream << " BY=1200;NT";
-  }
-
-  if (ext_smtputf8) {
-    param_stream << " SMTPUTF8";
-  }
-
   if (FLAGS_badpipline) {
     LOG(INFO) << "C: NOOP NOOP";
     cnn.sock.out() << "NOOP\r\nNOOP\r\n" << std::flush;
@@ -1728,9 +1661,75 @@ bool snd(fs::path                    config_path,
   bool rcpt_to2_ok = false;
   bool rcpt_to3_ok = false;
 
-  auto param_str = param_stream.str();
-
   for (auto count = 0UL; count < FLAGS_reps; ++count) {
+
+    auto eml{create_eml(sender, from, to, bodies, ext_smtputf8)};
+
+    if (FLAGS_use_dkim) {
+      auto const dom = Mailbox(from).domain().ascii();
+      sign_eml(eml, dom.c_str(), bodies);
+    }
+    else if (FLAGS_bogus_dkim) {
+      eml.add_hdr("DKIM-Signature", "");
+    }
+
+    // Get the header as one big string
+    std::ostringstream hdr_stream;
+    hdr_stream << eml;
+    if (!FLAGS_rawmsg)
+      hdr_stream << "\r\n";
+    auto hdr_str = hdr_stream.view();
+
+    // In the case of DATA style transfer, this total_size number is an
+    // *estimate* only, as line endings may be translated or added
+    // during transfer.  In the BDAT case, this number must be exact.
+
+    auto const total_size = rng::accumulate(
+        bodies, hdr_str.size(),
+        [](size_t s, const content& body) { return s + body.size(); });
+
+    // auto total_size = hdr_str.size();
+    // for (auto const& body : bodies)
+    //   total_size += body.size();
+
+    if (ext_size && max_msg_size && (total_size > max_msg_size)) {
+      LOG(ERROR) << "message size " << total_size << " exceeds size limit of "
+                 << max_msg_size;
+      LOG(INFO) << "C: QUIT";
+      cnn.sock.out() << "QUIT\r\n" << std::flush;
+      CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
+      exit(EXIT_FAILURE);
+    }
+
+    std::ostringstream param_stream;
+    if (FLAGS_huge_size && ext_size) {
+      // Claim some huge size.
+      param_stream << " SIZE=" << std::numeric_limits<std::streamsize>::max();
+    }
+    else if (ext_size) {
+      param_stream << " SIZE=" << total_size;
+    }
+
+    if (ext_binarymime) {
+      param_stream << " BODY=BINARYMIME";
+    }
+    else if (ext_8bitmime) {
+      param_stream << " BODY=8BITMIME";
+    }
+
+    if (ext_prdr && (!smtp_to2_mbx.empty() || !smtp_to3_mbx.empty())) {
+      param_stream << " PRDR";
+    }
+
+    if (ext_deliverby) {
+      param_stream << " BY=1200;NT";
+    }
+
+    if (ext_smtputf8) {
+      param_stream << " SMTPUTF8";
+    }
+
+    auto param_str = param_stream.str();
 
     LOG(INFO) << "C: MAIL FROM:<" << smtp_from_mbx.as_string(enc) << '>'
               << param_str;
