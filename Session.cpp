@@ -199,14 +199,30 @@ Session::Session(fs::path                  config_path,
 //, send_(config_path, "smtp")
 //, srs_(config_path)
 {
-  auto accept_db_name = config_path_ / "accept_domains";
-  auto allow_db_name  = config_path_ / "allow";
-  auto block_db_name  = config_path_ / "block";
+  auto accept_db_name              = config_path_ / "accept_domains";
+  auto allow_db_name               = config_path_ / "allow";
+  auto bad_recipients_data_db_name = config_path_ / "bad_recipients_data";
+  auto bad_recipients_db_name      = config_path_ / "bad_recipients";
+  auto bad_senders_db_name         = config_path_ / "bad_senders";
+  auto block_db_name               = config_path_ / "block";
+  auto fail_554_db_name            = config_path_ / "fail_554";
+  auto ip_block_db_name            = config_path_ / "ip-block";
+  auto temp_fail_data_db_name      = config_path_ / "temp_fail_data";
+
   // auto forward_db_name = config_path_ / "forward";
 
-  accept_domains_.open(accept_db_name);
-  allow_.open(allow_db_name);
-  block_.open(block_db_name);
+  // Required databases.
+  CHECK(accept_domains_.open(accept_db_name));
+  CHECK(allow_.open(allow_db_name));
+  CHECK(block_.open(block_db_name));
+
+  // Optional.
+  bad_recipients_data_.open(bad_recipients_data_db_name);
+  bad_recipients_.open(bad_recipients_db_name);
+  bad_senders_.open(bad_senders_db_name);
+  fail_554_.open(fail_554_db_name);
+  temp_fail_data_.open(temp_fail_data_db_name);
+
   // forward_.open(forward_db_name);
 
   if (strlen(sock_.us_c_str()) && !IP::is_private(sock_.us_c_str())) {
@@ -1058,31 +1074,19 @@ bool Session::do_deliver_()
 
 void Session::xfer_response_(std::string_view success_msg)
 {
-  auto bad_recipients_db_name = config_path_ / "bad_recipients_data";
-  CDB  bad_recipients_db;
-  if (!bad_recipients_db.open(bad_recipients_db_name)) {
-    LOG(WARNING) << "can't open bad_recipients_data";
-  }
-
-  auto temp_fail_db_name = config_path_ / "temp_fail_data";
-  CDB  temp_fail_db;
-  if (!temp_fail_db.open(temp_fail_db_name)) {
-    LOG(WARNING) << "can't open temp_fail_data";
-  }
-
   std::vector<std::string> bad_recipients;
-  if (bad_recipients_db.is_open()) {
+  if (bad_recipients_data_.is_open()) {
     for (auto fp : forward_path_) {
-      if (bad_recipients_db.contains_lc(fp.local_part())) {
+      if (bad_recipients_data_.contains(fp.local_part())) {
         bad_recipients.push_back(fp);
         LOG(WARNING) << "bad recipient " << fp;
       }
     }
   }
   std::vector<std::string> temp_failed;
-  if (temp_fail_db.is_open()) {
+  if (temp_fail_data_.is_open()) {
     for (auto fp : forward_path_) {
-      if (temp_fail_db.contains_lc(fp.local_part())) {
+      if (temp_fail_data_.contains(fp.local_part())) {
         temp_failed.push_back(fp);
         LOG(WARNING) << "temp failed recipient " << fp;
       }
@@ -1091,7 +1095,6 @@ void Session::xfer_response_(std::string_view success_msg)
 
   if (prdr_ && forward_path_.size() > 1 &&
       (bad_recipients.size() || temp_failed.size())) {
-
     if (forward_path_.size() == bad_recipients.size()) {
       out_() << "550 5.1.1 all recipients bad\r\n";
     }
@@ -1102,13 +1105,13 @@ void Session::xfer_response_(std::string_view success_msg)
       // this is the mixed situation
       out_() << "353 per recipient responses follow:\r\n";
       for (auto fp : forward_path_) {
-        if (bad_recipients_db.is_open() &&
-            bad_recipients_db.contains_lc(fp.local_part())) {
+        if (bad_recipients_.is_open() &&
+            bad_recipients_.contains(fp.local_part())) {
           out_() << "550 5.1.1 bad recipient " << fp << "\r\n";
           LOG(INFO) << "bad recipient " << fp;
         }
-        else if (temp_fail_db.is_open() &&
-                 temp_fail_db.contains_lc(fp.local_part())) {
+        else if (temp_fail_data_.is_open() &&
+                 temp_fail_data_.contains(fp.local_part())) {
           out_() << "450 4.1.1 temporary failure for " << fp << "\r\n";
           LOG(INFO) << "temp fail for " << fp;
         }
@@ -1534,10 +1537,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_ = sock_.them_address_literal();
   }
 
-  auto ip_block_db_name = config_path_ / "ip-block";
-  CDB  ip_block;
-  if (ip_block.open(ip_block_db_name) &&
-      ip_block.contains(sock_.them_c_str())) {
+  if (ip_block_.is_open() && ip_block_.contains(sock_.them_c_str())) {
     error_msg =
         fmt::format("IP address {} on static blocklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
@@ -1560,7 +1560,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
   if (!client_fcrdns_.empty()) {
     // check allow list
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (allow_.contains_lc(client_fcrdns.ascii())) {
+      if (allow_.contains(client_fcrdns.ascii())) {
         LOG(INFO) << "FCrDNS " << client_fcrdns << " allowed";
         fcrdns_allowed_ = true;
         return true;
@@ -1579,7 +1579,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     }
     // check blocklist
     for (auto const& client_fcrdns : client_fcrdns_) {
-      if (block_.contains_lc(client_fcrdns.ascii())) {
+      if (block_.contains(client_fcrdns.ascii())) {
         error_msg =
             fmt::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
@@ -1832,10 +1832,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
     return false;
   }
 
-  auto bad_senders_db_name = config_path_ / "bad_senders";
-  CDB  bad_senders;
-  if (bad_senders.open(bad_senders_db_name) &&
-      bad_senders.contains(sender_str)) {
+  if (bad_senders_.is_open() && bad_senders_.contains(sender_str)) {
     error_msg = fmt::format("{} bad sender", sender_str);
     out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
@@ -2005,7 +2002,6 @@ bool Session::verify_from_params_(parameters_t const& parameters)
       LOG(INFO) << "using PRDR";
       prdr_ = true;
     }
-
     else if (iequal(name, "SIZE")) {
       if (value.empty()) {
         LOG(WARNING) << "SIZE parameter has no value.";
@@ -2100,44 +2096,19 @@ bool Session::verify_recipient_(Mailbox const& recipient)
     return false;
   }
 
-  // if (recipient.local_part() == "gene" && client_fcrdns_.size() &&
-  //     client_fcrdns_[0].ascii().ends_with("outlook.com")) {
-  //   // Getting Spam'ed by MS
-  //   if (reverse_path_.empty() || (reverse_path_.length() > 40) ||
-  //       reverse_path_.domain().ascii().ends_with(".onmicrosoft.com")) {
-  //     std::string error_msg = fmt::format("rejecting spammy message from {}",
-  //                                         client_fcrdns_[0].ascii());
-  //     LOG(WARNING) << error_msg;
-  //     out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
-  //     return false;
-  //   }
-  // }
-
   // Check for local addresses we reject.
-  {
-    auto bad_recipients_db_name = config_path_ / "bad_recipients";
-    CDB  bad_recipients_db;
-    if (bad_recipients_db.open(bad_recipients_db_name) &&
-        bad_recipients_db.contains_lc(recipient.local_part())) {
-      out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
-      LOG(WARNING) << "bad recipient " << recipient;
-      return false;
-    }
+  if (bad_recipients_.is_open() &&
+      bad_recipients_.contains(recipient.local_part())) {
+    out_() << "550 5.1.1 bad recipient " << recipient << "\r\n" << std::flush;
+    LOG(WARNING) << "bad recipient " << recipient;
+    return false;
   }
 
-  {
-    auto fail_db_name = config_path_ / "fail_554";
-    if (fs::exists(fail_db_name)) {
-      CDB fail_db;
-      if (fail_db.open(fail_db_name) &&
-          fail_db.contains(recipient.local_part())) {
-        out_() << "554 5.7.1 prohibited for policy reasons" << recipient
-               << "\r\n"
-               << std::flush;
-        LOG(WARNING) << "fail_554 recipient " << recipient;
-        return false;
-      }
-    }
+  if (fail_554_.is_open() && fail_554_.contains(recipient.local_part())) {
+    out_() << "554 5.7.1 prohibited for policy reasons" << recipient << "\r\n"
+           << std::flush;
+    LOG(WARNING) << "fail_554 recipient " << recipient;
+    return false;
   }
 
   return true;
