@@ -58,16 +58,16 @@ std::streamsize SockBuffer::read(char* s, std::streamsize n)
   if (read != static_cast<std::streamsize>(-1)) {
     octets_read_ += read;
     total_octets_read_ += read;
+
+    if (log_data_) {
+      auto str = std::string(s, static_cast<size_t>(read));
+      LOG(INFO) << "< «" << esc(str, esc_line_option::multi) << "»";
+    }
   }
   if (maxed_out()) {
     LOG(ERROR) << "read of " << read << " puts total of " << octets_read_
                << " over limit of " << read_limit_;
     return static_cast<std::streamsize>(-1);
-  }
-
-  if (log_data_) {
-    auto str = std::string(s, static_cast<size_t>(read));
-    LOG(INFO) << "< «" << esc(str, esc_line_option::multi) << "»";
   }
 
   return read;
@@ -81,11 +81,11 @@ std::streamsize SockBuffer::write(const char* s, std::streamsize n)
   if (written != static_cast<std::streamsize>(-1)) {
     octets_written_ += written;
     total_octets_written_ += written;
-  }
 
-  if (log_data_) {
-    auto str = std::string(s, static_cast<size_t>(written));
-    LOG(INFO) << "> «" << esc(str, esc_line_option::multi) << "»";
+    if (log_data_) {
+      auto str = std::string(s, static_cast<size_t>(written));
+      LOG(INFO) << "> «" << esc(str, esc_line_option::multi) << "»";
+    }
   }
 
   return written;
