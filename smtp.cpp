@@ -924,8 +924,10 @@ int session()
     if (!ctx->session.pre_greeting())
       return EXIT_BAD_IP_ADDRESS;
 
-    if (!ctx->session.greeting())
+    if (!ctx->session.greeting()) {
+      ctx->session.flush(); // Try not to flush in d'tor.
       return EXIT_BAD_GREETING;
+    }
 
     istream_input<eol::crlf, 1> in(ctx->session.in(), FLAGS_cmd_bfr_size,
                                    "session");
