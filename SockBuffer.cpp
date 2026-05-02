@@ -46,6 +46,8 @@ SockBuffer::SockBuffer(SockBuffer const& that)
 
 std::streamsize SockBuffer::read(char* s, std::streamsize n)
 {
+  if (fd_in_ == -1)
+    return -1;
   if (maxed_out()) {
     LOG(ERROR) << "read attempted when"
                << " total of " << octets_read_ << " is over limit of "
@@ -64,6 +66,11 @@ std::streamsize SockBuffer::read(char* s, std::streamsize n)
       LOG(INFO) << "< «" << esc(str, esc_line_option::multi) << "»";
     }
   }
+  else {
+    // Timeout or connection reset.
+    (void)::close(fd_in_);
+    fd_in_ = -1;
+  }
   if (maxed_out()) {
     LOG(ERROR) << "read of " << read << " puts total of " << octets_read_
                << " over limit of " << read_limit_;
@@ -75,6 +82,8 @@ std::streamsize SockBuffer::read(char* s, std::streamsize n)
 
 std::streamsize SockBuffer::write(const char* s, std::streamsize n)
 {
+  if (fd_out_ == -1)
+    return -1;
   auto written = tls_active_
                      ? tls_.write(s, n, write_timeout_, timed_out_)
                      : POSIX::write(fd_out_, s, n, write_timeout_, timed_out_);
@@ -86,6 +95,11 @@ std::streamsize SockBuffer::write(const char* s, std::streamsize n)
       auto str = std::string(s, static_cast<size_t>(written));
       LOG(INFO) << "> «" << esc(str, esc_line_option::multi) << "»";
     }
+  }
+  else {
+    // Timeout or connection reset.
+    (void)::close(fd_out_);
+    fd_out_ = -1;
   }
 
   return written;

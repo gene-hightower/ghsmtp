@@ -95,8 +95,8 @@ public:
   void close_fds()
   {
     if (fd_in_ != fd_out_)
-      ::close(fd_in_);
-    ::close(fd_out_);
+      (void)::close(fd_in_);
+    (void)::close(fd_out_);
     fd_in_ = fd_out_ = -1;
   }
 
