@@ -216,14 +216,19 @@ Session::Session(fs::path                  config_path,
   CHECK(allow_.open(allow_db_name));
   CHECK(block_.open(block_db_name));
 
-  // Optional.
-  bad_recipients_data_.open(bad_recipients_data_db_name);
-  bad_recipients_.open(bad_recipients_db_name);
-  bad_senders_.open(bad_senders_db_name);
-  fail_554_.open(fail_554_db_name);
-  temp_fail_data_.open(temp_fail_data_db_name);
-
   // forward_.open(forward_db_name);
+
+  // These are optional.
+  if (fs::exists(bad_recipients_data_db_name))
+    CHECK(bad_recipients_data_.open(bad_recipients_data_db_name));
+  if (fs::exists(bad_recipients_db_name))
+    CHECK(bad_recipients_.open(bad_recipients_db_name));
+  if (fs::exists(bad_senders_db_name))
+    CHECK(bad_senders_.open(bad_senders_db_name));
+  if (fs::exists(fail_554_db_name))
+    CHECK(fail_554_.open(fail_554_db_name));
+  if (fs::exists(temp_fail_data_db_name))
+    CHECK(temp_fail_data_.open(temp_fail_data_db_name));
 
   if (strlen(sock_.us_c_str()) && !IP::is_private(sock_.us_c_str())) {
     server_fcrdns_.clear();
@@ -577,6 +582,7 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   // fwd_path_.clear();
   // fwd_from_.clear();
   forward_path_.clear();
+
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
 
@@ -658,8 +664,8 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
 
   LOG(INFO) << "RCPT TO:<" << rcpt_to_mbx << ">";
 
-  // No flush RFC-2920 section 3.1, this could be part of a command group.
   out_() << "250 2.1.5 RCPT TO OK\r\n";
+  // No flush RFC-2920 section 3.1, this could be part of a command group.
 
   state_ = xact_step::data;
 }
@@ -1150,6 +1156,8 @@ void Session::xfer_response_(std::string_view success_msg)
       out_() << "250 2.0.0 " << success_msg << " OK\r\n";
     }
   }
+
+  out_() << std::flush;
 }
 
 void Session::data_done()
@@ -1189,7 +1197,6 @@ void Session::data_done()
 
   xfer_response_("DATA");
 
-  out_() << std::flush;
   reset_();
 }
 
@@ -1304,7 +1311,6 @@ void Session::bdat_done(size_t n, bool last)
 
   xfer_response_(fmt::format("BDAT {} LAST", n));
 
-  out_() << std::flush;
   reset_();
 }
 
