@@ -164,12 +164,15 @@ private:
 
   std::random_device random_device_;
 
-  // Domains we receive mail for.
-  CDB accept_domains_;
-
-  // Allow and block lists for domains.
-  CDB allow_;
-  CDB block_;
+  CDB accept_domains_; // Domains we receive mail for.
+  CDB allow_;          // Allow list for domains.
+  CDB bad_recipients_;
+  CDB bad_recipients_data_;
+  CDB bad_senders_;
+  CDB block_; // Block list for domains.
+  CDB fail_554_;
+  CDB ip_block_;
+  CDB temp_fail_data_;
 
   // Forwards
   // CDB forward_;

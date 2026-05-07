@@ -1,6 +1,6 @@
 USES := ldns libglog libidn2 opendkim openssl libseccomp
 
-CXXFLAGS += -IPEGTL/include
+CXXFLAGS += -IPEGTL/include -DGLOG_USE_GLOG_EXPORT
 
 LDLIBS += \
 	-lboost_filesystem \
