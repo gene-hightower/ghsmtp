@@ -635,6 +635,18 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if (!verify_recipient_(forward_path))
     return;
 
+  /* MS bounce spam, see spam_status_().
+  if ((forward_path_.size() == 1 && forward_path_[0].local_part() == "gene") &&
+      reverse_path_.empty() && !client_fcrdns_.empty() &&
+      iends_with(client_fcrdns_[0].ascii(), ".outlook.com")) {
+    std::string error_msg = fmt::format(
+        "rejecting spammy bounce message from {}", client_fcrdns_[0].ascii());
+    LOG(WARNING) << error_msg;
+    out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
+    return;
+  }
+  */
+
   // V6 spam...
   if (IP6::is_address(sock_.them_c_str()) &&
       (forward_path.local_part() == "gene") &&
@@ -748,6 +760,13 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
+  // MS bounce spam.
+  if ((forward_path_.size() == 1 && forward_path_[0].local_part() == "gene") &&
+      reverse_path_.empty() && !client_fcrdns_.empty() &&
+      iends_with(client_fcrdns_[0].ascii(), ".outlook.com")) {
+    return {SpamStatus::spam, "MS bounce assumed to be spam"};
+  }
+
   if (spf_result_ == SPF::Result::FAIL && !ip_allowed_) {
     LOG(INFO) << "spam since SPF failed";
     return {SpamStatus::spam, "SPF failed"};
