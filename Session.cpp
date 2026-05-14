@@ -713,32 +713,35 @@ std::string Session::added_headers_(MessageStore const& msg)
     fmt::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
   }
 
-  // Received:
-  // <https://tools.ietf.org/html/rfc5321#section-4.4>
-  fmt::format_to(std::back_inserter(headers), "Received: from {}",
-                 client_identity_.ascii());
-  if (sock_.has_peername()) {
-    fmt::format_to(std::back_inserter(headers), " ({})", client_);
-  }
-  fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
-                 server_identity_.ascii(), protocol, msg.id().as_string_view());
-  if (forward_path_.size()) {
+  // Received: header(s)
+
+  // From <https://datatracker.ietf.org/doc/html/rfc5321#section-4.4>:
+  // “If the FOR clause appears, it MUST contain exactly one <path>
+  //  entry, even when multiple RCPT commands have been given.  Multiple
+  //  <path>s raise some security issues and have been deprecated, see
+  //  Section 7.2.”
+
+  // Since a Received: header is limited to one <path> I will add a
+  // Received: header for each item in forward_path_.
+
+  for (auto i = 0u; i < forward_path_.size(); ++i) {
+    fmt::format_to(std::back_inserter(headers), "Received: from {}",
+                   client_identity_.ascii());
+    if (sock_.has_peername()) {
+      fmt::format_to(std::back_inserter(headers), " ({})", client_);
+    }
+    fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
+                   server_identity_.ascii(), protocol,
+                   msg.id().as_string_view());
     fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
-                   forward_path_[0].as_string());
-    // From <https://datatracker.ietf.org/doc/html/rfc5321#section-4.4>:
-    // “If the FOR clause appears, it MUST contain exactly one <path>
-    //  entry, even when multiple RCPT commands have been given.  Multiple
-    //  <path>s raise some security issues and have been deprecated, see
-    //  Section 7.2.”
-    // for (auto i = 1u; i < forward_path_.size(); ++i)
-    //   fmt::format_to(headers, ",\r\n\t   <{}>", forward_path_[i]);
+                   forward_path_[i].as_string());
+    std::string const tls_info = sock_.tls_info();
+    if (tls_info.length()) {
+      fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
+    }
+    fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
+                   msg.when().as_string_view());
   }
-  std::string const tls_info = sock_.tls_info();
-  if (tls_info.length()) {
-    fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
-  }
-  fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
-                 msg.when().as_string_view());
 
   return fmt::to_string(headers);
 }
