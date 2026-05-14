@@ -9,7 +9,7 @@
 namespace Config {
 constexpr auto read_timeout_default     = std::chrono::seconds(30);
 constexpr auto write_timeout_default    = std::chrono::seconds(30);
-constexpr auto starttls_timeout_default = std::chrono::seconds(30);
+constexpr auto starttls_timeout_default = std::chrono::seconds(60);
 } // namespace Config
 
 class Sock {
