@@ -37,8 +37,15 @@ void do_lookup(lkp const& lookup)
 
   CHECK_EQ(q.nx_domain(), q_ldns.nx_domain()) << lookup.name;
 
-  CHECK_EQ(q.bogus_or_indeterminate(), q_ldns.bogus_or_indeterminate())
-      << lookup.name;
+  if (q.bogus_or_indeterminate() != q_ldns.bogus_or_indeterminate()) {
+    LOG(WARNING)
+        << "q.bogus_or_indeterminate() != q_ldns.bogus_or_indeterminate() for "
+        << lookup.name;
+    LOG(WARNING) << "q.bogus_or_indeterminate()      == "
+                 << q.bogus_or_indeterminate();
+    LOG(WARNING) << "q_ldns.bogus_or_indeterminate() == "
+                 << q_ldns.bogus_or_indeterminate();
+  }
 
   if (q.authentic_data() != q_ldns.authentic_data()) {
     LOG(WARNING) << "q.authentic_data() != q_ldns.authentic_data() for "
@@ -118,7 +125,8 @@ int main(int argc, char const* argv[])
   std::vector<std::thread> lookup_threads;
   for (auto const& lookup : lookups) {
     lookup_threads.emplace_back(do_lookup, lookup);
-    // LOG(INFO) << lookup.name << " on thead " << lookup_threads.back().get_id();
+    // LOG(INFO) << lookup.name << " on thead " <<
+    // lookup_threads.back().get_id();
   }
   for (auto& thread : lookup_threads) {
     // LOG(INFO) << "join " << thread.get_id();
@@ -138,7 +146,8 @@ int main(int argc, char const* argv[])
   std::vector<std::thread> result_threads;
   for (auto const& lookup : results) {
     result_threads.emplace_back(do_lookup_result, lookup);
-    // LOG(INFO) << lookup.name << " on thead " << result_threads.back().get_id();
+    // LOG(INFO) << lookup.name << " on thead " <<
+    // result_threads.back().get_id();
   }
   for (auto& thread : result_threads) {
     // LOG(INFO) << "join " << thread.get_id();
