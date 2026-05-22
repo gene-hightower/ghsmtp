@@ -199,8 +199,6 @@ struct address_literal : seq<one<'['>,
                                  general_address_literal>,
                              one<']'>> {};
 
-struct at_domain : seq<one<'@'>, domain> {};
-
 // The qtextSMTP rule explained: it's ASCII...
 // excluding all the control chars below SPACE
 //           34 '"' the double quote
@@ -248,7 +246,13 @@ struct non_local_part : sor<domain, address_literal> {};
 
 struct mailbox : seq<local_part, one<'@'>, non_local_part> {};
 
-struct path : seq<one<'<'>, mailbox, one<'>'>> {};
+struct domain_ignored : list_tail<sub_domain, dot> {};
+
+struct at_domain : seq<one<'@'>, domain_ignored> {};
+
+struct a_d_l : seq<at_domain, star<seq<one<','>, at_domain>>> {};
+
+struct path : seq<one<'<'>, opt<seq<a_d_l, one<':'>>>, mailbox, one<'>'>> {};
 
 struct bounce_path : seq<one<'<'>, one<'>'>> {};
 
@@ -581,6 +585,15 @@ struct action<magic_postmaster> {
   {
     ctx.mb_loc = std::string{"Postmaster"};
     ctx.mb_dom.clear();
+  }
+};
+
+template <>
+struct action<at_domain> {
+  template <typename Input>
+  static void apply(Input const& in, Ctx& ctx)
+  {
+    LOG(WARNING) << "Source routing " << in.string();
   }
 };
 

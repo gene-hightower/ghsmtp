@@ -1,0 +1,4 @@
+EHLO example.com
+MAIL FROM:<postmaster@example.com>
+RCPT TO:<@THREE,@TWO:foo-bar@digilicious.com>
+QUIT
