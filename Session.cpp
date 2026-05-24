@@ -763,11 +763,16 @@ bool lookup_domain(CDB& cdb, Domain const& domain)
 
 std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 {
-  // MS bounce spam.
-  if ((forward_path_.size() == 1 && forward_path_[0].local_part() == "gene") &&
-      reverse_path_.empty() && !client_fcrdns_.empty() &&
-      iends_with(client_fcrdns_[0].ascii(), ".outlook.com")) {
-    return {SpamStatus::spam, "MS bounce assumed to be spam"};
+  // MS spam.
+  if (forward_path_.size() == 1 && forward_path_[0].local_part() == "gene") {
+    if (!client_fcrdns_.empty() &&
+        iends_with(client_fcrdns_[0].ascii(), ".outlook.com")) {
+      // Bounce or from onmicrosoft.
+      if (reverse_path_.empty() ||
+          iends_with(reverse_path_.domain().ascii(), ".onmicrosoft.com")) {
+        return {SpamStatus::spam, "MS bounce/onmicrosoft assumed to be spam"};
+      }
+    }
   }
 
   if (spf_result_ == SPF::Result::FAIL && !ip_allowed_) {
