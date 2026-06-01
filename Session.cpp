@@ -875,6 +875,12 @@ static std::string folder(Session::SpamStatus         status,
   if (iends_with(forward_path[0].local_part(), "-at-duck"))
     return ".JunkDuck";
 
+  std::vector<std::string> labels;
+  boost::algorithm::split(labels, forward_path[0].domain().ascii(),
+                          boost::algorithm::is_any_of("."));
+  if (iends_with(labels[0], "-at-duck"))
+    return ".JunkDuck";
+
   if (status == Session::SpamStatus::spam)
     return ".Junk";
 
