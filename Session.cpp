@@ -1682,31 +1682,32 @@ bool Session::verify_ip_address_(std::string& error_msg)
                  random_device_);
 
     for (auto bl : Config::bls) {
+      auto const bl_tld = tld_db_.get_registered_domain(bl);
       DNS::Query q(res_, DNS::RR_type::A, reversed + bl);
       if (q.has_record()) {
         const auto a_strings = q.get_strings();
         for (auto const& as : a_strings) {
-          LOG(INFO) << bl << " returned " << as;
+          LOG(INFO) << bl_tld << " returned " << as;
         }
         for (auto const& as : a_strings) {
           if (as == "127.0.0.1") {
-            LOG(INFO) << "Should never get 127.0.0.1, from " << bl;
+            LOG(INFO) << "Should never get 127.0.0.1, from " << bl_tld;
           }
           else if (as == "127.0.0.10" || as == "127.0.0.11") {
-            LOG(INFO) << "PBL listed, ignoring " << bl;
+            LOG(INFO) << "PBL listed, ignoring " << bl_tld;
           }
           else if (as == "127.255.255.252") {
-            LOG(INFO) << "Typing error in DNSBL name " << bl;
+            LOG(INFO) << "Typing error in DNSBL name " << bl_tld;
           }
           else if (as == "127.255.255.254") {
-            LOG(INFO) << "Anonymous query through public resolver " << bl;
+            LOG(INFO) << "Anonymous query through public resolver " << bl_tld;
           }
           else if (as == "127.255.255.255") {
-            LOG(INFO) << "Excessive number of queries " << bl;
+            LOG(INFO) << "Excessive number of queries " << bl_tld;
           }
           else {
             error_msg = fmt::format("IP address {} blocked: {} returned {}",
-                                    sock_.them_c_str(), bl, as);
+                                    sock_.them_c_str(), bl_tld, as);
             out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
             return false;
           }
@@ -1835,7 +1836,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (domain_blocked(res_, client_identity) ||
       (tld && domain_blocked(res_, Domain(tld)))) {
-    error_msg = fmt::format("claimed identity \"{}\" blocked by rbl",
+    error_msg = fmt::format("claimed identity \"{}\" is blocked",
                             client_identity.ascii());
     out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
@@ -1964,10 +1965,10 @@ bool Session::verify_sender_domain_(Domain const& sender,
 void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
-    spf_received_      = fmt::format("Received-SPF: pass ({}: allow-listed) "
-                                          "client-ip={}; envelope-from={}; helo={};",
-                                     server_id_(), "127.0.0.1", sender.as_string(),
-                                     client_identity_.ascii());
+    spf_received_ = fmt::format("Received-SPF: pass ({}: allow-listed) "
+                                "client-ip={}; envelope-from={}; helo={};",
+                                server_id_(), "127.0.0.1", sender.as_string(),
+                                client_identity_.ascii());
     spf_sender_domain_ = Domain("localhost");
     return;
   }
