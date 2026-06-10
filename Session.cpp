@@ -35,54 +35,6 @@
 using namespace std::string_literals;
 
 namespace Config {
-/*
-char const* wls[]{
-    "list.dnswl.org",
-};
-*/
-
-/*
-<https://www.dnswl.org/?page_id=15#query>
-
-Return codes
-
-The return codes are structured as 127.0.x.y, with “x” indicating the category
-of an entry and “y” indicating how trustworthy an entry has been judged.
-
-Categories (127.0.X.y):
-
-    2 – Financial services
-    3 – Email Service Providers
-    4 – Organisations (both for-profit [ie companies] and non-profit)
-    5 – Service/network providers
-    6 – Personal/private servers
-    7 – Travel/leisure industry
-    8 – Public sector/governments
-    9 – Media and Tech companies
-    10 – some special cases
-    11 – Education, academic
-    12 – Healthcare
-    13 – Manufacturing/Industrial
-    14 – Retail/Wholesale/Services
-    15 – Email Marketing Providers
-    20 – Added through Self Service without specific category
-
-Trustworthiness / Score (127.0.x.Y):
-
-    0 = none – only avoid outright blocking (eg large ESP mailservers, -0.1)
-    1 = low – reduce chance of false positives (-1.0)
-    2 = medium – make sure to avoid false positives but allow override for clear
-cases (-10.0) 3 = high – avoid override (-100.0).
-
-The scores in parantheses are typical SpamAssassin scores.
-
-Special return code 127.0.0.255
-
-In cases where your nameserver issues more than 100’000 queries / 24 hours, you
-may be blocked from further queries. The return code “127.0.0.255” indicates
-this situation.
-
-*/
 
 char const* bls[]{
     "b.barracudacentral.org",
