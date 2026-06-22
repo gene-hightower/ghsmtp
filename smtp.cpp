@@ -1016,7 +1016,7 @@ std::unordered_map<pid_t, server> servers;
 static constexpr uint64_t max_connections = 2;
 
 struct counter_def {
-  uint64_t max;
+  uint64_t limit;
   time_t   window;
 };
 
@@ -1178,13 +1178,14 @@ void log_stats()
       CHECK_EQ(strftime(time_buf, sizeof time_buf, "%FT%TZ",
                         gmtime(&conn.rates[rate_num].start)),
                sizeof(time_buf) - 1);
+
       fmt::format_to(std::back_inserter(report),
                      "\n---- {} sec window ----"
                      "\n    count: {}"
-                     "\n      max: {}"
+                     "\n    limit: {}"
                      "\n    since: {}",
                      rate_counters[rate_num].window, conn.rates[rate_num].count,
-                     rate_counters[rate_num].max, time_buf);
+                     rate_counters[rate_num].limit, time_buf);
     }
     fmt::format_to(std::back_inserter(report),
                    "\n==============================");
@@ -1397,7 +1398,7 @@ int server()
           rate.count = 1;
           rate.start = now;
         }
-        else if (!limited && ++rate.count >= rate_counters[rate_num].max) {
+        else if (!limited && ++rate.count >= rate_counters[rate_num].limit) {
           connection.last_rejected = now;
           std::string msg =
               fmt::format("Too many connections {} within {} seconds.",
