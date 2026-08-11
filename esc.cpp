@@ -1,8 +1,7 @@
 #include "esc.hpp"
 
-#include <fmt/format.h>
-
 #include <algorithm>
+#include <format>
 #include <iomanip>
 
 std::string esc(std::string_view str, esc_line_option line_option)
@@ -35,7 +34,7 @@ std::string esc(std::string_view str, esc_line_option line_option)
         ret += c;
       }
       else {
-        ret += fmt::format("\\x{:02x}", static_cast<unsigned char>(c));
+        ret += std::format("\\x{:02x}", static_cast<unsigned char>(c));
       }
     }
   }
