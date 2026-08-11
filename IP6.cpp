@@ -3,14 +3,14 @@
 #include "DNS.hpp"
 #include "iequal.hpp"
 
-#include <fmt/format.h>
+#include <format>
 
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
+using tao::pegtl::digit;
 using tao::pegtl::eof;
 using tao::pegtl::memory_input;
 using tao::pegtl::one;
@@ -24,9 +24,7 @@ using tao::pegtl::seq;
 using tao::pegtl::sor;
 using tao::pegtl::string;
 using tao::pegtl::two;
-
-using tao::pegtl::abnf::DIGIT;
-using tao::pegtl::abnf::HEXDIG;
+using tao::pegtl::xdigit;
 
 #include <glog/logging.h>
 
@@ -37,15 +35,15 @@ using colon = one<':'>;
 
 // clang-format off
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
-                       seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<one<'1'>, rep<2, DIGIT>>,
-                       seq<range<'1', '9'>, DIGIT>,
-                       DIGIT
+                       seq<one<'2'>, range<'0','4'>, digit>,
+                       seq<one<'1'>, rep<2, digit>>,
+                       seq<range<'1', '9'>, digit>,
+                       digit
                       > {};
 struct ipv4_address
   : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {};
+struct h16 : rep_min_max<1, 4, xdigit> {};
 
 struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {};
 
@@ -91,7 +89,7 @@ auto is_address_literal(std::string_view addr) -> bool
 auto to_address_literal(std::string_view addr) -> std::string
 {
   CHECK(is_address(addr));
-  return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
+  return std::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
 auto reverse(std::string_view addr_str) -> std::string

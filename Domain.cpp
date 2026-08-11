@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <format>
 #include <stdexcept>
 
 #include <idn2.h>
@@ -19,16 +20,11 @@
 #include <glog/logging.h>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
-
-#include <fmt/format.h>
-#include <fmt/ostream.h>
 
 namespace RFC5321 {
 #include "UTF8.hpp"
@@ -36,13 +32,13 @@ namespace RFC5321 {
 using dot  = one<'.'>;
 using dash = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, one<'_'>, UTF8_non_ascii> {};
+struct u_let_dig : sor<alpha, digit, one<'_'>, UTF8_non_ascii> {};
 
 struct u_ldh_tail : star<sor<seq<plus<dash>, u_let_dig>, u_let_dig>> {};
 
 struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
-struct let_dig : sor<ALPHA, DIGIT, one<'_'>> {};
+struct let_dig : sor<alpha, digit, one<'_'>> {};
 
 struct ldh_tail : star<sor<seq<plus<dash>, let_dig>, let_dig>> {};
 
@@ -62,9 +58,6 @@ size_t constexpr max_dom_length = 253; // RFC-1035 section 3.1
 size_t constexpr max_lab_length = 63;
 } // namespace
 
-template <>
-struct fmt::formatter<Domain> : ostream_formatter {};
-
 namespace domain {
 bool is_fully_qualified(Domain const& dom, std::string& msg)
 {
@@ -78,12 +71,12 @@ bool is_fully_qualified(Domain const& dom, std::string& msg)
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) {
-    msg = fmt::format("domain «{}» must have two or more labels", dom);
+    msg = std::format("domain «{}» must have two or more labels", dom);
     return false;
   }
 
   if (labels[labels.size() - 1].length() < 2) {
-    msg = fmt::format("TLD «{}» must be two or more octets",
+    msg = std::format("TLD «{}» must be two or more octets",
                       labels[labels.size() - 1]);
     return false;
   }
@@ -96,9 +89,7 @@ bool is_fully_qualified(Domain const& dom, std::string& msg)
 struct free_deleter {
   template <typename T>
   void operator()(T* p) const
-  {
-    std::free(const_cast<std::remove_const_t<T>*>(p));
-  }
+  { std::free(const_cast<std::remove_const_t<T>*>(p)); }
 };
 
 template <typename T>
@@ -146,7 +137,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
     if (should_throw) {
       throw std::invalid_argument("failed to parse domain");
     }
-    msg = fmt::format("failed to parse domain «{}»", dom);
+    msg = std::format("failed to parse domain «{}»", dom);
     return false;
   }
 
@@ -157,7 +148,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
     if (dom.length() > max_dom_length) {
       if (should_throw)
         throw std::invalid_argument("domain name too long");
-      msg = fmt::format("domain name «{}» too long", dom);
+      msg = std::format("domain name «{}» too long", dom);
       return false;
     }
 
@@ -169,7 +160,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
       if (len > max_lab_length) {
         if (should_throw)
           throw std::invalid_argument("domain label too long");
-        msg = fmt::format("domain label «{}» too long",
+        msg = std::format("domain label «{}» too long",
                           std::string_view{lst, len});
         return false;
       }
@@ -205,7 +196,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
     auto const errmsg = std::strerror(errno);
     if (should_throw)
       throw std::invalid_argument(errmsg);
-    msg = fmt::format("u8_normalize(\"{}\") failed: ", dom, errmsg);
+    msg = std::format("u8_normalize(\"{}\") failed: ", dom, errmsg);
     return false;
   }
 
@@ -220,20 +211,20 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
     if (code == IDN2_TOO_BIG_DOMAIN) {
       if (should_throw)
         throw std::invalid_argument("domain name too long");
-      msg = fmt::format("domain name «{}» too long", norm);
+      msg = std::format("domain name «{}» too long", norm);
       return false;
     }
     if (code == IDN2_TOO_BIG_LABEL) {
       if (should_throw)
         throw std::invalid_argument("domain label too long");
-      msg = fmt::format("domain label «{}» too long", norm);
+      msg = std::format("domain label «{}» too long", norm);
       return false;
     }
     auto const errmsg = idn2_strerror(code);
     if (should_throw)
       throw std::invalid_argument(errmsg);
     msg =
-        fmt::format("idn2_to_ascii_8z(\"{}\", …, IDN2_TRANSITIONAL) failed: {}",
+        std::format("idn2_to_ascii_8z(\"{}\", …, IDN2_TRANSITIONAL) failed: {}",
                     norm, errmsg);
     return false;
   }
@@ -245,7 +236,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
   if (ascii.length() > max_dom_length) {
     if (should_throw)
       throw std::invalid_argument("domain name too long");
-    msg = fmt::format("domain name «{}» too long", ascii);
+    msg = std::format("domain name «{}» too long", ascii);
     return false;
   }
 
@@ -255,7 +246,7 @@ bool Domain::set_(std::string_view dom, bool should_throw, std::string& msg)
     auto errmsg = idn2_strerror(code);
     if (should_throw)
       throw std::invalid_argument(errmsg);
-    msg = fmt::format(
+    msg = std::format(
         "idn2_to_unicode_8z8z(\"{}\", …, IDN2_TRANSITIONAL) failed: {}", ascii,
         errmsg);
     return false;

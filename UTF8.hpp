@@ -20,6 +20,8 @@ struct UTF8_4 : sor<seq<one<'\xF0'>, range<'\x90', '\xBF'>, rep<2, UTF8_tail>>,
 
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
+struct VCHAR : range<'\x21', '\x7E'> {};
+
 struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {};
 
 // clang-format on

@@ -4,12 +4,6 @@
 
 #include <glog/logging.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
-template <>
-struct fmt::formatter<Mailbox> : ostream_formatter {};
-
 using namespace std::string_literals;
 
 int main(int argc, char* argv[])

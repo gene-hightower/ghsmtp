@@ -31,7 +31,6 @@
 #include <boost/iostreams/device/mapped_file.hpp>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 using std::begin;
 using std::end;
@@ -59,7 +58,6 @@ auto constexpr helo     = "helo";
 auto constexpr mailfrom = "mailfrom";
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 

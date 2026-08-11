@@ -4,6 +4,7 @@
 #include "osutil.hpp"
 
 #include <cstddef>
+#include <iostream>
 #include <memory>
 
 #include <arpa/inet.h>
@@ -14,8 +15,6 @@
 #include <unistd.h>
 
 #include <glog/logging.h>
-
-#include <fmt/format.h>
 
 #define CRLF "\r\n"
 
@@ -42,9 +41,7 @@ constexpr char const* c_str(auth_method auth)
 }
 
 std::ostream& operator<<(std::ostream& os, auth_method const& auth)
-{
-  return os << c_str(auth);
-}
+{ return os << c_str(auth); }
 
 class greeting {
   octet       version_{socks_version};
@@ -94,9 +91,7 @@ constexpr char const* c_str(address_type at)
 }
 
 std::ostream& operator<<(std::ostream& os, address_type const& at)
-{
-  return os << c_str(at);
-}
+{ return os << c_str(at); }
 
 class request_domain {
   octet        version_{socks_version};
@@ -129,9 +124,7 @@ class request4 {
   octet        port_lo_;
 
   void addr_(char const* addr)
-  {
-    CHECK_EQ(inet_pton(AF_INET, addr, reinterpret_cast<void*>(ip4_)), 1);
-  }
+  { CHECK_EQ(inet_pton(AF_INET, addr, reinterpret_cast<void*>(ip4_)), 1); }
   void port_(uint16_t port)
   {
     port_hi_ = hi(port);
@@ -176,9 +169,7 @@ constexpr char const* c_str(reply_field rp)
 }
 
 std::ostream& operator<<(std::ostream& os, reply_field const& rp)
-{
-  return os << c_str(rp);
-}
+{ return os << c_str(rp); }
 
 class reply4 {
   octet        version_;
@@ -210,7 +201,7 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
   CHECK(!domain.ascii().empty());
 
-  auto const tlsa{fmt::format("_{:d}._tcp.{}", port, domain.ascii())};
+  auto const tlsa{std::format("_{:d}._tcp.{}", port, domain.ascii())};
 
   DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
@@ -229,15 +220,11 @@ get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 
 template <class T>
 void read_checked(int fd, T& obj, std::string_view msg)
-{
-  PCHECK(read(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
-}
+{ PCHECK(read(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg; }
 
 template <class T>
 void write_checked(int fd, T const& obj, std::string_view msg)
-{
-  PCHECK(write(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg;
-}
+{ PCHECK(write(fd, &obj, sizeof(obj)) == sizeof(obj)) << msg; }
 } // namespace
 
 int main(int argc, char* argv[])

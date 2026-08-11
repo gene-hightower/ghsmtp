@@ -4,8 +4,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
-
-#include <fmt/format.h>
+#include <print>
 
 #include <glog/logging.h>
 
@@ -28,5 +27,5 @@ int main(int argc, char* argv[])
   dks.body("foo\r\nbar\r\nbaz\r\n");
   dks.eom();
 
-  fmt::print("DKIM-Signature: {}\n", dks.getsighdr());
+  std::println("DKIM-Signature: {}", dks.getsighdr());
 }

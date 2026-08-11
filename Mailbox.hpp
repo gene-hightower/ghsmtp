@@ -119,6 +119,18 @@ bool Mailbox::operator==(Mailbox const& rhs) const
 
 bool Mailbox::operator!=(Mailbox const& rhs) const { return !(*this == rhs); }
 
+template <>
+struct std::formatter<Mailbox> {
+  constexpr auto parse( format_parse_context& context ) {
+    return context.begin();
+  }
+
+  inline auto format(const Mailbox& mbox, std::format_context& context) const
+  {
+    return std::format_to(context.out(), "{}", static_cast<std::string>(mbox));
+  }
+};
+
 inline std::ostream& operator<<(std::ostream& s, Mailbox const& mb)
 {
   return s << static_cast<std::string>(mb);

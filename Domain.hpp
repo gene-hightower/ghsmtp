@@ -4,7 +4,8 @@
 #include "IP.hpp"
 
 #include <compare>
-#include <iostream>
+#include <format>
+#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -51,9 +52,7 @@ Domain::Domain(std::string_view dom)
 }
 
 bool Domain::validate(std::string_view domain, std::string& msg, Domain& dom)
-{
-  return dom.set_(domain, false /* don't throw */, msg);
-}
+{ return dom.set_(domain, false /* don't throw */, msg); }
 
 void Domain::clear()
 {
@@ -65,32 +64,39 @@ void Domain::clear()
 bool Domain::empty() const { return ascii_.empty(); }
 
 bool Domain::operator==(Domain const& rhs) const
-{
-  return ascii_ == rhs.ascii_;
-}
+{ return ascii_ == rhs.ascii_; }
 
 auto Domain::operator<=>(const Domain& rhs) const
-{
-  return ascii_ <=> rhs.ascii_;
-}
+{ return ascii_ <=> rhs.ascii_; }
 
 bool Domain::is_address_literal() const { return is_address_literal_; }
 bool Domain::is_unicode() const
-{
-  return (!utf8().empty()) && (utf8() != ascii());
-}
+{ return (!utf8().empty()) && (utf8() != ascii()); }
 
 std::string const& Domain::ascii() const { return ascii_; }
 std::string const& Domain::utf8() const
-{
-  return utf8_.empty() ? ascii_ : utf8_;
-}
+{ return utf8_.empty() ? ascii_ : utf8_; }
+
+template <>
+struct std::formatter<Domain> {
+  constexpr auto parse( format_parse_context& context ) {
+    return context.begin();
+  }
+
+  inline auto format(const Domain& dom, std::format_context& context) const
+  {
+    if (dom.is_unicode())
+      return std::format_to(context.out(), "{{{}, {}}}", dom.ascii(),
+                            dom.utf8());
+    else
+      return std::format_to(context.out(), "{}", dom.ascii());
+  }
+};
 
 inline std::ostream& operator<<(std::ostream& os, Domain const& dom)
 {
-  if (dom.is_unicode())
-    return os << '{' << dom.ascii() << ',' << dom.utf8() << '}';
-  return os << dom.ascii();
+  std::format_to(std::ostream_iterator<char>(os), "{}", dom);
+  return os;
 }
 
 namespace domain {
@@ -101,9 +107,7 @@ namespace std {
 template <>
 struct hash<Domain> {
   std::size_t operator()(Domain const& k) const
-  {
-    return hash<std::string>()(k.ascii());
-  }
+  { return hash<std::string>()(k.ascii()); }
 };
 } // namespace std
 

@@ -4,12 +4,10 @@
 
 #include <glog/logging.h>
 
-#include <fmt/format.h>
-
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 using tao::pegtl::action;
+using tao::pegtl::digit;
 using tao::pegtl::eof;
 using tao::pegtl::memory_input;
 using tao::pegtl::nothing;
@@ -22,8 +20,6 @@ using tao::pegtl::seq;
 using tao::pegtl::sor;
 using tao::pegtl::string;
 
-using tao::pegtl::abnf::DIGIT;
-
 namespace IP4 {
 
 using dot = one<'.'>;
@@ -31,10 +27,10 @@ using dot = one<'.'>;
 // clang-format off
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
-                       seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<one<'1'>, rep<2, DIGIT>>,
-                       seq<range<'1', '9'>, DIGIT>,
-                       DIGIT
+                       seq<one<'2'>, range<'0','4'>, digit>,
+                       seq<one<'1'>, rep<2, digit>>,
+                       seq<range<'1', '9'>, digit>,
+                       digit
                       > {};
 
 struct ipv4_address
@@ -56,16 +52,13 @@ struct ipv4_address_lit : seq<one<'['>,
 // clang-format on
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<dec_octet> {
   template <typename Input>
   static void apply(Input const& in, std::vector<std::string>& a)
-  {
-    a.push_back(in.string());
-  }
+  { a.push_back(in.string()); }
 };
 
 // <https://en.wikipedia.org/wiki/Private_network#Private_IPv4_addresses>
@@ -114,7 +107,7 @@ auto is_address_literal(std::string_view addr) -> bool
 auto to_address_literal(std::string_view addr) -> std::string
 {
   CHECK(is_address(addr));
-  return fmt::format("{}{}{}", lit_pfx, addr, lit_sfx);
+  return std::format("{}{}{}", lit_pfx, addr, lit_sfx);
 }
 
 std::string reverse(std::string_view addr)
@@ -125,6 +118,6 @@ std::string reverse(std::string_view addr)
   auto in{memory_input<>{addr.data(), addr.size(), "addr"}};
   CHECK((parse<ipv4_address, action>(in, a)));
 
-  return fmt::format("{}.{}.{}.{}.", a[3], a[2], a[1], a[0]);
+  return std::format("{}.{}.{}.{}.", a[3], a[2], a[1], a[0]);
 }
 } // namespace IP4

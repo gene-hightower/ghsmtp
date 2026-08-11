@@ -4,10 +4,8 @@
 #include <string>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 struct Address {
   std::string local_part;
@@ -39,6 +37,7 @@ struct non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 } // namespace RFC3629
 
 namespace Chars {
+struct VCHAR : range<'\x21', '\x7E'> {};
 struct VUCHAR : sor<VCHAR, RFC3629::non_ascii> {};
 
 // excluded from atext: "(),.@[]"

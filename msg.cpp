@@ -31,18 +31,14 @@ DEFINE_bool(selftest, false, "run a self test");
 #include "osutil.hpp"
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 // #include <tao/pegtl/contrib/tracer.hpp>
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 template <typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept
-{
-  return N;
-}
+{ return N; }
 
 namespace RFC5322 {
 
@@ -98,8 +94,8 @@ constexpr char const* defined_fields[]{
 bool is_defined_field(std::string_view name)
 {
   return std::find_if(std::begin(defined_fields), std::end(defined_fields),
-                      [=](std::string_view v) { return iequal(name, v); })
-         != std::end(defined_fields);
+                      [=](std::string_view v) { return iequal(name, v); }) !=
+         std::end(defined_fields);
 }
 
 char const* defined_field(std::string_view name)
@@ -113,9 +109,7 @@ char const* defined_field(std::string_view name)
 
 struct ci_less {
   bool operator()(std::string const& lhs, std::string const& rhs) const
-  {
-    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
-  }
+  { return strcasecmp(lhs.c_str(), rhs.c_str()) < 0; }
 };
 
 struct Ctx {
@@ -185,10 +179,12 @@ struct UTF8_4
 
 struct UTF8_non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 
+struct VCHAR : range<'\x21', '\x7E'> {};
 struct VUCHAR : sor<VCHAR, UTF8_non_ascii> {};
 
-using dot   = one<'.'>;
-using colon = one<':'>;
+using dquote = one<'"'>;
+using dot    = one<'.'>;
+using colon  = one<':'>;
 
 struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {};
 
@@ -198,13 +194,14 @@ struct text : sor<ranges<1, 9, 11, 12, 14, 127>, UTF8_non_ascii> {};
 // BINARYMIME allows any byte
 struct body : until<eof> {};
 
+struct WSP : one<' ', '\t'> {};
 struct FWS : seq<opt<seq<star<WSP>, eol>>, plus<WSP>> {};
 
 struct qtext : sor<one<33>, ranges<35, 91, 93, 126>, UTF8_non_ascii> {};
 
 struct quoted_pair : seq<one<'\\'>, sor<VUCHAR, WSP>> {};
 
-struct atext : sor<ALPHA, DIGIT,
+struct atext : sor<alpha, digit,
                    one<'!', '#',
                        '$', '%',
                        '&', '\'',
@@ -293,9 +290,9 @@ struct qcontent : sor<qtext, quoted_pair> {};
 // Corrected in errata ID: 3135
 struct quoted_string
   : seq<opt<CFWS>,
-        DQUOTE,
+        dquote,
         sor<seq<star<seq<opt<FWS>, qcontent>>, opt<FWS>>, FWS>,
-        DQUOTE,
+        dquote,
         opt<CFWS>> {};
 
 // *([FWS] VCHAR) *WSP
@@ -314,15 +311,15 @@ struct word : sor<atom, quoted_string> {};
 struct phrase : plus<sor<encoded_word, word>> {};
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
-                       seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<one<'1'>, rep<2, DIGIT>>,
-                       seq<range<'1', '9'>, DIGIT>,
-                       DIGIT
+                       seq<one<'2'>, range<'0','4'>, digit>,
+                       seq<one<'1'>, rep<2, digit>>,
+                       seq<range<'1', '9'>, digit>,
+                       digit
                       > {};
 struct ipv4_address
   : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {};
+struct h16 : rep_min_max<1, 4, xdigit> {};
 
 struct ls32 : sor<seq<h16, colon, h16>, ipv4_address> {};
 
@@ -410,7 +407,7 @@ struct group_list : sor<mailbox_list, CFWS> {};
 
 // 3.3. Date and Time Specification (mostly from RFC 2822)
 
-struct day : seq<opt<FWS>, rep_min_max<1, 2, DIGIT>> {};
+struct day : seq<opt<FWS>, rep_min_max<1, 2, digit>> {};
 
 struct month_name : sor<TAO_PEGTL_ISTRING("Jan"),
                         TAO_PEGTL_ISTRING("Feb"),
@@ -427,7 +424,7 @@ struct month_name : sor<TAO_PEGTL_ISTRING("Jan"),
 
 struct month : seq<FWS, month_name, FWS> {};
 
-struct year : rep<4, DIGIT> {};
+struct year : rep<4, digit> {};
 
 struct date : seq<day, month, year> {};
 
@@ -442,19 +439,19 @@ struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
 // struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
 // };
 
-// struct obs_day : seq<opt<CFWS>, rep_min_max<1, 2, DIGIT>, opt<CFWS>> {
+// struct obs_day : seq<opt<CFWS>, rep_min_max<1, 2, digit>, opt<CFWS>> {
 // };
 
-// struct obs_year : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// struct obs_year : seq<opt<CFWS>, rep<2, digit>, opt<CFWS>> {
 // };
 
-// struct obs_hour : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// struct obs_hour : seq<opt<CFWS>, rep<2, digit>, opt<CFWS>> {
 // };
 
-// struct obs_minute : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// struct obs_minute : seq<opt<CFWS>, rep<2, digit>, opt<CFWS>> {
 // };
 
-// struct obs_second : seq<opt<CFWS>, rep<2, DIGIT>, opt<CFWS>> {
+// struct obs_second : seq<opt<CFWS>, rep<2, digit>, opt<CFWS>> {
 // };
 
 // struct obs_day_of_week : seq<opt<CFWS>, day_name, opt<CFWS>> {
@@ -462,13 +459,13 @@ struct day_name : sor<TAO_PEGTL_ISTRING("Mon"),
 
 struct day_of_week : seq<opt<FWS>, day_name> {};
 
-struct hour : rep<2, DIGIT> {};
+struct hour : rep<2, digit> {};
 
-struct minute : rep<2, DIGIT> {};
+struct minute : rep<2, digit> {};
 
-struct second : rep<2, DIGIT> {};
+struct second : rep<2, digit> {};
 
-struct millisecond : rep<3, DIGIT> {};
+struct millisecond : rep<3, digit> {};
 
 // RFC-5322 extension is optional milliseconds
 struct time_of_day
@@ -493,7 +490,7 @@ struct time_of_day
 //                       TAO_PEGTL_ISTRING("PDT")> {
 // };
 
-struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, DIGIT>> {};
+struct zone : seq<sor<one<'+'>, one<'-'>>, rep<4, digit>> {};
 
 struct time : seq<time_of_day, FWS, zone> {};
 
@@ -808,8 +805,7 @@ struct message : seq<fields, opt<seq<eol, body>>, eof> {};
 // clang-format on
 
 template <typename Rule>
-struct action : nothing<Rule> {
-};
+struct action : nothing<Rule> {};
 
 template <>
 struct action<fields> {
@@ -824,34 +820,26 @@ template <>
 struct action<unstructured> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.unstructured = in.string();
-  }
+  { ctx.unstructured = in.string(); }
 };
 
 template <>
 struct action<field_name> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.opt_name = in.string();
-  }
+  { ctx.opt_name = in.string(); }
 };
 
 template <>
 struct action<field_value> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.opt_value = in.string();
-  }
+  { ctx.opt_value = in.string(); }
 };
 
 template <typename Input>
 static void header(Input const& in, Ctx& ctx)
-{
-  ctx.dkv.header(std::string_view(begin(in), end(in) - begin(in)));
-}
+{ ctx.dkv.header(std::string_view(begin(in), end(in) - begin(in))); }
 
 template <>
 struct action<optional_field> {
@@ -866,8 +854,8 @@ struct action<optional_field> {
         // LOG(INFO) << in.string();
       }
       else {
-        auto const err
-            = fmt::format("syntax error in: \"{}\"", esc(in.string()));
+        auto const err =
+            fmt::format("syntax error in: \"{}\"", esc(in.string()));
         ctx.msg_errors.push_back(err);
         LOG(ERROR) << err;
       }
@@ -952,9 +940,9 @@ struct action<sender> {
   static void apply(const Input& in, Ctx& ctx)
   {
     if (!ctx.sender.empty()) {
-      auto const err
-          = fmt::format("multiple 'Sender:' headers, previous: {}, this: {}",
-                        static_cast<std::string>(ctx.sender), in.string());
+      auto const err =
+          fmt::format("multiple 'Sender:' headers, previous: {}, this: {}",
+                      static_cast<std::string>(ctx.sender), in.string());
       ctx.msg_errors.push_back(err);
     }
     header(in, ctx);
@@ -1036,18 +1024,14 @@ template <>
 struct action<in_reply_to> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 template <>
 struct action<references> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 // Informational Fields
@@ -1076,9 +1060,7 @@ template <>
 struct action<keywords> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 // Resent Fields
@@ -1087,9 +1069,7 @@ template <>
 struct action<resent_date> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 template <>
@@ -1146,9 +1126,7 @@ template <>
 struct action<resent_msg_id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 // Trace Fields
@@ -1198,9 +1176,7 @@ template <>
 struct action<spf_key> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    ctx.key = std::move(in.string());
-  }
+  { ctx.key = std::move(in.string()); }
 };
 
 template <>
@@ -1389,9 +1365,7 @@ template <>
 struct action<subtype> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    ctx.subtype = in.string();
-  }
+  { ctx.subtype = in.string(); }
 };
 
 template <>
@@ -1408,27 +1382,21 @@ template <>
 struct action<id> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 template <>
 struct action<description> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    header(in, ctx);
-  }
+  { header(in, ctx); }
 };
 
 template <>
 struct action<attribute> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    ctx.key = in.string();
-  }
+  { ctx.key = in.string(); }
 };
 
 template <>
@@ -1446,9 +1414,7 @@ template <>
 struct action<value> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    ctx.value = in.string();
-  }
+  { ctx.value = in.string(); }
 };
 
 template <>
@@ -1583,27 +1549,21 @@ template <>
 struct action<obs_mbox_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    LOG(INFO) << "obsolete mailbox list: " << esc(in.string());
-  }
+  { LOG(INFO) << "obsolete mailbox list: " << esc(in.string()); }
 };
 
 template <>
 struct action<obs_addr_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    LOG(INFO) << "obsolete address list: " << esc(in.string());
-  }
+  { LOG(INFO) << "obsolete address list: " << esc(in.string()); }
 };
 
 template <>
 struct action<obs_group_list> {
   template <typename Input>
   static void apply(const Input& in, Ctx& ctx)
-  {
-    LOG(INFO) << "obsolete group list: " << esc(in.string());
-  }
+  { LOG(INFO) << "obsolete group list: " << esc(in.string()); }
 };
 
 template <>

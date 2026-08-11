@@ -8,8 +8,6 @@
 #include "message.hpp"
 #include "osutil.hpp"
 
-#include <fmt/format.h>
-
 #include <gflags/gflags.h>
 
 // This needs to be at least the length of each string it's trying to match.
@@ -22,10 +20,8 @@ DEFINE_string(local_address, "", "local address to bind");
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
@@ -264,27 +260,21 @@ template <>
 struct action<server_id> {
   template <typename Input>
   static void apply(Input const& in, Connection& conn)
-  {
-    conn.server_id = in.string();
-  }
+  { conn.server_id = in.string(); }
 };
 
 template <>
 struct action<local_part> {
   template <typename Input>
   static void apply(Input const& in, Mailbox& mbx)
-  {
-    mbx.set_local(in.string());
-  }
+  { mbx.set_local(in.string()); }
 };
 
 template <>
 struct action<non_local_part> {
   template <typename Input>
   static void apply(Input const& in, Mailbox& mbx)
-  {
-    mbx.set_domain(in.string());
-  }
+  { mbx.set_domain(in.string()); }
 };
 
 template <>
@@ -329,9 +319,7 @@ template <>
 struct action<ehlo_param> {
   template <typename Input>
   static void apply(Input const& in, Connection& conn)
-  {
-    conn.ehlo_param.push_back(in.string());
-  }
+  { conn.ehlo_param.push_back(in.string()); }
 };
 
 template <>
@@ -361,9 +349,7 @@ template <>
 struct action<reply_code> {
   template <typename Input>
   static void apply(Input const& in, Connection& conn)
-  {
-    conn.reply_code = in.string();
-  }
+  { conn.reply_code = in.string(); }
 };
 } // namespace SMTP
 

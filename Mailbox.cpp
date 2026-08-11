@@ -6,18 +6,13 @@
 #include <boost/algorithm/string/split.hpp>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 #include <glog/logging.h>
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 #include "is_ascii.hpp"
 
@@ -46,10 +41,11 @@ struct non_ascii : sor<UTF8_2, UTF8_3, UTF8_4> {};
 } // namespace RFC3629
 
 namespace Chars {
+struct VCHAR : range<'\x21', '\x7E'> {};
 struct VUCHAR : sor<VCHAR, RFC3629::non_ascii> {};
 
 // excluded from atext: "(),.@[]"
-struct atext : sor<ALPHA, DIGIT,
+struct atext : sor<alpha, digit,
                    one<'!', '#',
                        '$', '%',
                        '&', '\'',
@@ -70,13 +66,13 @@ namespace RFC5321 {
 using dot = one<'.'>;
 using colon = one<':'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, RFC3629::non_ascii> {};
+struct u_let_dig : sor<alpha, digit, RFC3629::non_ascii> {};
 
 struct u_ldh_tail : star<sor<seq<plus<one<'-'>>, u_let_dig>, u_let_dig>> {};
 
 struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
-struct let_dig : sor<ALPHA, DIGIT> {};
+struct let_dig : sor<alpha, digit> {};
 
 struct ldh_tail : star<sor<seq<plus<one<'-'>>, let_dig>, let_dig>> {};
 
@@ -89,13 +85,13 @@ struct sub_domain : sor<label, u_label> {};
 struct domain : list<sub_domain, dot> {};
 
 struct dec_octet : sor<seq<string<'2','5'>, range<'0','5'>>,
-                       seq<one<'2'>, range<'0','4'>, DIGIT>,
-                       seq<range<'0', '1'>, rep<2, DIGIT>>,
-                       rep_min_max<1, 2, DIGIT>> {};
+                       seq<one<'2'>, range<'0','4'>, digit>,
+                       seq<range<'0', '1'>, rep<2, digit>>,
+                       rep_min_max<1, 2, digit>> {};
 
 struct IPv4_address_literal : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {};
+struct h16 : rep_min_max<1, 4, xdigit> {};
 
 struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {};
 
@@ -236,9 +232,6 @@ struct action<non_local_part> {
 };
 } // namespace RFC5321
 
-template <>
-struct fmt::formatter<Mailbox> : ostream_formatter {};
-
 std::optional<Mailbox::parse_results> Mailbox::parse(std::string_view mailbox)
 {
   if (mailbox.empty())
@@ -322,7 +315,7 @@ bool Mailbox::set_(std::string_view mailbox,
                                                                  results)) {
     if (should_throw)
       throw std::invalid_argument("invalid mailbox syntax");
-    msg = fmt::format("invalid mailbox syntax «{}»", mailbox);
+    msg = std::format("invalid mailbox syntax «{}»", mailbox);
     return false;
   }
 
@@ -335,7 +328,7 @@ bool Mailbox::set_(std::string_view mailbox,
     if (should_throw)
       throw std::invalid_argument("general address literal in mailbox");
     msg =
-        fmt::format("general address literal in mailbox «{}», unknown tag «{}»",
+        std::format("general address literal in mailbox «{}», unknown tag «{}»",
                     mailbox, results.standardized_tag);
     return false;
   }

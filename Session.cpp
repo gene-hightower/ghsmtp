@@ -2,7 +2,9 @@
 #include <charconv>
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "DNS.hpp"
@@ -17,11 +19,10 @@
 #include "is_ascii.hpp"
 #include "osutil.hpp"
 
-#include <experimental/iterator>
-
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <fmt/ranges.h>
+
+#include <experimental/iterator>
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -32,7 +33,7 @@
 
 #include <gflags/gflags.h>
 
-using namespace std::string_literals;
+using namespace std::literals;
 
 namespace Config {
 
@@ -538,14 +539,14 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
 
-  fmt::memory_buffer params;
+  std::string params;
   for (auto const& [name, value] : parameters) {
-    fmt::format_to(std::back_inserter(params), " {}", name);
+    std::format_to(std::back_inserter(params), " {}", name);
     if (!value.empty()) {
-      fmt::format_to(std::back_inserter(params), "={}", value);
+      std::format_to(std::back_inserter(params), "={}", value);
     }
   }
-  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params;
 
   state_ = xact_step::rcpt;
   return true;
@@ -591,7 +592,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
   if ((forward_path_.size() == 1 && forward_path_[0].local_part() == "gene") &&
       reverse_path_.empty() && !client_fcrdns_.empty() &&
       iends_with(client_fcrdns_[0].ascii(), ".outlook.com")) {
-    std::string error_msg = fmt::format(
+    std::string error_msg = std::format(
         "rejecting spammy bounce message from {}", client_fcrdns_[0].ascii());
     LOG(WARNING) << error_msg;
     out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
@@ -604,7 +605,7 @@ void Session::rcpt_to(Mailbox&& forward_path, parameters_t const& parameters)
       (forward_path.local_part() == "gene") &&
       (iends_with(reverse_path_.domain().ascii(), ".firebaseapp.com") ||
        iends_with(reverse_path_.domain().ascii(), ".microsoft.com"))) {
-    std::string error_msg = fmt::format("rejecting spammy message from {}",
+    std::string error_msg = std::format("rejecting spammy message from {}",
                                         client_fcrdns_[0].ascii());
     LOG(WARNING) << error_msg;
     out_() << "550 5.7.0 " << error_msg << "\r\n" << std::flush;
@@ -654,15 +655,15 @@ std::string Session::added_headers_(MessageStore const& msg)
       return "SMTP";
   }()};
 
-  fmt::memory_buffer headers;
+  std::string headers;
 
   // Return-Path:
-  fmt::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
+  std::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
                  reverse_path_.as_string());
 
   // Received-SPF:
   if (!spf_received_.empty()) {
-    fmt::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
+    std::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
   }
 
   // Received: header(s)
@@ -677,25 +678,25 @@ std::string Session::added_headers_(MessageStore const& msg)
   // Received: header for each item in forward_path_.
 
   for (auto i = 0u; i < forward_path_.size(); ++i) {
-    fmt::format_to(std::back_inserter(headers), "Received: from {}",
+    std::format_to(std::back_inserter(headers), "Received: from {}",
                    client_identity_.ascii());
     if (sock_.has_peername()) {
-      fmt::format_to(std::back_inserter(headers), " ({})", client_);
+      std::format_to(std::back_inserter(headers), " ({})", client_);
     }
-    fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
+    std::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
                    server_identity_.ascii(), protocol,
                    msg.id().as_string_view());
-    fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
+    std::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
                    forward_path_[i].as_string());
     std::string const tls_info = sock_.tls_info();
     if (tls_info.length()) {
-      fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
+      std::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
     }
-    fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
+    std::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
                    msg.when().as_string_view());
   }
 
-  return fmt::to_string(headers);
+  return headers;
 }
 
 namespace {
@@ -747,14 +748,14 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 
   if (spf_result_ == SPF::Result::PASS) {
     if (lookup_domain(allow_, spf_sender_domain_)) {
-      why_ham.emplace_back(fmt::format("SPF sender domain ({}) is allowed",
+      why_ham.emplace_back(std::format("SPF sender domain ({}) is allowed",
                                        spf_sender_domain_.utf8()));
     }
     else {
       auto const tld_dom =
           tld_db_.get_registered_domain(spf_sender_domain_.ascii());
       if (tld_dom && allow_.contains(tld_dom)) {
-        why_ham.emplace_back(fmt::format(
+        why_ham.emplace_back(std::format(
             "SPF sender registered domain ({}) is allowed", tld_dom));
       }
     }
@@ -765,7 +766,7 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 
   if (fcrdns_allowed_) {
     why_ham.emplace_back(
-        fmt::format("FCrDNS (or it's registered domain) is allowed"));
+        std::format("FCrDNS (or it's registered domain) is allowed"));
   }
   else {
     LOG(INFO) << "not ham since fcrdns not allowed";
@@ -866,8 +867,8 @@ bool Session::msg_new()
     auto const hdrs = added_headers_(*(msg_.get()));
     msg_->write(hdrs);
 
-    // fmt::memory_buffer spam_status;
-    // fmt::format_to(spam_status, "X-Spam-Status: {}, {}\r\n",
+    // std::string spam_status;
+    // std::format_to(back_insterer(spam_status), "X-Spam-Status: {}, {}\r\n",
     //                ((status == SpamStatus::spam) ? "Yes" : "No"), reason);
     // msg_->write(spam_status.data(), spam_status.size());
 
@@ -1295,7 +1296,7 @@ void Session::bdat_done(size_t n, bool last)
     return;
   }
 
-  xfer_response_(fmt::format("BDAT {} LAST", n));
+  xfer_response_(std::format("BDAT {} LAST", n));
 
   reset_();
 }
@@ -1522,7 +1523,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     client_fcrdns_.emplace_back(fcr);
   }
   if (!client_fcrdns_.empty()) {
-    client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
+    client_ = std::format("{} {}", client_fcrdns_.front().ascii(),
                           sock_.them_address_literal());
   }
   else {
@@ -1531,7 +1532,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
 
   if (ip_block_.is_open() && ip_block_.contains(sock_.them_c_str())) {
     error_msg =
-        fmt::format("IP address {} on static blocklist", sock_.them_c_str());
+        std::format("IP address {} on static blocklist", sock_.them_c_str());
     out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
@@ -1573,7 +1574,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
     for (auto const& client_fcrdns : client_fcrdns_) {
       if (block_.contains(client_fcrdns.ascii())) {
         error_msg =
-            fmt::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
+            std::format("FCrDNS {} on static blocklist", client_fcrdns.ascii());
         out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
         return false;
       }
@@ -1581,7 +1582,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
       auto const tld = tld_db_.get_registered_domain(client_fcrdns.ascii());
       if (tld) {
         if (block_.contains(tld)) {
-          error_msg = fmt::format(
+          error_msg = std::format(
               "FCrDNS registered domain {} on static blocklist", tld);
           out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
           return false;
@@ -1659,7 +1660,7 @@ bool Session::verify_ip_address_(std::string& error_msg)
             LOG(INFO) << "Excessive number of queries " << bl_tld;
           }
           else {
-            error_msg = fmt::format("IP address {} blocked: {} returned {}",
+            error_msg = std::format("IP address {} blocked: {} returned {}",
                                     sock_.them_c_str(), bl_tld, as);
             out_() << "554 5.7.1 " << error_msg << "\r\n" << std::flush;
             return false;
@@ -1681,7 +1682,7 @@ bool domain_blocked(DNS::Resolver& res, Domain const& identity)
     return false;
   }
   if (!identity.ascii().empty()) {
-    Domain     lookup(fmt::format("{}.dbl.spamhaus.org", identity.ascii()));
+    Domain     lookup(std::format("{}.dbl.spamhaus.org", identity.ascii()));
     DNS::Query q(res, DNS::RR_type::A, lookup.ascii());
     if (q.has_record()) {
       const auto a_strings = q.get_strings();
@@ -1710,7 +1711,7 @@ bool Session::verify_client_(Domain const& client_identity,
         // …then rotate that one to the front of the list.
         std::rotate(begin(client_fcrdns_), id, id + 1);
       }
-      client_ = fmt::format("{} {}", client_fcrdns_.front().ascii(),
+      client_ = std::format("{} {}", client_fcrdns_.front().ascii(),
                             sock_.them_address_literal());
       // Client's claimed identity matches FCrDNS.
       return true;
@@ -1745,7 +1746,7 @@ bool Session::verify_client_(Domain const& client_identity,
       return true;
     }
 
-    error_msg = fmt::format("liar, claimed to be {}", client_identity.ascii());
+    error_msg = std::format("liar, claimed to be {}", client_identity.ascii());
     out_() << "550 5.7.1 liar\r\n" << std::flush;
     return false;
   }
@@ -1755,7 +1756,7 @@ bool Session::verify_client_(Domain const& client_identity,
                           boost::algorithm::is_any_of("."));
   if (labels.size() < 2) {
     error_msg =
-        fmt::format("claimed HELO/EHLO identity \"{}\" not fully qualified",
+        std::format("claimed HELO/EHLO identity \"{}\" not fully qualified",
                     client_identity.ascii());
     out_() << "550 5.7.1 bogus identity\r\n" << std::flush;
     return false;
@@ -1768,7 +1769,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (lookup_domain(block_, client_identity)) {
     error_msg =
-        fmt::format("claimed identity \"{}\" blocked", client_identity.ascii());
+        std::format("claimed identity \"{}\" blocked", client_identity.ascii());
     out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
   }
@@ -1781,7 +1782,7 @@ bool Session::verify_client_(Domain const& client_identity,
     // return true;
   }
   else if (block_.contains(tld)) {
-    error_msg = fmt::format(
+    error_msg = std::format(
         "claimed identity registered domain \"{}\" is blocked", tld);
     out_() << "550 5.7.1 blocked registered domain\r\n" << std::flush;
     return false;
@@ -1789,7 +1790,7 @@ bool Session::verify_client_(Domain const& client_identity,
 
   if (domain_blocked(res_, client_identity) ||
       (tld && domain_blocked(res_, Domain(tld)))) {
-    error_msg = fmt::format("claimed identity \"{}\" is blocked",
+    error_msg = std::format("claimed identity \"{}\" is blocked",
                             client_identity.ascii());
     out_() << "550 5.7.1 blocked identity\r\n" << std::flush;
     return false;
@@ -1820,13 +1821,13 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   }
 
   if (domain_blocked(res_, sender.domain())) {
-    error_msg = fmt::format("{} sender domain blocked", sender_str);
+    error_msg = std::format("{} sender domain blocked", sender_str);
     out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
   if (bad_senders_.is_open() && bad_senders_.contains(sender_str)) {
-    error_msg = fmt::format("{} bad sender", sender_str);
+    error_msg = std::format("{} bad sender", sender_str);
     out_() << "550 5.1.8 " << error_msg << "\r\n" << std::flush;
     return false;
   }
@@ -1845,7 +1846,7 @@ bool Session::verify_sender_(Mailbox const& sender, std::string& error_msg)
   //       return true;
   //     }
   //     out_() << "550 5.7.1 liar\r\n" << std::flush;
-  //     error_msg = fmt::format("liar, claimed to be {}",
+  //     error_msg = std::format("liar, claimed to be {}",
   //     sender.domain().utf8()); return false;
   //   }
   // }
@@ -1883,13 +1884,13 @@ bool Session::verify_sender_domain_(Domain const& sender,
                           boost::algorithm::is_any_of("."));
 
   if (labels.size() < 2) { // This is not a valid domain.
-    error_msg = fmt::format("{} invalid syntax", sender.ascii());
+    error_msg = std::format("{} invalid syntax", sender.ascii());
     out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
   }
 
   if (lookup_domain(block_, sender)) {
-    error_msg = fmt::format("SPF sender domain ({}) is blocked",
+    error_msg = std::format("SPF sender domain ({}) is blocked",
                             spf_sender_domain_.ascii());
     out_() << "550 5.7.1 " << error_msg << "\r\n" << std::flush;
     return false;
@@ -1918,7 +1919,7 @@ bool Session::verify_sender_domain_(Domain const& sender,
 void Session::do_spf_check_(Mailbox const& sender)
 {
   if (!sock_.has_peername()) {
-    spf_received_ = fmt::format("Received-SPF: pass ({}: allow-listed) "
+    spf_received_ = std::format("Received-SPF: pass ({}: allow-listed) "
                                 "client-ip={}; envelope-from={}; helo={};",
                                 server_id_(), "127.0.0.1", sender.as_string(),
                                 client_identity_.ascii());

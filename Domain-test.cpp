@@ -4,12 +4,6 @@
 
 #include <glog/logging.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
-template <>
-struct fmt::formatter<Domain> : ostream_formatter {};
-
 using namespace std::string_literals;
 
 int main(int argc, char const* argv[])

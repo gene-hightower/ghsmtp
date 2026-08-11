@@ -46,7 +46,6 @@ constexpr auto smtp_max_str_length =
 #include <fmt/ranges.h>
 
 #include <tao/pegtl.hpp>
-#include <tao/pegtl/contrib/abnf.hpp>
 
 // Process exit codes, the EXIT_BAD_xxx codes taint the sender.
 enum {
@@ -103,7 +102,6 @@ std::string exit_as_text(int ret)
 }
 
 using namespace tao::pegtl;
-using namespace tao::pegtl::abnf;
 
 using namespace std::string_literals;
 
@@ -128,19 +126,20 @@ struct Ctx {
 
 #include "UTF8.hpp"
 
-struct quoted_pair : seq<one<'\\'>, sor<VCHAR, WSP>> {};
+struct wsp : one<' ', '\t'> {};
+struct quoted_pair : seq<one<'\\'>, sor<VCHAR, wsp>> {};
 
 using dot   = one<'.'>;
 using colon = one<':'>;
 using dash  = one<'-'>;
 
-struct u_let_dig : sor<ALPHA, DIGIT, UTF8_non_ascii> {};
+struct u_let_dig : sor<alpha, digit, UTF8_non_ascii> {};
 
 struct u_ldh_tail : star<sor<seq<plus<one<'-'>>, u_let_dig>, u_let_dig>> {};
 
 struct u_label : seq<u_let_dig, u_ldh_tail> {};
 
-struct let_dig : sor<ALPHA, DIGIT> {};
+struct let_dig : sor<alpha, digit> {};
 
 struct ldh_tail : star<sor<seq<plus<one<'-'>>, let_dig>, let_dig>> {};
 
@@ -153,14 +152,14 @@ struct sub_domain : u_label {};
 struct domain : list_tail<sub_domain, dot> {};
 
 struct dec_octet : sor<seq<string<'2', '5'>, range<'0', '5'>>,
-                       seq<one<'2'>, range<'0', '4'>, DIGIT>,
-                       seq<one<'1'>, rep<2, DIGIT>>,
-                       seq<range<'1', '9'>, DIGIT>,
-                       DIGIT> {};
+                       seq<one<'2'>, range<'0', '4'>, digit>,
+                       seq<one<'1'>, rep<2, digit>>,
+                       seq<range<'1', '9'>, digit>,
+                       digit> {};
 struct IPv4_address_literal
   : seq<dec_octet, dot, dec_octet, dot, dec_octet, dot, dec_octet> {};
 
-struct h16 : rep_min_max<1, 4, HEXDIG> {};
+struct h16 : rep_min_max<1, 4, xdigit> {};
 
 struct ls32 : sor<seq<h16, colon, h16>, IPv4_address_literal> {};
 
@@ -189,12 +188,12 @@ struct dcontent : ranges<33, 90, 94, 126> {};
 
 // struct standardized_tag : ldh_str {};
 
-// struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>> {};
+// struct general_address_literal : seq<standardized_tag, colon, plus<dcontent>>
+// {};
 
 // See rfc 5321 Section 4.1.3
 struct address_literal : seq<one<'['>,
-                             sor<IPv4_address_literal,
-                                 IPv6_address_literal>,
+                             sor<IPv4_address_literal, IPv6_address_literal>,
                              // Don't match General-address-literal
                              one<']'>> {};
 
@@ -221,7 +220,7 @@ struct quoted_string : seq<one<'"'>, plus<qcontentSMTP>, one<'"'>> {};
 // excluded from atext are the “specials”: "()<>[]:;@\\,."
 
 // clang-format off
-struct atext : sor<ALPHA, DIGIT,
+struct atext : sor<alpha, digit,
                    one<'!', '#',
                        '$', '%',
                        '&', '\'',
@@ -272,18 +271,25 @@ struct magic_postmaster : seq<one<'<'>,
 
 struct forward_path : sor<path, magic_postmaster> {};
 
-struct esmtp_keyword : seq<sor<ALPHA, DIGIT>, star<sor<ALPHA, DIGIT, dash>>> {};
+struct esmtp_keyword : seq<sor<alpha, digit>, star<sor<alpha, digit, dash>>> {};
 
 struct esmtp_value : plus<sor<range<33, 60>, range<62, 126>, UTF8_non_ascii>> {
 };
 
 struct esmtp_param : seq<esmtp_keyword, opt<seq<one<'='>, esmtp_value>>> {};
 
+struct SP : one<' '> {};
+
 struct mail_parameters : list<esmtp_param, SP> {};
 
 struct rcpt_parameters : list<esmtp_param, SP> {};
 
 struct string : sor<quoted_string, atom> {};
+
+struct CR : one<'\r'> {};
+struct LF : one<'\n'> {};
+
+struct CRLF : seq<CR, LF> {};
 
 struct helo
   : seq<TAO_PEGTL_ISTRING("HELO"), SP, sor<domain, address_literal>, CRLF> {};
@@ -315,7 +321,7 @@ struct rcpt_to : seq<TAO_PEGTL_ISTRING("RCPT"),
                      CRLF> {};
 // clang-format on
 
-struct chunk_size : plus<DIGIT> {};
+struct chunk_size : plus<digit> {};
 
 struct last : TAO_PEGTL_ISTRING("LAST") {};
 
@@ -380,10 +386,10 @@ struct quit : seq<TAO_PEGTL_ISTRING("QUIT"), CRLF> {};
 
 // Anti-AUTH support
 
-// base64-char     = ALPHA / DIGIT / "+" / "/"
+// base64-char     = alpha / digit / "+" / "/"
 //                   ;; Case-sensitive
 
-struct base64_char : sor<ALPHA, DIGIT, one<'+', '/'>> {};
+struct base64_char : sor<alpha, digit, one<'+'>, one<'/'>> {};
 
 // base64-terminal = (2base64-char "==") / (3base64-char "=")
 
@@ -410,7 +416,7 @@ struct UPPER_ALPHA : range<'A', 'Z'> {};
 using HYPHEN     = one<'-'>;
 using UNDERSCORE = one<'_'>;
 
-struct mech_char : sor<UPPER_ALPHA, DIGIT, HYPHEN, UNDERSCORE> {};
+struct mech_char : sor<UPPER_ALPHA, digit, HYPHEN, UNDERSCORE> {};
 struct sasl_mech : rep_min_max<1, 20, mech_char> {};
 
 // auth-command    = "AUTH" SP sasl-mech [SP initial-response]
@@ -517,18 +523,14 @@ template <>
 struct action<esmtp_keyword> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.param.first = in.string();
-  }
+  { ctx.param.first = in.string(); }
 };
 
 template <>
 struct action<esmtp_value> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.param.second = in.string();
-  }
+  { ctx.param.second = in.string(); }
 };
 
 template <>
@@ -591,9 +593,7 @@ template <>
 struct action<at_domain> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    LOG(WARNING) << "Source routing " << in.string();
-  }
+  { LOG(WARNING) << "Source routing " << in.string(); }
 };
 
 template <>
@@ -665,9 +665,7 @@ template <>
 struct action<chunk_size> {
   template <typename Input>
   static void apply(Input const& in, Ctx& ctx)
-  {
-    ctx.chunk_size = std::strtoull(in.string().c_str(), nullptr, 10);
-  }
+  { ctx.chunk_size = std::strtoull(in.string().c_str(), nullptr, 10); }
 };
 
 void bdat_act(Ctx& ctx, bool last)

@@ -3,6 +3,7 @@
 #include "DNS-iostream.hpp"
 
 #include <algorithm>
+//#include <format>
 #include <iomanip>
 
 #include <ldns/ldns.h>
@@ -12,8 +13,6 @@
 #include <arpa/inet.h>
 
 #include <glog/logging.h>
-
-#include <fmt/format.h>
 
 namespace DNS_ldns {
 
@@ -46,7 +45,7 @@ std::string rr_name_str(ldns_rdf const* rdf)
         // str += c;
       }
       // else if (!(isascii(c) && isgraph(c))) {
-      //   str += fmt::format("0x{:02x}", c);
+      //   str += std::format("0x{:02x}", c);
       // }
       // else {
       str += c;
