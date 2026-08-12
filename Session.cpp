@@ -786,8 +786,8 @@ static std::string folder(Session::SpamStatus         status,
       Mailbox("gene.hightower+caf_=forwarded-gmail=digilicious.com@gmail.com"))
     return ".Gmail";
 
-  if (reverse_path ==
-      Mailbox("gene.hightower+caf_=forwarded=digilicious.com@gmail.com"))
+  if (reverse_path.domain().ascii() == "gmail.com" &&
+      istarts_with(reverse_path.local_part(), "gene.hightower+caf_"))
     return ".Gmail";
 
   if (reverse_path == Mailbox("ietf-smtp-bounces@ietf.org"))
