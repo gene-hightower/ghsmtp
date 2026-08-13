@@ -539,14 +539,14 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
 
-  std::string params;
+  fmt::memory_buffer params;
   for (auto const& [name, value] : parameters) {
-    std::format_to(std::back_inserter(params), " {}", name);
+    fmt::format_to(std::back_inserter(params), " {}", name);
     if (!value.empty()) {
-      std::format_to(std::back_inserter(params), "={}", value);
+      fmt::format_to(std::back_inserter(params), "={}", value);
     }
   }
-  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params;
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
 
   state_ = xact_step::rcpt;
   return true;
@@ -655,15 +655,15 @@ std::string Session::added_headers_(MessageStore const& msg)
       return "SMTP";
   }()};
 
-  std::string headers;
+  fmt::memory_buffer headers;
 
   // Return-Path:
-  std::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
+  fmt::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
                  reverse_path_.as_string());
 
   // Received-SPF:
   if (!spf_received_.empty()) {
-    std::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
+    fmt::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
   }
 
   // Received: header(s)
@@ -678,25 +678,25 @@ std::string Session::added_headers_(MessageStore const& msg)
   // Received: header for each item in forward_path_.
 
   for (auto i = 0u; i < forward_path_.size(); ++i) {
-    std::format_to(std::back_inserter(headers), "Received: from {}",
+    fmt::format_to(std::back_inserter(headers), "Received: from {}",
                    client_identity_.ascii());
     if (sock_.has_peername()) {
-      std::format_to(std::back_inserter(headers), " ({})", client_);
+      fmt::format_to(std::back_inserter(headers), " ({})", client_);
     }
-    std::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
+    fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
                    server_identity_.ascii(), protocol,
                    msg.id().as_string_view());
-    std::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
+    fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
                    forward_path_[i].as_string());
     std::string const tls_info = sock_.tls_info();
     if (tls_info.length()) {
-      std::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
+      fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
     }
-    std::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
+    fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
                    msg.when().as_string_view());
   }
 
-  return headers;
+  return fmt::to_string(headers);
 }
 
 namespace {
