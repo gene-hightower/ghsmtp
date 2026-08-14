@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+using namespace std::string_literals;
+
 struct Session_test {
   static void test()
   {
@@ -46,6 +48,26 @@ struct Session_test {
     // IP address
     // auto error_msg{std::string{}};
     // CHECK(!sess.verify_ip_address_("blocklisted.digilicious.com"s));
+
+    sess.ehlo("example.com");
+
+    Session::parameters_t from_parameters;
+    from_parameters["BODY"s]     = "8BITMIME"s;
+    from_parameters["SIZE"s]     = "100"s;
+    from_parameters["SMTPUTF8"s] = ""s;
+    sess.mail_from(Mailbox("Postmaster", Domain("example.com")),
+                   from_parameters);
+
+    Session::parameters_t to_parameters;
+    sess.rcpt_to(Mailbox("foo-bar", Domain("digilicious.com")), to_parameters);
+
+    std::string_view data = "To: foo-bar@digilicious.com\r\n"
+                            "From: Postsmaster@example.com\r\n"
+                            "Subject: foo bar baz\r\n"
+                            "\r\nSome text.\r\n";
+    sess.data_start();
+    sess.msg_write(data.data(), data.size());
+    sess.data_done();
   }
 };
 
