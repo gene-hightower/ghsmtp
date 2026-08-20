@@ -19,9 +19,6 @@
 #include "is_ascii.hpp"
 #include "osutil.hpp"
 
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-
 #include <experimental/iterator>
 
 #include <boost/algorithm/string/classification.hpp>
@@ -539,14 +536,14 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
   out_() << "250 2.1.0 MAIL FROM OK\r\n";
   // No flush RFC-2920 section 3.1, this could be part of a command group.
 
-  fmt::memory_buffer params;
+  std::string params;
   for (auto const& [name, value] : parameters) {
-    fmt::format_to(std::back_inserter(params), " {}", name);
+    std::format_to(std::back_inserter(params), " {}", name);
     if (!value.empty()) {
-      fmt::format_to(std::back_inserter(params), "={}", value);
+      std::format_to(std::back_inserter(params), "={}", value);
     }
   }
-  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << fmt::to_string(params);
+  LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params;
 
   state_ = xact_step::rcpt;
   return true;
@@ -655,15 +652,15 @@ std::string Session::added_headers_(MessageStore const& msg)
       return "SMTP";
   }()};
 
-  fmt::memory_buffer headers;
+  std::string headers;
 
   // Return-Path:
-  fmt::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
+  std::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
                  reverse_path_.as_string());
 
   // Received-SPF:
   if (!spf_received_.empty()) {
-    fmt::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
+    std::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
   }
 
   // Received: header(s)
@@ -678,25 +675,25 @@ std::string Session::added_headers_(MessageStore const& msg)
   // Received: header for each item in forward_path_.
 
   for (auto i = 0u; i < forward_path_.size(); ++i) {
-    fmt::format_to(std::back_inserter(headers), "Received: from {}",
+    std::format_to(std::back_inserter(headers), "Received: from {}",
                    client_identity_.ascii());
     if (sock_.has_peername()) {
-      fmt::format_to(std::back_inserter(headers), " ({})", client_);
+      std::format_to(std::back_inserter(headers), " ({})", client_);
     }
-    fmt::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
+    std::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
                    server_identity_.ascii(), protocol,
                    msg.id().as_string_view());
-    fmt::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
+    std::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
                    forward_path_[i].as_string());
     std::string const tls_info = sock_.tls_info();
     if (tls_info.length()) {
-      fmt::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
+      std::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
     }
-    fmt::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
+    std::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
                    msg.when().as_string_view());
   }
 
-  return fmt::to_string(headers);
+  return headers;
 }
 
 namespace {
@@ -772,8 +769,15 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
     LOG(INFO) << "not ham since fcrdns not allowed";
   }
 
-  if (!why_ham.empty())
-    return {SpamStatus::ham, fmt::format("{}", fmt::join(why_ham, ", and "))};
+  if (!why_ham.empty()) {
+    std::string whys;
+    auto why = why_ham.begin();
+    std::format_to(std::back_inserter(whys), "{}", *why);
+    while (++why != why_ham.end()) {
+      std::format_to(std::back_inserter(whys), ", and {}", *why);
+    }
+    return {SpamStatus::ham, whys};
+  }
 
   return {SpamStatus::spam, "it's not ham"};
 }
