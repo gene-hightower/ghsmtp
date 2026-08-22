@@ -125,9 +125,6 @@ DEFINE_string(dkim_key_file, "", "DKIM key file");
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <boost/iostreams/device/mapped_file.hpp>
@@ -1278,20 +1275,20 @@ auto create_eml(Domain const&               sender,
   auto const date{Now{}};
   auto const pill{Pill{}};
 
-  auto mid_str = fmt::format("<{}.{}@{}>", date.sec(), pill.as_string_view(),
+  auto mid_str = std::format("<{}.{}@{}>", date.sec(), pill.as_string_view(),
                              sender.ascii());
   eml.add_hdr("Message-ID", mid_str.c_str());
   eml.add_hdr("Date", date.c_str());
 
   if (!FLAGS_from_name.empty())
-    eml.add_hdr("From", fmt::format("{} <{}>", FLAGS_from_name, from));
+    eml.add_hdr("From", std::format("{} <{}>", FLAGS_from_name, from));
   else
     eml.add_hdr("From", from);
 
   eml.add_hdr("Subject", FLAGS_subject);
 
   if (!FLAGS_to_name.empty())
-    eml.add_hdr("To", fmt::format("{} <{}>", FLAGS_to_name, to));
+    eml.add_hdr("To", std::format("{} <{}>", FLAGS_to_name, to));
   else
     eml.add_hdr("To", to);
 
@@ -1373,7 +1370,7 @@ void do_auth(Input& in, RFC5321::Connection& cnn)
   if (std::find(cbegin(auth->second), cend(auth->second), "PLAIN") !=
       cend(auth->second)) {
     LOG(INFO) << "C: AUTH PLAIN";
-    auto const tok = fmt::format("\0{}\0{}", FLAGS_username, FLAGS_password);
+    auto const tok = std::format("\0{}\0{}", FLAGS_username, FLAGS_password);
     cnn.sock.out() << "AUTH PLAIN " << Base64::enc(tok) << "\r\n" << std::flush;
     CHECK((parse<RFC5321::reply_lines, RFC5321::action>(in, cnn)));
     if (cnn.reply_code != "235") {
@@ -1499,7 +1496,7 @@ bool snd(fs::path                    config_path,
     LOG(INFO) << "C: EHLO " << FLAGS_client_id;
 
     if (FLAGS_slow_strangle) {
-      auto ehlo_str = fmt::format("EHLO {}\r\n", FLAGS_client_id);
+      auto ehlo_str = std::format("EHLO {}\r\n", FLAGS_client_id);
       for (auto ch : ehlo_str) {
         cnn.sock.out() << ch << std::flush;
         sleep(1);
@@ -2029,7 +2026,7 @@ bool snd(fs::path                    config_path,
 DNS::RR_collection
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
-  auto const tlsa = fmt::format("_{}._tcp.{}", port, domain.ascii());
+  auto const tlsa = std::format("_{}._tcp.{}", port, domain.ascii());
 
   DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
