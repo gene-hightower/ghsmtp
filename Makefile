@@ -1,4 +1,4 @@
-USES := ldns libglog libidn2 opendkim openssl libseccomp
+USES := ldns libglog libidn2 opendkim openssl
 
 CXXFLAGS += -IPEGTL/include -DGLOG_USE_GLOG_EXPORT
 
@@ -15,7 +15,7 @@ LDLIBS += \
 	-lspf2 \
 	-lunistring
 
-PROGRAMS := dns_tool smtp msg sasl snd socks5
+PROGRAMS := dns_tool smtp msg snd
 
 DNS := DNS DNS-rrs DNS-fcrdns DNS-message
 
