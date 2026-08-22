@@ -6,9 +6,6 @@
 #include "esc.hpp"
 #include "osutil.hpp"
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include <gflags/gflags.h>
 
 #include <glog/logging.h>
@@ -81,34 +78,32 @@ int main(int argc, char* argv[])
 
   auto const date{Now{}};
   auto const pill{Pill{}};
-  auto const mid_str = fmt::format("<{}.{}@{}>", date.sec(),
+  auto const mid_str = std::format("<{}.{}@{}>", date.sec(),
                                    pill.as_string_view(), server_identity);
 
-  fmt::memory_buffer bfr;
-  fmt::format_to(std::back_inserter(bfr), "Message-ID: {}\r\n",
+  std::string msg;
+  std::format_to(std::back_inserter(msg), "Message-ID: {}\r\n",
                  mid_str.c_str());
-  fmt::format_to(std::back_inserter(bfr),
+  std::format_to(std::back_inserter(msg),
                  "From: \"Gene (more \\) comments) Hightower\" <{}>\r\n",
                  from.as_string(Mailbox::domain_encoding::utf8));
-  fmt::format_to(std::back_inserter(bfr), "To: \"Gene Hightower\" <{}>\r\n",
+  std::format_to(std::back_inserter(msg), "To: \"Gene Hightower\" <{}>\r\n",
                  to.as_string(Mailbox::domain_encoding::utf8));
-  fmt::format_to(std::back_inserter(bfr),
+  std::format_to(std::back_inserter(msg),
                  "Subject: Testing, one, two, three.\r\n");
-  fmt::format_to(std::back_inserter(bfr), "Date: {}\r\n", date.c_str());
-  fmt::format_to(std::back_inserter(bfr),
+  std::format_to(std::back_inserter(msg), "Date: {}\r\n", date.c_str());
+  std::format_to(std::back_inserter(msg),
                  "Authentication-Results: {}; none\r\n", server_identity);
-  fmt::format_to(std::back_inserter(bfr), "MIME-Version: 1.0\r\n");
-  fmt::format_to(std::back_inserter(bfr),
+  std::format_to(std::back_inserter(msg), "MIME-Version: 1.0\r\n");
+  std::format_to(std::back_inserter(msg),
                  "Content-Type: text/plain; charset=utf-8\r\n");
 
-  fmt::format_to(std::back_inserter(bfr), "\r\n");
+  std::format_to(std::back_inserter(msg), "\r\n");
 
-  fmt::format_to(std::back_inserter(bfr), "This is the body of the email.\r\n");
-  auto const msg_str = fmt::to_string(bfr);
+  std::format_to(std::back_inserter(msg), "This is the body of the email.\r\n");
 
-#if 0
   message::parsed msg;
-  bool const      message_parsed = msg.parse(msg_str);
+  bool const      message_parsed = msg.parse(msg);
 
   if (message_parsed) {
     LOG(INFO) << "message parsed";
@@ -188,7 +183,6 @@ int main(int argc, char* argv[])
     }
     return 0;
   }
-#endif
 
   for (int a = 1; a < argc; ++a) {
     if (!fs::exists(argv[a]))

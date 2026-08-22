@@ -9,8 +9,6 @@
 #include <string>
 #include <unordered_map>
 
-#include <fmt/format.h>
-
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -224,7 +222,7 @@ int main()
     LOG(INFO) << m.first;
   }
 
-  auto const tok{fmt::format(std::string_view("\0{}\0{}", 6), test::username, test::password)};
+  auto const tok{std::format(std::string_view("\0{}\0{}", 6), test::username, test::password)};
   auto const init{Base64::enc(tok)};
 
   if (ctx.mechs.find("PLAIN") != end(ctx.mechs)) {

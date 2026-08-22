@@ -5,8 +5,6 @@
 #include <fstream>
 #include <iostream>
 
-#include <fmt/format.h>
-
 #include <glog/logging.h>
 
 int main(int argc, char* argv[])
@@ -37,7 +35,7 @@ int main(int argc, char* argv[])
   iostream.clear(); // unset eof bit, if set will short-circut flush
   iostream << std::flush;
 
-  auto const diff_cmd{fmt::format("diff {} {}", infile, outfile)};
+  auto const diff_cmd{std::format("diff {} {}", infile, outfile)};
   CHECK_EQ(system(diff_cmd.c_str()), 0);
 
   PCHECK(!unlink(outfile)) << "unlink failed for " << outfile;

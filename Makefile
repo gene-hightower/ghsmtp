@@ -7,7 +7,6 @@ LDLIBS += \
 	-lboost_iostreams \
 	-lboost_system \
 	-lcdb \
-	-lfmt \
 	-lgflags \
 	-lmagic \
 	-lopendmarc \
@@ -17,12 +16,6 @@ LDLIBS += \
 	-lunistring
 
 PROGRAMS := dns_tool smtp msg sasl snd socks5
-
-arcsign_STEMS := arcsign \
-	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
-
-arcverify_STEMS := arcverify \
-	message Domain IP IP4 IP6 Mailbox OpenARC OpenDKIM OpenDMARC Pill Reply osutil esc
 
 DNS := DNS DNS-rrs DNS-fcrdns DNS-message
 
@@ -305,7 +298,7 @@ show::
 
 init::
 	touch accept_domains bad_recipients bad_recipients_data bad_senders block ip-block temp_fail
-	sudo dnf install boost-devel file-devel fmt-devel glog-devel ldns-devel libidn2-devel tinycdb-devel libunistring-devel
+	sudo dnf install boost-devel file-devel glog-devel ldns-devel libidn2-devel tinycdb-devel libunistring-devel
 
 .PHONY:: list
 list:

@@ -6,9 +6,6 @@
 
 #include <glog/logging.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 void check_mbx(std::string_view mbx)
 {
   if (!Mailbox::validate(mbx))

@@ -13,9 +13,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#define FMT_STRING_ALIAS 1
-#include <fmt/format.h>
-
 #include "DNS.hpp"
 #include "POSIX.hpp"
 #include "osutil.hpp"
@@ -283,8 +280,8 @@ bool TLS::tls_client(fs::path                  config_path,
         else if (gen->type == GEN_IPADD) {
           unsigned char* p = gen->d.ip->data;
           if (gen->d.ip->length == 4) {
-            auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
-                                        p[1], p[2], p[3]);
+            auto const ip =
+                std::format("{:d}.{:d}.{:d}.{:d}", p[0], p[1], p[2], p[3]);
             if (log_cert_info)
               LOG(INFO) << "alt name IP4 address " << ip;
           }
@@ -368,8 +365,8 @@ bool TLS::tls_client(fs::path                  config_path,
     if (std::holds_alternative<DNS::RR_TLSA>(tlsa_rr)) {
       auto const rp   = std::get<DNS::RR_TLSA>(tlsa_rr);
       auto       data = rp.assoc_data();
-      auto       rc   = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
-                                          rp.matching_type(), data.data(), data.size());
+      auto rc = SSL_dane_tlsa_add(ssl_, rp.cert_usage(), rp.selector(),
+                                  rp.matching_type(), data.data(), data.size());
 
       if (rc < 0) {
         auto const cp = bin2hexstring(data);
@@ -642,8 +639,8 @@ bool TLS::tls_server(fs::path                  config_path,
       else if (gen->type == GEN_IPADD) {
         unsigned char* p = gen->d.ip->data;
         if (gen->d.ip->length == 4) {
-          auto const ip = fmt::format(FMT_STRING("{:d}.{:d}.{:d}.{:d}"), p[0],
-                                      p[1], p[2], p[3]);
+          auto const ip =
+              std::format("{:d}.{:d}.{:d}.{:d}", p[0], p[1], p[2], p[3]);
           // LOG(INFO) << "alt name IP4 address " << ip;
           names.emplace_back(ip);
         }
@@ -773,7 +770,7 @@ std::string TLS::info() const
   if (c) {
     int alg_bits;
     int bits = SSL_CIPHER_get_bits(c, &alg_bits);
-    return fmt::format("version={} cipher={} bits={}/{}{}",
+    return std::format("version={} cipher={} bits={}/{}{}",
                        SSL_CIPHER_get_version(c), SSL_CIPHER_get_name(c), bits,
                        alg_bits, (verified_ ? " verified" : ""));
   }

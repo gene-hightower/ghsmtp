@@ -13,9 +13,6 @@ DEFINE_bool(selftest, false, "run a self test");
 
 #include <glog/logging.h>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
 
@@ -855,7 +852,7 @@ struct action<optional_field> {
       }
       else {
         auto const err =
-            fmt::format("syntax error in: \"{}\"", esc(in.string()));
+            std::format("syntax error in: \"{}\"", esc(in.string()));
         ctx.msg_errors.push_back(err);
         LOG(ERROR) << err;
       }
@@ -918,14 +915,14 @@ struct action<from> {
   static void apply(const Input& in, Ctx& ctx)
   {
     if (!ctx.from_list.empty()) {
-      fmt::memory_buffer msg;
-      fmt::format_to(std::back_inserter(msg),
+      std::string msg;
+      std::format_to(std::back_inserter(msg),
                      "multiple 'From:' address headers, previous:\n");
       for (auto const& add : ctx.from_list) {
-        fmt::format_to(std::back_inserter(msg), " {}\n", add.as_string());
+        std::format_to(std::back_inserter(msg), " {}\n", add.as_string());
       }
-      fmt::format_to(std::back_inserter(msg), "new: {}", in.string());
-      ctx.msg_errors.push_back(fmt::to_string(msg));
+      std::format_to(std::back_inserter(msg), "new: {}", in.string());
+      ctx.msg_errors.push_back(msg);
     }
 
     header(in, ctx);
@@ -941,7 +938,7 @@ struct action<sender> {
   {
     if (!ctx.sender.empty()) {
       auto const err =
-          fmt::format("multiple 'Sender:' headers, previous: {}, this: {}",
+          std::format("multiple 'Sender:' headers, previous: {}, this: {}",
                       static_cast<std::string>(ctx.sender), in.string());
       ctx.msg_errors.push_back(err);
     }

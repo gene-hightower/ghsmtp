@@ -13,8 +13,6 @@
 
 #include <experimental/iterator>
 
-#include <fmt/format.h>
-
 void check_dnsrbl(DNS::Resolver& res, char const* a)
 {
   char const* rbls[]{
@@ -61,7 +59,7 @@ void check_uribls(DNS::Resolver& res, char const* dom)
   };
 
   for (auto uribl : uribls) {
-    auto const lookup = fmt::format("{}.{}", dom, uribl);
+    auto const lookup = std::format("{}.{}", dom, uribl);
     auto       as     = DNS::get_strings(res, DNS::RR_type::A, lookup);
     if (!as.empty()) {
       if (as.front() == "127.255.255.252") {
@@ -124,7 +122,7 @@ void do_addr(DNS::Resolver& res, char const* a)
 DNS::RR_collection
 get_tlsa_rrs(DNS::Resolver& res, Domain const& domain, uint16_t port)
 {
-  auto const tlsa = fmt::format("_{}._tcp.{}", port, domain.ascii());
+  auto const tlsa = std::format("_{}._tcp.{}", port, domain.ascii());
 
   DNS::Query q(res, DNS::RR_type::TLSA, tlsa);
 
