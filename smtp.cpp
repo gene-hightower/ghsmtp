@@ -85,7 +85,7 @@ std::string exit_as_text(int ret)
   case EXIT_TIME_OUT:          return "TIME_OUT";
   case EXIT_TOO_MANY_BAD_CMDS: return "TOO_MANY_BAD_CMDS";
   } // clang-format on
-  return fmt::format("{}", ret);
+  return std::format("{}", ret);
 }
 
 [[noreturn]] void smtp_exit(int ret)
@@ -1158,7 +1158,7 @@ void log_stats()
   for (auto const& [addr, conn] : connections) {
     std::string report;
 
-    fmt::format_to(std::back_inserter(report),
+    std::format_to(std::back_inserter(report),
                    "\n==== {:15} ===="
                    "\n  current: {}"
                    "\n    total: {}"
@@ -1170,14 +1170,14 @@ void log_stats()
       CHECK_EQ(strftime(time_buf, sizeof time_buf, "%FT%TZ",
                         gmtime(&conn.tainted_at)),
                sizeof(time_buf) - 1);
-      fmt::format_to(std::back_inserter(report), "\n  tainted at {}", time_buf);
+      std::format_to(std::back_inserter(report), "\n  tainted at {}", time_buf);
     }
     for (auto rate_num = 0uz; rate_num < std::size(conn.rates); ++rate_num) {
       CHECK_EQ(strftime(time_buf, sizeof time_buf, "%FT%TZ",
                         gmtime(&conn.rates[rate_num].start)),
                sizeof(time_buf) - 1);
 
-      fmt::format_to(std::back_inserter(report),
+      std::format_to(std::back_inserter(report),
                      "\n---- {} sec window ----"
                      "\n    count: {}"
                      "\n    limit: {}"
@@ -1185,7 +1185,7 @@ void log_stats()
                      rate_counters[rate_num].window, conn.rates[rate_num].count,
                      rate_counters[rate_num].limit, time_buf);
     }
-    fmt::format_to(std::back_inserter(report),
+    std::format_to(std::back_inserter(report),
                    "\n==============================");
     LOG(INFO) << report;
   }
@@ -1399,10 +1399,10 @@ int server()
         else if (!limited && ++rate.count >= rate_counters[rate_num].limit) {
           connection.last_rejected = now;
           std::string msg =
-              fmt::format("Too many connections {} within {} seconds.",
+              std::format("Too many connections {} within {} seconds.",
                           rate.count, rate_counters[rate_num].window);
           std::string error_str =
-              fmt::format("421 4.3.0 {} Try again later.\r\n", msg);
+              std::format("421 4.3.0 {} Try again later.\r\n", msg);
           (void)write(accepted_fd, error_str.data(), error_str.size());
           PCHECK(close(accepted_fd) == 0);
           LOG(INFO) << msg;
@@ -1437,7 +1437,7 @@ int server()
 
       if (pid > 0) { // parent
         servers[pid] = srv;
-        LOG(INFO) << fmt::format("pid == {} for {:15}", pid, srv.remote_string);
+        LOG(INFO) << std::format("pid == {} for {:15}", pid, srv.remote_string);
         PCHECK(close(accepted_fd) == 0); // We passed this to our child.
         continue;                        // Check next srv…
       }
