@@ -41,7 +41,8 @@ zAqCkc3OyX3Pjsm1Wn+IpGtNtahR9EGC4caKAH5eZV9q//////////8CAQI=
 
 // convert binary input into a std::string of hex digits
 
-auto bin2hexstring(std::span<unsigned char const> const data) -> std::string
+template <typename ConstBufferSequence>
+auto constexpr bin2hexstring(ConstBufferSequence const& data)
 {
   std::string ret;
   ret.reserve(2 * data.size());
@@ -475,7 +476,7 @@ bool TLS::tls_client(fs::path                  config_path,
       if (log_cert_info)
         LOG(INFO) << "DANE TLSA " << unsigned(usage) << " "
                   << unsigned(selector) << " " << unsigned(mtype) << " ["
-                  << bin2hexstring({certdata, 6}) << "...] "
+                  << bin2hexstring(std::span(certdata, 6)) << "...] "
                   << ((mspki != nullptr) ? "TA public key verified certificate"
                       : depth            ? "matched TA certificate"
                                          : "matched EE certificate")
@@ -743,7 +744,7 @@ bool TLS::tls_server(fs::path                  config_path,
                            &certdata_len);
 
         LOG(INFO) << "DANE TLSA " << usage << " " << selector << " " << mtype
-                  << " [" << bin2hexstring({certdata, 6}) << "...] "
+                  << " [" << bin2hexstring(std::span(certdata, 6)) << "...] "
                   << ((mspki != nullptr) ? "TA public key verified certificate"
                       : depth            ? "matched TA certificate"
                                          : "matched EE certificate")
