@@ -1191,7 +1191,7 @@ void log_stats()
 
 int server()
 {
-  // LOG(INFO) << "running server";
+  LOG(INFO) << "running server pid == " << getpid();
 
   CDB ip_block;
   if (!ip_block.open(osutil::get_config_dir() / "ip-block")) {
@@ -1296,6 +1296,34 @@ int server()
   if (maxsock < 0) {
     LOG(INFO) << "no sockets to listen on";
     return 0;
+  }
+
+  // Drop root
+  uid_t ruid, euid, suid;
+  PCHECK(getresuid(&ruid, &euid, &suid) == 0);
+
+  // gid_t rgid, egid, sgid;
+  // PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
+
+  if (ruid == 0) {
+    // run by root, ensure groups vector gets trashed
+    gid_t gid = getgid();
+    setgroups(1, &gid);
+  }
+
+  char const* user = getenv("USER");
+  if (user == nullptr)
+    user = "gene";
+  struct passwd* pwd = getpwnam(user);
+  PCHECK(pwd != nullptr) << "no such user " << user;
+
+  if (pwd->pw_uid != euid) {
+    LOG(INFO) << "switching to user " << pwd->pw_name
+              << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid
+              << " pid == " << getpid();
+
+    PCHECK(setgid(pwd->pw_gid) == 0) << "setgid(" << pwd->pw_gid << ")";
+    PCHECK(setuid(pwd->pw_uid) == 0) << "setuid(" << pwd->pw_uid << ")";
   }
 
   while (!sig_quit) {
@@ -1440,33 +1468,6 @@ int server()
 
       CHECK_EQ(pid, 0); // child
       PCHECK(setsid() != -1);
-
-      // Drop root
-      uid_t ruid, euid, suid;
-      PCHECK(getresuid(&ruid, &euid, &suid) == 0);
-
-      // gid_t rgid, egid, sgid;
-      // PCHECK(getresgid(&rgid, &egid, &sgid) == 0);
-
-      if (ruid == 0) {
-        // run by root, ensure groups vector gets trashed
-        gid_t gid = getgid();
-        setgroups(1, &gid);
-      }
-
-      char const* user = getenv("USER");
-      if (user == nullptr)
-        user = "gene";
-      struct passwd* pwd = getpwnam(user);
-      PCHECK(pwd != nullptr) << "no such user " << user;
-
-      if (pwd->pw_uid != euid) {
-        // LOG(INFO) << "switching to user " << pwd->pw_name
-        // << " uid == " << pwd->pw_uid << " gid == " << pwd->pw_gid;
-
-        PCHECK(setgid(pwd->pw_gid) == 0) << "setgid(" << pwd->pw_gid << ")";
-        PCHECK(setuid(pwd->pw_uid) == 0) << "setuid(" << pwd->pw_uid << ")";
-      }
 
       // We can leave STDERR_FILENO alone.
       if (accepted_fd != STDIN_FILENO) {
