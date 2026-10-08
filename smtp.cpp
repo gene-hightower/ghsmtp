@@ -41,10 +41,6 @@ constexpr auto smtp_max_str_length =
 #include <memory>
 #include <stdexcept>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <fmt/ranges.h>
-
 #include <tao/pegtl.hpp>
 
 // Process exit codes, the EXIT_BAD_xxx codes taint the sender.
