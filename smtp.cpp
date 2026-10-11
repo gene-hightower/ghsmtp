@@ -1071,8 +1071,8 @@ void sigchild(int signum)
       break;
 
     try {
-      auto  srv        = servers.at(pid);
-      auto& connection = connections[srv.remote_string];
+      auto const& srv        = servers.at(pid);
+      auto&       connection = connections[srv.remote_string];
 
       // srv.service_ptr
       if (WIFEXITED(status)) {
@@ -1393,7 +1393,7 @@ int server()
       ++connection.attempts;
 
       if (connection.tainted) {
-        connection.last_rejected = time(nullptr);
+        connection.last_rejected = now;
         char const msg[]         = "550 5.7.1 sender blocked\r\n";
         (void)write(accepted_fd, msg, sizeof(msg));
         PCHECK(close(accepted_fd) == 0);
@@ -1403,7 +1403,7 @@ int server()
 
       if (ip_block.is_open() && ip_block.contains(srv.remote_string.c_str())) {
         connection.tainted    = true;
-        connection.tainted_at = time(nullptr);
+        connection.tainted_at = now;
         char const msg[]      = "554 5.7.1 sender IP on static block list\r\n";
         (void)write(accepted_fd, msg, sizeof(msg));
         PCHECK(close(accepted_fd) == 0);
@@ -1440,13 +1440,14 @@ int server()
 
       if (++connection.ncurrent >= max_connections) {
         connection.ncurrent--;
-        connection.last_rejected = time(nullptr);
-        char const msg[] =
-            "421 4.3.0 Too many concurrent connections, try again later.\r\n";
-        (void)write(accepted_fd, msg, sizeof(msg));
+        connection.last_rejected = now;
+        std::string msg =
+            std::format("Too many connections from {}.", srv.remote_string);
+        std::string error_str =
+            std::format("421 4.3.0 {} Try again later.\r\n", msg);
+        (void)write(accepted_fd, error_str.data(), error_str.size());
         PCHECK(close(accepted_fd) == 0);
-        LOG(INFO) << "too many concurrent connections from "
-                  << srv.remote_string;
+        LOG(INFO) << msg;
         continue;
       }
 
