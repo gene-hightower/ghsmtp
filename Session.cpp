@@ -538,9 +538,9 @@ bool Session::mail_from(Mailbox&& reverse_path, parameters_t const& parameters)
 
   std::string params;
   for (auto const& [name, value] : parameters) {
-    std::format_to(std::back_inserter(params), " {}", name);
+    params.append(std::format(" {}", name));
     if (!value.empty()) {
-      std::format_to(std::back_inserter(params), "={}", value);
+      params.append(std::format("={}", value));
     }
   }
   LOG(INFO) << "MAIL FROM:<" << reverse_path_ << ">" << params;
@@ -653,14 +653,15 @@ std::string Session::added_headers_(MessageStore const& msg)
   }()};
 
   std::string headers;
+  headers.reserve(2048);
 
   // Return-Path:
-  std::format_to(std::back_inserter(headers), "Return-Path: <{}>\r\n",
-                 reverse_path_.as_string());
+  headers.append(
+      std::format("Return-Path: <{}>\r\n", reverse_path_.as_string()));
 
   // Received-SPF:
   if (!spf_received_.empty()) {
-    std::format_to(std::back_inserter(headers), "{}\r\n", spf_received_);
+    headers.append(std::format("{}\r\n", spf_received_));
   }
 
   // Received: header(s)
@@ -675,22 +676,19 @@ std::string Session::added_headers_(MessageStore const& msg)
   // Received: header for each item in forward_path_.
 
   for (auto i = 0u; i < forward_path_.size(); ++i) {
-    std::format_to(std::back_inserter(headers), "Received: from {}",
-                   client_identity_.ascii());
+    headers.append(std::format("Received: from {}", client_identity_.ascii()));
     if (sock_.has_peername()) {
-      std::format_to(std::back_inserter(headers), " ({})", client_);
+      headers.append(std::format(" ({})", client_));
     }
-    std::format_to(std::back_inserter(headers), "\r\n\tby {} with {} id {}",
-                   server_identity_.ascii(), protocol,
-                   msg.id().as_string_view());
-    std::format_to(std::back_inserter(headers), "\r\n\tfor <{}>",
-                   forward_path_[i].as_string());
+    headers.append(std::format("\r\n\tby {} with {} id {}",
+                               server_identity_.ascii(), protocol,
+                               msg.id().as_string_view()));
+    headers.append(std::format("\r\n\tfor <{}>", forward_path_[i].as_string()));
     std::string const tls_info = sock_.tls_info();
     if (tls_info.length()) {
-      std::format_to(std::back_inserter(headers), "\r\n\t({})", tls_info);
+      headers.append(std::format("\r\n\t({})", tls_info));
     }
-    std::format_to(std::back_inserter(headers), ";\r\n\t{}\r\n",
-                   msg.when().as_string_view());
+    headers.append(std::format(";\r\n\t{}\r\n", msg.when().as_string_view()));
   }
 
   return headers;
@@ -771,10 +769,10 @@ std::tuple<Session::SpamStatus, std::string> Session::spam_status_()
 
   if (!why_ham.empty()) {
     std::string whys;
-    auto why = why_ham.begin();
-    std::format_to(std::back_inserter(whys), "{}", *why);
+    auto        why = why_ham.begin();
+    whys.append(std::format("{}", *why));
     while (++why != why_ham.end()) {
-      std::format_to(std::back_inserter(whys), ", and {}", *why);
+      whys.append(std::format(", and {}", *why));
     }
     return {SpamStatus::ham, whys};
   }
