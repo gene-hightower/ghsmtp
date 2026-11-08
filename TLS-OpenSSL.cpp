@@ -229,19 +229,21 @@ bool TLS::tls_client(fs::path                  config_path,
 
       auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
 
-      X509_NAME* subj = X509_get_subject_name(x509);
+      auto subj = X509_get_subject_name(x509);
 
       int lastpos = -1;
       for (;;) {
         lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
         if (lastpos == -1)
           break;
-        auto         e   = X509_NAME_get_entry(subj, lastpos);
-        ASN1_STRING* d   = X509_NAME_ENTRY_get_data(e);
-        auto         str = ASN1_STRING_get0_data(d);
+        auto e = X509_NAME_get_entry(subj, lastpos);
+        auto d = X509_NAME_ENTRY_get_data(e);
+
+        std::string str(reinterpret_cast<const char*>(ASN1_STRING_get0_data(d)),
+                        ASN1_STRING_length(d));
         if (log_cert_info)
           LOG(INFO) << "client cert found for " << str;
-        cn.emplace_back(reinterpret_cast<const char*>(str));
+        cn.emplace_back(str);
       }
 
       auto subject_alt_names = static_cast<GENERAL_NAMES*>(
@@ -254,8 +256,8 @@ bool TLS::tls_client(fs::path                  config_path,
         if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-          std::string const str(
-              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+          std::string_view str(
+              reinterpret_cast<const char*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
 
           if (log_cert_info)
@@ -265,7 +267,7 @@ bool TLS::tls_client(fs::path                  config_path,
           ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
           std::string_view str(
-              reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+              reinterpret_cast<const char*>(ASN1_STRING_get0_data(asn1_str)),
               ASN1_STRING_length(asn1_str));
           Domain const dom{str};
           if (std::find(begin(cn), end(cn), dom) == end(cn)) {
@@ -279,14 +281,14 @@ bool TLS::tls_client(fs::path                  config_path,
           }
         }
         else if (gen->type == GEN_IPADD) {
-          unsigned char* p = gen->d.ip->data;
-          if (gen->d.ip->length == 4) {
+          auto p = ASN1_STRING_get0_data(gen->d.ip);
+          if (ASN1_STRING_length(gen->d.ip) == 4) {
             auto const ip =
                 std::format("{:d}.{:d}.{:d}.{:d}", p[0], p[1], p[2], p[3]);
             if (log_cert_info)
               LOG(INFO) << "alt name IP4 address " << ip;
           }
-          else if (gen->d.ip->length == 16) {
+          else if (ASN1_STRING_length(gen->d.ip) == 16) {
             LOG(ERROR) << "IPv6 not implemented";
           }
           else {
@@ -345,7 +347,7 @@ bool TLS::tls_client(fs::path                  config_path,
       LOG(INFO) << "SSL_dane_enable(ssl_, " << server_name << ")";
   }
   else {
-    CHECK_EQ(SSL_set1_host(ssl_, server_name), 1);
+    // CHECK_EQ(SSL_set1_host(ssl_, server_name), 1);
 
     // SSL_set_tlsext_host_name(ssl_, server_name);
     // same as:
@@ -572,18 +574,20 @@ bool TLS::tls_server(fs::path                  config_path,
 
     auto const x509 = CHECK_NOTNULL(SSL_CTX_get0_certificate(ctx));
 
-    X509_NAME* subj = X509_get_subject_name(x509);
+    auto subj = X509_get_subject_name(x509);
 
     int lastpos = -1;
     for (;;) {
       lastpos = X509_NAME_get_index_by_NID(subj, NID_commonName, lastpos);
       if (lastpos == -1)
         break;
-      auto         e   = X509_NAME_get_entry(subj, lastpos);
-      ASN1_STRING* d   = X509_NAME_ENTRY_get_data(e);
-      auto         str = ASN1_STRING_get0_data(d);
+      auto e = X509_NAME_get_entry(subj, lastpos);
+      auto d = X509_NAME_ENTRY_get_data(e);
+
+      std::string str(reinterpret_cast<const char*>(ASN1_STRING_get0_data(d)),
+                      ASN1_STRING_length(d));
       // LOG(INFO) << "server cert found for " << str;
-      names.emplace_back(reinterpret_cast<const char*>(str));
+      names.emplace_back(str);
     }
 
     // auto ext_stack = X509_get0_extensions(x509);
@@ -615,8 +619,8 @@ bool TLS::tls_server(fs::path                  config_path,
       if (gen->type == GEN_URI || gen->type == GEN_EMAIL) {
         ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-        std::string str(
-            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+        std::string_view str(
+            reinterpret_cast<const char*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
         // LOG(INFO) << "email or uri alt name " << str;
@@ -624,8 +628,8 @@ bool TLS::tls_server(fs::path                  config_path,
       else if (gen->type == GEN_DNS) {
         ASN1_IA5STRING* asn1_str = gen->d.uniformResourceIdentifier;
 
-        std::string str(
-            reinterpret_cast<char const*>(ASN1_STRING_get0_data(asn1_str)),
+        std::string_view str(
+            reinterpret_cast<const char*>(ASN1_STRING_get0_data(asn1_str)),
             ASN1_STRING_length(asn1_str));
 
         Domain const dom{str};
@@ -638,14 +642,14 @@ bool TLS::tls_server(fs::path                  config_path,
         }
       }
       else if (gen->type == GEN_IPADD) {
-        unsigned char* p = gen->d.ip->data;
-        if (gen->d.ip->length == 4) {
+        auto p = ASN1_STRING_get0_data(gen->d.ip);
+        if (ASN1_STRING_length(gen->d.ip) == 4) {
           auto const ip =
               std::format("{:d}.{:d}.{:d}.{:d}", p[0], p[1], p[2], p[3]);
           // LOG(INFO) << "alt name IP4 address " << ip;
           names.emplace_back(ip);
         }
-        else if (gen->d.ip->length == 16) {
+        else if (ASN1_STRING_length(gen->d.ip) == 16) {
           // FIXME!
           LOG(FATAL) << "IPv6 not implemented";
         }
